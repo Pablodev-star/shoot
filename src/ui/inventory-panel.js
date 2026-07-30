@@ -1,36 +1,52 @@
 /**
- * SHOOT! — Inventory overlay (Block 4).
+ * SHOOT! — Inventory overlay.
  *
  * One component, three contexts:
  *   'walk'  — eat, heal, read the Map, sell anything
- *   'shop'  — selling is emphasised (you are standing at a counter)
+ *   'shop'  — the same, with selling to hand
  *   'duel'  — only duel-legal items are actionable
  *
- * Opening it never breaks the flow: the caller passes `onOpen`/`onClose` hooks
- * so the walk engine can pause and resume around it.
+ * Design notes:
+ *  - Filter tabs, because by world 3 the bag is a wall of icons.
+ *  - The detail pane always says what the selected item will do and what it is
+ *    worth, so nothing has to be remembered.
+ *  - Items that cannot be used right now explain why instead of going grey.
+ *  - Opening it never breaks the flow: the caller pauses and resumes around it.
  */
 
-import { el, clearNode } from '../core/dom.js';
+import { el, clearNode, appendAll } from '../core/dom.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { framedIconURL } from '../art/sprites-items.js';
 import { getInventory, sellItem, useItem, getState } from '../game/player.js';
 import { sellPrice } from '../game/progression.js';
 import { EVENTS, on } from '../core/events.js';
-import { toast } from '../ui/toast.js';
-import { rarityChip } from './widgets.js';
+import { toast } from './toast.js';
+import { rarityChip, emptyState, icon } from './widgets.js';
+
+const FILTERS = [
+  { id: 'all', label: 'All', match: () => true },
+  { id: 'food', label: 'Food', match: (item) => !!item.food },
+  { id: 'heal', label: 'Healing', match: (item) => !!item.heal },
+  { id: 'duel', label: 'Duel', match: (item) => item.context === 'duel' },
+  { id: 'gear', label: 'Gear', match: (item) => item.context === 'passive' || item.context === 'special' },
+];
 
 /**
  * @param {object} opts
  * @param {'walk'|'shop'|'duel'} opts.context
+ * @param {() => object} [opts.useOpts] extra options passed to useItem
+ * @param {(id: string) => boolean} [opts.canUse]
  * @param {(itemId: string, result: object) => void} [opts.onUse]
+ * @param {() => void} [opts.onOpen]
  * @param {() => void} [opts.onClose]
- * @param {(id: string) => boolean} [opts.canUse] extra gate (duel screen uses it)
  */
 export function openInventory(opts = {}) {
   const context = opts.context || 'walk';
-  const grid = el('div.inv-grid');
+  const grid = el('div.inv-grid', { role: 'listbox', 'aria-label': 'Saddlebag' });
   const detail = el('div.inv-detail');
-  let selected = null;
+  const tabsBar = el('div.tabs', { role: 'tablist' });
+  let selectedId = null;
+  let filter = 'all';
 
   const backdrop = el('div.modal-backdrop', {
     onclick: (e) => {
@@ -39,55 +55,94 @@ export function openInventory(opts = {}) {
   });
 
   function close() {
-    unsub();
+    unsubInv();
+    document.removeEventListener('keydown', onKey);
     backdrop.remove();
     if (opts.onClose) opts.onClose();
   }
 
+  const onKey = (e) => {
+    if (e.key === 'Escape' || e.key === 'i' || e.key === 'I') close();
+  };
+  document.addEventListener('keydown', onKey);
+
+  /** Why an item cannot be used right now — or null when it can. */
+  function blockedReason(item) {
+    if (item.context === 'passive') return 'Works on its own while you carry it';
+    if (item.context === 'special') return 'Already in use';
+    if (item.context === 'duel' && context !== 'duel') return 'Only in a duel';
+    if (opts.canUse && !opts.canUse(item.id)) return 'Not usable here';
+    return null;
+  }
+
+  function actionLabel(item) {
+    if (item.food) return 'Eat';
+    if (item.heal) return 'Use';
+    if (item.context === 'utility') return 'Read';
+    return 'Throw';
+  }
+
+  function renderTabs() {
+    clearNode(tabsBar);
+    for (const f of FILTERS) {
+      tabsBar.append(
+        el('button.tab', {
+          role: 'tab',
+          'aria-selected': String(filter === f.id),
+          onclick: () => {
+            filter = f.id;
+            renderAll();
+          },
+          text: f.label,
+        }),
+      );
+    }
+  }
+
   function renderDetail() {
     clearNode(detail);
-    if (!selected) {
+    const entry = getInventory().find((e) => e.item.id === selectedId);
+
+    if (!entry) {
       detail.append(
-        el('p.muted.center', { text: 'Select an item to inspect, use or sell it.' }),
+        emptyState('Nothing selected', 'Pick something from the bag to see what it does.'),
       );
       return;
     }
-    const { item, qty } = selected;
-    const value = sellPrice(item, getState().world);
-    const usable =
-      (item.context === 'anytime' || (item.context === 'duel' && context === 'duel') ||
-        item.context === 'utility') &&
-      (!opts.canUse || opts.canUse(item.id));
 
-    detail.append(
+    const { item, qty } = entry;
+    const value = sellPrice(item, getState().world);
+    const blocked = blockedReason(item);
+
+    appendAll(detail, [
       el('div.inv-detail-head', {}, [
-        el('img.pixel', { src: framedIconURL(item.icon, item.rarity, 3), width: '60', height: '60' }),
+        el('img.pixel', {
+          src: framedIconURL(item.icon, item.rarity, 3),
+          width: '60',
+          height: '60',
+          alt: '',
+        }),
         el('div.col', { style: { gap: '4px' } }, [
           el('div.inv-name', { text: item.name }),
-          rarityChip(item.rarity),
+          el('div.row.row--tight', {}, [rarityChip(item.rarity), el('span.chip', { text: `x${qty}` })]),
         ]),
       ]),
       el('p.inv-desc', { text: item.desc }),
-      el('div.row', { style: { justifyContent: 'space-between' } }, [
-        el('span.muted', { text: `Owned: ${qty}` }),
-        el('span.muted', { text: `Sells for ${value}g` }),
+      blocked ? el('p.field-hint', { text: blocked }) : null,
+      el('div.inv-actions', {}, [
+        blocked
+          ? el('button.btn.btn--sm', { disabled: true }, [actionLabel(item)])
+          : el('button.btn.btn--sm.btn--gold', { onclick: () => doUse(item.id) }, [actionLabel(item)]),
+        el('button.btn.btn--sm.btn--danger', {
+          onclick: () => doSell(item.id),
+          'data-tip': 'Sell one for half its shop price',
+        }, ['Sell', icon('coin', 0.9), String(value)]),
       ]),
-      el('div.row', { style: { marginTop: '10px' } }, [
-        usable
-          ? el('button.btn.btn--small.btn--gold', { onclick: () => doUse(item.id) }, [
-              item.food ? 'Eat' : item.context === 'utility' ? 'Read' : 'Use',
-            ])
-          : el('button.btn.btn--small', { disabled: true }, [
-              item.context === 'passive' ? 'Passive' : item.context === 'special' ? 'Equipped' : 'Duel only',
-            ]),
-        el('button.btn.btn--small.btn--danger', { onclick: () => doSell(item.id) }, [`Sell ${value}g`]),
-      ]),
-    );
+    ]);
     attachButtonSounds(detail);
   }
 
   function doUse(id) {
-    // `useOpts` lets the duel screen hand over its own life counts.
     const result = useItem(id, { context, ...(opts.useOpts ? opts.useOpts() : {}) });
     if (!result.ok) {
       play('error');
@@ -96,75 +151,93 @@ export function openInventory(opts = {}) {
     }
     if (opts.onUse) opts.onUse(id, result);
     if (result.effect === 'food') toast('That hits the spot', 'good');
-    if (result.effect === 'heal') toast(`Restored ${result.amount} life`, 'good');
+    if (result.effect === 'heal') {
+      toast(`Restored ${result.amount} ${result.amount === 1 ? 'life' : 'lives'}`, 'good');
+    }
     if (context === 'duel') close();
     else renderAll();
   }
 
   function doSell(id) {
     const value = sellItem(id);
-    if (value > 0) toast(`Sold for ${value}g`, 'gold');
-    selected = null;
+    if (value > 0) toast(`Sold for ${value} gold`, 'gold');
     renderAll();
   }
 
   function renderGrid() {
     clearNode(grid);
-    const entries = getInventory();
+    const active = FILTERS.find((f) => f.id === filter) || FILTERS[0];
+    const entries = getInventory().filter((e) => active.match(e.item));
+
     if (entries.length === 0) {
-      grid.append(el('p.muted.center', { text: 'Your saddlebag is empty.' }));
+      grid.append(
+        emptyState(
+          filter === 'all' ? 'Your saddlebag is empty' : 'Nothing of that kind',
+          filter === 'all' ? 'Shops on the road will sell you what you need.' : 'Try another tab.',
+        ),
+      );
       return;
     }
+
     for (const entry of entries) {
       const { item, qty } = entry;
-      const cell = el(
-        'button.inv-cell',
-        {
-          class: selected && selected.item.id === item.id ? 'is-selected' : '',
+      grid.append(
+        el('button.inv-cell', {
+          role: 'option',
+          'aria-pressed': String(selectedId === item.id),
+          'aria-label': `${item.name}, ${qty}`,
+          'data-tip': item.name,
           onclick: () => {
-            selected = entry;
+            selectedId = item.id;
             renderGrid();
             renderDetail();
           },
-          title: item.name,
-        },
-        [
-          el('img.pixel', { src: framedIconURL(item.icon, item.rarity, 2), width: '40', height: '40' }),
+        }, [
+          el('img.pixel', {
+            src: framedIconURL(item.icon, item.rarity, 2),
+            width: '40',
+            height: '40',
+            alt: '',
+          }),
           qty > 1 ? el('span.inv-qty', { text: `x${qty}` }) : null,
-        ],
+        ]),
       );
-      grid.append(cell);
     }
     attachButtonSounds(grid);
   }
 
   function renderAll() {
-    // Keep the selection pointing at a live entry after a sale.
-    if (selected) {
-      const fresh = getInventory().find((e) => e.item.id === selected.item.id);
-      selected = fresh || null;
-    }
+    // Keep the selection pointing at something that still exists.
+    if (selectedId && !getInventory().some((e) => e.item.id === selectedId)) selectedId = null;
+    renderTabs();
     renderGrid();
     renderDetail();
   }
 
-  const modal = el('div.panel.modal.inv-modal', {}, [
-    el('div.row', { style: { justifyContent: 'space-between', marginBottom: '10px' } }, [
-      el('h2.panel-title', { style: { margin: 0 }, text: 'Saddlebag' }),
-      el('button.btn.btn--small.btn--ghost', { onclick: close }, ['Close']),
+  const modal = el('div.panel.modal.inv-modal', { role: 'dialog', 'aria-label': 'Saddlebag' }, [
+    el('div.modal-header', {}, [
+      el('h2.panel-title', { text: 'Saddlebag' }),
+      el('div.row', {}, [
+        el('span.chip.chip--gold', {}, [icon('coin', 1), String(getState().gold)]),
+        el('button.btn.btn--sm.btn--icon.btn--ghost', {
+          onclick: close,
+          'aria-label': 'Close',
+        }, ['✕']),
+      ]),
     ]),
-    el('div.inv-layout', {}, [grid, detail]),
+    el('div.modal-content.col', { style: { gap: 'var(--sp-3)' } }, [
+      tabsBar,
+      el('div.inv-layout', {}, [grid, detail]),
+    ]),
   ]);
 
   backdrop.append(modal);
   document.getElementById('app').append(backdrop);
 
   const unsubInv = on(EVENTS.INVENTORY_CHANGED, renderAll);
-  const unsub = () => unsubInv();
 
   renderAll();
   attachButtonSounds(modal);
-
   if (opts.onOpen) opts.onOpen();
 
   return { close, refresh: renderAll };

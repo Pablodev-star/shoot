@@ -197,6 +197,21 @@ export function countOf(id) {
   return entry ? entry.qty : 0;
 }
 
+/** How many more copies of an item will fit before the stack is full. */
+export function stackSpace(id) {
+  const item = getItem(id);
+  if (!item) return 0;
+  return Math.max(0, (item.stack ?? 99) - countOf(id));
+}
+
+/**
+ * True when `qty` more copies would actually be received. `addItem` clamps to
+ * the stack limit, so callers that charge gold MUST check this first.
+ */
+export function canHold(id, qty = 1) {
+  return stackSpace(id) >= qty;
+}
+
 export function addItem(id, qty = 1) {
   const item = getItem(id);
   if (!item) return false;
@@ -292,7 +307,10 @@ export function useItem(id, opts = {}) {
   }
 
   if (item.context === 'utility') {
-    // Map consumption is handled by the caller (it needs the encounter list).
+    // Utility items are spent on the information they give. The caller reads
+    // the encounter list and shows it; the copy is consumed here so one Map
+    // cannot reveal every stretch of road forever.
+    removeItem(id, 1);
     return { ok: true, effect: 'map' };
   }
 

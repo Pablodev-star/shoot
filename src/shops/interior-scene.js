@@ -66,17 +66,31 @@ export function createInteriorScene(kind = 'shop') {
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, view.w, view.h);
 
-      // Hanging lantern.
-      ctx.fillStyle = PALETTE.ink;
-      ctx.fillRect(Math.round(gx - s), 0, s * 2, Math.round(gy - 6 * s));
+      // Hanging lantern, drawn as pixel art rather than bare rectangles: a thin
+      // chain, a cap, a glass body with a flame inside, and a base.
+      const lx = Math.round(gx);
+      const ly = Math.round(gy);
       ctx.fillStyle = PALETTE.steelDark;
-      ctx.fillRect(Math.round(gx - 4 * s), Math.round(gy - 6 * s), 8 * s, 2 * s);
-      ctx.fillStyle = warm;
+      ctx.fillRect(lx - Math.round(s / 2), 0, Math.max(1, Math.round(s / 2)), ly - 7 * s);
+      // cap
+      ctx.fillRect(lx - 4 * s, ly - 7 * s, 8 * s, s);
+      ctx.fillRect(lx - 3 * s, ly - 6 * s, 6 * s, s);
+      // glass
+      ctx.fillStyle = 'rgba(255, 235, 190, 0.22)';
+      ctx.fillRect(lx - 3 * s, ly - 5 * s, 6 * s, 6 * s);
+      ctx.strokeStyle = PALETTE.steelDark;
+      ctx.lineWidth = Math.max(1, s / 2);
+      ctx.strokeRect(lx - 3 * s, ly - 5 * s, 6 * s, 6 * s);
+      // flame
       ctx.globalAlpha = flicker;
-      ctx.fillRect(Math.round(gx - 3 * s), Math.round(gy - 4 * s), 6 * s, 6 * s);
+      ctx.fillStyle = warm;
+      ctx.fillRect(lx - s, ly - 3 * s, 2 * s, 3 * s);
+      ctx.fillStyle = PALETTE.goldLight;
+      ctx.fillRect(lx - Math.round(s / 2), ly - 2 * s, Math.max(1, s), 2 * s);
       ctx.globalAlpha = 1;
+      // base
       ctx.fillStyle = PALETTE.steelDark;
-      ctx.fillRect(Math.round(gx - 4 * s), Math.round(gy + 2 * s), 8 * s, 2 * s);
+      ctx.fillRect(lx - 4 * s, ly + s, 8 * s, s);
 
       // Dust.
       ctx.fillStyle = PALETTE.bone;

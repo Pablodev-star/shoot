@@ -8,6 +8,7 @@ import { el } from '../core/dom.js';
 import { back } from '../core/router.js';
 import { attachButtonSounds } from '../core/audio.js';
 import { VERSION } from './title.js';
+import { backButton } from '../ui/widgets.js';
 
 const ERAS = [
   {
@@ -37,13 +38,14 @@ export const CreditsScreen = {
   mount(root) {
     const screen = el('div.screen', {}, [
       el('div.screen-header', {}, [
-        el('button.btn.btn--small.btn--ghost', { onclick: () => back('title') }, ['◀ Back']),
+        backButton(() => back('title')),
         el('h1.screen-title', { text: 'Credits' }),
         el('span.chip.chip--gold', { text: VERSION }),
       ]),
 
-      el('div.panel.panel--paper.poster', { style: { width: 'min(760px, 97%)' } }, [
-        el('div.credits-scroll', {}, [
+      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
+        el('div.panel.panel--paper.poster', {}, [
+          el('div.credits-scroll', {}, [
           el('h3', { text: 'Shoot!' }),
           el('p', {
             text: 'A turn-based western duel. Reload, shield, shoot — the whole game has lived in those three buttons for three years.',
@@ -69,6 +71,7 @@ export const CreditsScreen = {
           el('p', {
             text: 'To the three or four friends who played the Roblox version every day when it was new. This one is the version that finally gets finished.',
           }),
+          ]),
         ]),
       ]),
     ]);

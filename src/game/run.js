@@ -70,6 +70,17 @@ export async function startNewRun(slot) {
 export async function loadRun(slot, data) {
   run.slot = slot;
   restorePlayer(data.player);
+
+  // A finished run has no road left to walk — every encounter of the Galaxy is
+  // resolved. Continuing it replays the ending instead of stranding the player
+  // on an empty segment.
+  if (data.completed) {
+    run.started = false;
+    resetStack();
+    await go('victory', {});
+    return;
+  }
+
   daynight.restore(data.daynight);
   weather.restore(data.weather);
   hunger.reset();
@@ -116,6 +127,24 @@ on(EVENTS.GAME_OVER, async () => {
 });
 
 /**
+ * Safety net. A segment normally ends with the boss duel, which routes the
+ * world transition itself — but if the walker ever runs off the end of a
+ * segment (a restored save, a hand-edited slot), move on rather than walking an
+ * empty road forever.
+ */
+on(EVENTS.SEGMENT_CLEARED, async ({ worldId }) => {
+  if (!run.started) return;
+  if (worldId >= FINAL_WORLD) {
+    run.started = false;
+    await save({ completed: true });
+    emit(EVENTS.GAME_COMPLETED, {});
+    await go('victory', {});
+  } else {
+    await beginWorld(worldId + 1);
+  }
+});
+
+/**
  * Called by shop/inn/duel screens when the player is done with the encounter.
  * Advances the counter, saves and puts the player back on the road.
  */
@@ -141,9 +170,11 @@ export async function resolveDuel({ won, enemy, isBoss }) {
     if (isBoss) {
       bumpStat('worldsCleared');
       advanceEncounter();
-      await save();
       if (worldId >= FINAL_WORLD) {
         run.started = false;
+        // Flagged as finished so the slot picker offers the ending rather than
+        // dropping the player onto a segment with nothing left in it.
+        await save({ completed: true });
         emit(EVENTS.GAME_COMPLETED, {});
         await go('victory', {});
       } else {
@@ -168,7 +199,12 @@ export async function resolveDuel({ won, enemy, isBoss }) {
 // Saving
 // ---------------------------------------------------------------------------
 
-export async function save() {
+/**
+ * Write the current run to its slot.
+ * @param {object} [extra] merged into the payload — `{ completed: true }` marks
+ *   a finished run so it is never resumed as a road state.
+ */
+export async function save(extra = {}) {
   if (!run.started && getState().lives <= 0) return;
   const engineState = run.engine ? run.engine.serialize() : {};
   await writeSlot(run.slot, {
@@ -178,6 +214,7 @@ export async function save() {
     travelled: engineState.travelled ?? 0,
     segmentSeed: engineState.seed,
     savedAt: Date.now(),
+    ...extra,
   });
   emit(EVENTS.SAVE_WRITTEN, { slot: run.slot });
 }

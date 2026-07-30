@@ -63,5 +63,7 @@ export function describeSlot(data) {
     lives: p.lives ?? 3,
     maxLives: p.maxLives ?? 3,
     savedAt: data.savedAt || 0,
+    /** A finished run: the slot replays the ending instead of the road. */
+    completed: !!data.completed,
   };
 }

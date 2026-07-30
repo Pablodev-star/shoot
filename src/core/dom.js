@@ -36,6 +36,21 @@ export function el(spec, props = {}, children = []) {
   return node;
 }
 
+/**
+ * Append children, skipping null/false/undefined.
+ *
+ * Native `node.append(null)` inserts the *text* "null", which is exactly the
+ * kind of bug that reaches a screenshot, so conditional children must always go
+ * through here (or through `el`, which filters the same way).
+ */
+export function appendAll(node, children) {
+  for (const child of children) {
+    if (child == null || child === false) continue;
+    node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return node;
+}
+
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
