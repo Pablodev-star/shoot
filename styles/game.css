@@ -1,0 +1,434 @@
+/* ==========================================================================
+   SHOOT! — In-game screens: exploration HUD, shops, inns, inventory, duel,
+   interstitials.
+   ========================================================================== */
+
+/* --- Exploration HUD ------------------------------------------------------ */
+
+.explore-screen {
+  justify-content: flex-start;
+  align-items: stretch;
+  pointer-events: none; /* the desert shows through; children opt back in */
+}
+
+.explore-screen .btn,
+.explore-screen .bag-button,
+.explore-screen .hud {
+  pointer-events: auto;
+}
+
+.hud {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.hud-left,
+.hud-right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(27, 18, 16, 0.82), rgba(27, 18, 16, 0.55));
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 2px rgba(242, 227, 198, 0.1);
+  backdrop-filter: blur(1px);
+}
+
+.hud-right { align-items: flex-end; }
+
+.hud-block { display: flex; flex-direction: column; gap: 5px; min-width: 168px; }
+
+.hud-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bone-dark);
+}
+
+.bag-button {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 14px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bone);
+  background: linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+  border: 3px solid var(--wood-deep);
+  box-shadow: 0 5px 0 var(--wood-deep), 0 10px 18px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+  animation: bag-bob 3.4s ease-in-out infinite;
+}
+
+.bag-button:hover { transform: translateY(-3px); box-shadow: 0 8px 0 var(--wood-deep), 0 14px 22px rgba(0, 0, 0, 0.55); }
+.bag-button:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--wood-deep); }
+
+@keyframes bag-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* --- Shops / inns --------------------------------------------------------- */
+
+.venue-screen { justify-content: center; gap: 16px; }
+
+.venue-panel { width: min(960px, 97%); }
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.shop-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(163, 112, 60, 0.28), rgba(30, 18, 8, 0.6));
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 2px rgba(242, 227, 198, 0.08);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  animation: card-in 320ms cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.shop-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold-dark);
+  box-shadow: inset 0 0 0 2px rgba(255, 226, 122, 0.2), 0 12px 22px rgba(0, 0, 0, 0.5);
+}
+
+.shop-card.is-sold { filter: grayscale(0.8) brightness(0.6); }
+.shop-card.is-poor .shop-price { color: var(--red-light); }
+
+.shop-icon { image-rendering: pixelated; }
+
+.shop-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.shop-desc { font-size: 12px; color: var(--bone-dark); line-height: 1.4; min-height: 34px; }
+
+.shop-price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--gold-light);
+}
+
+.old-price { text-decoration: line-through; color: var(--bone-dark); font-size: 13px; }
+
+.discount-flag {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  padding: 3px 9px;
+  background: linear-gradient(180deg, var(--red-light), var(--red-dark));
+  border: 2px solid #4a0d0c;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1px;
+  transform: rotate(9deg);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+  animation: flag-wave 2.4s ease-in-out infinite;
+}
+
+.discount-flag.inline { position: static; transform: none; margin-left: 8px; animation: none; }
+
+@keyframes flag-wave {
+  0%, 100% { transform: rotate(9deg) scale(1); }
+  50% { transform: rotate(6deg) scale(1.06); }
+}
+
+.shake { animation: shake 320ms ease; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+.bed-list { display: flex; flex-direction: column; gap: 12px; }
+
+.bed-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(163, 112, 60, 0.25), rgba(30, 18, 8, 0.55));
+  border: 3px solid var(--wood-dark);
+}
+
+.bed-card.is-used { filter: grayscale(0.75) brightness(0.65); }
+
+.bed-name {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* --- Inventory ------------------------------------------------------------ */
+
+.inv-modal { width: min(720px, 96%); }
+
+.inv-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 620px) {
+  .inv-layout { grid-template-columns: 1fr; }
+}
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  align-content: start;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  min-height: 120px;
+}
+
+.inv-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.inv-cell:hover { transform: translateY(-3px); background: rgba(232, 177, 44, 0.12); }
+.inv-cell.is-selected { border-color: var(--gold); background: rgba(232, 177, 44, 0.18); }
+
+.inv-qty {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--bone);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.inv-detail {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 3px solid var(--wood-dark);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv-detail-head { display: flex; align-items: center; gap: 12px; }
+
+.inv-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+.inv-desc { font-size: 13px; line-height: 1.5; color: var(--bone-dark); }
+
+/* --- Duel ----------------------------------------------------------------- */
+
+.duel-screen {
+  justify-content: space-between;
+  padding: clamp(10px, 2.4vh, 26px);
+}
+
+.duel-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.duel-fighter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(27, 18, 16, 0.85), rgba(27, 18, 16, 0.55));
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 2px rgba(242, 227, 198, 0.1);
+  min-width: 190px;
+}
+
+.duel-fighter.is-enemy { align-items: flex-end; text-align: right; border-color: var(--red-dark); }
+
+.duel-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red-light);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+}
+
+.duel-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.bullet-row { display: flex; gap: 3px; align-items: center; min-height: 20px; flex-wrap: wrap; }
+
+.duel-callout {
+  align-self: center;
+  padding: 10px 24px;
+  font-family: var(--font-display);
+  font-size: clamp(15px, 2.4vh, 22px);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--sand-light);
+  background: rgba(13, 9, 8, 0.66);
+  border: 3px solid var(--wood-dark);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+  animation: callout-in 220ms ease-out both;
+}
+
+@keyframes callout-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+.duel-bottom { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+
+.duel-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: min(760px, 98%);
+  transition: opacity 180ms ease;
+}
+
+.duel-controls.is-waiting { opacity: 0.55; }
+
+.duel-btn {
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 10px;
+}
+
+.duel-btn-label { font-size: 20px; letter-spacing: 3px; }
+.duel-btn-hint {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  color: rgba(242, 227, 198, 0.7);
+}
+
+.duel-btn--reload { background: linear-gradient(180deg, #c79a4e, var(--wood) 55%, var(--wood-dark)); }
+.duel-btn--shield { background: linear-gradient(180deg, #6f9ad8, #35578f 55%, #1f3459); border-color: #16233c; }
+.duel-btn--shoot { background: linear-gradient(180deg, var(--red-light), var(--red) 50%, var(--red-dark)); border-color: #4a0d0c; }
+
+.duel-btn:not(:disabled):hover { filter: brightness(1.15); }
+
+/* --- Battle overview ------------------------------------------------------ */
+
+.overview { width: min(680px, 96%); }
+
+.overview-table-wrap {
+  margin-top: 14px;
+  max-height: 34vh;
+  overflow: auto;
+  border: 3px solid var(--wood-dark);
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.overview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.overview-table th {
+  position: sticky;
+  top: 0;
+  padding: 8px 10px;
+  background: var(--wood-dark);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.overview-table td { padding: 7px 10px; border-top: 1px solid rgba(242, 227, 198, 0.1); }
+.overview-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.03); }
+
+.mv--shoot { color: var(--red-light); }
+.mv--shield { color: var(--blue-light); }
+.mv--reload { color: var(--gold-light); }
+
+/* --- Interstitials -------------------------------------------------------- */
+
+.intro-screen { cursor: pointer; }
+
+.intro-card {
+  width: min(640px, 94%);
+  text-align: center;
+  animation: intro-in 520ms cubic-bezier(0.2, 1.1, 0.3, 1) both;
+}
+
+@keyframes intro-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+
+.intro-eyebrow {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--wood-dark);
+}
+
+.intro-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vh, 52px);
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--wood-deep);
+  margin: 6px 0;
+}
+
+.intro-sub { font-style: italic; color: var(--sand-deep); }

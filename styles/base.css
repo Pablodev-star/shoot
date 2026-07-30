@@ -1,0 +1,233 @@
+/* ==========================================================================
+   SHOOT! — Base layer: tokens, reset, layout skeleton, screen transitions.
+   The palette here mirrors src/art/palette.js one-for-one.
+   ========================================================================== */
+
+:root {
+  /* Palette (keep in sync with src/art/palette.js) */
+  --ink: #1b1210;
+  --ink-soft: #2e211c;
+  --shadow: #0d0908;
+  --bone: #f2e3c6;
+  --bone-dark: #d8c39c;
+  --grey: #8a8079;
+
+  --sand-light: #f0d69a;
+  --sand: #dcb46c;
+  --sand-mid: #c2914d;
+  --sand-dark: #9a6b34;
+  --sand-deep: #6f4a24;
+
+  --wood-light: #a3703c;
+  --wood: #7b4f27;
+  --wood-dark: #54331a;
+  --wood-deep: #38210f;
+  --leather: #8b5a2b;
+
+  --red-light: #f0574f;
+  --red: #c62f2a;
+  --red-dark: #8d1a18;
+
+  --green: #4f9a3c;
+  --blue-light: #7fb8ff;
+  --blue: #3a6fd8;
+  --gold-light: #ffe27a;
+  --gold: #e8b12c;
+  --gold-dark: #a8760f;
+  --purple: #8a5cd6;
+
+  /* Typography — "wanted poster": heavy slab serif for display, clean serif
+     for body. Canvas headings use the 5x7 pixel font instead. */
+  --font-display: 'Rockwell', 'Courier New', 'Georgia', serif;
+  --font-body: 'Georgia', 'Times New Roman', serif;
+
+  --border-w: 4px;
+  --radius: 2px;
+  --transition: 320ms;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--wood-deep);
+  color: var(--bone);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  /* Faint leather grain behind everything. */
+  background-image:
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 4px),
+    radial-gradient(circle at 50% 30%, #4a2f18 0%, #241407 100%);
+}
+
+img.pixel,
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* --- App frame ------------------------------------------------------------ */
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1280px;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* The canvas that ambient scenes (menu desert, exploration, duel) draw into. */
+#scene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+
+/* Screens live above the canvas. */
+#screen-root {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3vh, 32px);
+  gap: clamp(10px, 2vh, 20px);
+  animation: screen-in 340ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--wood-light) transparent;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Saloon-door transition ---------------------------------------------- */
+
+#transition {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#transition::before,
+#transition::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 52%;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.25) 0 6px, transparent 6px 14px),
+    linear-gradient(180deg, #6b4423 0%, #3a2110 100%);
+  border-right: 4px solid var(--wood-deep);
+  transform: translateX(-101%);
+  transition: transform var(--transition) cubic-bezier(0.6, 0, 0.4, 1);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+#transition::before {
+  left: 0;
+}
+
+#transition::after {
+  right: 0;
+  transform: translateX(101%);
+  border-right: 0;
+  border-left: 4px solid var(--wood-deep);
+}
+
+#transition.is-closing::before,
+#transition.is-closing::after {
+  transform: translateX(0);
+}
+
+/* --- Toasts --------------------------------------------------------------- */
+
+#toasts {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 8px 18px;
+  background: linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+  border: 3px solid var(--wood-deep);
+  box-shadow: inset 0 0 0 2px rgba(242, 227, 198, 0.25), 0 4px 0 rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--bone);
+  animation: toast-in 240ms ease-out both, toast-out 300ms ease-in 2.2s both;
+  white-space: nowrap;
+}
+
+.toast.is-good { border-color: var(--green); }
+.toast.is-bad { border-color: var(--red-dark); }
+.toast.is-gold { border-color: var(--gold-dark); color: var(--gold-light); }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* --- Utility -------------------------------------------------------------- */
+
+.hidden { display: none !important; }
+.center { text-align: center; }
+.muted { color: var(--bone-dark); opacity: 0.75; }
+.row { display: flex; align-items: center; gap: 10px; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.grow { flex: 1; }
+.nowrap { white-space: nowrap; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+::-webkit-scrollbar-thumb { background: var(--wood-light); border: 2px solid var(--wood-deep); }
