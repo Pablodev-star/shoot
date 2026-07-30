@@ -1,20 +1,22 @@
 /**
- * SHOOT! — Profile / account (Block 1).
+ * SHOOT! — Profile.
  *
  * Local-only for now: the name is stored on the device through the storage
- * driver. When accounts arrive, this screen gains a "Sign in" panel and the
- * same driver starts pointing at the remote store — no other change needed.
+ * driver. When accounts arrive this screen gains a sign-in panel and the same
+ * driver starts pointing at the remote store — nothing else changes.
  */
 
 import { el, pixelImg } from '../core/dom.js';
 import { back } from '../core/router.js';
-import { attachButtonSounds } from '../core/audio.js';
+import { attachButtonSounds, play } from '../core/audio.js';
 import { getProfile, updateProfile } from '../core/settings.js';
 import { getCharacterSprites } from '../art/sprites-character.js';
 import { toast } from '../ui/toast.js';
+import { backButton, statTile } from '../ui/widgets.js';
 
 export const ProfileScreen = {
   id: 'profile',
+
   mount(root) {
     const profile = getProfile();
     const sprites = getCharacterSprites();
@@ -23,53 +25,74 @@ export const ProfileScreen = {
       type: 'text',
       value: profile.name,
       maxlength: '14',
+      'aria-label': 'Gunslinger name',
       oninput: (e) => {
         e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9 _-]/g, '');
+        saveBtn.disabled = e.target.value.trim().length === 0;
+      },
+      onkeydown: (e) => {
+        if (e.key === 'Enter') save();
       },
     });
 
-    const save = async () => {
+    const saveBtn = el('button.btn.btn--sm.btn--gold', { onclick: () => save() }, ['Save name']);
+
+    async function save() {
       const name = nameInput.value.trim() || 'STRANGER';
       await updateProfile({ name });
-      toast('Name saved', 'good', 'coin');
-    };
+      play('coin');
+      toast('Name saved', 'good');
+    }
 
     const s = profile.stats;
+    const duels = s.duelsWon + s.duelsLost;
+    const winRate = duels ? Math.round((s.duelsWon / duels) * 100) : 0;
+
     const screen = el('div.screen', {}, [
       el('div.screen-header', {}, [
-        el('button.btn.btn--small.btn--ghost', { onclick: () => back('title') }, ['◀ Back']),
+        backButton(() => back('title')),
         el('h1.screen-title', { text: 'Profile' }),
-        el('span.chip', { text: 'Local' }),
+        el('span.chip', { text: 'On this device' }),
       ]),
 
-      el('div.panel.profile-card', {}, [
-        el('div.avatar-plate', {}, [pixelImg(sprites.player.duel[2], 4)]),
-        el('div.col', { style: { gap: '12px' } }, [
-          el('div.field', {}, [el('label', { text: 'Gunslinger name' }), nameInput]),
-          el('div.row', {}, [
-            el('button.btn.btn--small.btn--gold', { onclick: save }, ['Save']),
-            el('span.muted', { text: 'Shown on the title screen and, later, in online rooms.' }),
+      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
+        el('div.panel.profile-card', {}, [
+          el('div.avatar-plate', {}, [pixelImg(sprites.player.duel[2], 4)]),
+          el('div.col', { style: { gap: 'var(--sp-3)' } }, [
+            el('div.field', {}, [
+              el('label', { text: 'Gunslinger name' }),
+              nameInput,
+              el('span.field-hint', {
+                text: 'Shown on the title screen and, later, in online rooms.',
+              }),
+            ]),
+            el('div.row', {}, [saveBtn]),
           ]),
         ]),
-      ]),
 
-      el('div.stat-grid', {}, [
-        el('div.stat-tile', {}, [el('span.k', { text: 'Duels won' }), el('span.v', { text: String(s.duelsWon) })]),
-        el('div.stat-tile', {}, [el('span.k', { text: 'Duels lost' }), el('span.v', { text: String(s.duelsLost) })]),
-        el('div.stat-tile', {}, [el('span.k', { text: 'Worlds cleared' }), el('span.v', { text: String(s.worldsCleared) })]),
-        el('div.stat-tile', {}, [el('span.k', { text: 'Gold earned' }), el('span.v', { text: String(s.goldEarned) })]),
-        el('div.stat-tile', {}, [el('span.k', { text: 'Miles walked' }), el('span.v', { text: String(Math.floor(s.milesWalked)) })]),
-      ]),
+        el('div.divider', { text: 'Lifetime record' }),
+        el('div.stat-grid', {}, [
+          statTile('Duels won', s.duelsWon),
+          statTile('Duels lost', s.duelsLost),
+          statTile('Win rate', `${winRate}%`),
+          statTile('Worlds cleared', s.worldsCleared),
+          statTile('Gold earned', s.goldEarned, 'coin'),
+          statTile('Distance', Math.floor(s.milesWalked || 0)),
+        ]),
 
-      el('div.panel', { style: { width: 'min(620px, 96%)' } }, [
-        el('h2.panel-title', { text: 'Account' }),
-        el('p.muted.center', {
-          text: 'Cloud accounts arrive with online mode. Your progress is stored on this device for now.',
-        }),
-        el('div.row', { style: { justifyContent: 'center', marginTop: '12px' } }, [
-          el('button.btn.btn--small.btn--soon', {
-            onclick: () => toast('Accounts — coming soon', 'gold', 'error'),
-          }, ['Sign In', el('span.tag-soon', { text: 'Soon' })]),
+        el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
+          el('h2.panel-title', { text: 'Account' }),
+          el('p.muted.center', {
+            text: 'Cloud accounts arrive with online mode. Your progress is stored on this device for now.',
+          }),
+          el('div.row', { style: { justifyContent: 'center' } }, [
+            el('button.btn.btn--sm.btn--soon', {
+              onclick: () => {
+                play('error');
+                toast('Accounts — coming soon', 'gold');
+              },
+            }, ['Sign In', el('span.chip.chip--gold', { text: 'Soon' })]),
+          ]),
         ]),
       ]),
     ]);

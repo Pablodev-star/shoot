@@ -41,8 +41,13 @@ export function createParallax(options = {}) {
   /** Palette shift applied per world (Galaxy tints everything violet). */
   let worldTint = options.tint || null;
 
+  /**
+   * The walk line. Duels raise it so the fighters never sit under the action
+   * buttons; exploration keeps it low so more desert is visible.
+   */
+  const groundRatio = options.groundRatio ?? 0.78;
   function groundY(view) {
-    return Math.round((view.h * 0.78) / view.scale) * view.scale;
+    return Math.round((view.h * groundRatio) / view.scale) * view.scale;
   }
 
   function setStructures(list) {

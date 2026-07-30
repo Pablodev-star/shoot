@@ -22,7 +22,7 @@ let elapsed = 0;
 const view = { w: 0, h: 0, scale: 3, dpr: 1 };
 
 /** Design height in source pixels — the scale factor targets this. */
-const DESIGN_H = 220;
+const DESIGN_H = 180;
 
 export function initScene(canvasNode) {
   canvas = canvasNode;

@@ -14,7 +14,7 @@ import { PALETTE } from '../art/palette.js';
 import { drawTextCentered } from '../art/font.js';
 
 export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnabled = true }) {
-  const parallax = createParallax({ seed: (seed ^ (worldId * 31337)) >>> 0 });
+  const parallax = createParallax({ seed: (seed ^ (worldId * 31337)) >>> 0, groundRatio: 0.7 });
   parallax.setTint(tint);
   const player = getCharacterSprites().player;
 
@@ -63,8 +63,12 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
 
     render(ctx, view) {
       const s = view.scale;
-      /** A duel is a close-up: the fighters are drawn at twice world scale. */
-      const fs = s * 2;
+      /**
+       * A duel is a close-up: fighters are drawn larger than on the road. The
+       * cap keeps the two of them apart on a phone, where doubling the scale
+       * would have them standing shoulder to shoulder.
+       */
+      const fs = Math.max(s, Math.min(s * 2, Math.floor((view.w * 0.26) / 16)));
       const shakeAmp = shakeEnabled ? Math.min(6, fx.shake / 26) : 0;
       const ox = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
       const oy = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;

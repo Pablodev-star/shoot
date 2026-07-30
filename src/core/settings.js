@@ -18,6 +18,8 @@ const DEFAULT_SETTINGS = {
   language: 'en',
   screenShake: true,
   showHints: true,
+  /** Set once the How to Play panel has been shown automatically. */
+  seenHowTo: false,
 };
 
 const DEFAULT_PROFILE = {

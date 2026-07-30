@@ -1,17 +1,16 @@
 /**
- * SHOOT! — Online lobby (Block 1).
+ * SHOOT! — Online lobby.
  *
  * VISUALLY COMPLETE, DELIBERATELY INERT.
  *
- * This screen is built to its final level of finish so it never has to be
- * rebuilt: room browser, room detail, create-room dialog, join-by-code and the
- * matchmaking flow are all here with sample data and full animation. What is
- * missing is only the network layer.
+ * Built to its final level of finish so it never has to be rebuilt: room
+ * browser, create-room dialog, join-by-code and matchmaking are all here with
+ * sample data and full animation. What is missing is only the network layer.
  *
  * Every action routes through `comingSoon()`, which shows a toast and plays the
  * error cue — nothing throws, nothing dead-ends, navigation always keeps
- * working. When the backend lands, replace the bodies of the handlers marked
- * `// NETWORK:` and delete `SAMPLE_ROOMS`.
+ * working. When the backend lands, replace the handlers marked `// NETWORK:`
+ * and delete `SAMPLE_ROOMS`.
  */
 
 import { el } from '../core/dom.js';
@@ -19,6 +18,7 @@ import { back } from '../core/router.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { toast } from '../ui/toast.js';
 import { getProfile } from '../core/settings.js';
+import { backButton, icon } from '../ui/widgets.js';
 
 /** Placeholder browser contents. NETWORK: replace with a live room feed. */
 const SAMPLE_ROOMS = [
@@ -45,74 +45,81 @@ function pingQuality(ping) {
 function roomRow(room) {
   const full = room.players >= room.max;
   return el(
-    'div.list-row.room-row',
+    'button.list-row.room-row',
     {
       class: full ? 'is-full' : '',
       onclick: () => comingSoon('Joining rooms'),
-      title: 'Coming soon',
+      'aria-label': `${room.name}, ${room.players} of ${room.max} players. Coming soon.`,
     },
     [
-      el('div.room-name.grow', {}, [
-        el('span.title', { text: `${room.locked ? '🔒 ' : ''}${room.name}` }),
+      el('span.room-name.grow', {}, [
+        el('span.title', { text: `${room.locked ? '· ' : ''}${room.name}` }),
         el('span.meta', { text: `${room.mode} · host ${room.host}` }),
       ]),
       el('span.room-players', { text: `${room.players}/${room.max}` }),
-      el('span.ping-bars', { class: pingQuality(room.ping) }, [el('i'), el('i'), el('i')]),
-      el('span.room-ping', { text: `${room.ping}ms` }),
+      el('span.ping', {}, [
+        el('span.ping-bars', { class: pingQuality(room.ping) }, [el('i'), el('i'), el('i')]),
+        el('span.ping-ms', { text: `${room.ping}ms` }),
+      ]),
     ],
   );
 }
 
 /** Create-room dialog: complete form, inert Create button. */
-function openCreateRoom(root) {
+function openCreateRoom() {
   const backdrop = el('div.modal-backdrop', {
     onclick: (e) => {
       if (e.target === backdrop) backdrop.remove();
     },
   });
-  const modal = el('div.panel.modal', {}, [
-    el('h2.panel-title', { text: 'Create Room' }),
-    el('p.panel-sub', { text: 'Set up a table and wait for a challenger' }),
-    el('div.col', {}, [
+  const select = (options) =>
+    el('div.select-wrap', {}, [el('select.input', {}, options.map((o) => el('option', { text: o })))]);
+
+  const modal = el('div.panel.modal', { role: 'dialog', 'aria-label': 'Create room' }, [
+    el('div.modal-header', {}, [
+      el('h2.panel-title', { text: 'Create Room' }),
+      el('button.btn.btn--sm.btn--icon.btn--ghost', {
+        onclick: () => backdrop.remove(),
+        'aria-label': 'Close',
+      }, ['✕']),
+    ]),
+    el('div.modal-content.col', { style: { gap: 'var(--sp-4)' } }, [
       el('div.field', {}, [
         el('label', { text: 'Room name' }),
         el('input.input', { type: 'text', value: `${getProfile().name}'S SALOON`, maxlength: '24' }),
       ]),
-      el('div.field', {}, [
-        el('label', { text: 'Mode' }),
-        el('select.input', {}, [
-          el('option', { text: 'Duel · Best of 3' }),
-          el('option', { text: 'Duel · Best of 5' }),
-          el('option', { text: 'Duel · Sudden Death' }),
-          el('option', { text: 'Free-for-all (4)' }),
-        ]),
+      el('div.field', {}, [el('label', { text: 'Mode' }), select([
+        'Duel · Best of 3',
+        'Duel · Best of 5',
+        'Duel · Sudden Death',
+        'Free-for-all (4)',
+      ])]),
+      el('div.field', {}, [el('label', { text: 'Starting lives' }), select([
+        '3 lives',
+        '5 lives',
+        '1 life · sudden death',
+      ])]),
+      el('label.switch', {}, [
+        el('input', { type: 'checkbox' }),
+        el('span.track'),
+        el('span.switch-label', { text: 'Private room (invite code only)' }),
       ]),
-      el('div.field', {}, [
-        el('label', { text: 'Starting lives' }),
-        el('select.input', {}, [
-          el('option', { text: '3 lives' }),
-          el('option', { text: '5 lives' }),
-          el('option', { text: '1 life · sudden death' }),
-        ]),
-      ]),
-      el('label.toggle', {}, [el('input', { type: 'checkbox' }), 'Private room (invite code only)']),
-      el('div.row', { style: { justifyContent: 'flex-end', marginTop: '10px' } }, [
-        el('button.btn.btn--small.btn--ghost', { onclick: () => backdrop.remove() }, ['Cancel']),
-        el(
-          'button.btn.btn--small.btn--soon',
-          { onclick: () => comingSoon('Creating rooms') },
-          ['Create', el('span.tag-soon', { text: 'Soon' })],
-        ),
+    ]),
+    el('div.modal-footer', {}, [
+      el('button.btn.btn--sm.btn--ghost', { onclick: () => backdrop.remove() }, ['Cancel']),
+      el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Creating rooms') }, [
+        'Create',
+        el('span.chip.chip--gold', { text: 'Soon' }),
       ]),
     ]),
   ]);
   backdrop.append(modal);
-  root.append(backdrop);
+  document.getElementById('app').append(backdrop);
   attachButtonSounds(backdrop);
 }
 
 /** Matchmaking preview: the real search UI, clearly flagged as a preview. */
-function openMatchmaking(root) {
+function openMatchmaking() {
   const statuses = [
     'Saddling up…',
     'Scanning the territory…',
@@ -122,20 +129,19 @@ function openMatchmaking(root) {
   let i = 0;
 
   const status = el('div.mm-status', { text: statuses[0] });
+  const spinner = el('div.mm-spinner');
   const backdrop = el('div.modal-backdrop');
-  const modal = el('div.panel.modal', {}, [
+  const modal = el('div.panel.modal', { role: 'dialog', 'aria-label': 'Quick match' }, [
     el('div.matchmaking', {}, [
       el('h2.panel-title', { text: 'Quick Match' }),
-      el('div.mm-spinner'),
+      spinner,
       status,
-      el('p.muted.center', {
-        text: 'Preview only — matchmaking servers are not live yet.',
-      }),
-      el('button.btn.btn--small.btn--ghost', { onclick: () => stop() }, ['Cancel']),
+      el('p.muted', { text: 'Preview only — matchmaking servers are not live yet.' }),
+      el('button.btn.btn--sm.btn--ghost', { onclick: () => stop() }, ['Cancel']),
     ]),
   ]);
   backdrop.append(modal);
-  root.append(backdrop);
+  document.getElementById('app').append(backdrop);
   attachButtonSounds(backdrop);
 
   const timer = setInterval(() => {
@@ -146,7 +152,7 @@ function openMatchmaking(root) {
   const giveUp = setTimeout(() => {
     clearInterval(timer);
     status.textContent = 'No games found — online is still being built.';
-    modal.querySelector('.mm-spinner')?.classList.add('hidden');
+    spinner.classList.add('hidden');
   }, 6000);
 
   function stop() {
@@ -158,6 +164,7 @@ function openMatchmaking(root) {
 
 export const OnlineScreen = {
   id: 'online',
+
   mount(root) {
     const list = el('div.list.room-list');
     SAMPLE_ROOMS.forEach((r) => list.append(roomRow(r)));
@@ -165,7 +172,8 @@ export const OnlineScreen = {
     const codeInput = el('input.input', {
       type: 'text',
       maxlength: '6',
-      placeholder: '––––––',
+      placeholder: '· · · · · ·',
+      'aria-label': 'Room code',
       oninput: (e) => {
         e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       },
@@ -173,66 +181,62 @@ export const OnlineScreen = {
 
     const screen = el('div.screen', {}, [
       el('div.screen-header', {}, [
-        el('button.btn.btn--small.btn--ghost', { onclick: () => back('title') }, ['◀ Back']),
+        backButton(() => back('title')),
         el('h1.screen-title', { text: 'Online' }),
         el('span.chip.chip--live', {}, [el('span.dot-live'), 'Preview']),
       ]),
 
-      el('div.construction-banner', {}, [
-        'Online mode is under construction — the lobby below is a preview of the finished interface',
-      ]),
+      el('div.screen-body', {}, [
+        el('div.construction-banner', {
+          text: 'Online mode is under construction — this lobby is a preview of the finished interface',
+        }),
 
-      el('div.online-layout', {}, [
-        el('div.panel', {}, [
-          el('div.row', { style: { justifyContent: 'space-between', marginBottom: '10px' } }, [
-            el('h2.panel-title', { style: { margin: '0' }, text: 'Room Browser' }),
-            el('button.btn.btn--small.btn--ghost', {
-              onclick: () => comingSoon('Refreshing the browser'),
-            }, ['⟳ Refresh']),
-          ]),
-          list,
-        ]),
-
-        el('div.online-side', {}, [
+        el('div.online-layout', {}, [
           el('div.panel', {}, [
-            el('h2.panel-title', { text: 'Play' }),
-            el('div.col', {}, [
-              el('button.btn.btn--wide.btn--soon', { onclick: () => openMatchmaking(root) }, [
+            el('div.row.spread', { style: { marginBottom: 'var(--sp-3)' } }, [
+              el('h2.panel-title', { style: { textAlign: 'left' }, text: 'Room Browser' }),
+              el('button.btn.btn--sm.btn--ghost', {
+                onclick: () => comingSoon('Refreshing the browser'),
+                'data-tip': 'Reload the room list',
+              }, ['Refresh']),
+            ]),
+            list,
+          ]),
+
+          el('div.online-side', {}, [
+            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
+              el('h2.panel-title', { text: 'Play' }),
+              el('button.btn.btn--block.btn--soon', { onclick: () => openMatchmaking() }, [
                 'Quick Match',
-                el('span.tag-soon', { text: 'Soon' }),
+                el('span.chip.chip--gold', { text: 'Soon' }),
               ]),
-              el('button.btn.btn--wide.btn--soon', { onclick: () => openCreateRoom(root) }, [
+              el('button.btn.btn--block.btn--soon', { onclick: () => openCreateRoom() }, [
                 'Create Room',
-                el('span.tag-soon', { text: 'Soon' }),
+                el('span.chip.chip--gold', { text: 'Soon' }),
               ]),
             ]),
-          ]),
 
-          el('div.panel', {}, [
-            el('h2.panel-title', { text: 'Join with Code' }),
-            el('div.join-code', {}, [
-              codeInput,
-              el('button.btn.btn--small.btn--soon', {
-                onclick: () => comingSoon('Joining by code'),
-              }, ['Join']),
+            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
+              el('h2.panel-title', { text: 'Join with Code' }),
+              el('div.join-code', {}, [
+                codeInput,
+                el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Joining by code') }, ['Join']),
+              ]),
+              el('p.field-hint.center', { text: 'Ask a friend for their six-character room code.' }),
             ]),
-            el('p.muted.center', {
-              style: { marginTop: '10px', fontSize: '12px' },
-              text: 'Ask a friend for their six-character room code.',
-            }),
-          ]),
 
-          el('div.panel', {}, [
-            el('h2.panel-title', { text: 'Your Standing' }),
-            el('div.stat-grid', {}, [
-              el('div.stat-tile', {}, [el('span.k', { text: 'Rank' }), el('span.v', { text: '—' })]),
-              el('div.stat-tile', {}, [el('span.k', { text: 'Wins' }), el('span.v', { text: '—' })]),
-              el('div.stat-tile', {}, [el('span.k', { text: 'Streak' }), el('span.v', { text: '—' })]),
+            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
+              el('h2.panel-title', { text: 'Your Standing' }),
+              el('div.stat-grid', {}, [
+                el('div.stat-tile', {}, [el('span.k', { text: 'Rank' }), el('span.v', { text: '—' })]),
+                el('div.stat-tile', {}, [el('span.k', { text: 'Wins' }), el('span.v', { text: '—' })]),
+                el('div.stat-tile', {}, [el('span.k', { text: 'Streak' }), el('span.v', { text: '—' })]),
+              ]),
+              el('p.field-hint.center', {}, [
+                icon('coin', 0.9),
+                ' Ranked standings unlock when online play goes live.',
+              ]),
             ]),
-            el('p.muted.center', {
-              style: { marginTop: '10px', fontSize: '12px' },
-              text: 'Ranked standings unlock when online play goes live.',
-            }),
           ]),
         ]),
       ]),
