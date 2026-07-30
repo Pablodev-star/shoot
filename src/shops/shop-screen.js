@@ -6,7 +6,7 @@ import { el, clearNode } from '../core/dom.js';
 import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
 import { framedIconURL } from '../art/sprites-items.js';
-import { getState, addItem, spendGold, canAfford } from '../game/player.js';
+import { getState, addItem, spendGold, canAfford, canHold } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { generateStock, shopSeed, DISCOUNT_RATE } from './shop.js';
 import { finishEncounter } from '../game/run.js';
@@ -36,6 +36,13 @@ export const ShopScreen = {
 
     function buy(entry, card) {
       if (entry.soldOut) return;
+      // addItem() clamps to the stack limit, so a full stack would take the
+      // gold and hand back nothing. Refuse the sale before charging.
+      if (!canHold(entry.item.id)) {
+        play('error');
+        toast(`You cannot carry another ${entry.item.name}`, 'bad');
+        return;
+      }
       if (!canAfford(entry.price)) {
         play('error');
         toast('Not enough gold', 'bad');
@@ -58,9 +65,14 @@ export const ShopScreen = {
       clearNode(grid);
       stock.forEach((entry) => {
         const affordable = canAfford(entry.price);
+        const room = canHold(entry.item.id);
         const card = el(
           'div.shop-card',
-          { class: `${entry.soldOut ? 'is-sold' : ''} ${!affordable && !entry.soldOut ? 'is-poor' : ''}`.trim() },
+          {
+            class: `${entry.soldOut || !room ? 'is-sold' : ''} ${
+              !affordable && !entry.soldOut && room ? 'is-poor' : ''
+            }`.trim(),
+          },
           [
             entry.discounted && !entry.soldOut
               ? el('span.discount-flag', { text: `-${Math.round(DISCOUNT_RATE * 100)}%` })
@@ -84,7 +96,9 @@ export const ShopScreen = {
             ]),
             entry.soldOut
               ? el('button.btn.btn--small', { disabled: true }, ['Sold'])
-              : el('button.btn.btn--small.btn--gold', { onclick: () => buy(entry, card) }, ['Buy']),
+              : !room
+                ? el('button.btn.btn--small', { disabled: true }, ['Owned'])
+                : el('button.btn.btn--small.btn--gold', { onclick: () => buy(entry, card) }, ['Buy']),
           ],
         );
         grid.append(card);

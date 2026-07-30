@@ -53,7 +53,10 @@ export const SlotsScreen = {
         const world = getWorld(info.world);
         grid.append(
           el('div.panel.slot-card', {}, [
-            el('span.slot-name', { text: `Slot ${slot}` }),
+            el('div.row', { style: { justifyContent: 'space-between' } }, [
+              el('span.slot-name', { text: `Slot ${slot}` }),
+              info.completed ? el('span.chip.chip--legendary', { text: 'Finished' }) : null,
+            ]),
             el('div.slot-line', {}, [el('span', { text: 'World' }), el('span', { text: world.name })]),
             el('div.slot-line', {}, [el('span', { text: 'Level' }), el('span', { text: String(info.level) })]),
             el('div.slot-line', {}, [
@@ -66,7 +69,9 @@ export const SlotsScreen = {
               el('span', { text: timeAgo(info.savedAt) }),
             ]),
             el('div.slot-actions', {}, [
-              el('button.btn.btn--small.btn--gold', { onclick: () => resume(slot, data) }, ['Continue']),
+              el('button.btn.btn--small.btn--gold', { onclick: () => resume(slot, data) }, [
+                info.completed ? 'View ending' : 'Continue',
+              ]),
               el('button.btn.btn--small.btn--danger', { onclick: () => erase(slot) }, ['Erase']),
             ]),
           ]),

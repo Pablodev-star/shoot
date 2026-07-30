@@ -83,6 +83,8 @@ export function createDuel(config) {
   let round = 0;
   let over = false;
   let ended = null;
+  /** Set when an enemy ability damaged the player during the current round. */
+  let abilityHitPlayer = false;
 
   /** What agents are allowed to see. Both sides get the same shape. */
   function publicView(selfId) {
@@ -149,7 +151,7 @@ export function createDuel(config) {
         return playerMove;
       }
       case 'dynamite': {
-        damage('player', 1, { ignoreShield: true, source: 'dynamite' });
+        abilityHitPlayer = damage('player', 1, { ignoreShield: true, source: 'dynamite' });
         log('ability', { ability, side: 'enemy' });
         return playerMove;
       }
@@ -206,23 +208,68 @@ export function createDuel(config) {
     return over;
   }
 
+  /**
+   * Every resolution the engine hands back has the same shape, including the
+   * ones where the round ended early (an ability or a thrown item finished the
+   * duel before moves could resolve). The UI reads these fields unconditionally,
+   * so a partial object would crash the animation.
+   */
+  function makeResolution(extra = {}) {
+    return {
+      round,
+      ability: null,
+      playerMove: null,
+      enemyMove: null,
+      playerDry: false,
+      enemyDry: false,
+      playerMisfired: false,
+      enemyMisfired: false,
+      playerFires: false,
+      enemyFires: false,
+      hits: { player: false, enemy: false },
+      lives: { player: sides.player.lives, enemy: sides.enemy.lives },
+      bullets: { player: sides.player.bullets, enemy: sides.enemy.bullets },
+      ended,
+      /** Set when the round did not play out normally. */
+      terminatedBy: null,
+      ...extra,
+    };
+  }
+
   /** Play one full round. Returns the resolution for the UI to animate. */
   async function playRound() {
     if (over) return null;
     round += 1;
 
     const ability = rollEnemyAbility();
+    abilityHitPlayer = false;
 
     const [rawPlayerMove, enemyMove] = await Promise.all([
       sides.player.agent.chooseMove(publicView('player')),
       sides.enemy.agent.chooseMove(publicView('enemy')),
     ]);
 
-    if (over) return null; // an item may have ended the duel while choosing
+    // An item thrown from the inventory can end the duel while the engine is
+    // still waiting for a move. Hand back a well-formed terminal resolution so
+    // the screen can close the fight instead of stalling.
+    if (over) {
+      const resolution = makeResolution({ terminatedBy: 'item' });
+      log('round', resolution);
+      return resolution;
+    }
 
     let playerMove = rawPlayerMove;
     if (ability) playerMove = applyEnemyAbility(ability, playerMove);
-    if (checkEnd()) return { round, ability, ended };
+    if (checkEnd()) {
+      const resolution = makeResolution({
+        ability,
+        playerMove,
+        terminatedBy: 'ability',
+        hits: { player: abilityHitPlayer, enemy: false },
+      });
+      log('round', resolution);
+      return resolution;
+    }
 
     const p = normalise(sides.player, playerMove);
     const e = normalise(sides.enemy, enemyMove);
@@ -279,8 +326,12 @@ export function createDuel(config) {
   /**
    * Swap the enemy in without ending the duel — used for the Galaxy boss's
    * second phase. The player's bullets and lives carry over.
+   *
+   * Pass `agent` to install a controller built for the new stats: without it
+   * the incoming phase would keep playing with the previous phase's accuracy
+   * and move history.
    */
-  function setEnemy(next) {
+  function setEnemy(next, agent) {
     Object.assign(sides.enemy, {
       name: next.name,
       lives: next.lives,
@@ -290,6 +341,7 @@ export function createDuel(config) {
       abilities: next.abilities || [],
       abilityChanceMul: next.abilityChanceMul || 1,
       poison: 0,
+      agent: agent || sides.enemy.agent,
     });
     over = false;
     ended = null;

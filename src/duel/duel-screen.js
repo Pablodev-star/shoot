@@ -273,6 +273,8 @@ export const DuelScreen = {
     }
 
     function describe(res) {
+      if (res.terminatedBy === 'item') return 'That finished it.';
+      if (res.terminatedBy === 'ability') return 'Caught by their trick!';
       if (res.hits.player && res.hits.enemy) return 'Both of you go down a life!';
       if (res.hits.enemy) return 'You hit!';
       if (res.hits.player) return 'You are hit!';
@@ -285,14 +287,27 @@ export const DuelScreen = {
     // --- main loop ---------------------------------------------------------
     async function loop() {
       while (!finished) {
+        // A thrown item can finish the duel between rounds; never re-arm the
+        // controls on a duel that is already decided.
+        if (duel.isOver()) {
+          await endDuel(duel.getResult());
+          return;
+        }
+
         setControlsEnabled(true);
         callout.textContent = 'Make your move';
         const res = await duel.playRound();
         if (finished) return;
-        if (!res) break;
+        if (!res) {
+          if (duel.isOver()) await endDuel(duel.getResult());
+          return;
+        }
 
-        roundLog.push(res);
-        if (aiAgent.observe) aiAgent.observe(res.playerMove);
+        // Rounds cut short by an item have no moves to log or learn from.
+        if (res.playerMove) {
+          roundLog.push(res);
+          if (aiAgent.observe) aiAgent.observe(res.playerMove);
+        }
         await animate(res);
 
         if (duel.isOver()) {
@@ -302,8 +317,10 @@ export const DuelScreen = {
             const next = nextBossPhase(enemy);
             if (next) {
               enemy = next;
+              // The new agent has to go into the engine, not just this
+              // closure — otherwise phase two fights with phase one's brain.
               aiAgent = createAiAgent(enemy, modifiers, { thinkMs: 120 });
-              duel.setEnemy(next);
+              duel.setEnemy(next, aiAgent);
               enemyName.textContent = next.name;
               syncBars();
               await wait(900);
