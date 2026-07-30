@@ -1,0 +1,411 @@
+/* ==========================================================================
+   SHOOT! — Reusable UI kit: buttons, panels, wanted posters, lists, form
+   controls, modals, badges. Every screen is built out of these.
+   ========================================================================== */
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 200px;
+  padding: 12px 26px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bone);
+  background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 45%, var(--wood-dark) 100%);
+  border: 3px solid var(--wood-deep);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 2px 0 rgba(242, 227, 198, 0.28),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+    0 5px 0 var(--wood-deep),
+    0 8px 14px rgba(0, 0, 0, 0.45);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: transform 110ms ease, box-shadow 110ms ease, filter 160ms ease;
+  user-select: none;
+}
+
+/* Nail heads in the corners — sells the "sign nailed to a post" look. */
+.btn::before,
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #d9c7a4, #6b5230);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.btn::before { left: 8px; }
+.btn::after { right: 8px; }
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 2px 0 rgba(242, 227, 198, 0.35),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+    0 7px 0 var(--wood-deep),
+    0 12px 18px rgba(0, 0, 0, 0.5);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 1px 0 var(--wood-deep);
+}
+
+.btn:disabled,
+.btn.is-disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.65) brightness(0.7);
+  box-shadow: inset 0 2px 0 rgba(242, 227, 198, 0.1), 0 3px 0 var(--wood-deep);
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, #d8873f 0%, var(--wood) 55%, var(--wood-dark) 100%);
+  border-color: #2f1a09;
+  font-size: 22px;
+  min-width: 280px;
+  padding: 16px 30px;
+}
+
+.btn--danger { background: linear-gradient(180deg, var(--red-light), var(--red) 50%, var(--red-dark)); border-color: #4a0d0c; }
+.btn--gold { background: linear-gradient(180deg, var(--gold-light), var(--gold) 50%, var(--gold-dark)); color: var(--ink); text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35); }
+.btn--ghost { background: rgba(27, 18, 16, 0.55); border-color: var(--wood); box-shadow: inset 0 0 0 2px rgba(242, 227, 198, 0.12); }
+.btn--small { min-width: 0; padding: 8px 14px; font-size: 14px; letter-spacing: 1px; }
+.btn--icon { min-width: 0; padding: 8px; }
+.btn--wide { width: 100%; }
+
+/* "Coming soon" buttons: elegant, clearly inert, never look broken. */
+.btn--soon {
+  cursor: not-allowed;
+  color: var(--bone-dark);
+  background: linear-gradient(180deg, #6f5738, #4a3a25 60%, #33270f);
+  border-color: #241a0c;
+  filter: none;
+}
+.btn--soon:hover { transform: none; filter: brightness(1.05); }
+.btn--soon .tag-soon { font-size: 10px; }
+
+.tag-soon {
+  padding: 2px 7px;
+  border: 2px solid var(--gold-dark);
+  background: rgba(232, 177, 44, 0.14);
+  color: var(--gold-light);
+  font-size: 11px;
+  letter-spacing: 1px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* --- Panels --------------------------------------------------------------- */
+
+.panel {
+  position: relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 3px, transparent 3px 6px),
+    linear-gradient(180deg, #3a2716 0%, #23150a 100%);
+  border: var(--border-w) solid var(--wood-dark);
+  box-shadow:
+    inset 0 0 0 2px rgba(242, 227, 198, 0.12),
+    inset 0 0 40px rgba(0, 0, 0, 0.55),
+    0 10px 26px rgba(0, 0, 0, 0.55);
+  padding: clamp(14px, 2.4vh, 26px);
+  border-radius: var(--radius);
+}
+
+.panel--paper {
+  background:
+    repeating-linear-gradient(92deg, rgba(155, 120, 70, 0.08) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--sand-light) 0%, var(--sand) 55%, var(--sand-mid) 100%);
+  color: var(--ink);
+  border-color: var(--wood-dark);
+  box-shadow: inset 0 0 0 2px rgba(84, 51, 26, 0.4), 0 12px 26px rgba(0, 0, 0, 0.55);
+}
+
+.panel--paper .panel-title { color: var(--wood-deep); text-shadow: none; }
+
+.panel-title {
+  font-family: var(--font-display);
+  font-size: clamp(20px, 3vh, 30px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--gold-light);
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.65);
+  margin-bottom: 6px;
+}
+
+.panel-sub {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bone-dark);
+  margin-bottom: 14px;
+}
+
+/* Torn/nailed poster treatment. */
+.poster {
+  position: relative;
+  padding: 26px 32px;
+}
+
+.poster::before,
+.poster::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #efe0bd, #6b5230 70%, #2a1d0c);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+  top: 10px;
+}
+.poster::before { left: 12px; }
+.poster::after { right: 12px; }
+
+/* --- Section header + back ------------------------------------------------ */
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(920px, 96%);
+}
+
+.screen-title {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vh, 40px);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--sand-light);
+  text-shadow: 0 0 18px rgba(232, 177, 44, 0.25), 4px 4px 0 rgba(0, 0, 0, 0.65);
+}
+
+/* --- Lists / rows --------------------------------------------------------- */
+
+.list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(163, 112, 60, 0.35), rgba(56, 33, 15, 0.55));
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 1px rgba(242, 227, 198, 0.1);
+  transition: transform 130ms ease, border-color 130ms ease, background 130ms ease;
+}
+
+.list-row:hover {
+  transform: translateX(4px);
+  border-color: var(--gold-dark);
+  background: linear-gradient(180deg, rgba(200, 140, 70, 0.4), rgba(70, 42, 18, 0.6));
+}
+
+.list-row .title {
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 15px;
+}
+
+.list-row .meta { font-size: 12px; color: var(--bone-dark); letter-spacing: 1px; }
+
+/* --- Form controls -------------------------------------------------------- */
+
+.field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+
+.field > label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bone-dark);
+}
+
+.input {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--sand-light), var(--sand));
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.input:focus { border-color: var(--gold); box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(232, 177, 44, 0.3); }
+
+select.input { cursor: pointer; }
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  background: linear-gradient(180deg, var(--wood-deep), #1a0f05);
+  border: 3px solid var(--wood-dark);
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 26px;
+  margin-top: -2px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold-dark));
+  border: 2px solid var(--ink);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 26px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold-dark));
+  border: 2px solid var(--ink);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.toggle input { width: 18px; height: 18px; accent-color: var(--gold); }
+
+/* --- Badges / chips ------------------------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 2px solid var(--wood-dark);
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.chip--common { border-color: var(--grey); color: #cfc7bd; }
+.chip--rare { border-color: var(--blue-light); color: var(--blue-light); }
+.chip--legendary { border-color: var(--gold-light); color: var(--gold-light); text-shadow: 0 0 8px rgba(255, 226, 122, 0.6); }
+.chip--live { border-color: var(--green); color: #b7e9a0; }
+.chip--gold { border-color: var(--gold-dark); color: var(--gold-light); }
+
+.dot-live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+/* --- Modal ---------------------------------------------------------------- */
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 5, 3, 0.72);
+  backdrop-filter: blur(2px);
+  animation: fade-in 180ms ease-out both;
+  padding: 16px;
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  width: min(620px, 96%);
+  max-height: 88vh;
+  overflow: auto;
+  animation: modal-in 240ms cubic-bezier(0.2, 1.1, 0.3, 1) both;
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- Lives (red diamonds) — the one visual that never changes ------------- */
+
+.lives { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+
+.life {
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(150deg, var(--red-light), var(--red) 45%, var(--red-dark));
+  transform: rotate(45deg);
+  border: 2px solid #4a0d0c;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.life.is-empty {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(141, 26, 24, 0.55);
+  box-shadow: none;
+}
+
+.life.is-lost { animation: life-pop 420ms ease-out both; }
+
+@keyframes life-pop {
+  0% { transform: rotate(45deg) scale(1.5); filter: brightness(2.2); }
+  100% { transform: rotate(45deg) scale(1); filter: none; }
+}
+
+.life--big { width: 22px; height: 22px; }
+
+/* --- Bars ----------------------------------------------------------------- */
+
+.bar {
+  position: relative;
+  height: 18px;
+  background: linear-gradient(180deg, #1a0f05, #2a1a0c);
+  border: 3px solid var(--wood-dark);
+  overflow: hidden;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+.bar > .fill {
+  height: 100%;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold) 55%, var(--gold-dark));
+  transition: width 260ms ease-out, background 300ms linear;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.bar.is-low > .fill { background: linear-gradient(180deg, var(--red-light), var(--red-dark)); }
+.bar.is-low { animation: bar-alarm 900ms ease-in-out infinite; }
+
+@keyframes bar-alarm {
+  0%, 100% { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6); }
+  50% { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 12px rgba(198, 47, 42, 0.8); }
+}
+
+.bar--exp > .fill { background: linear-gradient(180deg, var(--blue-light), var(--blue)); }
