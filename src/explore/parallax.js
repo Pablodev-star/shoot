@@ -95,7 +95,7 @@ const BAYER = [
  * sandstorm gets none — sand does not arrive under rain cloud, it arrives as
  * the sky itself turning the colour of the ground, which the ochre haze does.
  */
-const STORM_DECK = { cloudy: 0.85, rain: 1, sandstorm: 0 };
+const STORM_DECK = { cloudy: 0.6, rain: 1, sandstorm: 0 };
 
 export function createParallax(options = {}) {
   const env = getEnvironmentSprites();
@@ -237,7 +237,7 @@ export function createParallax(options = {}) {
       ctx.globalAlpha = 1;
     }
 
-    drawHorizonGlow(ctx, view, sky, gy, cx);
+    drawHorizonGlow(ctx, view, sky, gy);
     drawStars(ctx, view, sky);
 
     const pattern = skyPattern(ctx, view, sky);
@@ -308,36 +308,31 @@ export function createParallax(options = {}) {
   /**
    * The band of light lying on the horizon. Quantised into steps rather than
    * poured out of a gradient, for the same reason the sky is.
+   *
+   * It starts at the walk line and fades upward over a long stack. Two earlier
+   * versions of this were wrong in opposite ways: started at the walk line over
+   * a short stack it was buried behind the ridges and nobody ever saw it, and
+   * started fifty pixels up it hung a bright bar in mid-air at sunrise, with a
+   * hard bottom edge floating wherever no ridge happened to cover it. Running
+   * the stack from the ground up means the bottom is always behind terrain and
+   * only the fading top shows, which is what a horizon glow is.
+   *
+   * There is no separate bright pool under the sun any more. It was drawn with
+   * the baked orange halo whatever the hour, so on a rainy night it put an
+   * orange smear over the dunes under the moon.
    */
-  function drawHorizonGlow(ctx, view, sky, gy, bodyX) {
+  function drawHorizonGlow(ctx, view, sky, gy) {
     if (sky.glowA <= 0.02) return;
     const s = view.scale;
-    const bands = 12;
-    const bandH = Math.max(s, Math.round((view.h * 0.16) / bands / s) * s);
-    // Anchored to the *skyline*, not to the walk line: the ridges stand up to
-    // fifty source pixels above the road, and a glow laid on the road is a glow
-    // nobody ever sees.
-    const horizon = gy - 50 * s;
+    const bands = 22;
+    const bandH = Math.max(s, Math.round((view.h * 0.42) / bands / s) * s);
     ctx.fillStyle = sky.glow;
     for (let i = 0; i < bands; i++) {
-      const y = horizon - (i + 1) * bandH;
+      const y = gy - (i + 1) * bandH;
       if (y + bandH < 0) break;
-      ctx.globalAlpha = sky.glowA * 0.34 * (1 - i / bands) ** 1.7;
+      ctx.globalAlpha = sky.glowA * 0.4 * (1 - i / bands) ** 1.5;
       ctx.fillRect(0, y, view.w, bandH + 1);
     }
-    ctx.globalAlpha = 1;
-    // A brighter pool directly under whichever body is near the horizon. Its
-    // scale is a whole number of screen pixels so the halo's own pixels stay
-    // square when it is blown up.
-    const pool = SKY_GLOW_SIZE * Math.max(1, Math.round(s * 2.2));
-    ctx.globalAlpha = sky.glowA * 0.5;
-    ctx.drawImage(
-      env.sky.glow[0],
-      Math.round((bodyX - pool / 2) / s) * s,
-      Math.round((horizon - pool * 0.45) / s) * s,
-      pool,
-      pool,
-    );
     ctx.globalAlpha = 1;
   }
 

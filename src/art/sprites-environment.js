@@ -279,10 +279,16 @@ export const SKY_BODY_SIZE = 16;
 /** How many moon phases are baked. One step per in-game day. */
 export const MOON_PHASE_COUNT = 8;
 
-/** Sun tones: index 0 is the low, red sun; index 1 the high, white one. */
+/**
+ * Sun tones: index 0 is the low, red sun; index 1 the high one.
+ *
+ * The high sun's core is a paler yellow, not white. A white centre is what a
+ * camera does when it blows out an exposure, not what the sun looks like — and
+ * against a palette this warm it read as a hole in the sprite.
+ */
 const SUN_TONES = [
   { rim: '#a83a12', body: '#e8642a', core: PALETTE.goldLight },
-  { rim: PALETTE.goldDark, body: PALETTE.gold, core: PALETTE.white },
+  { rim: PALETTE.goldDark, body: PALETTE.gold, core: '#ffea9e' },
 ];
 
 function discPixels(size, plot) {
@@ -619,7 +625,7 @@ export function getEnvironmentSprites() {
         makeMoonPhase(0.12 + (i / MOON_PHASE_COUNT) * 0.76),
       ),
       /** Halos: [low sun, high sun] and the moon's colder, tighter one. */
-      glow: [makeGlow('#ff9a4c', 0.55), makeGlow(PALETTE.goldLight, 0.38)],
+      glow: [makeGlow('#ff9a4c', 0.55), makeGlow('#ffd766', 0.34)],
       moonGlow: makeGlow('#b9c9ff', 0.26),
     },
     buildings: {
