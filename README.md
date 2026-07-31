@@ -93,9 +93,9 @@ src/
     palette.js            the one palette the whole game uses
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
     sprites-character.js  player, rider and horse animations (Block 2a)
-    sprites-environment.js props, buildings, parallax layers (Block 2b)
+    sprites-environment.js props, buildings, sun/moon, parallax layers (Block 2b)
     sprites-items.js      item icons (Block 2c)
-    sprites-ui.js         interface icons — back, close, help, lock (Block 2d)
+    sprites-ui.js         interface icons + the duel shield (Block 2d)
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens

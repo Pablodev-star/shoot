@@ -26,6 +26,7 @@ import {
   PARALLAX_MANIFEST,
   LAYER_TILE_W,
   SCATTER_TABLE,
+  SKY_BODY_SIZE,
 } from '../art/sprites-environment.js';
 import { makeRng } from '../core/rng.js';
 import { getSky } from './daynight.js';
@@ -80,35 +81,34 @@ export function createParallax(options = {}) {
       ctx.globalAlpha = 1;
     }
 
-    // Sun by day, moon by night — same arc, opposite phase.
+    /**
+     * Sun by day, moon by night — same arc, opposite phase. Both are sprites
+     * on the pixel grid rather than `arc()` fills, and the moon's crescent is
+     * cut out of the sprite instead of being painted over with a sky colour:
+     * the dark limb is transparent, so the gradient behind it shows through
+     * exactly and there is nothing there to see. Painting the bite could only
+     * ever match the sky at one height and one moment of the day/night clock.
+     */
     const p = sky.sunProgress;
     const isSun = p >= 0 && p <= 1;
     const arcT = isSun ? p : (p < 0 ? p + 1 : p - 1);
+    const bodyScale = view.scale;
+    const size = SKY_BODY_SIZE * bodyScale;
     const cx = view.w * (0.1 + arcT * 0.8);
     const cy = view.h * 0.62 - Math.sin(arcT * Math.PI) * view.h * 0.5;
-    const r = view.scale * (isSun ? 7 : 5);
     if (isSun) {
       // Soft halo first, so the disc sits inside a glow rather than a ring.
+      const r = size / 2;
       const halo = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 3.2);
       halo.addColorStop(0, 'rgba(255, 226, 122, 0.32)');
       halo.addColorStop(1, 'rgba(255, 226, 122, 0)');
       ctx.fillStyle = halo;
       ctx.fillRect(cx - r * 3.4, cy - r * 3.4, r * 6.8, r * 6.8);
     }
-    ctx.fillStyle = isSun ? PALETTE.goldLight : PALETTE.bone;
-    ctx.globalAlpha = 0.95;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (!isSun) {
-      // Crescent bite.
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = sky.top;
-      ctx.beginPath();
-      ctx.arc(cx + r * 0.45, cy - r * 0.3, r * 0.95, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+    // Snap to the pixel grid so the disc never lands on a half pixel.
+    const bx = Math.round((cx - size / 2) / bodyScale) * bodyScale;
+    const by = Math.round((cy - size / 2) / bodyScale) * bodyScale;
+    drawSprite(ctx, isSun ? env.sky.sun : env.sky.moon, bx, by, bodyScale);
   }
 
   // --- tiled layers -------------------------------------------------------
