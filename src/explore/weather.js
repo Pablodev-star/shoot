@@ -5,7 +5,7 @@
  * the sky clears again:
  *
  *   clear      — nothing drawn
- *   cloudy     — a grey wash and drifting cloud shadows, mild visibility loss
+ *   cloudy     — a light grey wash under the storm deck, mild visibility loss
  *   rain       — three depths of falling rain that break on the ground, a dark
  *                wash, and lightning that actually strikes something
  *   sandstorm  — three depths of driven sand, tumbling grit, gusting dust
@@ -90,21 +90,31 @@ const TRANSITIONS = {
 };
 
 /**
- * Rain depths, in source pixels per 60Hz frame.
- *  `land` is how far below the walk line this depth breaks: negative is behind
- *  the road (up against the dunes), positive is in front of it.
+ * EVERYTHING HERE IS MEASURED AGAINST THE MAN
+ * ---------------------------------------------------------------------------
+ * The gunslinger is 16 x 24 source pixels. That is the ruler. A raindrop two
+ * pixels wide and eleven long is a drop half as tall as the person it is
+ * falling on, and no amount of detail survives that — it reads as debris
+ * flying past, not as weather. Drops are one pixel wide and two to five long,
+ * sand is a dash of two to nine — half his width at the very most, and only on
+ * the fastest layer, where the length is reading as speed — and the density
+ * does the work the size used to be doing.
+ *
+ * Rain depths, in source pixels per 60Hz frame. `land` is how far below the
+ * walk line this depth breaks: negative is behind the road (up against the
+ * dunes), positive is in front of it.
  */
 const RAIN_DEPTHS = [
-  { len: 4, vy: 3.4, alpha: 0.34, w: 1, land: 0, share: 0.42 },
-  { len: 7, vy: 4.8, alpha: 0.5, w: 1, land: 5, share: 0.34 },
-  { len: 11, vy: 6.4, alpha: 0.72, w: 2, land: 11, share: 0.24 },
+  { len: 2, vy: 3.4, alpha: 0.4, w: 1, land: 0, share: 0.42 },
+  { len: 3, vy: 4.8, alpha: 0.56, w: 1, land: 5, share: 0.34 },
+  { len: 5, vy: 6.4, alpha: 0.78, w: 1, land: 11, share: 0.24 },
 ];
 
 /** Sandstorm depths, same units. Sand travels sideways, not down. */
 const SAND_DEPTHS = [
-  { vx: -7, len: [12, 30], alpha: 0.26, h: 1, share: 0.4 },
-  { vx: -12, len: [9, 22], alpha: 0.44, h: 1, share: 0.36 },
-  { vx: -19, len: [6, 15], alpha: 0.68, h: 2, share: 0.24 },
+  { vx: -7, len: [2, 6], alpha: 0.3, h: 1, share: 0.4 },
+  { vx: -12, len: [3, 7], alpha: 0.48, h: 1, share: 0.36 },
+  { vx: -19, len: [4, 9], alpha: 0.7, h: 1, share: 0.24 },
 ];
 
 const RAIN_COLOR = [186, 214, 255];
@@ -213,7 +223,7 @@ export function update(dt, view) {
 
 function stepParticles(dt, view) {
   const id = state.shown.id;
-  const wanted = id === 'sandstorm' ? 240 : id === 'rain' ? 200 : 0;
+  const wanted = id === 'sandstorm' ? 300 : id === 'rain' ? 300 : 0;
   const count = Math.round(wanted * state.intensity);
   const W = view.w / view.scale;
   const H = view.h / view.scale;
@@ -404,7 +414,7 @@ function boltAlpha() {
  * of those read as eight ruled lines across the desert.
  */
 function bandWash(ctx, view, color, fromY, toY, alphaTop, alphaBottom) {
-  const bands = 8;
+  const bands = 16;
   const span = toY - fromY;
   ctx.fillStyle = color;
   for (let i = 0; i < bands; i++) {
@@ -448,29 +458,15 @@ export function render(ctx, view) {
   const light = 0.45 + getSky().light * 0.55;
 
   if (id === 'cloudy') {
-    bandWash(ctx, view, 'rgb(64, 68, 84)', 0, view.h, 0.4 * k, 0.28 * k);
     /**
-     * Cloud shadows crawling over the road. Two rules learned the hard way: a
-     * shadow falls on the ground, not on the sky above it — and it has no edge.
-     * Cast over the ridges it was a translucent rectangle sliding across the
-     * scenery, which is exactly what it looked like. Kept to the flat sand
-     * below the walk line and stepped in five widths, it is a cloud going over.
+     * Overcast is the mildest weather there is: it takes the edge off the
+     * light, and that is the whole of it. It used to drop the scene by nearly
+     * half and drag shadow bands across the road as well, which made a cloudy
+     * afternoon a bigger change than nightfall and put a shape on the sand
+     * that nothing in the sky accounted for. The cloud belongs in the sky,
+     * where the storm deck draws it. Down here it is only less sun.
      */
-    ctx.fillStyle = 'rgb(40, 42, 56)';
-    for (let i = 0; i < 3; i++) {
-      const w = view.w * (0.34 + i * 0.1);
-      const x = ((state.clock / (46 + i * 17) + i * 900) % (view.w + w * 2)) - w * 1.5;
-      for (const [inset, mul] of [[0, 0.2], [0.1, 0.4], [0.2, 0.65], [0.32, 0.85], [0.42, 1]]) {
-        ctx.globalAlpha = 0.09 * k * mul;
-        ctx.fillRect(
-          Math.round((x + w * inset) / s) * s,
-          gy,
-          Math.round((w * (1 - inset * 2)) / s) * s,
-          view.h - gy,
-        );
-      }
-    }
-    ctx.globalAlpha = 1;
+    bandWash(ctx, view, 'rgb(64, 68, 84)', 0, view.h, 0.2 * k, 0.14 * k);
     return;
   }
 
@@ -518,10 +514,10 @@ function drawRain(ctx, view, k, light) {
     const d = RAIN_DEPTHS[p.depth];
     const c = RAIN_COLOR.map((v) => Math.round(v * light));
     ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${p.a * k})`;
-    // A streak is a stack of short blocks, each nudged sideways by the wind,
-    // rather than one long slanted line: this is what a drop looks like when
-    // the screen only has whole pixels to spend.
-    const segs = Math.max(2, Math.round(p.len / 3));
+    // A streak is one or two short blocks, the upper one nudged sideways by
+    // the wind. At this size that is the whole drop: a couple of pixels of
+    // lean is already the difference between rain and hail.
+    const segs = Math.max(1, Math.round(p.len / 2));
     const segLen = p.len / segs;
     for (let i = 0; i < segs; i++) {
       const y = p.y - i * segLen;
@@ -552,19 +548,18 @@ function drawSplashes(ctx, view, k, light) {
     const a = (1 - sp.t) * k * (near ? 0.8 : 0.5);
     ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
     if (sp.t < 0.34) {
-      // The hit: a chip of water standing up off the ground.
+      // The hit: one pixel of water standing up off the road.
       ctx.fillRect(x, y - s, s, s);
-      ctx.fillRect(x - s, y, s * 3, s);
+      ctx.fillRect(x, y, s, s);
     } else if (sp.t < 0.67) {
-      // Two beads thrown sideways.
-      ctx.fillRect(x - s * 2, y - s, s, s);
-      ctx.fillRect(x + s * 2, y - s, s, s);
-      ctx.fillRect(x - s, y, s * 3, s);
+      // Two beads thrown sideways, one pixel each — a drop one pixel wide
+      // cannot throw a five-pixel crown.
+      ctx.fillRect(x - s, y, s, s);
+      ctx.fillRect(x + s, y, s, s);
     } else {
-      // The ring left behind, one continuous line so it reads as a puddle
-      // rather than as two pieces of grit.
-      ctx.globalAlpha = 0.55;
-      ctx.fillRect(x - s * 2, y, s * 5, s);
+      // The ring left behind on the wet ground.
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(x - s, y, s * 3, s);
       ctx.globalAlpha = 1;
     }
   }
@@ -602,16 +597,22 @@ function drawSand(ctx, view, k, light) {
     const x = Math.round(p.x) * s;
     const y = Math.round(p.y) * s;
     if (p.grit) {
-      // Grit tumbles: a two-pixel clump with a pixel trailing it.
-      ctx.fillRect(x, y, s * 2, s * 2);
+      // Grit tumbles: a single pixel with a fainter one trailing it. The
+      // grain's own opacity is already in `fillStyle`, so the trail only asks
+      // for half of it here — multiplying it in twice squared the alpha and
+      // faded the trails out quadratically as the storm came and went.
+      ctx.fillRect(x, y, s, s);
       ctx.globalAlpha = 0.5;
-      ctx.fillRect(x + s * 3, y + s, s, s);
+      ctx.fillRect(x + s * 2, y, s, s);
       ctx.globalAlpha = 1;
-    } else {
-      // A streak with a gap in it reads as speed; a solid bar reads as a bar.
-      const head = Math.round(p.len * 0.6);
+    } else if (p.len > 4) {
+      // The long dashes get a gap in them: a streak with a break reads as
+      // speed, a solid bar reads as a bar. The short ones cannot spare it.
+      const head = p.len - 2;
       ctx.fillRect(x, y, head * s, d.h * s);
-      ctx.fillRect(x + (head + 2) * s, y, (p.len - head) * s, d.h * s);
+      ctx.fillRect(x + (head + 2) * s, y, s, d.h * s);
+    } else {
+      ctx.fillRect(x, y, p.len * s, d.h * s);
     }
   }
   ctx.globalAlpha = 1;
