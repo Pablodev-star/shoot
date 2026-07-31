@@ -183,10 +183,23 @@ export function setPaused(paused) {
   state.paused = paused;
 }
 
-/** Jump the clock (used when loading a save). */
+/** Jump the clock without touching how many days have gone by. */
 export function setTime(t) {
   state.time = ((t % 1) + 1) % 1;
   state.phase = phaseAt(state.time);
+}
+
+/**
+ * Start the clock over: hour of the day *and* the day count.
+ *
+ * A new run needs both. `elapsed` is what the moon phase is counted from, and
+ * it keeps running under the menu backdrop, so a run started after ten minutes
+ * on the title screen would otherwise open under a different moon than one
+ * started immediately. Saves restore `elapsed` and so keep their own moon.
+ */
+export function reset(t = 0.32) {
+  state.elapsed = 0;
+  setTime(t);
 }
 
 function phaseAt(t) {

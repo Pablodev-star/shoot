@@ -219,7 +219,7 @@ function stepParticles(dt, view) {
   const H = view.h / view.scale;
   const gy = groundOf(view) / view.scale;
 
-  while (state.particles.length < count) state.particles.push(spawn(W, H, gy, id));
+  while (state.particles.length < count) state.particles.push(spawn(W, H, id, gy));
   while (state.particles.length > count) state.particles.pop();
 
   const step = dt / 16.67;
@@ -231,14 +231,19 @@ function stepParticles(dt, view) {
       p.vx = (wind * p.vy) / 6;
       p.x += p.vx * step;
       p.y += p.vy * step;
-      if (p.y >= p.landY) {
+      // The landing line is derived from the ground *this frame*, never
+      // captured at spawn: the duel raises the walk line, and drops holding an
+      // old landing line fell straight through the new road until they
+      // happened to be recycled.
+      const landY = gy + p.landOffset;
+      if (p.y >= landY) {
         // The far curtain does not splash: at that distance a single pixel of
         // spray is noise, and 200 of them turned the road into gravel.
-        if (p.depth > 0) addSplash(p.x, p.landY, p.depth);
-        Object.assign(p, spawn(W, H, gy, id));
+        if (p.depth > 0) addSplash(p.x, landY, p.depth);
+        Object.assign(p, spawn(W, H, id));
         p.y = -rng.range(2, 30);
       } else if (p.x < -30 || p.x > W + 30) {
-        Object.assign(p, spawn(W, H, gy, id));
+        Object.assign(p, spawn(W, H, id));
       }
     }
     return;
@@ -250,13 +255,18 @@ function stepParticles(dt, view) {
       p.x += p.vx * gust * step;
       p.y += p.vy * step;
       if (p.grit) p.y += Math.sin(state.clock / 260 + p.phase) * 0.28 * step;
-      if (p.x < -40 || p.y > H + 10 || p.y < -10) Object.assign(p, spawn(W, H, gy, id));
+      if (p.x < -40 || p.y > H + 10 || p.y < -10) Object.assign(p, spawn(W, H, id, gy));
     }
     stepSheets(dt, W, H);
   }
 }
 
-function spawn(W, H, gy, id) {
+/**
+ * A new particle. `gy` is only consulted by the sandstorm, which piles its sand
+ * up against the ground at spawn time; rain keeps its landing line as an offset
+ * from whatever the ground happens to be when it gets there.
+ */
+function spawn(W, H, id, gy = H * 0.78) {
   if (id === 'sandstorm') {
     const depth = pickDepth(SAND_DEPTHS);
     const d = SAND_DEPTHS[depth];
@@ -284,7 +294,8 @@ function spawn(W, H, gy, id) {
     vy: d.vy * rng.range(0.9, 1.1),
     len: d.len,
     a: d.alpha * rng.range(0.75, 1.1),
-    landY: gy + d.land + rng.range(-3, 3),
+    /** How far below the walk line this drop breaks, in source pixels. */
+    landOffset: d.land + rng.range(-3, 3),
   };
 }
 
