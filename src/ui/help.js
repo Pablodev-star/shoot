@@ -2,42 +2,62 @@
  * SHOOT! — How to Play.
  *
  * The whole game is three buttons, but nothing on screen explains them unless
- * we do. This panel is reachable from the title screen and from inside a duel,
- * and it opens automatically the first time a player starts a run.
+ * we do. This panel is reachable from the title screen, from settings and from
+ * inside a duel, and it opens automatically the first time a player starts a
+ * run.
+ *
+ * It is also where the duel rules now live in full. The duel screen used to
+ * reprint them under its buttons on every turn of every fight; stating them
+ * once, properly, in a place the player can return to is worth more than
+ * stating them badly a thousand times.
+ *
+ * The outcome table is the centre of this panel: five prose rules about who
+ * hits whom become one grid you can read in a single pass.
  */
 
 import { el } from '../core/dom.js';
 import { attachButtonSounds } from '../core/audio.js';
 import { getSettings, updateSettings } from '../core/settings.js';
-import { icon } from './widgets.js';
+import { icon, uiIcon, closeButton } from './widgets.js';
 
 const MOVES = [
   {
     key: 'reload',
     name: 'Reload',
-    hint: '+1 bullet',
-    body: 'You load a round — but you are wide open this turn.',
+    iconName: 'chamber',
+    chip: '+1 round',
+    body: 'Puts one round in the cylinder. You are open to a shot while you do it.',
   },
   {
     key: 'shield',
     name: 'Shield',
-    hint: 'no bullets spent',
+    iconName: 'shieldPlate',
+    chip: 'costs nothing',
     body: 'Nothing gets through. You gain nothing either.',
   },
   {
     key: 'shoot',
     name: 'Shoot',
-    hint: 'costs 1 bullet',
-    body: 'Hits a rival who reloaded or shot. Wasted on a shield.',
+    iconName: 'revolver',
+    chip: '−1 round',
+    body: 'Needs a loaded round. Wasted on someone who shielded.',
   },
 ];
 
-const RULES = [
-  'Both of you choose at the same time. Nobody sees the other move first.',
-  'Shoot someone who is reloading or shooting and they lose a life.',
-  'If you both shoot, you both lose a life.',
-  'First one out of lives loses the duel.',
-  'Out on the road: hunger drains as you walk, and at zero it costs you lives. Keep food in your bag.',
+/** Every pairing, and what comes of it. Rows are you, columns are them. */
+const OUTCOMES = [
+  ['Reload', 'Reload', 'Nothing happens. You both gain a round.'],
+  ['Reload', 'Shoot', 'You lose a life.'],
+  ['Shield', 'Shoot', 'Blocked. Their round is wasted.'],
+  ['Shoot', 'Reload', 'They lose a life.'],
+  ['Shoot', 'Shield', 'Blocked. Your round is wasted.'],
+  ['Shoot', 'Shoot', 'You both lose a life.'],
+];
+
+const ROAD_RULES = [
+  'You and your rival choose at the same time. Nobody sees the other move first.',
+  'The first one out of lives loses the duel.',
+  'On the road, hunger drains as you walk. At zero it starts costing lives, so keep food in your bag.',
 ];
 
 /**
@@ -62,39 +82,69 @@ export function openHowToPlay(opts = {}) {
   };
   document.addEventListener('keydown', onKey);
 
+  const moveClass = (name) => `mv--${name.toLowerCase()}`;
+
   const modal = el('div.panel.modal.modal--wide', { role: 'dialog', 'aria-label': 'How to play' }, [
     el('div.modal-header', {}, [
       el('h2.panel-title', { text: 'How to Play' }),
-      el('button.btn.btn--sm.btn--icon.btn--ghost', { onclick: close, 'aria-label': 'Close' }, ['✕']),
+      closeButton(close),
     ]),
+
     el('div.modal-content', {}, [
-      el('p.panel-sub', { text: 'Every duel is these three buttons' }),
       el('div.howto-moves', {},
         MOVES.map((m) =>
           el(`div.howto-move.is-${m.key}`, {}, [
-            el('h4', {}, [m.name, el('span.chip', { text: m.hint })]),
+            el('div.howto-move-head', {}, [
+              uiIcon(m.iconName, 1.2),
+              el('span', { text: m.name }),
+              el('span.chip', { text: m.chip }),
+            ]),
             el('p', { text: m.body }),
           ]),
         ),
       ),
-      el('div.divider', { text: 'The rules' }),
+
+      el('div.divider', { text: 'What beats what' }),
+      el('table.howto-matrix', {}, [
+        el('thead', {}, [
+          el('tr', {}, [
+            el('th', { text: 'You' }),
+            el('th', { text: 'Them' }),
+            el('th', { text: 'Result' }),
+          ]),
+        ]),
+        el('tbody', {},
+          OUTCOMES.map(([mine, theirs, result]) =>
+            el('tr', {}, [
+              el('td', { class: moveClass(mine), text: mine }),
+              el('td', { class: moveClass(theirs), text: theirs }),
+              el('td', { text: result }),
+            ]),
+          ),
+        ),
+      ]),
+
+      el('div.divider', { text: 'The rest' }),
       el('div.howto-rules', {},
-        RULES.map((rule) => el('div.howto-rule', {}, [el('span.bullet'), el('span', { text: rule })])),
+        ROAD_RULES.map((rule) => el('div.howto-rule', {}, [el('span.bullet'), el('span', { text: rule })])),
       ),
-      el('div.divider', { text: 'Controls' }),
-      el('div.row', { style: { justifyContent: 'center' } }, [
+
+      el('div.divider', { text: 'Keys' }),
+      el('div.row.row--center', {}, [
         el('span.chip', {}, [el('span.kbd', { text: '1' }), 'Reload']),
         el('span.chip', {}, [el('span.kbd', { text: '2' }), 'Shield']),
         el('span.chip', {}, [el('span.kbd', { text: '3' }), 'Shoot']),
         el('span.chip', {}, [el('span.kbd', { text: 'I' }), 'Saddlebag']),
         el('span.chip', {}, [el('span.kbd', { text: 'Esc' }), 'Close']),
       ]),
-      el('div.row', { style: { justifyContent: 'center', marginTop: 'var(--sp-4)' } }, [
-        icon('life', 1.4),
-        el('span.muted', { text: 'Lives are red diamonds — yours on the left, theirs on the right.' }),
+
+      el('div.row.row--center', { style: { marginTop: 'var(--sp-4)' } }, [
+        icon('life', 1.2),
+        el('span.muted', { text: 'Lives are red diamonds. Yours on the left, theirs on the right.' }),
       ]),
     ]),
-    el('div.modal-footer', {}, [
+
+    el('div.modal-footer', { style: { justifyContent: 'center' } }, [
       el('button.btn.btn--primary', { onclick: close }, ['Got it']),
     ]),
   ]);

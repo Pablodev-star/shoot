@@ -69,9 +69,16 @@ marked `// NETWORK:` in `src/menu/online.js` need bodies.
 
 ## Layout
 
+The interface is built from five materials and nothing else — plank, iron,
+brass, paper and rope — defined once in `styles/base.css`. Four rules keep it
+honest: no screen is wider than its content needs, a control never stretches to
+fill space it does not use, nothing on screen restates what the player can
+already see, and every icon is drawn in the game's own palette rather than
+typed as a character.
+
 ```
 index.html              boot page: one canvas, one screen root, one overlay
-styles/                 base tokens · UI kit · menu screens · game screens
+styles/                 materials & tokens · UI kit · menu screens · game screens
 src/
   main.js               boot order + screen registry
   core/                 engine plumbing, no game rules
@@ -87,7 +94,8 @@ src/
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
     sprites-character.js  player, rider and horse animations (Block 2a)
     sprites-environment.js props, buildings, parallax layers (Block 2b)
-    sprites-items.js      item and UI icons (Block 2c)
+    sprites-items.js      item icons (Block 2c)
+    sprites-ui.js         interface icons — back, close, help, lock (Block 2d)
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens
@@ -95,6 +103,9 @@ src/
   game/                  items, worlds, progression maths, player state,
                          enemies, save slots, run controller, interstitials
 ```
+
+`docs/ui-audit.md` records what was wrong with the previous interface and why
+each part of it was rebuilt.
 
 Three rules hold the architecture together:
 

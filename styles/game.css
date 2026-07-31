@@ -1,37 +1,37 @@
 /* ==========================================================================
-   SHOOT! — In-game screens: travelling HUD, shops, inns, inventory, duel,
+   SHOOT! — In-game screens: the travel band, shops, inns, inventory, duel,
    interstitials.
    ========================================================================== */
 
 /* ==========================================================================
-   Shared in-game status bar
-   Same position, same order, on every screen inside a run — so the player
-   never hunts for their lives or their gold.
+   The travel band
+
+   One bar, not two. Where you are, how you are doing, and how hungry you are,
+   in a single strip at the top of every screen inside a run — so the player
+   builds one mental map of the interface instead of three.
    ========================================================================== */
 
-.statusbar {
+.trailband {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
-  max-width: var(--content-wide);
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-glass);
   border: 2px solid var(--edge);
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-1);
-  backdrop-filter: blur(4px);
-  flex: 0 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1);
+  backdrop-filter: blur(5px);
 }
 
-.statusbar-place {
+.trailband-place {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
   min-width: 0;
-  line-height: 1.15;
 }
 
-.statusbar-place .world {
+.trailband-place .world {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-tight);
@@ -41,143 +41,65 @@
   text-overflow: ellipsis;
 }
 
-.statusbar-place .sub {
-  font-size: var(--text-xs);
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-
-.statusbar .divider-v {
+.trailband .rule {
   width: 2px;
   align-self: stretch;
-  background: var(--edge);
+  margin: 2px 0;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 1px 0 0 var(--edge-highlight);
   border-radius: 1px;
 }
 
-.chip.is-bumped { animation: chip-bump var(--dur-base) var(--ease-spring) both; }
+/* The hunger meter lives in the band, sized to itself. */
+.trailband .meter { max-width: 190px; flex: 0 1 190px; }
 
-@keyframes chip-bump {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.16); }
-  100% { transform: scale(1); }
+.trailband-actions { display: flex; align-items: center; gap: var(--sp-2); }
+
+@media (max-width: 900px) {
+  .trailband .meter { flex: 0 1 130px; }
 }
 
 @media (max-width: 700px) {
-  .statusbar { gap: var(--sp-2); padding: var(--sp-2); }
-  .statusbar .divider-v { display: none; }
-  .statusbar-place .sub { display: none; }
+  .trailband { gap: var(--sp-2); padding: var(--sp-2); flex-wrap: wrap; }
+  .trailband .rule { display: none; }
+  .trailband .meter { flex: 1 1 100%; max-width: none; order: 5; }
 }
 
-/* On a phone the bar must stay one line: shrink the diamonds rather than let
-   them wrap, and let the world name truncate instead of pushing everything. */
 @media (max-width: 520px) {
-  .statusbar { gap: 6px; }
-  .statusbar .lives { flex-wrap: nowrap; gap: 3px; }
-  .statusbar .life { width: 11px; height: 11px; border-width: 1px; }
-  .statusbar-place { max-width: 80px; }
-  .statusbar-place .world { font-size: var(--text-xs); }
-  .statusbar .chip { padding: 4px 8px; }
+  .trailband { gap: 6px; }
+  .trailband .lives { flex-wrap: nowrap; gap: 3px; }
+  .trailband .life { width: 11px; height: 11px; border-width: 1px; }
+  .trailband-place { max-width: 96px; }
+  .trailband-place .world { font-size: var(--text-xs); }
+  .trailband .chip { padding: 4px 8px; }
 }
 
 /* ==========================================================================
    Exploration
+
+   Deliberately almost empty. The band at the top, the bag at the bottom, and
+   nothing in between — no status pill narrating the walk, no countdown to the
+   next encounter. What you see is your character on the road.
    ========================================================================== */
 
 .explore-screen {
+  --screen-max: 1000px;
   justify-content: space-between;
   pointer-events: none; /* the desert shows through; children opt back in */
 }
 
 .explore-screen > * { pointer-events: auto; }
 
-.explore-top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-  max-width: var(--content-wide);
-}
-
-/* Survival strip: hunger + lives, big enough to read while walking. */
-.travel-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--sp-4);
-  width: 100%;
-  padding: var(--sp-3);
-  background: var(--surface-glass);
-  border: 2px solid var(--edge);
-  border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-1);
-  backdrop-filter: blur(4px);
-}
-
-.travel-atmos {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-@media (max-width: 620px) {
-  .travel-panel { grid-template-columns: 1fr; gap: var(--sp-2); }
-  .travel-atmos { justify-content: flex-start; }
-}
-
-/* The road-status line: what the player is doing right now, in words. */
-.travel-status {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  background: var(--surface-glass);
-  border: 2px solid var(--edge);
-  border-radius: 999px;
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--text-dim);
-  backdrop-filter: blur(4px);
-  animation: rise var(--dur-base) var(--ease-out) both;
-}
-
-.travel-status .walk-dots { display: inline-flex; gap: 3px; }
-.travel-status .walk-dots i {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--gold);
-  animation: walk-dot 1.2s var(--ease-in-out) infinite;
-}
-.travel-status .walk-dots i:nth-child(2) { animation-delay: 0.15s; }
-.travel-status .walk-dots i:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes walk-dot {
-  0%, 100% { opacity: 0.25; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(-3px); }
-}
-
-/* Bottom action rail — thumb-reachable on a phone, out of the way on desktop */
 .explore-actions {
   display: flex;
   gap: var(--sp-2);
   justify-content: center;
-  width: 100%;
-  max-width: var(--content);
+  align-items: center;
 }
 
-.explore-actions .btn { flex: 0 1 auto; }
+.bag-button { position: relative; }
 
-.bag-button {
-  position: relative;
-  gap: var(--sp-2);
-}
-
-.bag-button .bag-count {
+.bag-count {
   display: grid;
   place-items: center;
   min-width: 20px;
@@ -185,26 +107,38 @@
   padding: 0 5px;
   background: var(--gold);
   color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.5);
   border-radius: 999px;
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  text-shadow: none;
 }
 
 /* ==========================================================================
    Venue screens (shop / inn)
+
+   One frame, not three. The goods sit directly on the board — the old version
+   put bordered cards inside a bordered grid inside a bordered panel.
    ========================================================================== */
 
-.venue-screen { gap: var(--sp-4); }
+.venue-screen { --screen-max: 860px; gap: var(--sp-3); }
 
-.shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+.venue-board {
+  display: flex;
+  flex-direction: column;
   gap: var(--sp-4);
   width: 100%;
 }
 
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+  width: 100%;
+}
+
 @media (max-width: 520px) {
-  .shop-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); }
+  .shop-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-2); }
 }
 
 .shop-card {
@@ -217,8 +151,10 @@
   text-align: center;
   background: var(--surface-raised);
   border: var(--border) solid var(--edge);
+  border-top-width: 4px;
+  border-top-color: var(--grey);
   border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--edge-highlight);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1);
   transition:
     transform var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) linear,
@@ -226,16 +162,16 @@
 }
 
 .shop-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--gold-dark);
-  box-shadow: inset 0 0 0 2px rgba(255, 226, 122, 0.2), var(--lift-3);
+  transform: translateY(-4px);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-3);
 }
 
-/* Rarity reads from the card edge, not only from the icon frame. */
-.shop-card.rarity-rare { border-color: rgba(127, 184, 255, 0.55); }
+/* Rarity reads from the top edge of the card as well as the icon frame, so a
+   legendary is obvious from across the grid without a chip spelling it out. */
+.shop-card.rarity-rare { border-top-color: var(--blue-light); }
 .shop-card.rarity-legendary {
-  border-color: rgba(255, 226, 122, 0.6);
-  box-shadow: inset 0 0 0 1px var(--edge-highlight), 0 0 22px rgba(232, 177, 44, 0.18);
+  border-top-color: var(--gold-light);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), 0 0 20px rgba(232, 177, 44, 0.16), var(--lift-1);
 }
 
 .shop-card.is-sold { filter: grayscale(0.85) brightness(0.55); }
@@ -249,13 +185,13 @@
   font-size: var(--text-md);
   letter-spacing: var(--tracking-tight);
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .shop-desc {
   font-size: var(--text-xs);
   line-height: 1.45;
   color: var(--text-dim);
-  min-height: 2.9em;
 }
 
 .shop-price {
@@ -274,12 +210,28 @@
   font-size: var(--text-sm);
 }
 
-.shop-card .btn { width: 100%; margin-top: auto; }
+/* Price and button are pinned to the bottom of the card, so a row of cards
+   with different amounts of description text still lines up along the buy
+   buttons — the thing the eye actually scans across. */
+.shop-card .card-foot,
+.bed-card .card-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  margin-top: auto;
+  padding-top: var(--sp-2);
+}
 
+.shop-card .card-foot .btn,
+.bed-card .card-foot .btn { width: 100%; justify-self: stretch; }
+
+/* The discount tag hangs off the card on a string. */
 .discount-flag {
   position: absolute;
-  top: -12px;
-  right: -10px;
+  top: -10px;
+  right: -8px;
   padding: 3px 9px;
   background: linear-gradient(180deg, var(--red-light), var(--red-dark));
   border: 2px solid var(--red-deep);
@@ -311,54 +263,69 @@
 
 /* --- Inn beds ------------------------------------------------------------- */
 
-.bed-list { display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; }
+.bed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-3);
+  width: 100%;
+}
 
 .bed-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4);
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  text-align: center;
   background: var(--surface-raised);
   border: var(--border) solid var(--edge);
+  border-top-width: 4px;
+  border-top-color: var(--grey);
   border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--edge-highlight);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1);
   transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) linear;
 }
 
-.bed-card:hover { transform: translateY(-3px); border-color: var(--gold-dark); }
+.bed-card:hover { transform: translateY(-4px); }
 .bed-card.is-used { filter: grayscale(0.8) brightness(0.6); }
 .bed-card.is-used:hover { transform: none; }
-.bed-card.is-premium { border-color: rgba(255, 226, 122, 0.5); }
+.bed-card.is-premium { border-top-color: var(--gold-light); }
 
 .bed-name {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
   font-family: var(--font-display);
   font-size: var(--text-md);
   letter-spacing: var(--tracking-tight);
   text-transform: uppercase;
 }
 
-.bed-buy { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-
-@media (max-width: 560px) {
-  .bed-card { grid-template-columns: auto minmax(0, 1fr); }
-  .bed-buy { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
-  .bed-buy .btn { flex: 1 1 auto; }
+/* What you actually get, in the same diamonds used everywhere else. */
+.bed-gain {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-sunken);
+  border: 2px solid var(--edge);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-tight);
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
+
 
 /* ==========================================================================
    Inventory
    ========================================================================== */
 
-.inv-modal { width: min(820px, 100%); }
+.inv-modal { width: min(780px, 100%); }
 
 .inv-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: var(--sp-4);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-3);
   min-height: 0;
 }
 
@@ -368,17 +335,17 @@
 
 .inv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
   gap: var(--sp-2);
   align-content: start;
-  max-height: min(42vh, 340px);
+  max-height: min(40vh, 320px);
   overflow: auto;
   padding: var(--sp-2);
   background: var(--surface-sunken);
   border: 2px solid var(--edge);
   border-radius: var(--radius);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
-  min-height: 130px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55);
+  min-height: 128px;
 }
 
 .inv-cell {
@@ -387,7 +354,7 @@
   place-items: center;
   aspect-ratio: 1;
   padding: 4px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.34);
   border: 2px solid transparent;
   border-radius: var(--radius);
   cursor: pointer;
@@ -431,22 +398,29 @@
 
 .inv-name {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   letter-spacing: var(--tracking-tight);
   text-transform: uppercase;
   color: var(--gold-light);
+  line-height: 1.2;
 }
 
-.inv-desc { font-size: var(--text-sm); line-height: 1.55; color: var(--text-dim); }
+.inv-desc { font-size: var(--text-sm); line-height: 1.5; color: var(--text-dim); }
 
 .inv-actions { display: flex; gap: var(--sp-2); margin-top: auto; }
 .inv-actions .btn { flex: 1 1 auto; }
 
 /* ==========================================================================
    Duel
+
+   Layout in three bands so nothing ever overlaps the duellists:
+     top     the two fighters, symmetric
+     middle  empty — this is where the fight is drawn
+     bottom  the callout, then the three moves
    ========================================================================== */
 
 .duel-screen {
+  --screen-max: 1000px;
   justify-content: space-between;
   gap: var(--sp-3);
   pointer-events: none;
@@ -459,24 +433,22 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: start;
   gap: var(--sp-3);
-  width: 100%;
-  max-width: var(--content-wide);
 }
 
 .fighter-card {
   justify-self: start;
-  width: fit-content;
-  min-width: min(240px, 100%);
-  max-width: 100%;
+  width: 100%;
+  max-width: 260px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
   padding: var(--sp-3);
   background: var(--surface-glass);
   border: 2px solid var(--edge);
+  border-top: 4px solid var(--blue-dark);
   border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-1);
-  backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1);
+  backdrop-filter: blur(5px);
   transition: border-color var(--dur-fast) linear, box-shadow var(--dur-fast) linear;
 }
 
@@ -484,13 +456,14 @@
   justify-self: end;
   align-items: flex-end;
   text-align: right;
-  border-color: rgba(141, 26, 24, 0.75);
+  border-top-color: var(--red-dark);
 }
+
 .fighter-card.is-hit { animation: card-hit var(--dur-slow) var(--ease-out); }
 
 @keyframes card-hit {
   0% { box-shadow: 0 0 0 3px rgba(240, 87, 79, 0.9), var(--lift-1); }
-  100% { box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-1); }
+  100% { box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1); }
 }
 
 .fighter-name {
@@ -498,30 +471,48 @@
   font-size: var(--text-md);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
+  line-height: 1.2;
 }
 
-.fighter-card.is-enemy .fighter-name { color: var(--red-light); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7); }
+.fighter-card.is-enemy .fighter-name {
+  color: var(--red-light);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+}
 
-.bullet-row {
+/* --- The cylinder --------------------------------------------------------
+   Six chambers, always drawn. A loaded chamber holds a brass round, an empty
+   one is a hole. This replaces the old "no bullets" caption: an empty gun is
+   now something you see rather than something you read. */
+
+.cylinder {
   display: flex;
-  gap: 3px;
+  gap: 4px;
   align-items: center;
-  min-height: 22px;
-  flex-wrap: wrap;
 }
 
-.bullet-row .empty-label {
-  font-size: var(--text-xs);
-  color: var(--text-dim);
-  letter-spacing: var(--tracking-tight);
-  text-transform: uppercase;
+.chamber {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  /* An empty chamber is a hole with a lit rim, not a dark dot: the rim is what
+     makes six of them read as a cylinder at a glance. */
+  background: radial-gradient(circle at 38% 32%, #1d1409, #0a0603 72%);
+  border: 2px solid #5d4a30;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.95), 0 1px 0 rgba(255, 226, 170, 0.14);
+  transition: background var(--dur-fast) linear, border-color var(--dur-fast) linear;
 }
 
-.bullet-row img { animation: bullet-in var(--dur-base) var(--ease-spring) both; }
+.chamber.is-loaded {
+  background: radial-gradient(circle at 34% 28%, var(--gold-light) 0%, var(--gold) 45%, var(--gold-dark) 100%);
+  border-color: #3d2a06;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 6px rgba(232, 177, 44, 0.4);
+}
 
-@keyframes bullet-in {
-  from { opacity: 0; transform: translateY(-6px) scale(0.6); }
-  to { opacity: 1; transform: none; }
+.chamber.is-fresh { animation: chamber-load var(--dur-base) var(--ease-spring) both; }
+
+@keyframes chamber-load {
+  0% { transform: scale(0.2) rotate(-90deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
 }
 
 .duel-center {
@@ -543,14 +534,26 @@
   backdrop-filter: blur(4px);
 }
 
-/* The single most important line on the screen: what just happened. */
+.duel-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: 720px;
+}
+
+/* The single most important line on the screen: what just happened. It sits
+   directly above the buttons, never over the duellists. */
 .duel-callout {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-5);
+  min-height: 46px;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-4);
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   text-align: center;
@@ -559,81 +562,116 @@
   border: 2px solid var(--edge);
   border-radius: 999px;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
-  animation: callout-in var(--dur-base) var(--ease-spring) both;
+  backdrop-filter: blur(5px);
 }
 
-.duel-callout.is-good { border-color: var(--green); }
+.duel-callout > span { animation: callout-in var(--dur-base) var(--ease-spring) both; }
+
+.duel-callout.is-good { border-color: var(--green); color: var(--green-light); }
 .duel-callout.is-bad { border-color: var(--red); color: var(--red-light); }
 .duel-callout.is-waiting { color: var(--text-dim); }
 
 @keyframes callout-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
   to { opacity: 1; transform: none; }
-}
-
-.duel-bottom {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-3);
-  width: 100%;
-  max-width: var(--content);
 }
 
 .duel-controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   width: 100%;
   transition: opacity var(--dur-fast) linear;
 }
 
-.duel-controls.is-waiting { opacity: 0.5; }
+.duel-controls.is-waiting { opacity: 0.45; }
 
+/* Each move is a full plate: icon, name, and a cost read as pips rather than
+   as a sentence. The rules live in How to Play; the button is for playing. */
 .duel-btn {
   flex-direction: column;
   gap: 4px;
-  min-height: 84px;
+  width: 100%;
+  justify-self: stretch;
+  min-height: 92px;
   padding: var(--sp-3) var(--sp-2);
 }
 
-.duel-btn-top { display: flex; align-items: center; gap: var(--sp-2); }
+.duel-btn-label {
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-wide);
+  line-height: 1;
+}
 
-.duel-btn-label { font-size: var(--text-lg); letter-spacing: var(--tracking-wide); }
-
-.duel-btn-hint {
-  font-family: var(--font-body);
+/* The cost strip: a bullet gained, a bullet spent, or nothing at all. */
+.duel-cost {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 14px;
+  font-family: var(--font-display);
   font-size: var(--text-xs);
   letter-spacing: 0;
-  text-transform: none;
-  color: rgba(242, 227, 198, 0.72);
-  text-shadow: none;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.duel-cost .pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, var(--gold-light), var(--gold-dark));
+  border: 1px solid rgba(0, 0, 0, 0.65);
+}
+
+.duel-cost .pip.is-spent {
+  background: rgba(0, 0, 0, 0.45);
+  border-style: dashed;
 }
 
 .duel-btn--reload { --btn-face: #d3a457; --btn-mid: #9a6a2c; --btn-deep: #5f3d13; --btn-edge: #2c1a05; }
 .duel-btn--shield { --btn-face: #7fb0e8; --btn-mid: #3a6fd8; --btn-deep: #22407f; --btn-edge: #101d38; }
 .duel-btn--shoot { --btn-face: var(--red-light); --btn-mid: var(--red); --btn-deep: var(--red-dark); --btn-edge: var(--red-deep); }
 
-/* A shoot button with no bullets explains itself instead of just greying out. */
-.duel-btn:disabled .duel-btn-hint { color: rgba(242, 227, 198, 0.85); }
+/* Guide · callout · saddlebag, all on one line. */
+.duel-extras {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.duel-extras .duel-callout { flex: 1 1 auto; min-width: 0; }
+.duel-extras > .btn { flex: 0 0 auto; }
+
+@media (max-width: 620px) {
+  /* On a phone the callout takes the full line and the two controls sit under
+     it, rather than squeezing a status message into a third of the width. */
+  .duel-extras { flex-wrap: wrap; }
+  .duel-extras .duel-callout { order: -1; flex: 1 1 100%; }
+}
 
 @media (max-width: 560px) {
-  .duel-btn { min-height: 72px; }
-  .duel-btn-label { font-size: var(--text-md); }
-  .duel-btn-hint { display: none; }
-  .duel-top { grid-template-columns: 1fr 1fr; grid-template-areas: 'you enemy' 'center center'; }
+  .duel-btn { min-height: 76px; }
+  .duel-btn-label { font-size: var(--text-sm); }
+  .duel-top {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'you enemy' 'center center';
+  }
   .duel-top > .fighter-card:first-child { grid-area: you; }
   .duel-top > .fighter-card:last-child { grid-area: enemy; }
   .duel-center { grid-area: center; }
+  .chamber { width: 12px; height: 12px; border-width: 1px; }
+  .cylinder { gap: 3px; }
 }
 
 /* --- Battle overview ------------------------------------------------------ */
 
-.overview { width: min(720px, 100%); }
+.overview { width: min(680px, 100%); }
 
 .overview-table-wrap {
-  max-height: min(34vh, 320px);
+  max-height: min(32vh, 300px);
   overflow: auto;
   border: 2px solid var(--edge);
   border-radius: var(--radius);
@@ -680,22 +718,24 @@
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.6);
+  line-height: 1.15;
+  text-align: center;
 }
 
 /* ==========================================================================
    Interstitials
    ========================================================================== */
 
-.intro-screen { cursor: pointer; justify-content: center; }
+.intro-screen { --screen-max: 620px; cursor: pointer; justify-content: center; }
 
 .intro-card {
-  width: min(620px, 100%);
+  width: 100%;
   text-align: center;
   animation: intro-in var(--dur-slow) var(--ease-spring) both;
 }
 
 @keyframes intro-in {
-  from { opacity: 0; transform: translate3d(0, 30px, 0) scale(0.94); }
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(0.95); }
   to { opacity: 1; transform: none; }
 }
 
@@ -712,8 +752,9 @@
   font-size: var(--text-2xl);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
-  color: var(--wood-deep);
+  color: var(--paper-ink);
   margin: var(--sp-2) 0;
+  line-height: 1.1;
 }
 
 .intro-sub { font-style: italic; color: var(--sand-deep); }
@@ -727,11 +768,13 @@
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: rgba(56, 33, 15, 0.7);
+  color: var(--paper-ink-dim);
   animation: nudge 1.8s var(--ease-in-out) infinite;
 }
 
 @keyframes nudge {
-  0%, 100% { transform: translateY(0); opacity: 0.65; }
-  50% { transform: translateY(3px); opacity: 1; }
+  0%, 100% { transform: translateX(0); opacity: 0.6; }
+  50% { transform: translateX(4px); opacity: 1; }
 }
+
+.ending-screen { --screen-max: 640px; }

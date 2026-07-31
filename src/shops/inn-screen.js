@@ -1,8 +1,14 @@
 /**
  * SHOOT! — Inn screen.
  *
- * Two offers, side by side, with the thing that actually matters — how many
- * lives you get back — stated in words and shown in diamonds.
+ * Two offers, side by side. The only thing that matters — how many lives you
+ * get back — is stated in the same red diamonds used everywhere else in the
+ * game, so it can be compared against the lives you are missing without doing
+ * arithmetic.
+ *
+ * The old version buried this: a bare row of diamonds floated at the top of a
+ * panel with no label, the offers were wide rows with the price stranded on the
+ * far right, and the whole thing sat inside a panel inside a panel.
  */
 
 import { el, clearNode } from '../core/dom.js';
@@ -15,7 +21,7 @@ import { DISCOUNT_RATE } from './shop.js';
 import { finishEncounter } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import { livesRow, updateLivesRow, icon } from '../ui/widgets.js';
-import { statusBar } from '../ui/statusbar.js';
+import { trailBand } from '../ui/statusbar.js';
 import { toast } from '../ui/toast.js';
 import { createInteriorScene } from './interior-scene.js';
 import { EVENTS, on } from '../core/events.js';
@@ -34,13 +40,22 @@ export const InnScreen = {
     playMusic('themeMenu');
     setRenderer(createInteriorScene('inn'));
 
-    const bar = statusBar({ subtitle: 'Resting at the inn' });
+    const band = trailBand();
     const lives = livesRow(player.lives, player.maxLives, { large: true });
-    const bedList = el('div.bed-list.stagger');
+    const livesNote = el('span.muted', { text: livesText() });
+    const bedGrid = el('div.bed-grid.stagger');
 
-    const unsub = on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) =>
-      updateLivesRow(lives, l, maxLives),
-    );
+    const unsub = on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => {
+      updateLivesRow(lives, l, maxLives);
+      livesNote.textContent = livesText();
+    });
+
+    function livesText() {
+      const s = getState();
+      const missing = s.maxLives - s.lives;
+      if (missing === 0) return 'Full health';
+      return `${missing} ${missing === 1 ? 'life' : 'lives'} down`;
+    }
 
     function rest(offer) {
       const state = getState();
@@ -64,7 +79,7 @@ export const InnScreen = {
     }
 
     function renderBeds() {
-      clearNode(bedList);
+      clearNode(bedGrid);
       const state = getState();
       const full = state.lives >= state.maxLives;
 
@@ -74,35 +89,38 @@ export const InnScreen = {
           ? state.maxLives - state.lives
           : Math.min(offer.heal, state.maxLives - state.lives);
 
-        bedList.append(
+        bedGrid.append(
           el('div.bed-card', {
             class: `${used ? 'is-used' : ''} ${offer.id === 'premium' ? 'is-premium' : ''}`.trim(),
           }, [
-            el('img.pixel', { src: iconURL('bed', 3), width: '48', height: '48', alt: '' }),
+            offer.discounted && !used
+              ? el('span.discount-flag', { text: `-${Math.round(DISCOUNT_RATE * 100)}%` })
+              : null,
 
-            el('div.col', { style: { gap: '4px' } }, [
-              el('div.bed-name', {}, [
-                offer.name,
-                offer.discounted && !used
-                  ? el('span.discount-flag.inline', { text: `-${Math.round(DISCOUNT_RATE * 100)}%` })
-                  : null,
-              ]),
-              el('p.shop-desc', { style: { minHeight: '0' }, text: offer.desc }),
-              !used && !full
-                ? el('span.chip.chip--gold', { text: `+${gain} ${gain === 1 ? 'life' : 'lives'}` })
-                : null,
+            el('img.pixel', { src: iconURL('bed', 3), width: '48', height: '48', alt: '' }),
+            el('div.bed-name', { text: offer.name }),
+            el('p.shop-desc', { text: offer.desc }),
+
+            // What you get, drawn rather than described — and shown only when
+            // there is something to get. When you are at full lives the button
+            // already says so; saying it here too, and again beside the life
+            // row above, was the same sentence three times on one screen.
+            full || used ? null : el('div.bed-gain', {}, [
+              el('span', { text: 'Restores' }),
+              livesRow(gain, gain, { small: true }),
             ]),
 
-            el('div.bed-buy', {}, [
+            el('div.card-foot', {}, [
               el('div.shop-price', {}, [
                 icon('coin', 1),
                 offer.discounted ? el('span.old-price', { text: String(offer.fullPrice) }) : null,
                 el('span', { text: String(offer.price) }),
               ]),
+
               used
-                ? el('button.btn.btn--sm', { disabled: true }, ['Rested'])
+                ? el('button.btn.btn--sm', { disabled: true }, ['Slept here'])
                 : full
-                  ? el('button.btn.btn--sm', { disabled: true, 'data-tip': 'Nothing to heal' }, ['Full'])
+                  ? el('button.btn.btn--sm', { disabled: true }, ['Lives full'])
                   : el('button.btn.btn--sm.btn--gold', {
                       onclick: () => rest(offer),
                       'aria-label': `${offer.name} for ${offer.price} gold`,
@@ -111,19 +129,18 @@ export const InnScreen = {
           ]),
         );
       });
-      attachButtonSounds(bedList);
+      attachButtonSounds(bedGrid);
     }
 
     renderBeds();
 
     const screen = el('div.screen.venue-screen', {}, [
-      bar,
-      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
+      band,
+      el('div.screen-body', {}, [
         el('h1.screen-title', { text: 'Inn' }),
-        el('p.panel-sub', { text: 'A bed, a roof, and no one asking questions' }),
-        el('div.panel.col', { style: { gap: 'var(--sp-4)' } }, [
-          el('div.row', { style: { justifyContent: 'center' } }, [lives]),
-          bedList,
+        el('div.panel.panel--braced.venue-board', {}, [
+          el('div.row.row--center', {}, [lives, livesNote]),
+          bedGrid,
         ]),
       ]),
       el('div.screen-footer', {}, [
@@ -139,7 +156,7 @@ export const InnScreen = {
 
     return () => {
       unsub();
-      bar.dispose();
+      band.dispose();
     };
   },
 };

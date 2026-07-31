@@ -39,11 +39,23 @@ export function generateStock(worldId, seed) {
   const discountChance = Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
 
   const stock = [];
+  const taken = new Set();
   for (let i = 0; i < slots; i++) {
     const rarity = rng.weighted(world.rarity);
     const pool = SHOP_POOL[rarity] || SHOP_POOL.common;
-    const item = getItem(rng.pick(pool));
+
+    // Never put the same item on the counter twice. A visit offering "Bandage,
+    // Carrot, Bandage" reads as a bug, and it wastes one of only three slots.
+    // Re-roll within the rolled rarity, then fall back to any unused item in
+    // that pool, so a small pool still fills the shelf.
+    let item = null;
+    for (let attempt = 0; attempt < 6 && !item; attempt++) {
+      const candidate = getItem(rng.pick(pool));
+      if (candidate && !taken.has(candidate.id)) item = candidate;
+    }
+    if (!item) item = pool.map(getItem).find((entry) => entry && !taken.has(entry.id));
     if (!item) continue;
+    taken.add(item.id);
 
     const fullPrice = itemPrice(item, worldId);
     const discounted = rng.chance(discountChance);

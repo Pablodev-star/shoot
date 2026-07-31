@@ -6,12 +6,16 @@
  * wires buttons.
  *
  * HUD RULES
- *  - Lives, gold and level sit in the shared status bar, in the same place as
- *    every other in-run screen.
- *  - Hunger gets a labelled meter with a number, because it is the only
- *    resource that can kill you while nothing is happening.
- *  - There is deliberately NO progress bar or timer toward the next encounter.
- *    The status line says what you are doing, never how long is left.
+ *  - One band at the top holds everything: place, lives, hunger, gold. There is
+ *    no second panel.
+ *  - There is deliberately NO progress bar and NO timer toward the next
+ *    encounter.
+ *  - There is also no status line. It used to read "Walking" over a picture of
+ *    a man walking, then "Riding on" over a picture of a man riding. A caption
+ *    that restates the animation is worse than no caption: it takes up the
+ *    middle of the screen and teaches the player that the text can be ignored.
+ *    Weather and nightfall arrive as a toast when they change and are visible
+ *    in the sky the rest of the time.
  *  - The saddlebag is one tap away at all times and pauses the walk while open.
  */
 
@@ -28,23 +32,20 @@ import {
 } from '../art/sprites-character.js';
 import { createParallax } from './parallax.js';
 import * as weather from './weather.js';
-import { getTimeState } from './daynight.js';
 import { starvationProgress } from './hunger.js';
 import { getEngine, quitToMenu } from '../game/run.js';
 import { getState, getInventory } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
-import { HUNGER_MAX } from '../game/progression.js';
-import { meter, icon } from '../ui/widgets.js';
-import { statusBar } from '../ui/statusbar.js';
+import { icon, iconButton } from '../ui/widgets.js';
+import { trailBand } from '../ui/statusbar.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import { peekAhead, ENCOUNTER_LABELS } from './encounters.js';
 import { toast } from '../ui/toast.js';
 import { confirmDialog } from '../ui/confirm.js';
 import { openHowToPlay } from '../ui/help.js';
 
-/** Plain-language description of the current weather, for the status line. */
+/** Plain-language notice when the weather turns. Shown once, then gone. */
 const WEATHER_BLURB = {
-  clear: 'The road is quiet',
   cloudy: 'Clouds are gathering',
   rain: 'Rain is coming down',
   sandstorm: 'Sand whips across the road',
@@ -64,41 +65,21 @@ export const ExploreScreen = {
     playMusic('themeWalk');
 
     // --- HUD ---------------------------------------------------------------
-    const bar = statusBar({
+    const band = trailBand({
+      hunger: true,
       actions: [
-        el('button.btn.btn--sm.btn--icon.btn--ghost', {
-          onclick: () => openHowToPlay(),
-          'aria-label': 'How to play',
-          'data-tip': 'How to play',
-        }, ['?']),
+        iconButton('question', { onClick: () => openHowToPlay(), label: 'How to play' }),
+        // A labelled button, not a cross: a cross in the corner of a running
+        // game reads as "close this panel", and this one abandons the road.
         el('button.btn.btn--sm.btn--ghost', { onclick: () => leave() }, ['Menu']),
       ],
     });
 
-    const hunger = meter({
-      label: 'Hunger',
-      iconName: 'hunger',
-      ratio: player.hunger / HUNGER_MAX,
-      value: `${Math.round(player.hunger)}%`,
-    });
-
-    const weatherChip = el('span.chip', { text: weather.getWeatherState().label });
-    const timeChip = el('span.chip', { text: getTimeState().phase });
-    const mountChip = player.hasHorse
-      ? el('span.chip.chip--gold', {}, [icon('horseToken', 1), 'Riding'])
-      : null;
-
-    const statusText = el('span', { text: 'Walking' });
-    const statusLine = el('div.travel-status', {}, [
-      statusText,
-      el('span.walk-dots', {}, [el('i'), el('i'), el('i')]),
-    ]);
-
     const bagCount = el('span.bag-count', { text: String(totalItems()) });
     const bagButton = el('button.btn.bag-button', {
       onclick: () => openBag(),
-      'data-tip': 'Eat, use or sell your things (I)',
-    }, [icon('shopTag', 1.2), el('span', { text: 'Saddlebag' }), bagCount, el('span.kbd', { text: 'I' })]);
+      'data-tip': 'Eat, use or sell what you are carrying',
+    }, [icon('shopTag', 1.1), el('span', { text: 'Saddlebag' }), bagCount, el('span.kbd', { text: 'I' })]);
 
     function totalItems() {
       return getInventory().reduce((sum, e) => sum + e.qty, 0);
@@ -109,7 +90,6 @@ export const ExploreScreen = {
       if (bagOpen) return;
       bagOpen = true;
       engine.pause();
-      setStatus('Rummaging through your saddlebag');
       openInventory({
         context: 'walk',
         onUse: (id, result) => {
@@ -118,7 +98,6 @@ export const ExploreScreen = {
         onClose: () => {
           bagOpen = false;
           engine.resume();
-          setStatus(player.hasHorse ? 'Riding on' : 'Walking');
         },
       });
     }
@@ -131,7 +110,7 @@ export const ExploreScreen = {
         toast('The road ahead is blank', 'bad');
         return;
       }
-      toast(ahead.map((a) => `${ENCOUNTER_LABELS[a.type]} · ${a.proximity}`).join('   '), 'gold');
+      toast(ahead.map((a) => `${ENCOUNTER_LABELS[a.type]} ${a.proximity}`).join('   '), 'gold');
     }
 
     async function leave() {
@@ -145,56 +124,28 @@ export const ExploreScreen = {
       else engine.resume();
     }
 
-    function setStatus(text) {
-      statusText.textContent = text;
-      statusLine.classList.remove('is-in');
-      void statusLine.offsetWidth;
-      statusLine.classList.add('is-in');
-    }
-
     const onKey = (e) => {
       if (e.key === 'i' || e.key === 'I') openBag();
     };
     window.addEventListener('keydown', onKey);
 
     const screen = el('div.screen.explore-screen', {}, [
-      el('div.explore-top', {}, [
-        bar,
-        el('div.travel-panel', {}, [
-          hunger.node,
-          el('div.travel-atmos', {}, [mountChip, weatherChip, timeChip].filter(Boolean)),
-        ]),
-      ]),
-
-      statusLine,
-
+      band,
       el('div.explore-actions', {}, [bagButton]),
     ]);
 
     root.append(screen);
     attachButtonSounds(screen);
-    setStatus(player.hasHorse ? 'Riding on' : 'Walking');
 
     // --- live bindings -----------------------------------------------------
     const unsubs = [
-      on(EVENTS.HUNGER_CHANGED, ({ hunger: h }) => hunger.set(h / HUNGER_MAX, `${Math.round(h)}%`)),
       on(EVENTS.INVENTORY_CHANGED, () => {
         bagCount.textContent = String(totalItems());
       }),
       on(EVENTS.WEATHER_CHANGED, (w) => {
-        weatherChip.textContent = w.label;
-        weatherChip.classList.toggle('chip--danger', w.id === 'sandstorm');
-        if (w.id !== 'clear') toast(WEATHER_BLURB[w.id] || w.label, 'info');
-        setStatus(WEATHER_BLURB[w.id] || (player.hasHorse ? 'Riding on' : 'Walking'));
+        if (WEATHER_BLURB[w.id]) toast(WEATHER_BLURB[w.id], w.id === 'sandstorm' ? 'bad' : 'info');
       }),
-      on(EVENTS.TIME_OF_DAY_CHANGED, (t) => {
-        timeChip.textContent = t.phase;
-        timeChip.classList.toggle('chip--danger', t.isNight);
-        if (t.phase === 'night') setStatus('Night falls on the road');
-        if (t.phase === 'dawn') setStatus('The sun comes up');
-      }),
-      on(EVENTS.HUNGER_EMPTY, () => setStatus('Starving — eat something')),
-      on(EVENTS.HORSE_ACQUIRED, () => setStatus('Riding on')),
+      on(EVENTS.HUNGER_EMPTY, () => toast('Starving — eat something', 'bad')),
     ];
 
     // --- canvas renderer ---------------------------------------------------
@@ -273,7 +224,7 @@ export const ExploreScreen = {
     return () => {
       window.removeEventListener('keydown', onKey);
       unsubs.forEach((fn) => fn());
-      bar.dispose();
+      band.dispose();
       engine.pause();
     };
   },

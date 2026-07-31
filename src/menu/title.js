@@ -100,7 +100,7 @@ export const TitleScreen = {
         el('button.btn.btn--primary', { onclick: () => go('slots') }, ['Story Mode']),
         el('button.btn', { onclick: () => go('online') }, [
           'Online',
-          el('span.chip.chip--gold', { text: 'Soon' }),
+          el('span.stamp', { text: 'Soon' }),
         ]),
         el('div.menu-nav-row', {}, [
           secondary('Profile', 'profile'),

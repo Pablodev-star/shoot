@@ -48,27 +48,30 @@ export const ProfileScreen = {
     const duels = s.duelsWon + s.duelsLost;
     const winRate = duels ? Math.round((s.duelsWon / duels) * 100) : 0;
 
-    const screen = el('div.screen', {}, [
+    const screen = el('div.screen.profile-screen', {}, [
       el('div.screen-header', {}, [
         backButton(() => back('title')),
         el('h1.screen-title', { text: 'Profile' }),
-        el('span.chip', { text: 'On this device' }),
+        el('span.chip', { text: 'This device' }),
       ]),
 
-      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
-        el('div.panel.profile-card', {}, [
+      el('div.screen-body', {}, [
+        el('div.panel.panel--braced.profile-card', {}, [
           el('div.avatar-plate', {}, [pixelImg(sprites.player.duel[2], 4)]),
           el('div.col', { style: { gap: 'var(--sp-3)' } }, [
             el('div.field', {}, [
               el('label', { text: 'Gunslinger name' }),
               nameInput,
-              el('span.field-hint', {
-                text: 'Shown on the title screen and, later, in online rooms.',
-              }),
             ]),
             el('div.row', {}, [saveBtn]),
           ]),
         ]),
+
+        // One line where a whole "Account" panel with an inert Sign In button
+        // used to sit. It said the same thing the Online screen already says.
+        el('p.field-hint.center', {
+          text: 'Saved on this device. Accounts arrive with online play.',
+        }),
 
         el('div.divider', { text: 'Lifetime record' }),
         el('div.stat-grid', {}, [
@@ -78,21 +81,6 @@ export const ProfileScreen = {
           statTile('Worlds cleared', s.worldsCleared),
           statTile('Gold earned', s.goldEarned, 'coin'),
           statTile('Distance', Math.floor(s.milesWalked || 0)),
-        ]),
-
-        el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
-          el('h2.panel-title', { text: 'Account' }),
-          el('p.muted.center', {
-            text: 'Cloud accounts arrive with online mode. Your progress is stored on this device for now.',
-          }),
-          el('div.row', { style: { justifyContent: 'center' } }, [
-            el('button.btn.btn--sm.btn--soon', {
-              onclick: () => {
-                play('error');
-                toast('Accounts — coming soon', 'gold');
-              },
-            }, ['Sign In', el('span.chip.chip--gold', { text: 'Soon' })]),
-          ]),
         ]),
       ]),
     ]);
