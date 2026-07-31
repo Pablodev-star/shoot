@@ -597,9 +597,12 @@ function drawSand(ctx, view, k, light) {
     const x = Math.round(p.x) * s;
     const y = Math.round(p.y) * s;
     if (p.grit) {
-      // Grit tumbles: a single pixel with a fainter one trailing it.
+      // Grit tumbles: a single pixel with a fainter one trailing it. The
+      // grain's own opacity is already in `fillStyle`, so the trail only asks
+      // for half of it here — multiplying it in twice squared the alpha and
+      // faded the trails out quadratically as the storm came and went.
       ctx.fillRect(x, y, s, s);
-      ctx.globalAlpha = p.a * k * 0.5;
+      ctx.globalAlpha = 0.5;
       ctx.fillRect(x + s * 2, y, s, s);
       ctx.globalAlpha = 1;
     } else if (p.len > 4) {
