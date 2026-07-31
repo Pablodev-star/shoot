@@ -1,0 +1,347 @@
+/**
+ * SHOOT! — Interface icons (Block 2d).
+ *
+ * The chrome of the UI — back arrows, close crosses, the help mark, the lock on
+ * a private room — used to be typed characters (`◀`, `✕`, `?`, `·`). Those come
+ * from the system font: they anti-alias, they change shape between platforms,
+ * and next to hand-drawn 16x16 sprites they look like something the game
+ * borrowed rather than something it owns.
+ *
+ * These are the replacements. Same 16 x 16 canvas as the item icons, same
+ * palette, same 1px ink outline, so a back arrow and a coin belong to the same
+ * set. Anything the interface needs to *say* with a picture is drawn here.
+ */
+
+import { PALETTE } from './palette.js';
+import { bake, makeCanvas } from './pixel.js';
+
+export const UI_ICON_SIZE = 16;
+
+const KEY = {
+  '.': null,
+  k: PALETTE.ink,
+  w: PALETTE.bone,
+  d: PALETTE.boneDark,
+  W: PALETTE.white,
+  r: PALETTE.red,
+  R: PALETTE.redLight,
+  q: PALETTE.redDark,
+  g: PALETTE.green,
+  G: PALETTE.greenLight,
+  o: PALETTE.gold,
+  O: PALETTE.goldLight,
+  y: PALETTE.goldDark,
+  s: PALETTE.steel,
+  S: PALETTE.steelDark,
+  b: PALETTE.blue,
+  B: PALETTE.blueLight,
+  v: PALETTE.blueDark,
+  t: PALETTE.leather,
+  T: PALETTE.leatherDark,
+  m: PALETTE.wood,
+  M: PALETTE.woodDark,
+  x: PALETTE.grey,
+};
+
+const ICONS = {
+  /** Back. A chevron with weight to it, so it reads at 16px on a dark plate. */
+  chevronLeft: [
+    '................',
+    '................',
+    '..........kkk...',
+    '.........kwwwk..',
+    '........kwwwdk..',
+    '.......kwwwdk...',
+    '......kwwwdk....',
+    '.....kwwwdk.....',
+    '.....kwwwdk.....',
+    '......kwwwdk....',
+    '.......kwwwdk...',
+    '........kwwwdk..',
+    '.........kwwwk..',
+    '..........kkk...',
+    '................',
+    '................',
+  ],
+
+  chevronRight: [
+    '................',
+    '................',
+    '...kkk..........',
+    '..kwwwk.........',
+    '..kwwwdk........',
+    '...kwwwdk.......',
+    '....kwwwdk......',
+    '.....kwwwdk.....',
+    '.....kwwwdk.....',
+    '....kwwwdk......',
+    '...kwwwdk.......',
+    '..kwwwdk........',
+    '..kwwwk.........',
+    '...kkk..........',
+    '................',
+    '................',
+  ],
+
+  /** Close. Two crossed planks rather than a font X. */
+  close: [
+    '................',
+    '................',
+    '..kkk......kkk..',
+    '.kwwwk....kwwwk.',
+    '.kwwwwk..kwwwwk.',
+    '..kwwwwkkwwwwk..',
+    '...kwwwwwwwwk...',
+    '....kwwwwwwk....',
+    '....kwwwwwwk....',
+    '...kwwwwwwwwk...',
+    '..kwwwwkkwwwwk..',
+    '.kwwwwk..kwwwwk.',
+    '.kwwwk....kwwwk.',
+    '..kkk......kkk..',
+    '................',
+    '................',
+  ],
+
+  /** New / add. Used by the empty save slot. */
+  plus: [
+    '................',
+    '................',
+    '......kkkk......',
+    '......kOOk......',
+    '......kOOk......',
+    '..kkkkkOOkkkkk..',
+    '..kOOOOOOOOOOk..',
+    '..kOOOOOOOOOOk..',
+    '..kyyyykOOkyyyk.',
+    '......kOOk......',
+    '......kOOk......',
+    '......kyyk......',
+    '......kkkk......',
+    '................',
+    '................',
+    '................',
+  ],
+
+  /** Help. A stencilled question mark, punched like a sign. */
+  question: [
+    '................',
+    '................',
+    '....kkkkkk......',
+    '...kwwwwwwk.....',
+    '..kwwkkkkwwk....',
+    '..kwwk..kwwk....',
+    '..kkk...kwwk....',
+    '.......kwwwk....',
+    '......kwwwk.....',
+    '......kwwk......',
+    '......kwdk......',
+    '......kkkk......',
+    '................',
+    '......kkkk......',
+    '......kwwk......',
+    '......kkkk......',
+  ],
+
+  /** Private room. */
+  lock: [
+    '................',
+    '.....kkkkk......',
+    '....kSSSSSk.....',
+    '...kSSkkkSSk....',
+    '...kSk...kSk....',
+    '...kSk...kSk....',
+    '..kkkkkkkkkkk...',
+    '..kOOOOOOOOOk...',
+    '..kOOOyyyOOOk...',
+    '..kOOOyyyOOOk...',
+    '..kOOOOyOOOOk...',
+    '..kOOOOyOOOOk...',
+    '..kOyOOOOOyOk...',
+    '..kkkkkkkkkkk...',
+    '................',
+    '................',
+  ],
+
+  /** Sheriff star. Ranks, records, anything earned. */
+  star: [
+    '.......kk.......',
+    '.......kk.......',
+    '......kOOk......',
+    '......kOOk......',
+    'kkkkkkkOOkkkkkkk',
+    'kOOOOOOOOOOOOOOk',
+    '.kOOOOOOOOOOOOk.',
+    '..kOOOOOOOOOOk..',
+    '...kOOOOOOOOk...',
+    '...kOOOOOOOOk...',
+    '...kOOOkkOOOk...',
+    '..kOOOk..kOOOk..',
+    '..kOOk....kOOk..',
+    '.kOOk......kOOk.',
+    '.kkk........kkk.',
+    '................',
+  ],
+
+  /**
+   * The revolver — Shoot.
+   *
+   * Barrel along the top, cylinder with a visible brass round in the middle,
+   * grip falling away to the left. At 16px the silhouette is doing all the
+   * work, so the barrel is deliberately long and the grip deliberately stubby.
+   */
+  revolver: [
+    '................',
+    '................',
+    '................',
+    '.....kkkkkkkkkk.',
+    '.....ksssssssssk',
+    '.....kSSSSSSSSSk',
+    '.kkkkkkkkkkkkkk.',
+    'kSsssssssSSSSk..',
+    'kSsokkoksSSSk...',
+    'kSssoookssSSk...',
+    'kSSSSSSSSSSk....',
+    '.kkkkkkkkkk.....',
+    '..kTTTTk........',
+    '..kTTTk.........',
+    '...kTTk.........',
+    '...kkk..........',
+  ],
+
+  /** The shield move. */
+  shieldPlate: [
+    '................',
+    '..kkkkkkkkkkkk..',
+    '.kBBBBBBBBBBBBk.',
+    '.kBvvvvvvvvvvBk.',
+    '.kBvBBBBBBBBvBk.',
+    '.kBvBbbbbbbBvBk.',
+    '.kBvBbbbbbbBvBk.',
+    '.kBvBBBBBBBBvBk.',
+    '.kBvvvvvvvvvvBk.',
+    '..kBvvvvvvvvBk..',
+    '...kBvvvvvvBk...',
+    '....kBvvvvBk....',
+    '.....kBvvBk.....',
+    '......kBBk......',
+    '.......kk.......',
+    '................',
+  ],
+
+  /** Reload — the cylinder face, chambers loaded with brass. */
+  chamber: [
+    '................',
+    '....kkkkkkkk....',
+    '..kkSSSSSSSSkk..',
+    '.kSSSSSSSSSSSSk.',
+    '.kSSkkSSSSkkSSk.',
+    'kSSkOOkSSkOOkSSk',
+    'kSSkOOkSSkOOkSSk',
+    'kSSkkkkSSkkkkSSk',
+    'kSSSSSSSSSSSSSSk',
+    'kSSkkkkSSkkkkSSk',
+    'kSSkOOkSSkOOkSSk',
+    '.kSkOOkSSkOOkSk.',
+    '.kSSkkkkkkkkSSk.',
+    '..kkSSSSSSSSkk..',
+    '....kkkkkkkk....',
+    '................',
+  ],
+
+  check: [
+    '................',
+    '................',
+    '...........kkk..',
+    '..........kGGk..',
+    '.........kGGGk..',
+    '..kk....kGGGk...',
+    '..kGk..kGGGk....',
+    '..kGGkkGGGk.....',
+    '...kGGGGGk......',
+    '....kGGGk.......',
+    '.....kGk........',
+    '......k.........',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+
+  /** Something is not available yet. Used on the inert online controls. */
+  hourglass: [
+    '................',
+    '...kkkkkkkkkk...',
+    '...kMMMMMMMMk...',
+    '....kEEEEEEk....',
+    '.....kEEEEk.....',
+    '......kEEk......',
+    '.......kk.......',
+    '.......kk.......',
+    '......kEEk......',
+    '.....kEEEEk.....',
+    '....kEEEEEEk....',
+    '...kEEEEEEEEk...',
+    '...kMMMMMMMMk...',
+    '...kkkkkkkkkk...',
+    '................',
+    '................',
+  ],
+
+  /** Trail marker — the world/place indicator in the travel band. */
+  signpost: [
+    '................',
+    '..kkkkkkkkkkk...',
+    '..kmMMMMMMMMk...',
+    '..kmmmmmmmmmk...',
+    '..kkkkkkkkkkk...',
+    '......kmk.......',
+    '..kkkkkkkkkkk...',
+    '..kmMMMMMMMMk...',
+    '..kmmmmmmmmmk...',
+    '..kkkkkkkkkkk...',
+    '......kmk.......',
+    '......kmk.......',
+    '......kmk.......',
+    '.....kkkkk......',
+    '................',
+    '................',
+  ],
+};
+
+const cache = { icons: null, urls: new Map() };
+
+function getUiSprites() {
+  if (!cache.icons) {
+    cache.icons = {};
+    for (const [name, rows] of Object.entries(ICONS)) {
+      cache.icons[name] = bake({ key: KEY, rows });
+    }
+  }
+  return cache.icons;
+}
+
+export const UI_ICON_NAMES = Object.keys(ICONS);
+
+/**
+ * Data URL for a UI icon. Results are cached: these are drawn into buttons that
+ * get rebuilt on every render, and re-encoding a PNG per button is wasteful.
+ *
+ * @param {keyof typeof ICONS} name
+ * @param {number} scale integer multiple of the 16px source
+ */
+export function uiIconURL(name, scale = 2) {
+  const cacheKey = `${name}@${scale}`;
+  const hit = cache.urls.get(cacheKey);
+  if (hit) return hit;
+
+  const sprite = getUiSprites()[name];
+  if (!sprite) return '';
+  const size = UI_ICON_SIZE * scale;
+  const { canvas, ctx } = makeCanvas(size, size);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sprite, 0, 0, size, size);
+  const url = canvas.toDataURL('image/png');
+  cache.urls.set(cacheKey, url);
+  return url;
+}

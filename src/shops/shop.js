@@ -39,11 +39,17 @@ export function generateStock(worldId, seed) {
   const discountChance = Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
 
   const stock = [];
+  const taken = new Set();
   for (let i = 0; i < slots; i++) {
-    const rarity = rng.weighted(world.rarity);
-    const pool = SHOP_POOL[rarity] || SHOP_POOL.common;
-    const item = getItem(rng.pick(pool));
-    if (!item) continue;
+    // Never put the same item on the counter twice. A visit offering "Bandage,
+    // Carrot, Bandage" reads as a bug, and it wastes one of only three slots.
+    const item = pickUnused(rng, rng.weighted(world.rarity), taken);
+
+    // Only reachable if the entire catalogue is already on the counter, which
+    // needs more slots than the game can currently grant. Stop rather than
+    // spin: there is genuinely nothing left to sell.
+    if (!item) break;
+    taken.add(item.id);
 
     const fullPrice = itemPrice(item, worldId);
     const discounted = rng.chance(discountChance);
@@ -57,6 +63,35 @@ export function generateStock(worldId, seed) {
     });
   }
   return stock;
+}
+
+/**
+ * One item that is not already on the counter.
+ *
+ * The rolled rarity is searched first, so the world's rarity table still
+ * decides what a shop mostly stocks. Only when that pool has nothing new left
+ * does the search widen to the other tiers.
+ *
+ * That fallback is the point. `SHOP_POOL.common` holds three items, and world 1
+ * rolls common 78% of the time — so a player who bought a Trader's Ledger for a
+ * fourth slot would, on better than a third of visits, have rolled four commons
+ * and got three items. A paid upgrade that sometimes does nothing is worse than
+ * the duplicate stock this deduplication was added to remove.
+ *
+ * @param {ReturnType<import('../core/rng.js').makeRng>} rng
+ * @param {string} rarity the tier rolled for this slot
+ * @param {Set<string>} taken item ids already on the counter
+ * @returns {object|null} null only when every item in the catalogue is taken
+ */
+function pickUnused(rng, rarity, taken) {
+  const tiers = [rarity, ...Object.keys(SHOP_POOL).filter((t) => t !== rarity)];
+  for (const tier of tiers) {
+    const available = (SHOP_POOL[tier] || [])
+      .map(getItem)
+      .filter((item) => item && !taken.has(item.id));
+    if (available.length) return rng.pick(available);
+  }
+  return null;
 }
 
 /** Seed for a specific shop so re-entering the screen shows the same stock. */

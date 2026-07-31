@@ -11,7 +11,7 @@ import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
 import { getState } from './player.js';
 import { getWorld, FINAL_WORLD } from './worlds.js';
-import { livesRow, statTile } from '../ui/widgets.js';
+import { livesRow, statTile, uiIcon } from '../ui/widgets.js';
 import { startMenuScene } from '../menu/menu-scene.js';
 import { createGalaxyScene } from './galaxy-scene.js';
 import { getProfile } from '../core/settings.js';
@@ -62,7 +62,10 @@ export const WorldIntroScreen = {
           livesRow(getState().lives, getState().maxLives, { large: true }),
         ]),
         el('p.muted.center', { style: { marginTop: 'var(--sp-2)' }, text: 'Lives restored' }),
-        el('div.intro-continue', {}, ['Click anywhere to ride on ▸']),
+        el('div.intro-continue', {}, [
+          el('span', { text: 'Click anywhere to ride on' }),
+          uiIcon('chevronRight', 0.9),
+        ]),
       ]),
     ]);
 
@@ -94,8 +97,8 @@ export const VictoryScreen = {
     const player = getState();
     const profile = getProfile();
 
-    const screen = el('div.screen.screen--centered', {}, [
-      el('div.panel.poster', { style: { width: 'min(700px, 100%)' } }, [
+    const screen = el('div.screen.screen--centered.ending-screen', {}, [
+      el('div.panel.panel--braced.poster', {}, [
         el('div.result-banner.is-win', {}, [
           el('div.headline', { text: 'The Stranger Falls' }),
           el('div.muted', { text: `${profile.name} rode past the last horizon and came back` }),
@@ -131,8 +134,8 @@ export const GameOverScreen = {
     const world = getWorld(params.world || getState().world);
     const player = getState();
 
-    const screen = el('div.screen.screen--centered', {}, [
-      el('div.panel.poster', { style: { width: 'min(620px, 100%)' } }, [
+    const screen = el('div.screen.screen--centered.ending-screen', {}, [
+      el('div.panel.panel--braced.poster', {}, [
         el('div.result-banner.is-loss', {}, [
           el('div.headline', { style: { color: 'var(--red-light)' }, text: 'You went down' }),
           el('div.muted', { text: `Somewhere in ${world.name}` }),

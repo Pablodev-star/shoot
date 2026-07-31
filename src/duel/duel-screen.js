@@ -6,10 +6,15 @@
  * the fight (the feature the third version was best remembered for).
  *
  * Readability rules:
- *  - Each button says what it costs and what it does to you, every turn.
- *  - Shoot with no bullets is disabled and says so, instead of failing silently.
- *  - One callout line, centre screen, always states the current situation:
- *    your move / their move / what happened.
+ *  - Both fighters are drawn the same way: name, lives, and a six-chamber
+ *    cylinder. An empty gun is six dark holes — the old screen printed the
+ *    words "no bullets" under each fighter on every round of every duel.
+ *  - Each button carries its cost as pips, not as a sentence. "+1 bullet · you
+ *    are open" under Reload was the rulebook reprinted on every turn; the rules
+ *    belong in How to Play, and the button belongs to the player who already
+ *    knows them.
+ *  - One callout line states the situation, and it sits directly above the
+ *    controls so it never covers the duellists.
  *  - The enemy's abilities are listed up front, so nothing is a surprise twice.
  *
  * All rules live in duel-engine.js. This file never decides an outcome.
@@ -28,7 +33,17 @@ import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
 import { resolveDuel } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
-import { livesRow, updateLivesRow, icon, statTile } from '../ui/widgets.js';
+import {
+  livesRow,
+  updateLivesRow,
+  cylinder,
+  updateCylinder,
+  icon,
+  uiIcon,
+  iconButton,
+  statTile,
+} from '../ui/widgets.js';
+import { MAX_BULLETS } from './duel-engine.js';
 import { getSettings } from '../core/settings.js';
 import { toast } from '../ui/toast.js';
 import { openHowToPlay } from '../ui/help.js';
@@ -97,16 +112,21 @@ export const DuelScreen = {
     // --- fighter cards -----------------------------------------------------
     const playerLives = livesRow(player.lives, player.maxLives, { large: true });
     const enemyLives = livesRow(enemy.lives, enemy.maxLives, { large: true });
-    const playerBullets = el('div.bullet-row');
-    const enemyBullets = el('div.bullet-row');
+    const playerCylinder = cylinder(0, MAX_BULLETS);
+    const enemyCylinder = cylinder(enemy.bullets || 0, MAX_BULLETS);
     const enemyName = el('div.fighter-name', { text: enemy.name });
     const enemyAbilities = el('div.row.row--tight');
     const playerCard = el('div.fighter-card', {}, [
       el('div.fighter-name', { text: 'You' }),
       playerLives,
-      playerBullets,
+      playerCylinder,
     ]);
-    const enemyCard = el('div.fighter-card.is-enemy', {}, [enemyName, enemyLives, enemyBullets, enemyAbilities]);
+    const enemyCard = el('div.fighter-card.is-enemy', {}, [
+      enemyName,
+      enemyLives,
+      enemyCylinder,
+      enemyAbilities,
+    ]);
 
     function renderAbilities() {
       clearNode(enemyAbilities);
@@ -121,12 +141,6 @@ export const DuelScreen = {
       if (isImmuneToEffects() && (enemy.abilities || []).length) {
         enemyAbilities.append(el('span.chip.chip--legendary', { text: 'Blocked by diadem' }));
       }
-    }
-
-    function renderBullets(node, count) {
-      clearNode(node);
-      for (let i = 0; i < Math.max(count, 0); i++) node.append(icon('bullet', 1.1));
-      if (count <= 0) node.append(el('span.empty-label', { text: 'no bullets' }));
     }
 
     // --- centre ------------------------------------------------------------
@@ -154,30 +168,67 @@ export const DuelScreen = {
     const buttons = {};
     const MOVE_SFX = { [MOVES.RELOAD]: 'reload', [MOVES.SHIELD]: 'shield', [MOVES.SHOOT]: 'shot' };
 
-    function moveButton(move, label, hint, key, cls) {
+    /**
+     * One move plate: icon, name, keyboard hint, and a cost strip.
+     *
+     * The cost strip is a picture of the transaction — a round gained, a round
+     * spent, or nothing — rather than a line of prose. `tip` carries the full
+     * explanation for anyone who hovers, and `aria-label` carries it for anyone
+     * who cannot see the plate at all.
+     */
+    function moveButton(move, { label, iconName, key, cls, cost, tip }) {
       // `data-sfx` lets attachButtonSounds play the move's own cue instead of
       // the generic click, so pressing Shoot sounds like a revolver.
-      const hintNode = el('span.duel-btn-hint', { text: hint });
+      const costNode = el('span.duel-cost', {}, cost());
       const btn = el(`button.btn.duel-btn.${cls}`, {
         onclick: () => submit(move),
         dataset: { sfx: MOVE_SFX[move] },
-        'aria-label': `${label}: ${hint}`,
+        'data-tip': tip,
+        'aria-label': `${label}. ${tip}`,
       }, [
-        el('span.duel-btn-top', {}, [
-          el('span.duel-btn-label', { text: label }),
-          el('span.kbd', { text: key }),
-        ]),
-        hintNode,
+        uiIcon(iconName, 1.3),
+        el('span.duel-btn-label', {}, [label, el('span.kbd', { text: key })]),
+        costNode,
       ]);
       buttons[move] = btn;
-      btn.hintNode = hintNode;
+      btn.costNode = costNode;
+      btn.renderCost = () => {
+        clearNode(costNode);
+        cost().forEach((child) => child && costNode.append(child));
+      };
       return btn;
     }
 
+    const pip = (spent = false) => el('span.pip', { class: spent ? 'is-spent' : '' });
+
     const controls = el('div.duel-controls', {}, [
-      moveButton(MOVES.RELOAD, 'Reload', '+1 bullet · you are open', '1', 'duel-btn--reload'),
-      moveButton(MOVES.SHIELD, 'Shield', 'nothing gets through', '2', 'duel-btn--shield'),
-      moveButton(MOVES.SHOOT, 'Shoot', 'spend 1 bullet', '3', 'duel-btn--shoot'),
+      moveButton(MOVES.RELOAD, {
+        label: 'Reload',
+        iconName: 'chamber',
+        key: '1',
+        cls: 'duel-btn--reload',
+        cost: () => [el('span', { text: '+' }), pip()],
+        tip: 'Load one round. You are open to a shot this turn.',
+      }),
+      moveButton(MOVES.SHIELD, {
+        label: 'Shield',
+        iconName: 'shieldPlate',
+        key: '2',
+        cls: 'duel-btn--shield',
+        cost: () => [el('span', { text: 'Safe' })],
+        tip: 'Nothing gets through. You gain nothing either.',
+      }),
+      moveButton(MOVES.SHOOT, {
+        label: 'Shoot',
+        iconName: 'revolver',
+        key: '3',
+        cls: 'duel-btn--shoot',
+        cost: () => {
+          const dry = duel.getSides().player.bullets <= 0;
+          return dry ? [el('span', { text: 'Empty' })] : [el('span', { text: '−' }), pip(true)];
+        },
+        tip: 'Spend one round. Hits a rival who reloaded or shot.',
+      }),
     ]);
 
     const itemButton = el('button.btn.btn--sm.btn--ghost', {
@@ -185,11 +236,10 @@ export const DuelScreen = {
       'data-tip': 'Use dynamite, poison or a bandage',
     }, [icon('shopTag', 1.1), 'Saddlebag', el('span.kbd', { text: 'I' })]);
 
-    const helpButton = el('button.btn.btn--sm.btn--icon.btn--ghost', {
-      onclick: () => openHowToPlay(),
-      'aria-label': 'How to play',
-      'data-tip': 'How to play',
-    }, ['?']);
+    const helpButton = iconButton('question', {
+      onClick: () => openHowToPlay(),
+      label: 'How to play',
+    });
 
     const screen = el('div.screen.duel-screen', {}, [
       el('div.duel-top', {}, [
@@ -197,10 +247,11 @@ export const DuelScreen = {
         el('div.duel-center', {}, [roundPill, ...atmosChips]),
         enemyCard,
       ]),
-      callout,
+      // The bag and the guide sit on the callout line rather than on a row of
+      // their own: a duel on a short screen was pushing them off the bottom.
       el('div.duel-bottom', {}, [
+        el('div.duel-extras', {}, [helpButton, callout, itemButton]),
         controls,
-        el('div.row', { style: { justifyContent: 'center' } }, [itemButton, helpButton]),
       ]),
     ]);
 
@@ -214,13 +265,13 @@ export const DuelScreen = {
       const sides = duel.getSides();
       updateLivesRow(playerLives, sides.player.lives, sides.player.maxLives);
       updateLivesRow(enemyLives, sides.enemy.lives, sides.enemy.maxLives);
-      renderBullets(playerBullets, sides.player.bullets);
-      renderBullets(enemyBullets, sides.enemy.bullets);
+      updateCylinder(playerCylinder, sides.player.bullets);
+      updateCylinder(enemyCylinder, sides.enemy.bullets);
       roundPill.textContent = `Round ${Math.max(1, duel.getRound() + (localAgent.isWaiting() ? 1 : 0))}`;
 
-      // The Shoot button explains itself rather than just greying out.
-      const dry = sides.player.bullets <= 0;
-      buttons[MOVES.SHOOT].hintNode.textContent = dry ? 'no bullets — reload first' : 'spend 1 bullet';
+      // Shoot swaps its cost strip for "Empty" when the cylinder is out, so a
+      // disabled button still says why it is disabled.
+      buttons[MOVES.SHOOT].renderCost();
     }
 
     function setControlsEnabled(enabled) {

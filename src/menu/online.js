@@ -7,10 +7,19 @@
  * browser, create-room dialog, join-by-code and matchmaking are all here with
  * sample data and full animation. What is missing is only the network layer.
  *
- * Every action routes through `comingSoon()`, which shows a toast and plays the
- * error cue — nothing throws, nothing dead-ends, navigation always keeps
- * working. When the backend lands, replace the handlers marked `// NETWORK:`
- * and delete `SAMPLE_ROOMS`.
+ * HOW THIS SCREEN IS ORGANISED
+ * The hard part of an unfinished screen is saying so exactly once. The previous
+ * version said it four times — a striped construction banner, a PREVIEW badge,
+ * a SOON chip on every button, and another disclaimer inside the matchmaking
+ * dialog — which made the screen read as a warning label with a lobby attached.
+ *
+ * Now there is one notice at the top, and everything below it is a preview of
+ * the finished thing. Controls that will do something later are stamped once;
+ * pressing one explains itself in a toast. The "Your Standing" panel is gone
+ * entirely: three stat tiles reading "—" are not a preview of anything.
+ *
+ * When the backend lands, replace the handlers marked `// NETWORK:` and delete
+ * `SAMPLE_ROOMS`.
  */
 
 import { el } from '../core/dom.js';
@@ -18,22 +27,22 @@ import { back } from '../core/router.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { toast } from '../ui/toast.js';
 import { getProfile } from '../core/settings.js';
-import { backButton, icon } from '../ui/widgets.js';
+import { backButton, closeButton, uiIcon } from '../ui/widgets.js';
 
 /** Placeholder browser contents. NETWORK: replace with a live room feed. */
 const SAMPLE_ROOMS = [
-  { name: "Dead Man's Gulch", host: 'CALAMITY', players: 2, max: 2, mode: 'Duel · Best of 3', ping: 28, locked: false },
-  { name: 'Rusty Spur Saloon', host: 'EL_TUERTO', players: 1, max: 2, mode: 'Duel · Sudden Death', ping: 46, locked: false },
+  { name: "Dead Man's Gulch", host: 'CALAMITY', players: 2, max: 2, mode: 'Best of 3', ping: 28, locked: false },
+  { name: 'Rusty Spur Saloon', host: 'EL_TUERTO', players: 1, max: 2, mode: 'Sudden death', ping: 46, locked: false },
   { name: 'High Noon Lobby', host: 'BONESAW', players: 1, max: 4, mode: 'Free-for-all', ping: 61, locked: true },
   { name: 'Coyote Ridge', host: 'MISS_ADA', players: 3, max: 4, mode: 'Free-for-all', ping: 112, locked: false },
-  { name: 'The Last Round', host: 'DOC_HALLOW', players: 1, max: 2, mode: 'Duel · Best of 5', ping: 74, locked: false },
-  { name: 'Buzzard Flats', host: 'SIX_SHOT', players: 2, max: 2, mode: 'Duel · Best of 3', ping: 155, locked: false },
+  { name: 'The Last Round', host: 'DOC_HALLOW', players: 1, max: 2, mode: 'Best of 5', ping: 74, locked: false },
+  { name: 'Buzzard Flats', host: 'SIX_SHOT', players: 2, max: 2, mode: 'Best of 3', ping: 155, locked: false },
   { name: 'Silver Vein Mine', host: 'PROSPECTOR', players: 2, max: 4, mode: 'Free-for-all', ping: 39, locked: false },
 ];
 
 function comingSoon(what = 'Online play') {
   play('error');
-  toast(`${what} — coming soon`, 'gold');
+  toast(`${what} is not wired up yet`, 'gold');
 }
 
 function pingQuality(ping) {
@@ -48,13 +57,16 @@ function roomRow(room) {
     'button.list-row.room-row',
     {
       class: full ? 'is-full' : '',
-      onclick: () => comingSoon('Joining rooms'),
-      'aria-label': `${room.name}, ${room.players} of ${room.max} players. Coming soon.`,
+      onclick: () => comingSoon('Joining a room'),
+      'aria-label': `${room.name}${room.locked ? ', private' : ''}, ${room.players} of ${room.max} players`,
     },
     [
       el('span.room-name.grow', {}, [
-        el('span.title', { text: `${room.locked ? '· ' : ''}${room.name}` }),
-        el('span.meta', { text: `${room.mode} · host ${room.host}` }),
+        el('span.title', {}, [
+          room.locked ? uiIcon('lock', 0.85) : null,
+          el('span', { text: room.name }),
+        ]),
+        el('span.meta', { text: `${room.mode} · ${room.host}` }),
       ]),
       el('span.room-players', { text: `${room.players}/${room.max}` }),
       el('span.ping', {}, [
@@ -72,45 +84,35 @@ function openCreateRoom() {
       if (e.target === backdrop) backdrop.remove();
     },
   });
-  const select = (options) =>
-    el('div.select-wrap', {}, [el('select.input', {}, options.map((o) => el('option', { text: o })))]);
+  const select = (label, options) =>
+    el('div.field.field--wide', {}, [
+      el('label', { text: label }),
+      el('div.select-wrap', {}, [
+        el('select.input', {}, options.map((o) => el('option', { text: o }))),
+      ]),
+    ]);
 
-  const modal = el('div.panel.modal', { role: 'dialog', 'aria-label': 'Create room' }, [
+  const modal = el('div.panel.modal.modal--narrow', { role: 'dialog', 'aria-label': 'Create room' }, [
     el('div.modal-header', {}, [
       el('h2.panel-title', { text: 'Create Room' }),
-      el('button.btn.btn--sm.btn--icon.btn--ghost', {
-        onclick: () => backdrop.remove(),
-        'aria-label': 'Close',
-      }, ['✕']),
+      closeButton(() => backdrop.remove()),
     ]),
-    el('div.modal-content.col', { style: { gap: 'var(--sp-4)' } }, [
-      el('div.field', {}, [
+    el('div.modal-content.col', { style: { gap: 'var(--sp-3)' } }, [
+      el('div.field.field--wide', {}, [
         el('label', { text: 'Room name' }),
         el('input.input', { type: 'text', value: `${getProfile().name}'S SALOON`, maxlength: '24' }),
       ]),
-      el('div.field', {}, [el('label', { text: 'Mode' }), select([
-        'Duel · Best of 3',
-        'Duel · Best of 5',
-        'Duel · Sudden Death',
-        'Free-for-all (4)',
-      ])]),
-      el('div.field', {}, [el('label', { text: 'Starting lives' }), select([
-        '3 lives',
-        '5 lives',
-        '1 life · sudden death',
-      ])]),
+      select('Mode', ['Best of 3', 'Best of 5', 'Sudden death', 'Free-for-all (4)']),
+      select('Starting lives', ['3 lives', '5 lives', '1 life']),
       el('label.switch', {}, [
         el('input', { type: 'checkbox' }),
         el('span.track'),
-        el('span.switch-label', { text: 'Private room (invite code only)' }),
+        el('span.switch-label', { text: 'Private — join by code only' }),
       ]),
     ]),
     el('div.modal-footer', {}, [
       el('button.btn.btn--sm.btn--ghost', { onclick: () => backdrop.remove() }, ['Cancel']),
-      el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Creating rooms') }, [
-        'Create',
-        el('span.chip.chip--gold', { text: 'Soon' }),
-      ]),
+      el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Creating a room') }, ['Create']),
     ]),
   ]);
   backdrop.append(modal);
@@ -118,7 +120,7 @@ function openCreateRoom() {
   attachButtonSounds(backdrop);
 }
 
-/** Matchmaking preview: the real search UI, clearly flagged as a preview. */
+/** Matchmaking preview: the real search UI, running against nothing. */
 function openMatchmaking() {
   const statuses = [
     'Saddling up…',
@@ -131,12 +133,11 @@ function openMatchmaking() {
   const status = el('div.mm-status', { text: statuses[0] });
   const spinner = el('div.mm-spinner');
   const backdrop = el('div.modal-backdrop');
-  const modal = el('div.panel.modal', { role: 'dialog', 'aria-label': 'Quick match' }, [
+  const modal = el('div.panel.modal.modal--narrow', { role: 'dialog', 'aria-label': 'Quick match' }, [
     el('div.matchmaking', {}, [
       el('h2.panel-title', { text: 'Quick Match' }),
       spinner,
       status,
-      el('p.muted', { text: 'Preview only — matchmaking servers are not live yet.' }),
       el('button.btn.btn--sm.btn--ghost', { onclick: () => stop() }, ['Cancel']),
     ]),
   ]);
@@ -151,7 +152,7 @@ function openMatchmaking() {
 
   const giveUp = setTimeout(() => {
     clearInterval(timer);
-    status.textContent = 'No games found — online is still being built.';
+    status.textContent = 'Nobody out there yet.';
     spinner.classList.add('hidden');
   }, 6000);
 
@@ -172,70 +173,63 @@ export const OnlineScreen = {
     const codeInput = el('input.input', {
       type: 'text',
       maxlength: '6',
-      placeholder: '· · · · · ·',
+      placeholder: 'ABC123',
       'aria-label': 'Room code',
       oninput: (e) => {
         e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       },
     });
 
-    const screen = el('div.screen', {}, [
+    const screen = el('div.screen.online-screen', {}, [
       el('div.screen-header', {}, [
         backButton(() => back('title')),
         el('h1.screen-title', { text: 'Online' }),
-        el('span.chip.chip--live', {}, [el('span.dot-live'), 'Preview']),
+        el('span.stamp', { text: 'Not live' }),
       ]),
 
       el('div.screen-body', {}, [
-        el('div.construction-banner', {
-          text: 'Online mode is under construction — this lobby is a preview of the finished interface',
-        }),
+        // Said once, at the top, and never repeated below.
+        el('div.notice', {}, [
+          el('span.notice-icon', {}, [uiIcon('hourglass', 1.8)]),
+          el('div.notice-text', {}, [
+            el('div.notice-title', { text: 'Online duels are still being built' }),
+            el('p.notice-body', {
+              text: 'Everything below is the finished interface running on sample data. Nothing connects to anyone yet.',
+            }),
+          ]),
+        ]),
 
         el('div.online-layout', {}, [
-          el('div.panel', {}, [
+          el('div.panel.panel--braced', {}, [
             el('div.row.spread', { style: { marginBottom: 'var(--sp-3)' } }, [
-              el('h2.panel-title', { style: { textAlign: 'left' }, text: 'Room Browser' }),
+              el('h2.panel-title', { style: { textAlign: 'left' }, text: 'Rooms' }),
               el('button.btn.btn--sm.btn--ghost', {
-                onclick: () => comingSoon('Refreshing the browser'),
-                'data-tip': 'Reload the room list',
+                onclick: () => comingSoon('The room browser'),
               }, ['Refresh']),
             ]),
             list,
           ]),
 
           el('div.online-side', {}, [
-            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
+            el('div.panel.col', { style: { gap: 'var(--sp-2)' } }, [
               el('h2.panel-title', { text: 'Play' }),
               el('button.btn.btn--block.btn--soon', { onclick: () => openMatchmaking() }, [
                 'Quick Match',
-                el('span.chip.chip--gold', { text: 'Soon' }),
               ]),
               el('button.btn.btn--block.btn--soon', { onclick: () => openCreateRoom() }, [
                 'Create Room',
-                el('span.chip.chip--gold', { text: 'Soon' }),
               ]),
             ]),
 
-            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
-              el('h2.panel-title', { text: 'Join with Code' }),
+            el('div.panel.col', { style: { gap: 'var(--sp-2)' } }, [
+              el('h2.panel-title', { text: 'Join with a code' }),
               el('div.join-code', {}, [
                 codeInput,
-                el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Joining by code') }, ['Join']),
+                el('button.btn.btn--sm.btn--soon', { onclick: () => comingSoon('Joining by code') }, [
+                  'Join',
+                ]),
               ]),
-              el('p.field-hint.center', { text: 'Ask a friend for their six-character room code.' }),
-            ]),
-
-            el('div.panel.col', { style: { gap: 'var(--sp-3)' } }, [
-              el('h2.panel-title', { text: 'Your Standing' }),
-              el('div.stat-grid', {}, [
-                el('div.stat-tile', {}, [el('span.k', { text: 'Rank' }), el('span.v', { text: '—' })]),
-                el('div.stat-tile', {}, [el('span.k', { text: 'Wins' }), el('span.v', { text: '—' })]),
-                el('div.stat-tile', {}, [el('span.k', { text: 'Streak' }), el('span.v', { text: '—' })]),
-              ]),
-              el('p.field-hint.center', {}, [
-                icon('coin', 0.9),
-                ' Ranked standings unlock when online play goes live.',
-              ]),
+              el('p.field-hint.center', { text: 'Six characters, from whoever made the room.' }),
             ]),
           ]),
         ]),

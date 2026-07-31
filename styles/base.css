@@ -2,8 +2,20 @@
    SHOOT! — Base layer.
 
    Design tokens, reset, app skeleton, screen transitions, toasts.
-   Everything downstream reads from the custom properties defined here, so a
-   change to the look of the game starts in this file.
+
+   THE MATERIALS
+   The game is built from five materials and nothing else. Every surface in
+   every screen is one of them, which is what makes the interface read as a
+   place rather than as a set of boxes:
+
+     plank    weathered board — the body of every panel
+     iron     blued gunmetal with rivets — buttons, frames, hardware
+     brass    warm and polished — the one action that matters on a screen
+     paper    sun-bleached poster stock — anything the world "printed"
+     rope     twisted hemp — separates, never encloses
+
+   Downstream files compose from these. If a screen needs a new colour, the
+   colour belongs here first.
    ========================================================================== */
 
 :root {
@@ -42,22 +54,77 @@
   --gold-dark: #a8760f;
   --purple: #8a5cd6;
 
-  /* --- Semantic surfaces -------------------------------------------------
-     Named by role, not by colour, so screens never hard-code a hex. */
-  --surface: linear-gradient(180deg, #3a2716 0%, #241608 100%);
-  --surface-raised: linear-gradient(180deg, #4a331d 0%, #2c1c0d 100%);
-  --surface-sunken: rgba(10, 6, 3, 0.55);
-  --surface-paper: linear-gradient(180deg, var(--sand-light) 0%, var(--sand) 55%, var(--sand-mid) 100%);
-  --surface-glass: rgba(24, 15, 10, 0.82);
+  --steel: #b8bcc4;
+  --steel-dark: #6f757f;
 
-  --edge: var(--wood-dark);
-  --edge-strong: var(--wood-deep);
-  --edge-highlight: rgba(242, 227, 198, 0.14);
+  /* --- Material: PLANK ----------------------------------------------------
+     Boards, not a gradient. The seam repeat is what sells it, so panels keep
+     their board rhythm at any height. */
+  --plank-face: linear-gradient(178deg, #4a3018 0%, #3b2412 52%, #2c1a0b 100%);
+  --plank-grain:
+    repeating-linear-gradient(
+      91deg,
+      rgba(255, 226, 170, 0.035) 0 1px,
+      rgba(0, 0, 0, 0.05) 1px 2px,
+      transparent 2px 7px
+    );
+  --plank-seams:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 21px,
+      rgba(0, 0, 0, 0.42) 21px 23px,
+      rgba(180, 138, 84, 0.09) 23px 24px
+    );
+  --plank: var(--plank-grain), var(--plank-seams), var(--plank-face);
+
+  /* --- Material: IRON ------------------------------------------------------ */
+  --iron-face: #6a5843;
+  --iron-mid: #46372a;
+  --iron-deep: #2c2119;
+  --iron-edge: #150f0a;
+
+  /* --- Material: BRASS ----------------------------------------------------- */
+  --brass-face: #f0b95a;
+  --brass-mid: #c2882c;
+  --brass-deep: #8a5711;
+  --brass-edge: #3c2405;
+
+  /* --- Material: PAPER ----------------------------------------------------- */
+  --paper:
+    radial-gradient(ellipse at 22% 12%, rgba(255, 255, 255, 0.32), transparent 55%),
+    repeating-linear-gradient(94deg, rgba(140, 104, 56, 0.05) 0 2px, transparent 2px 6px),
+    linear-gradient(172deg, #f4dfae 0%, #e6c884 48%, #cfa864 100%);
+  --paper-ink: #3d2510;
+  --paper-ink-dim: rgba(61, 37, 16, 0.66);
+
+  /* --- Material: ROPE ------------------------------------------------------
+     A twisted cord, drawn as a repeating diagonal on a fibre-coloured band. */
+  --rope:
+    repeating-linear-gradient(
+      66deg,
+      #b98d51 0 3px,
+      #8a6533 3px 5px,
+      #6d4d26 5px 7px
+    );
+
+  /* --- Semantic surfaces --------------------------------------------------- */
+  --surface: var(--plank);
+  --surface-raised: linear-gradient(180deg, #55391f 0%, #33200e 100%);
+  --surface-sunken: linear-gradient(180deg, rgba(9, 5, 2, 0.72), rgba(20, 12, 6, 0.58));
+  --surface-glass: rgba(26, 16, 9, 0.86);
+
+  --edge: #2a1a0c;
+  --edge-strong: #170d05;
+  --edge-highlight: rgba(242, 227, 198, 0.13);
 
   --text: var(--bone);
-  --text-dim: rgba(242, 227, 198, 0.62);
+  --text-dim: rgba(242, 227, 198, 0.6);
+  --text-faint: rgba(242, 227, 198, 0.38);
   --text-accent: var(--gold-light);
-  --text-on-paper: var(--wood-deep);
+
+  /* --- Hardware -----------------------------------------------------------
+     One rivet, reused. Corners of iron plates and the nails in posters. */
+  --rivet: radial-gradient(circle at 34% 30%, #d9c49c 0%, #9c7c4e 42%, #3a2812 78%, #1a1006 100%);
 
   /* --- Typography ---------------------------------------------------------
      A fluid scale: every size interpolates between phone and desktop, so no
@@ -69,16 +136,15 @@
   --text-sm: clamp(12px, 0.76rem + 0.14vw, 14px);
   --text-md: clamp(14px, 0.86rem + 0.2vw, 17px);
   --text-lg: clamp(16px, 0.95rem + 0.35vw, 21px);
-  --text-xl: clamp(20px, 1.1rem + 0.8vw, 30px);
-  --text-2xl: clamp(26px, 1.3rem + 1.7vw, 46px);
-  --text-3xl: clamp(32px, 1.5rem + 2.6vw, 62px);
+  --text-xl: clamp(19px, 1.05rem + 0.7vw, 28px);
+  --text-2xl: clamp(24px, 1.25rem + 1.5vw, 42px);
+  --text-3xl: clamp(30px, 1.45rem + 2.4vw, 56px);
 
   --tracking-tight: 0.02em;
-  --tracking-wide: 0.14em;
-  --tracking-wider: 0.24em;
+  --tracking-wide: 0.13em;
+  --tracking-wider: 0.22em;
 
-  /* --- Space --------------------------------------------------------------
-     A 4px-based scale. Screens compose from these instead of magic numbers. */
+  /* --- Space --------------------------------------------------------------- */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -86,40 +152,43 @@
   --sp-5: 24px;
   --sp-6: 32px;
   --sp-7: 48px;
-  --gutter: clamp(12px, 3vw, 32px);
+  --gutter: clamp(12px, 2.6vw, 28px);
 
   /* --- Shape --------------------------------------------------------------- */
-  --radius: 3px;
-  --radius-lg: 5px;
-  --border: 3px;
-  --border-thick: 4px;
+  --radius: 2px;
+  --radius-lg: 4px;
+  --border: 2px;
+  --border-thick: 3px;
 
   /* --- Elevation ---------------------------------------------------------- */
-  --lift-1: 0 2px 0 var(--edge-strong), 0 4px 10px rgba(0, 0, 0, 0.4);
-  --lift-2: 0 4px 0 var(--edge-strong), 0 10px 20px rgba(0, 0, 0, 0.45);
-  --lift-3: 0 6px 0 var(--edge-strong), 0 18px 34px rgba(0, 0, 0, 0.55);
-  --inset-hi: inset 0 2px 0 rgba(242, 227, 198, 0.25);
-  --inset-lo: inset 0 -3px 0 rgba(0, 0, 0, 0.32);
+  --lift-1: 0 2px 0 var(--edge-strong), 0 3px 8px rgba(0, 0, 0, 0.4);
+  --lift-2: 0 3px 0 var(--edge-strong), 0 8px 18px rgba(0, 0, 0, 0.45);
+  --lift-3: 0 5px 0 var(--edge-strong), 0 16px 30px rgba(0, 0, 0, 0.55);
+  --inset-hi: inset 0 2px 0 rgba(242, 227, 198, 0.2);
+  --inset-lo: inset 0 -3px 0 rgba(0, 0, 0, 0.34);
 
   /* --- Motion -------------------------------------------------------------
      One vocabulary for the whole game. `--ease-out` for things arriving,
      `--ease-spring` for anything the player pressed. */
   --dur-instant: 90ms;
-  --dur-fast: 160ms;
-  --dur-base: 260ms;
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
   --dur-slow: 420ms;
   --dur-screen: 340ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.2, 1.35, 0.35, 1);
+  --ease-spring: cubic-bezier(0.2, 1.4, 0.35, 1);
 
-  /* --- Layout -------------------------------------------------------------- */
-  --content-narrow: 620px;
-  --content: 900px;
-  --content-wide: 1100px;
+  /* --- Layout -------------------------------------------------------------
+     `--screen-max` is set per screen. Nothing gets the full width just because
+     the window is wide; a screen is only as wide as its content needs.
+     `--field-max` stops form controls growing into the empty space beside
+     them, which is what made everything look stretched on a tablet. */
+  --screen-max: 900px;
+  --field-max: 320px;
   --tap: 44px; /* minimum touch target */
 
-  --focus-ring: 0 0 0 3px rgba(255, 226, 122, 0.85), 0 0 0 7px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px rgba(255, 226, 122, 0.9), 0 0 0 6px rgba(0, 0, 0, 0.55);
 }
 
 /* Users who ask for less motion get the layout, not the choreography. */
@@ -213,7 +282,7 @@ textarea {
   position: relative;
   width: 100%;
   height: 100%;
-  max-width: 1400px;
+  max-width: 1600px;
   overflow: hidden;
   /* Respect notches and home indicators on phones. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
@@ -234,7 +303,10 @@ textarea {
   z-index: 2;
 }
 
-/* Every screen is a column: header / body / footer, with the body scrolling. */
+/* Every screen is a column: header / body / footer, with the body scrolling.
+   Children are centred and capped at `--screen-max`, which each screen sets
+   for itself — so a settings list does not sprawl to the width of a room
+   browser just because both are on the same tablet. */
 .screen {
   position: absolute;
   inset: 0;
@@ -250,15 +322,23 @@ textarea {
   animation: screen-in var(--dur-screen) var(--ease-out) both;
 }
 
-/* Screens that should sit dead-centre rather than flow from the top. */
+.screen > * {
+  width: 100%;
+  max-width: var(--screen-max);
+  flex: 0 0 auto;
+}
+
+/* Screens that should sit dead-centre rather than flow from the top. `safe`
+   keeps a tall card scrollable instead of centring it off the top edge. */
 .screen--centered {
   justify-content: center;
+  justify-content: safe center;
 }
 
 @keyframes screen-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 18px, 0);
+    transform: translate3d(0, 14px, 0);
   }
   to {
     opacity: 1;
@@ -280,12 +360,15 @@ textarea {
 .stagger > *:nth-child(8) { animation-delay: 390ms; }
 
 @keyframes rise {
-  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
   to { opacity: 1; transform: none; }
 }
 
 /* ==========================================================================
    Screen transition — saloon doors
+
+   Slatted doors that swing shut, with a hanging lamp-line of light down the
+   join so the two halves read as doors rather than two rectangles.
    ========================================================================== */
 
 #transition {
@@ -303,7 +386,8 @@ textarea {
   bottom: 0;
   width: 52%;
   background:
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 6px, transparent 6px 15px),
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0 15px, rgba(255, 220, 160, 0.05) 15px 17px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 16px),
     linear-gradient(180deg, #6b4423 0%, #341d0d 100%);
   transform: translate3d(-101%, 0, 0);
   transition: transform var(--dur-screen) var(--ease-in-out);
@@ -311,14 +395,21 @@ textarea {
   will-change: transform;
 }
 
-#transition::before { left: 0; border-right: var(--border-thick) solid var(--wood-deep); }
-#transition::after { right: 0; transform: translate3d(101%, 0, 0); border-left: var(--border-thick) solid var(--wood-deep); }
+#transition::before {
+  left: 0;
+  border-right: var(--border-thick) solid var(--wood-deep);
+}
+#transition::after {
+  right: 0;
+  transform: translate3d(101%, 0, 0);
+  border-left: var(--border-thick) solid var(--wood-deep);
+}
 
 #transition.is-closing::before,
 #transition.is-closing::after { transform: translate3d(0, 0, 0); }
 
 /* ==========================================================================
-   Toasts
+   Toasts — notices nailed up where you can see them
    ========================================================================== */
 
 #toasts {
@@ -332,22 +423,24 @@ textarea {
   gap: var(--sp-2);
   align-items: center;
   pointer-events: none;
-  width: min(92vw, 560px);
+  width: min(92vw, 520px);
 }
 
 .toast {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   max-width: 100%;
   padding: var(--sp-2) var(--sp-4);
-  background: var(--surface-raised);
-  border: var(--border) solid var(--edge-strong);
-  border-left-width: 6px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  border: var(--border) solid #4a2f14;
   border-radius: var(--radius);
-  box-shadow: var(--inset-hi), var(--lift-2);
+  box-shadow: var(--lift-2);
   font-family: var(--font-display);
   font-size: var(--text-sm);
+  font-weight: 700;
   letter-spacing: var(--tracking-tight);
   text-transform: uppercase;
   text-align: center;
@@ -355,17 +448,39 @@ textarea {
     toast-out var(--dur-base) ease-in 2.3s both;
 }
 
-.toast.is-good { border-left-color: var(--green); }
-.toast.is-bad { border-left-color: var(--red); }
-.toast.is-gold { border-left-color: var(--gold); color: var(--gold-light); }
+/* The nail it hangs from. */
+.toast::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: var(--rivet);
+}
+
+/* A colour-coded strip down the left, wide enough to read at a glance. */
+.toast::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--sand-deep);
+}
+
+.toast.is-good::after { background: var(--green); }
+.toast.is-bad::after { background: var(--red); }
+.toast.is-gold::after { background: var(--gold); }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.95); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(0, -14px, 0) rotate(-1.5deg) scale(0.95); }
+  to { opacity: 1; transform: rotate(-0.4deg); }
 }
 
 @keyframes toast-out {
-  to { opacity: 0; transform: translate3d(0, -10px, 0); }
+  to { opacity: 0; transform: translate3d(0, -10px, 0) rotate(-0.4deg); }
 }
 
 /* ==========================================================================
@@ -378,6 +493,7 @@ textarea {
 .row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .row--tight { gap: var(--sp-1); }
 .row--nowrap { flex-wrap: nowrap; }
+.row--center { justify-content: center; }
 .col { display: flex; flex-direction: column; gap: var(--sp-2); }
 .grow { flex: 1 1 auto; min-width: 0; }
 .spread { justify-content: space-between; }
@@ -397,7 +513,7 @@ textarea {
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.35); }
 ::-webkit-scrollbar-thumb {
   background: var(--wood-light);
   border: 2px solid var(--wood-deep);

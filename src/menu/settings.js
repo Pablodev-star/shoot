@@ -71,15 +71,15 @@ export const SettingsScreen = {
       ),
     ]);
 
-    const screen = el('div.screen', {}, [
+    const screen = el('div.screen.settings-screen', {}, [
       el('div.screen-header', {}, [
         backButton(() => back('title')),
         el('h1.screen-title', { text: 'Settings' }),
         el('span'),
       ]),
 
-      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
-        el('div.panel.col', { style: { gap: 'var(--sp-4)' } }, [
+      el('div.screen-body', {}, [
+        el('div.panel.panel--braced.col', { style: { gap: 'var(--sp-3)' } }, [
           el('div.divider', { text: 'Audio' }),
           el('div.settings-list', {}, [
             row('Volume', 'How loud everything is.', [volume, volumeValue]),
@@ -121,10 +121,6 @@ export const SettingsScreen = {
               el('button.btn.btn--sm.btn--ghost', { onclick: () => openHowToPlay() }, ['Open guide']),
             ),
           ]),
-
-          el('p.field-hint.center', {
-            text: 'Audio currently uses synthesised placeholder cues — see src/core/audio.js.',
-          }),
         ]),
       ]),
     ]);

@@ -7,7 +7,10 @@
  *   'duel'  — only duel-legal items are actionable
  *
  * Design notes:
- *  - Filter tabs, because by world 3 the bag is a wall of icons.
+ *  - Filter tabs, because by world 3 the bag is a wall of icons. There used to
+ *    be five: `Healing` has gone, because every healing item was already under
+ *    `Food` or `Duel` and a tab that only ever shows things you can reach in
+ *    one tap elsewhere is a tab that has to be checked for nothing.
  *  - The detail pane always says what the selected item will do and what it is
  *    worth, so nothing has to be remembered.
  *  - Items that cannot be used right now explain why instead of going grey.
@@ -21,12 +24,11 @@ import { getInventory, sellItem, useItem, getState } from '../game/player.js';
 import { sellPrice } from '../game/progression.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from './toast.js';
-import { rarityChip, emptyState, icon } from './widgets.js';
+import { rarityChip, emptyState, icon, closeButton } from './widgets.js';
 
 const FILTERS = [
   { id: 'all', label: 'All', match: () => true },
-  { id: 'food', label: 'Food', match: (item) => !!item.food },
-  { id: 'heal', label: 'Healing', match: (item) => !!item.heal },
+  { id: 'food', label: 'Food', match: (item) => !!item.food || !!item.heal },
   { id: 'duel', label: 'Duel', match: (item) => item.context === 'duel' },
   { id: 'gear', label: 'Gear', match: (item) => item.context === 'passive' || item.context === 'special' },
 ];
@@ -219,10 +221,7 @@ export function openInventory(opts = {}) {
       el('h2.panel-title', { text: 'Saddlebag' }),
       el('div.row', {}, [
         el('span.chip.chip--gold', {}, [icon('coin', 1), String(getState().gold)]),
-        el('button.btn.btn--sm.btn--icon.btn--ghost', {
-          onclick: close,
-          'aria-label': 'Close',
-        }, ['✕']),
+        closeButton(close),
       ]),
     ]),
     el('div.modal-content.col', { style: { gap: 'var(--sp-3)' } }, [

@@ -4,6 +4,10 @@
  * Story Mode always comes through here. Each card answers the only three
  * questions that matter at a glance: where am I, how am I doing, and what
  * happens if I press this.
+ *
+ * The card leads with the world's name rather than the slot number, because
+ * "Dust Flats" is what a player remembers about a run and "Slot 2" is what the
+ * save system calls it.
  */
 
 import { el, clearNode } from '../core/dom.js';
@@ -12,7 +16,7 @@ import { attachButtonSounds, play } from '../core/audio.js';
 import { readAllSlots, deleteSlot, describeSlot, SLOT_COUNT } from './save.js';
 import { getWorld, FINAL_WORLD } from './worlds.js';
 import { startNewRun, loadRun } from './run.js';
-import { livesRow, icon, backButton } from '../ui/widgets.js';
+import { livesRow, icon, uiIcon, backButton, iconButton } from '../ui/widgets.js';
 import { startMenuScene } from '../menu/menu-scene.js';
 import { toast } from '../ui/toast.js';
 import { confirmDialog } from '../ui/confirm.js';
@@ -48,9 +52,9 @@ export const SlotsScreen = {
               onclick: () => start(slot),
               'aria-label': `Slot ${slot}, empty. Start a new game.`,
             }, [
-              el('span.slot-plus', { text: '+' }),
+              uiIcon('plus', 2),
+              el('span.slot-world', { text: 'New run' }),
               el('span.slot-name', { text: `Slot ${slot}` }),
-              el('p.muted', { text: 'Empty — start a new journey' }),
             ]),
           );
           continue;
@@ -63,11 +67,13 @@ export const SlotsScreen = {
               el('span.slot-name', { text: `Slot ${slot}` }),
               info.completed
                 ? el('span.chip.chip--legendary', { text: 'Finished' })
-                : el('span.chip', { text: `World ${info.world}/${FINAL_WORLD}` }),
+                : el('span.chip', { text: `${info.world} / ${FINAL_WORLD}` }),
             ]),
 
-            el('div.slot-world', { text: world.name }),
-            livesRow(info.lives, info.maxLives),
+            el('div.col', { style: { gap: 'var(--sp-2)' } }, [
+              el('div.slot-world', { text: world.name }),
+              livesRow(info.lives, info.maxLives),
+            ]),
 
             el('div.slot-lines', {}, [
               el('div.slot-line', {}, [
@@ -76,7 +82,7 @@ export const SlotsScreen = {
               ]),
               el('div.slot-line', {}, [
                 el('span.k', { text: 'Gold' }),
-                el('span.v.row.row--tight', {}, [icon('coin', 0.9), String(info.gold)]),
+                el('span.v', {}, [icon('coin', 0.9), String(info.gold)]),
               ]),
               el('div.slot-line', {}, [
                 el('span.k', { text: 'Saved' }),
@@ -88,11 +94,12 @@ export const SlotsScreen = {
               el('button.btn.btn--sm.btn--gold', { onclick: () => resume(slot, data) }, [
                 info.completed ? 'View ending' : 'Continue',
               ]),
-              el('button.btn.btn--sm.btn--icon.btn--danger', {
-                onclick: () => erase(slot),
-                'aria-label': `Erase slot ${slot}`,
-                'data-tip': 'Erase this run',
-              }, ['✕']),
+              iconButton('close', {
+                onClick: () => erase(slot),
+                label: `Erase slot ${slot}`,
+                tip: 'Erase this run',
+                variant: 'btn--danger',
+              }),
             ]),
           ]),
         );
@@ -123,7 +130,7 @@ export const SlotsScreen = {
       render();
     }
 
-    const screen = el('div.screen', {}, [
+    const screen = el('div.screen.slots-screen', {}, [
       el('div.screen-header', {}, [
         backButton(() => back('title')),
         el('h1.screen-title', { text: 'Story Mode' }),
@@ -131,7 +138,7 @@ export const SlotsScreen = {
       ]),
       el('div.screen-body', {}, [
         grid,
-        el('p.muted.center', { text: 'Progress saves automatically after every encounter.' }),
+        el('p.muted.center', { text: 'Progress saves itself after every encounter.' }),
       ]),
     ]);
 

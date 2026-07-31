@@ -36,14 +36,14 @@ const ERAS = [
 export const CreditsScreen = {
   id: 'credits',
   mount(root) {
-    const screen = el('div.screen', {}, [
+    const screen = el('div.screen.credits-screen', {}, [
       el('div.screen-header', {}, [
         backButton(() => back('title')),
         el('h1.screen-title', { text: 'Credits' }),
         el('span.chip.chip--gold', { text: VERSION }),
       ]),
 
-      el('div.screen-body', { style: { maxWidth: 'var(--content)' } }, [
+      el('div.screen-body', {}, [
         el('div.panel.panel--paper.poster', {}, [
           el('div.credits-scroll', {}, [
           el('h3', { text: 'Shoot!' }),

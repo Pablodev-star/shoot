@@ -1,9 +1,14 @@
 /**
  * SHOOT! — Shop screen.
  *
- * Three questions answered per card without reading: what is it (icon + rarity
- * edge), can I afford it (price colour + button state), is it a bargain
- * (discount flag). Anything you cannot buy says why.
+ * Three questions answered per card without reading: what is it (icon + the
+ * rarity colour on the card's top edge), can I afford it (price colour + button
+ * state), is it a bargain (the tag hanging off the corner). Anything you cannot
+ * buy says why on the button itself.
+ *
+ * Removed in the rebuild: the subtitle ("the shopkeeper lays out 3 things worth
+ * having" — a sentence that carried no information), the COMMON chip on every
+ * card, and the panel that wrapped the grid of cards inside another frame.
  */
 
 import { el, clearNode } from '../core/dom.js';
@@ -15,7 +20,7 @@ import { generateStock, shopSeed, DISCOUNT_RATE } from './shop.js';
 import { finishEncounter } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import { icon, rarityChip } from '../ui/widgets.js';
-import { statusBar } from '../ui/statusbar.js';
+import { trailBand } from '../ui/statusbar.js';
 import { toast } from '../ui/toast.js';
 import { createInteriorScene } from './interior-scene.js';
 
@@ -30,7 +35,7 @@ export const ShopScreen = {
     playMusic('themeMenu');
     setRenderer(createInteriorScene('shop'));
 
-    const bar = statusBar({ subtitle: 'At the general store' });
+    const band = trailBand();
     const grid = el('div.shop-grid.stagger');
 
     function buy(entry, card) {
@@ -91,20 +96,22 @@ export const ShopScreen = {
             rarityChip(entry.item.rarity),
             el('p.shop-desc', { text: entry.item.desc }),
 
-            el('div.shop-price', {}, [
-              icon('coin', 1),
-              entry.discounted ? el('span.old-price', { text: String(entry.fullPrice) }) : null,
-              el('span', { text: String(entry.price) }),
-            ]),
+            el('div.card-foot', {}, [
+              el('div.shop-price', {}, [
+                icon('coin', 1),
+                entry.discounted ? el('span.old-price', { text: String(entry.fullPrice) }) : null,
+                el('span', { text: String(entry.price) }),
+              ]),
 
-            entry.soldOut
-              ? el('button.btn.btn--sm', { disabled: true }, ['Bought'])
-              : !room
-                ? el('button.btn.btn--sm', { disabled: true, 'data-tip': 'Your bag is full of these' }, ['Owned'])
-                : el('button.btn.btn--sm.btn--gold', {
-                    onclick: () => buy(entry, card),
-                    'aria-label': `Buy ${entry.item.name} for ${entry.price} gold`,
-                  }, ['Buy']),
+              entry.soldOut
+                ? el('button.btn.btn--sm', { disabled: true }, ['Bought'])
+                : !room
+                  ? el('button.btn.btn--sm', { disabled: true }, ['Bag full'])
+                  : el('button.btn.btn--sm.btn--gold', {
+                      onclick: () => buy(entry, card),
+                      'aria-label': `Buy ${entry.item.name} for ${entry.price} gold`,
+                    }, ['Buy']),
+            ]),
           ],
         );
         grid.append(card);
@@ -115,16 +122,15 @@ export const ShopScreen = {
     renderStock();
 
     const screen = el('div.screen.venue-screen', {}, [
-      bar,
+      band,
       el('div.screen-body', {}, [
         el('h1.screen-title', { text: 'General Store' }),
-        el('p.panel-sub', { text: `The shopkeeper lays out ${stock.length} things worth having` }),
-        el('div.panel', {}, [grid]),
+        el('div.panel.panel--braced.venue-board', {}, [grid]),
       ]),
       el('div.screen-footer', {}, [
         el('button.btn.btn--ghost', {
           onclick: () => openInventory({ context: 'shop' }),
-        }, [icon('shopTag', 1.1), 'Saddlebag · Sell']),
+        }, [icon('shopTag', 1.1), 'Saddlebag']),
         el('button.btn.btn--primary', { onclick: () => finishEncounter() }, ['Back to the road']),
       ]),
     ]);
@@ -132,6 +138,6 @@ export const ShopScreen = {
     root.append(screen);
     attachButtonSounds(screen);
 
-    return () => bar.dispose();
+    return () => band.dispose();
   },
 };
