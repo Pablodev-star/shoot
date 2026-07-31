@@ -113,7 +113,7 @@ const ICONS = {
     '..kkkkkOOkkkkk..',
     '..kOOOOOOOOOOk..',
     '..kOOOOOOOOOOk..',
-    '..kyyyykOOkyyyk.',
+    '..kyyykOOkyyyk..',
     '......kOOk......',
     '......kOOk......',
     '......kyyk......',
@@ -193,18 +193,18 @@ const ICONS = {
   revolver: [
     '................',
     '................',
-    '................',
-    '.....kkkkkkkkkk.',
-    '.....ksssssssssk',
-    '.....kSSSSSSSSSk',
-    '.kkkkkkkkkkkkkk.',
-    'kSsssssssSSSSk..',
-    'kSsokkoksSSSk...',
-    'kSssoookssSSk...',
-    'kSSSSSSSSSSk....',
-    '.kkkkkkkkkk.....',
+    '....kk..........',
+    '...kSk.kkkkkkkkk',
+    '...kSkkksssssssk',
+    '..kkkkkkSSSSSSSk',
+    '.kssssssssSSSk..',
+    '.ksoOkOosssSSk..',
+    '.ksOookooOsSSk..',
+    '.ksoOkOosssSSk..',
+    '.kSSSSSSSSSSk...',
+    '.kkTTTkkkkkk....',
     '..kTTTTk........',
-    '..kTTTk.........',
+    '..kTTTTk........',
     '...kTTk.........',
     '...kkk..........',
   ],
@@ -309,7 +309,77 @@ const ICONS = {
   ],
 };
 
-const cache = { icons: null, urls: new Map() };
+// ---------------------------------------------------------------------------
+// The duel shield
+//
+// Shielding used to be a stroked ellipse: a smooth vector curve laid over
+// sprites whose every edge is a whole pixel, which read as a bug rather than a
+// move. It is now two pieces of pixel art — a heater shield on the fighter's
+// leading arm, matching the shieldPlate icon on the button that triggered it,
+// and a chamfered aura around the body. Both are authored on the source-pixel
+// grid and drawn at the same integer scale as the duellists, so nothing in the
+// frame is smoother than anything else in it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Deliberately smaller than the 16 x 24 duellist. A shield big enough to hide
+ * behind also hides the fighter, and the player needs to keep reading their
+ * own character's pose while the round resolves.
+ */
+const SHIELD = [
+  'kkkkkkkkkkk',
+  'ksssssssssk',
+  'ksBBBBBBBsk',
+  'ksBbbbbbBsk',
+  'ksBbOOObBsk',
+  'ksBbOvObBsk',
+  'ksBbOOObBsk',
+  'ksBbbbbbBsk',
+  'kSBvvvvvBSk',
+  '.kSvvvvvSk.',
+  '.kSSvvvSSk.',
+  '..kSSvSSk..',
+  '...kSSSk...',
+  '....kkk....',
+];
+
+/**
+ * A hexagonal ring: six straight runs and four 45-degree chamfers, every one
+ * of them a whole number of pixels. Deliberately not a circle — a rasterised
+ * circle at this size just looks like a failed ellipse.
+ */
+const SHIELD_AURA = [
+  '........BBBBBB........',
+  '......BB......BB......',
+  '....BB..........BB....',
+  '..BB..............BB..',
+  'BB..................BB',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'B....................B',
+  'BB..................BB',
+  '..BB..............BB..',
+  '....BB..........BB....',
+  '......BB......BB......',
+  '........BBBBBB........',
+  '......................',
+];
+
+const cache = { icons: null, shield: null, urls: new Map() };
 
 function getUiSprites() {
   if (!cache.icons) {
@@ -319,6 +389,21 @@ function getUiSprites() {
     }
   }
   return cache.icons;
+}
+
+/**
+ * Baked shield art for the duel screen. `plate` is an 11 x 14 two-frame glint
+ * cycle; `aura` is the 22 x 28 ring drawn behind it.
+ */
+export function getShieldSprites() {
+  if (!cache.shield) {
+    const lit = SHIELD.map((r) => r.replace(/B/g, 'W'));
+    cache.shield = {
+      plate: [bake({ key: KEY, rows: SHIELD }), bake({ key: KEY, rows: lit })],
+      aura: bake({ key: KEY, rows: SHIELD_AURA }),
+    };
+  }
+  return cache.shield;
 }
 
 export const UI_ICON_NAMES = Object.keys(ICONS);

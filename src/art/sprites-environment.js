@@ -1,13 +1,24 @@
 /**
  * SHOOT! — Environment art (Block 2b).
  *
- * Contains three families of artwork:
+ * Contains four families of artwork:
  *
  *  1. PROPS — hand-authored pixel strings: cacti (3 variants), rocks, cow
  *     skull, sign post, tumbleweed (4-frame roll), carrot and apple.
- *  2. BUILDINGS — the shop and the inn, drawn big and blocky so they read from
+ *  2. SKY BODIES — the sun and the moon, drawn on the same pixel grid as
+ *     everything else instead of being stroked as circles.
+ *  3. BUILDINGS — the shop and the inn, drawn big and blocky so they read from
  *     far away while the camera scrolls past.
- *  3. PARALLAX LAYERS — generated procedurally from a seed at load time.
+ *  4. PARALLAX LAYERS — generated procedurally from a seed at load time.
+ *
+ * THE MOON
+ * ---------------------------------------------------------------------------
+ * The crescent is cut out of the disc, not painted over it. Nothing draws the
+ * dark limb: those pixels are transparent, so whatever the sky happens to be
+ * at that height shows through exactly. That is the only way the bite stays
+ * invisible against a gradient — a fill matched to one sky colour is wrong
+ * everywhere else on the screen, and wrong again a minute later as the day/
+ * night clock turns.
  *
  * PARALLAX SPEC (consumed by src/explore/parallax.js)
  * ---------------------------------------------------------------------------
@@ -27,11 +38,14 @@
 
 import { PALETTE } from './palette.js';
 import { bake, makeCanvas } from './pixel.js';
+import { drawText, measureText } from './font.js';
 import { makeRng } from '../core/rng.js';
 
 const KEY = {
   '.': null,
+  ' ': null,
   k: PALETTE.ink,
+  K: PALETTE.inkSoft,
   g: PALETTE.green,
   G: PALETTE.greenLight,
   d: PALETTE.greenDark,
@@ -39,6 +53,7 @@ const KEY = {
   R: PALETTE.sandMid,
   s: PALETTE.sand,
   S: PALETTE.sandLight,
+  z: PALETTE.sandDeep,
   b: PALETTE.bone,
   B: PALETTE.boneDark,
   w: PALETTE.wood,
@@ -47,179 +62,339 @@ const KEY = {
   X: PALETTE.woodDeep,
   o: PALETTE.gold,
   O: PALETTE.goldLight,
+  u: PALETTE.goldDark,
   e: PALETTE.red,
   E: PALETTE.redLight,
   q: PALETTE.redDark,
   n: PALETTE.ink,
   t: PALETTE.leather,
+  T: PALETTE.leatherDark,
   y: PALETTE.grey,
   Y: PALETTE.steel,
+  v: PALETTE.greyDark,
   c: PALETTE.skyDay,
+  C: PALETTE.skyDayHigh,
 };
+
+/** Rotate a square pixel-string sprite a quarter turn clockwise. */
+function rotate90(rows) {
+  const n = rows.length;
+  const out = [];
+  for (let y = 0; y < n; y++) {
+    let line = '';
+    for (let x = 0; x < n; x++) line += rows[n - 1 - x][y];
+    out.push(line);
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Props
+//
+// Every prop is lit from the top left and carries a 1px ink outline, matching
+// the character sprites, and every one of them ends on a strip of sand so it
+// sits in the ground rather than on top of it.
 // ---------------------------------------------------------------------------
 
 const PROPS = {
+  /**
+   * Saguaro. The arms leave the trunk low and turn upward — a cactus whose
+   * arms hang down reads as a candelabra, which is the usual way this shape
+   * goes wrong.
+   */
   cactusTall: [
-    '....gg....',
-    '....gG....',
-    '.g..gG..g.',
-    'gg..gG..gg',
-    'gG..gG..Gg',
-    'gG.ggGgg.g',
-    'gG.gggGg.g',
-    '.g.ggGgg.g',
-    '.ggggGgg..',
-    '...ggGg...',
-    '...ggGg...',
-    '...ggGg...',
-    '...ggGg...',
-    '...gdgd...',
-    '...gdgd...',
-    '..rrrrrr..',
+    '....kkkk....',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '.kkkgGGgkkk.',
+    'kgGkgGGgkgGk',
+    'kgGkgGGgkgGk',
+    'kgGkgGGgkgGk',
+    'kgGkgGGgkgGk',
+    'kgGggGGgggGk',
+    'kgGggGGgggGk',
+    '.kgggGGgggk.',
+    '..kkgGGgkk..',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '...kgGGgk...',
+    '...kgddgk...',
+    '...kgddgk...',
+    '..krrrrrk...',
+    '.krrrrrrrk..',
   ],
   cactusShort: [
-    '..gg..',
-    '..gG..',
-    'gggG..',
-    'ggGG..',
-    '.ggG.g',
-    '..gGgg',
-    '..gGGg',
-    '..ggG.',
-    '..gdg.',
-    '.rrrr.',
+    '...kkk..',
+    '..kgGgk.',
+    '..kgGgk.',
+    'kkkgGgk.',
+    'kgGgGgk.',
+    'kgggGgk.',
+    '.kkgGgk.',
+    '..kgGgk.',
+    '..kgGgk.',
+    '..kgdgk.',
+    '.krrrrk.',
+    'krrrrrrk',
   ],
+  /** Barrel cactus, ribbed and in flower. */
   cactusRound: [
-    '..ggg..',
-    '.ggGGg.',
-    'ggGGGgg',
-    'ggGGGgg',
-    'ggGGGgg',
-    '.ggdgg.',
-    '..ddd..',
-    '.rrrrr.',
+    '..keke...',
+    '.kkgGgkk.',
+    'kgGgGgGgk',
+    'kgGgGgGgk',
+    'kgGgGgGgk',
+    'kgGgGgGgk',
+    '.kgGgGgk.',
+    '..kgggk..',
+    '..kdddk..',
+    '.krrrrrk.',
   ],
   rockBig: [
-    '...RRR....',
-    '..RRRRRr..',
-    '.RRRsRRRr.',
-    'RRRRRRRRRr',
-    'rRRRRRRRrr',
-    '.rrrrrrrr.',
+    '....kkk....',
+    '..kkRRRkk..',
+    '.kRRRRRRRk.',
+    'kRRSRRRRRRk',
+    'kRRRRRRRrrk',
+    '.krrrrrrrk.',
+    '..kkkkkkk..',
   ],
-  rockSmall: ['..RR..', '.RRRr.', 'rRRrr.', '.rrr..'],
+  rockSmall: [
+    '..kkk..',
+    '.kRRRk.',
+    'kRSRRRk',
+    'krrrrrk',
+    '.kkkkk.',
+  ],
+  /** Longhorn skull. The horns are what make it read at a glance, not the eyes. */
   skull: [
-    '..bbbb..',
-    '.bbbbbb.',
-    'bbkbbkbb',
-    'bbbbbbbb',
-    '.bbbbbb.',
-    '..bBBb..',
-    '..b..b..',
+    '.k.......k.',
+    '.kk.....kk.',
+    'kbkk...kkbk',
+    'kbbkkkkkbbk',
+    '.kbbbbbbbk.',
+    '.kbkbbbkbk.',
+    '..kbbbbbk..',
+    '..kbkkbk...',
+    '...kbbk....',
   ],
   sign: [
-    '.wwwwwwww.',
-    'wWWWWWWWWw',
-    'wWkkWkkWWw',
-    'wWWWWWWWWw',
-    '.wwwwwwww.',
-    '....ww....',
-    '....ww....',
-    '....ww....',
-    '...xxxx...',
+    '.kkkkkkkkk.',
+    'kwWWWWWWWWk',
+    'kwWkkWkkWWk',
+    'kwWWWWWWWWk',
+    'kwWkWkkWWWk',
+    'kwWWWWWWWWk',
+    '.kkkkkkkkk.',
+    '....kxk....',
+    '....kxk....',
+    '....kxk....',
+    '...kkkkk...',
   ],
-  bones: ['..b..b..', '.bbbbbb.', '..b..b..'],
-  carrotGround: ['..GG..', '.GddG.', '..oo..', '..oo..', '...o..'],
-  appleGround: ['..d...', '.eEe..', 'eEEEe.', 'eEEEe.', '.eee..'],
+  bones: [
+    'kk.....kk',
+    'kbbkkkbbk',
+    'kbbbbbbbk',
+    '.kk...kk.',
+  ],
+  carrotGround: [
+    '..kGk.kGk.',
+    '.kGGkkGGk.',
+    '.kkGGGGkk.',
+    '..kOoooOk.',
+    '..kOoooOk.',
+    '...kouok..',
+    '...kouok..',
+    '....kok...',
+    '....kk....',
+  ],
+  appleGround: [
+    '....kd....',
+    '...kdGk...',
+    '..kEEeek..',
+    '.kEEeeeek.',
+    '.kEeeeeek.',
+    '.kqeeeeqk.',
+    '..kqeeqk..',
+    '...kkkk...',
+  ],
 };
 
-const TUMBLEWEED = [
-  ['..ww..', '.wWWw.', 'wWwwWw', 'wWwwWw', '.wWWw.', '..ww..'],
-  ['..ww..', '.wwWw.', 'wWWwww', 'wwwWWw', '.wWww.', '..ww..'],
-  ['..ww..', '.wWww.', 'wwWWww', 'wwWWww', '.wwWw.', '..ww..'],
-  ['..ww..', '.wwWw.', 'wWwwWw', 'wWwwWw', '.wWwW.', '..ww..'],
+/**
+ * Tumbleweed. One tangle, rolled a quarter turn per frame: a hand-drawn
+ * four-frame cycle never quite keeps its mass, and this one cannot drift.
+ */
+const WEED = [
+  '...kkk...',
+  '.kkwBwkk.',
+  '.kwkwkwk.',
+  'kwBkwkBwk',
+  'kBkwwwkBk',
+  'kwBkwkBwk',
+  '.kwkwkwk.',
+  '.kkwBwkk.',
+  '...kkk...',
+];
+
+const TUMBLEWEED = [WEED, rotate90(WEED), rotate90(rotate90(WEED)), rotate90(rotate90(rotate90(WEED)))];
+
+// ---------------------------------------------------------------------------
+// Sky bodies
+// ---------------------------------------------------------------------------
+
+/**
+ * Waxing crescent, 16 x 16. 'b' is the lit face, 'B' the limb falling into
+ * shadow, 'y' the maria; every other pixel is transparent, including the whole
+ * dark side of the moon. See the note at the top of this file.
+ */
+const MOON = [
+  '......BBB.......',
+  '....BBbbB.......',
+  '...Bbbbb........',
+  '..Bbbbb.........',
+  '.Bbbbb..........',
+  '.Bbybb..........',
+  'BBbyyb..........',
+  'BBbybb..........',
+  'BBbbbb..........',
+  '.Bbbbb..........',
+  '.Bbybb..........',
+  '..Bbbbb.........',
+  '..BBbbbb........',
+  '...BBbbB........',
+  '......BBB.......',
+  '................',
+];
+
+/** The sun: the same 16 x 16 grid, filled. */
+const SUN = [
+  '......uuu.......',
+  '....uOOOOOu.....',
+  '...uOOOOOOOuu...',
+  '..uOOOOOOOOOuu..',
+  '.uOOOOOOOOOOOu..',
+  '.uOOOOOOOOOOOu..',
+  'uuOOOOOOOOOOOuu.',
+  'uuOOOOOOOOOOOOu.',
+  'uuOOOOOOOOOOOOu.',
+  '.uOOOOOOOOOOOuu.',
+  '.uOOOOOOOOOOOu..',
+  '..uOOOOOOOOOuu..',
+  '..uuOOOOOOOuu...',
+  '...uuuuOOuuu....',
+  '......uuuu......',
+  '................',
 ];
 
 // ---------------------------------------------------------------------------
 // Buildings — 40 x 34 source pixels, ground line on the last row.
+//
+// Both are false-front frontier buildings: a tall flat parapet hiding a low
+// roof, a boardwalk under a porch, and a sign the player can read from across
+// the screen. The shop is the wider, busier one; the inn is quieter and taller
+// so the two never get mistaken for each other on the horizon.
 // ---------------------------------------------------------------------------
 
 const SHOP = [
-  '..........xxxxxxxxxxxxxxxxxx............',
-  '.........xXXXXXXXXXXXXXXXXXXx...........',
-  '........xXwwwwwwwwwwwwwwwwwwXx..........',
-  '.......xXwwwwwwwwwwwwwwwwwwwwXx.........',
-  '......xXwwwwwwwwwwwwwwwwwwwwwwXx........',
-  '.....xXwwwwwwwwwwwwwwwwwwwwwwwwXx.......',
-  '.....xxxxxxxxxxxxxxxxxxxxxxxxxxxx.......',
-  '.....xWWWWWWWWWWWWWWWWWWWWWWWWWWx.......',
-  '.....xWkkWkkWkkWkkWkkWkkWkkWkkWWx.......',
-  '.....xWWWWWWWWWWWWWWWWWWWWWWWWWWx.......',
-  '.....xxxxxxxxxxxxxxxxxxxxxxxxxxxx.......',
-  '.....xwwwwwwwwwwwwwwwwwwwwwwwwwwx.......',
-  '.....xwWWwwwwwwwwwwwwwwwwwwwwWWwx.......',
-  '.....xwWOOOOOOOOOOOOOOOOOOOOOOWwx.......',
-  '.....xwWOkkOkOkOOkkOkOkkOOOOOOWwx.......',
-  '.....xwWOOOOOOOOOOOOOOOOOOOOOOWwx.......',
-  '.....xwWWwwwwwwwwwwwwwwwwwwwwWWwx.......',
-  '.....xwwwwwwwwwwwwwwwwwwwwwwwwwwx.......',
-  '.....xwwccccwwwwwwwwwwwwwwccccwwx.......',
-  '.....xwwcYYcwwwxxxxxxxxwwwcYYcwwx.......',
-  '.....xwwcYYcwwwxXXXXXXxwwwcYYcwwx.......',
-  '.....xwwccccwwwxXwwwwXxwwwccccwwx.......',
-  '.....xwwwwwwwwwxXwooWXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxXwwwwXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxXwwwwXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxXwwwwXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxXwwwwXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxXwwwwXxwwwwwwwwwx.......',
-  '.....xwwwwwwwwwxxxxxxxxwwwwwwwwwx.......',
-  '.....xxxxxxxxxxxxxxxxxxxxxxxxxxxx.......',
-  '....rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr......',
-  '...rrsssssssssssssssssssssssssssrrr.....',
-  '..rrssssssssssssssssssssssssssssssrr....',
-  '.rrssssssssssssssssssssssssssssssssrr...',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
+  '...kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk...',
+  '...kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk...',
+  '...kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk...',
+  '...kXwWkkkkkkkkkkkkkkkkkkkkkkkkkkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
+  '...kXwWkkkkkkkkkkkkkkkkkkkkkkkkkkWwXk...',
+  '...kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk...',
+  '...kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk...',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
+  '..kxWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWxk..',
+  '..kxkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkxk..',
+  '...kxWwwwwwwwwwwwwwwwwwwwwwwwwwwwwWxk...',
+  '...kxWkkkkkkkwwwkkkkkkkkwwwkkkkkkkWxk...',
+  '...kxWkCcccckwwwkXwwwwXkwwwkCcccckWxk...',
+  '...kxWkCcccckwwwkXwWWwXkwwwkCcccckWxk...',
+  '...kxWkccccckwwwkXwWWwXkwwwkccccckWxk...',
+  '...kxWkccccckwwwkXwwOwXkwwwkccccckWxk...',
+  '...kxWkkkkkkkwwwkXwwwwXkwwwkkkkkkkWxk...',
+  '...kxWwwwwwwwwwwkXwwwwXkwwwwwwwwwwWxk...',
+  '...kxWwwwwwwwwwwkXwwwwXkwwwwwwwwwwWxk...',
+  '...kxWwwwwwwwwwwkkkkkkkkwwwwwwwwwwWxk...',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
+  '.kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
+  '.rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.',
+  'ssssssssssssssssssssssssssssssssssssssss',
 ];
 
 const INN = [
-  '.......xxxxxxxxxxxxxxxxxxxxxxxx.........',
-  '......xXXXXXXXXXXXXXXXXXXXXXXXXx........',
-  '.....xXwwwwwwwwwwwwwwwwwwwwwwwwXx.......',
-  '....xXwwwwwwwwwwwwwwwwwwwwwwwwwwXx......',
-  '....xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx......',
-  '....xWWWWWWWWWWWWWWWWWWWWWWWWWWWWx......',
-  '....xWkkWWkkWkkWkkWWkkWWkkWkkWWWWx......',
-  '....xWWWWWWWWWWWWWWWWWWWWWWWWWWWWx......',
-  '....xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx......',
-  '....xwwwwwwwwwwwwwwwwwwwwwwwwwwwwx......',
-  '....xwwwwwwwwwwwwwwwwwwwwwwwwwwwwx......',
-  '....xwwccccccwwwwwwwwwwwwccccccwwx......',
-  '....xwwcYYYYcwwwwwwwwwwwwcYYYYcwwx......',
-  '....xwwcYYYYcwwwOOOOOOwwwcYYYYcwwx......',
-  '....xwwcYYYYcwwwOkkkkOwwwcYYYYcwwx......',
-  '....xwwccccccwwwOOOOOOwwwccccccwwx......',
-  '....xwwwwwwwwwwwwwwwwwwwwwwwwwwwwx......',
-  '....xwwwwwwwwwwwwwwwwwwwwwwwwwwwwx......',
-  '....xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx......',
-  '....xwwwwwwwwwwwwwwwwwwwwwwwwwwwwx......',
-  '....xwwwwwwwwwxxxxxxxxxxwwwwwwwwwx......',
-  '....xwwwwwwwwwxXXXXXXXXxwwwwwwwwwx......',
-  '....xwwccccwwwxXwwwwwwXxwwwccccwwx......',
-  '....xwwcYYcwwwxXwwwwwwXxwwwcYYcwwx......',
-  '....xwwcYYcwwwxXwwoowwXxwwwcYYcwwx......',
-  '....xwwccccwwwxXwwwwwwXxwwwccccwwx......',
-  '....xwwwwwwwwwxXwwwwwwXxwwwwwwwwwx......',
-  '....xwwwwwwwwwxXwwwwwwXxwwwwwwwwwx......',
-  '....xwwwwwwwwwxxxxxxxxxxwwwwwwwwwx......',
-  '....xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx......',
-  '...rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.....',
-  '..rrssssssssssssssssssssssssssssssrr....',
-  '.rrssssssssssssssssssssssssssssssssrr...',
-  'rrssssssssssssssssssssssssssssssssssrr..',
+  '.....kkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.....',
+  '.....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
+  '.....kXwWkkkkkkkkkkkkkkkkkkkkkkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
+  '.....kXwWkkkkkkkkkkkkkkkkkkkkkkWwXk.....',
+  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.....',
+  '.....kwwwwwkkkkkwwwwwwwwkkkkkwwwwwk.....',
+  '.....kwwwwwkOOkkwwwwwwwwkOOkkwwwwwk.....',
+  '.....kwwwwwkOOOkwwwwwwwwkOOOkwwwwwk.....',
+  '.....kwwwwwkkkkkwwwwwwwwkkkkkwwwwwk.....',
+  '.....kwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.....',
+  '....kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk....',
+  '....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk....',
+  '....kxWWWWWWWWWWWWWWWWWWWWWWWWWWWWxk....',
+  '....kxkkkkkkkkkkkkkkkkkkkkkkkkkkkkxk....',
+  '.....kxWkkkkkkwwkkkkkkkkwwkkkkkkWxk.....',
+  '.....kxWkCccckwwkXwwwwXkwwkCccckWxk.....',
+  '.....kxWkcccckwwkXwWWwXkwwkcccckWxk.....',
+  '.....kxWkkkkkkwwkXwwOwXkwwkkkkkkWxk.....',
+  '.....kxWwwwwwwwwkXwwwwXkwwwwwwwwWxk.....',
+  '.....kxWwwwwwwwwkkkkkkkkwwwwwwwwWxk.....',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
+  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk...',
+  '..rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr..',
 ];
+
+/**
+ * The sign boards above are left blank in the art and lettered here, using the
+ * game's own 5x7 font at 1:1. Hand-drawn letters at this size come out as
+ * approximations of the real typeface; borrowing the font means the sign over
+ * the shop and the text in the shop screen are literally the same glyphs.
+ */
+const SIGNS = {
+  shop: { text: 'SHOP', x: 8, y: 5, boardW: 24 },
+  inn: { text: 'INN', x: 10, y: 5, boardW: 20 },
+};
+
+function bakeBuilding(rows, sign) {
+  const canvas = bake({ key: KEY, rows });
+  const ctx = canvas.getContext('2d');
+  const width = measureText(sign.text, 1);
+  const x = sign.x + Math.floor((sign.boardW - width) / 2);
+  drawText(ctx, sign.text, x, sign.y, {
+    scale: 1,
+    spacing: 1,
+    color: PALETTE.woodDeep,
+  });
+  return canvas;
+}
 
 // ---------------------------------------------------------------------------
 // Procedural parallax layers
@@ -337,9 +512,13 @@ export function getEnvironmentSprites() {
   cache = {
     props,
     tumbleweed: TUMBLEWEED.map((rows) => bake({ key: KEY, rows })),
+    sky: {
+      moon: bake({ key: KEY, rows: MOON }),
+      sun: bake({ key: KEY, rows: SUN }),
+    },
     buildings: {
-      shop: bake({ key: KEY, rows: SHOP }),
-      inn: bake({ key: KEY, rows: INN }),
+      shop: bakeBuilding(SHOP, SIGNS.shop),
+      inn: bakeBuilding(INN, SIGNS.inn),
     },
     layers: {
       clouds: makeCloudLayer({ seed: 7717, height: 48 }),
@@ -372,6 +551,9 @@ export function getEnvironmentSprites() {
   };
   return cache;
 }
+
+/** Source-pixel size of the sun and moon sprites. */
+export const SKY_BODY_SIZE = 16;
 
 /**
  * Parallax layer manifest. The renderer walks this array in order (back to

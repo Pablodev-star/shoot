@@ -3,28 +3,42 @@
  *
  * ART SPEC
  * ---------------------------------------------------------------------------
- * Player  : 16 x 24 source pixels, feet on the last row, facing right.
+ * Player  : 16 x 24 source pixels, soles on the last row, facing right.
+ * Rider   : 16 x 21 source pixels, seated, drawn on top of the horse.
  * Horse   : 32 x 24 source pixels, hooves on the last row, facing right.
+ *
+ * Every figure carries a 1px ink outline and a single light source at the top
+ * left, the same contract the item icons follow, so a duellist and a coin read
+ * as the same set. The player is drawn in three-quarter profile: the hat brim
+ * is wider on the leading side, the eye sits right of centre and the boot toes
+ * point forward, which is what makes a 16px silhouette read as "facing right"
+ * without any motion.
  *
  * Animations (frame lists are consumed by src/explore/walk-engine.js and by the
  * duel screen; timings are in milliseconds per frame):
  *
- *   PLAYER.idle   — 4 frames @ 220ms  breathing loop, used when the walk is
- *                   paused (shop/inn/duel intro).
+ *   PLAYER.idle   — 4 frames @ 220ms  breathing loop with a serape sway, used
+ *                   when the walk is paused (shop/inn/duel intro).
  *   PLAYER.walk   — 4 frames @ 130ms  contact / passing / contact / passing,
- *                   the classic 4-pose cycle. On horseback this is not used.
- *   PLAYER.duel   — 3 frames @ 160ms  ready stance: hand hovering over the
- *                   holster, arm rising, revolver levelled.
- *   PLAYER.ride   — 2 frames @ 200ms  seated upper body, drawn on top of the
- *                   horse at RIDER_OFFSET.
+ *                   the classic 4-pose cycle, with a 1px body bob so the
+ *                   passing poses sit high and the contacts sit low.
+ *   PLAYER.duel   — 3 frames @ 160ms  hand on the holster, revolver clearing
+ *                   leather, revolver levelled. The holster empties as the
+ *                   gun comes out.
+ *   PLAYER.hit    — 2 frames @ 120ms  knocked back a pixel and lit up, then a
+ *                   stagger onto the back foot.
+ *   RIDER.ride    — 2 frames @ 200ms  seated upper body + a leg in the stirrup.
  *
- *   HORSE.idle    — 2 frames @ 400ms  tail flick.
- *   HORSE.walk    — 4 frames @ 150ms  leg cycle.
- *   HORSE.gallop  — 4 frames @ 90ms   gathered / extended / contact / suspended.
+ *   HORSE.idle    — 2 frames @ 400ms  tail swish and a cocked hind hoof.
+ *   HORSE.walk    — 4 frames @ 150ms  diagonal 4-beat leg cycle.
+ *   HORSE.gallop  — 4 frames @ 90ms   gathered / extended / contact / suspended,
+ *                   the suspension frame lifted clear of the ground.
  *
  * Everything is authored as pixel strings and baked at load time (see
  * src/art/pixel.js), so the sprites stay in the shared palette and the repo
- * carries no binary assets.
+ * carries no binary assets. Limbs are stamped onto the body rather than
+ * re-typed per frame: a leg pose is drawn once and placed four times, which is
+ * what keeps a 4-beat gait consistent from frame to frame.
  */
 
 import { PALETTE } from './palette.js';
@@ -33,305 +47,455 @@ import { bake } from './pixel.js';
 // Shared color key for every character-side sprite.
 const KEY = {
   '.': null,
+  ' ': null,
   k: PALETTE.ink,          // outline
+  K: PALETTE.inkSoft,      // interior line
   h: PALETTE.leatherDark,  // hat
   H: PALETTE.leather,      // hat highlight
   s: PALETTE.skin,
   d: PALETTE.skinDark,
-  p: PALETTE.red,          // poncho
-  P: PALETTE.redDark,      // poncho shade
-  q: PALETTE.redLight,     // poncho highlight
-  b: PALETTE.woodDark,     // trousers / boots
+  p: PALETTE.red,          // serape
+  P: PALETTE.redDark,      // serape shade
+  q: PALETTE.redLight,     // serape highlight
+  w: PALETTE.bone,         // neckerchief + serape stripe
+  W: PALETTE.boneDark,
+  b: PALETTE.woodDark,     // trousers
   B: PALETTE.wood,         // boot highlight
   l: PALETTE.gold,         // belt buckle
   g: PALETTE.steel,        // revolver
   G: PALETTE.steelDark,
-  w: PALETTE.bone,
+  t: PALETTE.leather,      // belt / saddle
+  T: PALETTE.leatherDark,  // belt shade / saddle horn
   e: PALETTE.horse,
   E: PALETTE.horseLight,
   m: PALETTE.horseDark,
-  n: PALETTE.mane,
-  t: PALETTE.leather,      // saddle
+  M: PALETTE.mane,         // hooves
+  // A flaxen mane and tail. A black mane is the realistic choice and the wrong
+  // one at 32px: it lands on top of the ink outline and the whole neck turns
+  // into one dark smear. Pale hair separates from both the outline and the coat.
+  n: PALETTE.boneDark,
+  N: PALETTE.sandDark,     // hair in shadow
+  u: PALETTE.redDark,      // saddle blanket
 };
 
 // ---------------------------------------------------------------------------
-// PLAYER
+// Composition helpers
+//
+// Pixel strings are easy to read but painful to edit once a limb has to move.
+// These four helpers let a frame be described as "this body, with that leg
+// here", which is how the gaits below stay consistent.
 // ---------------------------------------------------------------------------
 
-/** Rows 0..16: head + torso. Shared by every ground animation. */
-const TORSO = [
+/**
+ * Draw `art` onto a copy of `rows` at (x, y).
+ * '.' in the stamp leaves whatever is underneath; ' ' punches a hole.
+ */
+function stamp(rows, art, x, y) {
+  const out = rows.map((r) => r.split(''));
+  for (let dy = 0; dy < art.length; dy++) {
+    const ty = y + dy;
+    if (ty < 0 || ty >= out.length) continue;
+    const line = art[dy];
+    for (let dx = 0; dx < line.length; dx++) {
+      if (line[dx] === '.') continue;
+      const tx = x + dx;
+      if (tx < 0 || tx >= out[ty].length) continue;
+      out[ty][tx] = line[dx];
+    }
+  }
+  return out.map((r) => r.join(''));
+}
+
+/** Slide a whole frame sideways, keeping its width. */
+function shiftX(rows, dx) {
+  if (!dx) return rows;
+  const w = rows[0].length;
+  return rows.map((r) =>
+    dx > 0 ? ('.'.repeat(dx) + r).slice(0, w) : (r.slice(-dx) + '.'.repeat(-dx)));
+}
+
+/** Slide a whole frame vertically, keeping its height. Negative = up. */
+function shiftY(rows, dy) {
+  if (!dy) return rows;
+  const w = rows[0].length;
+  const empty = '.'.repeat(w);
+  const h = rows.length;
+  if (dy > 0) return [...Array(dy).fill(empty), ...rows].slice(0, h);
+  return [...rows.slice(-dy), ...Array(-dy).fill(empty)];
+}
+
+/** Swap palette characters — used for the hit flash and the empty holster. */
+function recolor(rows, map) {
+  return rows.map((r) => r.replace(/./g, (c) => map[c] ?? c));
+}
+
+// ---------------------------------------------------------------------------
+// PLAYER — 16 x 24
+//
+//   rows  0..10  hat, face, neckerchief
+//   rows 11..17  serape and gun belt
+//   rows 18..23  legs and boots
+// ---------------------------------------------------------------------------
+
+/** Hat, face and neckerchief. Identical in every ground animation. */
+const HEAD = [
   '................',
-  '.....hhhhhh.....',
-  '....hHHHHHHh....',
-  '...hhhhhhhhhh...',
-  '..hhhhhhhhhhhh..',
-  '.....ssssss.....',
-  '.....sksks......',
-  '.....ssssss.....',
-  '......dddd......',
-  '....pppppppp....',
-  '...pqppppppqp...',
-  '...ppPPPPPPpp...',
-  '...pppppppppp...',
-  '...pppppppppp...',
-  '....pppppppp....',
-  '....bbllbbbb....',
-  '.....bbbbbb.....',
+  '.....kkkkk......',
+  '....kHHHHHk.....',
+  '....khhhhhk.....',
+  '..kkkhhhhhkkkk..',
+  '.kHHHHHHHHHHHk..',
+  '.kkkkkkkkkkkkk..',
+  '....ksssssk.....',
+  '....ksssksk.....',
+  '....kdssssk.....',
+  '...kpqqqqqqpk...',
 ];
 
-/** A one-pixel-lower torso, for the breathing/bob frames. */
-const TORSO_LOW = ['................', ...TORSO.slice(0, TORSO.length - 1)];
+/**
+ * Serape and belt. The cream stripe across row 13 is what stops the torso
+ * reading as one red block at 16px, and the two skin pixels on row 15 are the
+ * hands showing under the hem.
+ */
+const TORSO = [
+  '...kqqqqqqqqk...',
+  '..kqppppppppqk..',
+  '..kpwwwwwwwwpk..',
+  '..kpPPPPPPPPpk..',
+  '..kspPPPPPPpsk..',
+  '...kPPPPPPPPk...',
+  '...kTttllttTk...',
+];
+
+/** The serape flaring out as the body swings through a stride. */
+const TORSO_FLARE = stamp(TORSO, ['..kPPPPPPPPPPk..'], 0, 5);
+
+/** Holstered revolver on the leading hip; removed once the gun is drawn. */
+const HOLSTER = ['G', 'T', 'T'];
 
 const LEGS = {
   stand: [
-    '.....bb.bb......',
-    '.....bb.bb......',
-    '.....bb.bb......',
-    '....bbb.bbb.....',
-    '...BBbb.bbBB....',
-    '................',
-    '................',
+    '...kbbbbbbbbk...',
+    '...kbbk..kbbk...',
+    '...kbbk..kbbk...',
+    '...kbbk..kbbk...',
+    '..kBBBk.kBBBk...',
+    '..kkkkk.kkkkk...',
   ],
   contactA: [
-    '.....bb.bb......',
-    '....bb...bb.....',
-    '...bb.....bb....',
-    '..bbb.....bbb...',
-    '.BBbb.....bbBB..',
-    '................',
-    '................',
+    '...kbbbbbbbbk...',
+    '..kbbk...kbbk...',
+    '..kbbk....kbbk..',
+    '.kbbk.....kbbk..',
+    '.kBBk.....kBBBk.',
+    '.kkkk.....kkkkk.',
   ],
-  passing: [
-    '.....bb.bb......',
-    '.....bbbb.......',
-    '.....bb.bb......',
-    '....bbb..bb.....',
-    '...BBbb..bbB....',
-    '................',
-    '................',
+  passingA: [
+    '...kbbbbbbbbk...',
+    '...kbbk.kbbk....',
+    '...kbbk.kbbk....',
+    '...kbbkkbbk.....',
+    '..kBBBkkBBk.....',
+    '..kkkkk.........',
   ],
   contactB: [
-    '.....bb.bb......',
-    '.....bb..bb.....',
-    '....bb....bbb...',
-    '...bbb....bbb...',
-    '..BBbb....bbBB..',
-    '................',
-    '................',
+    '...kbbbbbbbbk...',
+    '..kbbk...kbbk...',
+    '.kbbk.....kbbk..',
+    '.kbbk......kbbk.',
+    'kBBBk......kBBk.',
+    'kkkkk......kkkk.',
+  ],
+  passingB: [
+    '...kbbbbbbbbk...',
+    '...kbbk.kbbk....',
+    '...kbbk.kbbk....',
+    '....kbbkbbk.....',
+    '....kBBkBBBk....',
+    '.......kkkkk....',
   ],
 };
 
-/** Arms are drawn over the torso by swapping two rows. */
-function withArms(torso, left, right) {
-  const rows = torso.slice();
-  const y = rows.length - 5; // arm line inside the poncho block
-  const chars = rows[y].split('');
-  chars[1] = left;
-  chars[2] = left;
-  chars[13] = right;
-  chars[14] = right;
-  rows[y] = chars.join('');
-  return rows;
+/** Head + torso, dropped one pixel: the exhale of the breathing loop. */
+function settle(upper) {
+  return ['................', ...upper.slice(0, upper.length - 1)];
 }
+
+function ground(upper, legs) {
+  return [...upper, ...legs];
+}
+
+const UPPER = [...HEAD, ...TORSO];
+const UPPER_FLARE = [...HEAD, ...TORSO_FLARE];
+const UPPER_LOW = settle(UPPER);
+const UPPER_LOW_FLARE = settle(UPPER_FLARE);
+
+/** Everything but the duel poses wears the revolver on its hip. */
+const holstered = (rows) => stamp(rows, HOLSTER, 13, 17);
 
 const PLAYER_FRAMES = {
   idle: [
-    [...TORSO, ...LEGS.stand],
-    [...TORSO_LOW, ...LEGS.stand],
-    [...TORSO, ...LEGS.stand],
-    [...TORSO_LOW, ...LEGS.stand],
+    holstered(ground(UPPER, LEGS.stand)),
+    holstered(ground(UPPER_LOW, LEGS.stand)),
+    holstered(ground(UPPER, LEGS.stand)),
+    holstered(ground(UPPER_LOW_FLARE, LEGS.stand)),
   ],
+  /**
+   * Contacts sit a pixel low (weight on the planted foot) and the passing
+   * poses ride high, which is the whole trick to a walk that does not look
+   * like a sprite sliding along the ground.
+   */
   walk: [
-    [...withArms(TORSO, 's', '.'), ...LEGS.contactA],
-    [...withArms(TORSO_LOW, '.', '.'), ...LEGS.passing],
-    [...withArms(TORSO, '.', 's'), ...LEGS.contactB],
-    [...withArms(TORSO_LOW, '.', '.'), ...LEGS.passing],
+    holstered(ground(UPPER_LOW_FLARE, LEGS.contactA)),
+    holstered(ground(UPPER, LEGS.passingA)),
+    holstered(ground(UPPER_LOW_FLARE, LEGS.contactB)),
+    holstered(ground(UPPER, LEGS.passingB)),
   ],
   duel: [
-    // hand hovering over the holster
-    [...TORSO, ...LEGS.stand].map((row, i) => (i === 14 ? '....pppppppps...' : row)),
-    // arm rising, revolver clearing leather
-    [...TORSO, ...LEGS.stand].map((row, i) => (i === 13 ? '...ppppppppppsG.' : row)),
-    // levelled
-    [...TORSO, ...LEGS.stand].map((row, i) => {
-      if (i === 12) return '...ppppppppppssG';
-      if (i === 13) return '...pppppppppp.Gg';
-      return row;
-    }),
+    // Hand dropped onto the holster, gun still in leather.
+    holstered(
+      stamp(ground(UPPER, LEGS.stand), ['..kspPPPPPPPpk..', '...kPPPPPPPPsk..'], 0, 15),
+    ),
+    // Arm up, barrel clearing leather. The holster is empty from here on.
+    stamp(
+      ground(UPPER, LEGS.stand),
+      ['..kpwwwwwwwwpkG.', '..kpPPPPPPPPpsgk', '..kspPPPPPPpk...'],
+      0,
+      13,
+    ),
+    // Levelled, dead flat, muzzle at the sprite edge where the flash lands.
+    stamp(
+      ground(UPPER, LEGS.stand),
+      ['..kpPPPPPPPPsGgg', '..kspPPPPPPpk...'],
+      0,
+      14,
+    ),
   ],
   hit: [
-    [...TORSO, ...LEGS.stand].map((row) => row.replace(/p/g, 'q')),
-    [...TORSO_LOW, ...LEGS.contactB],
-  ],
-};
-
-/** Seated upper body drawn over the horse. */
-const RIDER_FRAMES = {
-  ride: [
-    [
-      '................',
-      '.....hhhhhh.....',
-      '....hHHHHHHh....',
-      '...hhhhhhhhhh...',
-      '..hhhhhhhhhhhh..',
-      '.....ssssss.....',
-      '.....sksks......',
-      '.....ssssss.....',
-      '......dddd......',
-      '....pppppppp....',
-      '...pqppppppqp...',
-      '...ppPPPPPPps...',
-      '...pppppppppp...',
-      '....bbllbbbb....',
-      '.....bb..bb.....',
-      '.....bb..bb.....',
-      '................',
-    ],
-    [
-      '................',
-      '................',
-      '.....hhhhhh.....',
-      '....hHHHHHHh....',
-      '...hhhhhhhhhh...',
-      '..hhhhhhhhhhhh..',
-      '.....ssssss.....',
-      '.....sksks......',
-      '.....ssssss.....',
-      '......dddd......',
-      '....pppppppp....',
-      '...pqppppppqs...',
-      '...ppPPPPPPpp...',
-      '...pppppppppp...',
-      '....bbllbbbb....',
-      '.....bb..bb.....',
-      '.....bb..bb.....',
-    ],
+    // Knocked back a pixel and washed out by the impact.
+    shiftX(recolor(holstered(ground(UPPER, LEGS.stand)), { P: 'p', p: 'q', q: 'w' }), -1),
+    // Stagger: weight thrown onto the trailing foot.
+    holstered(ground(UPPER_LOW, LEGS.contactB)),
   ],
 };
 
 // ---------------------------------------------------------------------------
-// HORSE
+// RIDER — 16 x 21, the seated upper body drawn over the horse.
 // ---------------------------------------------------------------------------
 
-/**
- * Rows 0..15 of the horse: head (top right), neck, barrel, saddle and tail.
- * Facing right. The saddle sits at x 8..13 — RIDER_OFFSET is derived from it.
- */
-const HORSE_BODY = [
-  '......................mmmm......',
-  '.....................mEEEEm.....',
-  '.....................mEEEEmm....',
-  '.....................mEkEEEEm...',
-  '.....................mEEEEEEEm..',
-  '......................mEEEEEEm..',
-  '......................mEEEEmm...',
-  '....................nnmEEEEm....',
-  '...................nnmEEEEEm....',
-  '..................nnmEEEEEm.....',
-  '.mmmmmmmmmmmmmmmmmmmEEEEm.......',
-  'nmEEEEEEEEEEEEEEEEEEEEEm........',
-  'nmEEEEEttttttEEEEEEEEEm.........',
-  'nmEEEEEttttttEEEEEEEEm..........',
-  'nmEEEEEEEEEEEEEEEEEEm...........',
-  'n.mmEEEEEEEEEEEEEEEm............',
+const RIDER_BODY = [
+  ...HEAD,
+  '...kqqqqqqqqk...',
+  '..kqppppppppqk..',
+  '..kpwwwwwwwwpk..',
+  '..kspPPPPPPPpk..',
+  '...kPPPPPPPPsk..',
+  '...kTttllttTkG..',
+  '...kbbbbbbbbk...',
+  '....kbbbbbbbk...',
+  '......kbbbbk....',
+  '.......kBBBk....',
 ];
 
-/** Tail flick: `lean` swings the tip of the tail hanging off the rump. */
-function withTail(body, lean) {
-  const rows = body.slice();
-  const tip = 15;
-  for (let i = tip - lean; i <= tip; i++) {
-    if (i < 11) continue;
-    const chars = rows[i].split('');
-    if (chars[0] === '.') chars[0] = 'n';
-    rows[i] = chars.join('');
-  }
-  return rows;
-}
-
-/**
- * Rows 16..23: the leg cycle. Hind legs sit around x 4..6, forelegs around
- * x 17..19, matching where the barrel ends in HORSE_BODY.
- */
-const HOOVES = {
-  stand: [
-    '.mEEE..........mEEE.............',
-    '.mEEE..........mEEE.............',
-    '..mEE...........mEE.............',
-    '..mEE...........mEE.............',
-    '..mEE...........mEE.............',
-    '..mEE...........mEE.............',
-    '.mmmm..........mmmm.............',
-    '................................',
-  ],
-  walkA: [
-    '.mEEE..........mEEE.............',
-    '.mEEE...........mEEE............',
-    'mEE...............mEE...........',
-    'mEE................mEE..........',
-    'mEE.................mEE.........',
-    'mEE..................mEE........',
-    'mmm..................mmm........',
-    '................................',
-  ],
-  walkB: [
-    '.mEEE..........mEEE.............',
-    '..mEEE..........mEEE............',
-    '...mEE............mEE...........',
-    '...mEE............mEE...........',
-    '....mEE............mEE..........',
-    '....mEE............mEE..........',
-    '...mmm............mmm...........',
-    '................................',
-  ],
-  gallopGather: [
-    '.mEEEmEEE......mEEEmEEE.........',
-    '.mEE...mEE.....mEE...mEE........',
-    'mEE.....mEE...mEE.....mEE.......',
-    'mEE......mE...mE.......mEE......',
-    'mmm......mm...mm.......mmm......',
-    '................................',
-    '................................',
-    '................................',
-  ],
-  gallopExtend: [
-    '.mEEE..........mEEE.............',
-    'mEE.............mEEE............',
-    'mEE...............mEEE..........',
-    'EE..................mEEE........',
-    'EE....................mEE.......',
-    'mm.....................mm.......',
-    '................................',
-    '................................',
-  ],
-  gallopSuspend: [
-    '.mEEEmEEE......mEEEmEEE.........',
-    '..mEE.mEE.......mEE.mEE.........',
-    '..mEE.mEE.......mEE.mEE.........',
-    '..mm..mm........mm..mm..........',
-    '................................',
-    '................................',
-    '................................',
-    '................................',
+const RIDER_FRAMES = {
+  ride: [
+    RIDER_BODY,
+    // Half a beat later the rider has posted out of the saddle by a pixel; the
+    // leg in the stirrup stays put, which is what makes it read as posting
+    // rather than as the whole sprite jittering.
+    [...settle(RIDER_BODY.slice(0, 18)), ...RIDER_BODY.slice(18)],
   ],
 };
+
+// ---------------------------------------------------------------------------
+// HORSE — 32 x 24
+//
+//   rows  0..16  head, neck, barrel, saddle
+//   rows 17..23  the leg cycle, stamped from the poses below
+// ---------------------------------------------------------------------------
+
+/**
+ * Head, neck and barrel. Rows 0..8 are the head on top of a neck that tapers
+ * as it rises — the single thing that stops a 32px quadruped reading as a
+ * llama — with the mane running down its crest into the withers. Rows 9..16
+ * are the barrel: lit along the topline, mid-tone through the flank, dark
+ * under the belly, with a western saddle and blanket over the ribs.
+ */
+const HORSE_BODY = [
+  '.......................k...k....',
+  '......................kEk.kEk...',
+  '......................knEEEEk...',
+  '.....................knnEEwEEk..',
+  '.....................knEEkEwEEk.',
+  '....................knnEEEEwEEk.',
+  '...................knnEEEEEwEeek',
+  '..................knnEEEEmmeeMk.',
+  '................knnEEEEEEmmk....',
+  '.......kkkkkknnnnEEEEEEEEEk.....',
+  '.....kkEEEEEEEEEEEEEEEEEEEEk....',
+  '....kEEEEEEEEETEEEEEEEEEEEEk....',
+  '...knEeeeTeeeeTeeeeeeeeeeeek....',
+  '...kneeeuTttttTueeeeeeeeeeek....',
+  '...knmeeuTTTTTTueeeeeeeeeeek....',
+  '....kmmeeeeeeeeeeeeeeeeeeek.....',
+  '.....kmmmmmmmmmmmmmmmmmmmk......',
+];
+
+/**
+ * Tail poses. Docked on the croup and drawn over the rump, hanging past the
+ * belly line so the hair is still visible under a body that fills most of the
+ * sprite. A horse at rest flicks its tail; a horse at speed streams it out.
+ */
+const TAILS = {
+  hang: [
+    '....knn',
+    '...knnk',
+    '..knNnk',
+    '..knNNk',
+    '..knNNk',
+    '..kNNk.',
+    '..kNNk.',
+    '..kNNk.',
+    '...kNk.',
+    '...kk..',
+  ],
+  swish: [
+    '....knn',
+    '...knnk',
+    '..knNnk',
+    '.knNNk.',
+    'knNNk..',
+    'kNNk...',
+    'kNNk...',
+    '.kNk...',
+    '.kk....',
+    '.......',
+  ],
+  stream: [
+    '....knn',
+    '..knnnk',
+    'knNNNk.',
+    'kNNk...',
+    '.kk....',
+    '.......',
+    '.......',
+    '.......',
+    '.......',
+    '.......',
+  ],
+};
+
+/**
+ * One leg, seven rows tall, drawn once per pose and re-tinted for the far side
+ * of the animal. Templates are 8 columns wide so a limb can swing three pixels
+ * either way without running off its own stamp.
+ */
+const LEG_POSES = {
+  plant: [
+    '..keeEk.',
+    '..keeEk.',
+    '..keEk..',
+    '..keEk..',
+    '..keEk..',
+    '..keEk..',
+    '..kMMk..',
+  ],
+  fwd: [
+    '..keeEk.',
+    '..keeEk.',
+    '...keEk.',
+    '...keEk.',
+    '....keEk',
+    '....keEk',
+    '....kMMk',
+  ],
+  back: [
+    '..keeEk.',
+    '..keeEk.',
+    '.keEk...',
+    '.keEk...',
+    'keEk....',
+    'keEk....',
+    'kMMk....',
+  ],
+  lift: [
+    '..keeEk.',
+    '..keeEk.',
+    '...keEk.',
+    '...keEk.',
+    '...kMMk.',
+    '........',
+    '........',
+  ],
+  reach: [
+    '..keeEk.',
+    '...keEk.',
+    '....keEk',
+    '....keEk',
+    '....kMMk',
+    '........',
+    '........',
+  ],
+  tuck: [
+    '..keeEk.',
+    '..keeEk.',
+    '..keEk..',
+    '.keEk...',
+    '.kMMk...',
+    '........',
+    '........',
+  ],
+};
+
+/** The far pair is a shade darker so the near pair reads in front of it. */
+const farLeg = (pose) => recolor(LEG_POSES[pose], { e: 'm', E: 'm' });
+const nearLeg = (pose) => LEG_POSES[pose];
+
+/** Column each leg is stamped at. Far legs sit behind and slightly inboard. */
+const LEG_X = { hindFar: 3, hindNear: 6, foreFar: 17, foreNear: 20 };
+const LEG_Y = 17;
+
+/**
+ * Compose one horse frame.
+ * @param {{hindFar:string, hindNear:string, foreFar:string, foreNear:string}} gait
+ * @param {keyof TAILS} tail
+ * @param {number} lift vertical offset — the gallop's suspension phase
+ */
+function horseFrame(gait, tail = 'hang', lift = 0) {
+  // Barrel, then the tail draped over the rump, then the far pair of legs, then
+  // the near pair in front of everything.
+  let rows = stamp(Array(24).fill('.'.repeat(32)), HORSE_BODY, 0, 0);
+  rows = stamp(rows, TAILS[tail], 0, 9);
+  rows = stamp(rows, farLeg(gait.hindFar), LEG_X.hindFar, LEG_Y);
+  rows = stamp(rows, farLeg(gait.foreFar), LEG_X.foreFar, LEG_Y);
+  rows = stamp(rows, nearLeg(gait.hindNear), LEG_X.hindNear, LEG_Y);
+  rows = stamp(rows, nearLeg(gait.foreNear), LEG_X.foreNear, LEG_Y);
+  return lift ? shiftY(rows, -lift) : rows;
+}
 
 const HORSE_FRAMES = {
   idle: [
-    [...withTail(HORSE_BODY, 0), ...HOOVES.stand],
-    [...withTail(HORSE_BODY, 1), ...HOOVES.stand],
+    horseFrame({ hindFar: 'plant', hindNear: 'plant', foreFar: 'plant', foreNear: 'plant' }, 'hang'),
+    // Weight shifted off one hind hoof, tail flicked across.
+    horseFrame({ hindFar: 'plant', hindNear: 'lift', foreFar: 'plant', foreNear: 'plant' }, 'swish'),
   ],
+  /** A diagonal 4-beat: each leg leads its diagonal partner by half a cycle. */
   walk: [
-    [...withTail(HORSE_BODY, 0), ...HOOVES.walkA],
-    [...withTail(HORSE_BODY, 1), ...HOOVES.walkB],
-    [...withTail(HORSE_BODY, 0), ...HOOVES.walkA],
-    [...withTail(HORSE_BODY, 1), ...HOOVES.stand],
+    horseFrame({ hindFar: 'back', hindNear: 'fwd', foreFar: 'fwd', foreNear: 'back' }, 'hang'),
+    horseFrame({ hindFar: 'lift', hindNear: 'plant', foreFar: 'plant', foreNear: 'lift' }, 'swish'),
+    horseFrame({ hindFar: 'fwd', hindNear: 'back', foreFar: 'back', foreNear: 'fwd' }, 'hang'),
+    horseFrame({ hindFar: 'plant', hindNear: 'lift', foreFar: 'lift', foreNear: 'plant' }, 'swish'),
   ],
+  /**
+   * Gathered → extended → landing → drive. The two airborne frames are lifted
+   * clear of the ground so the whole animal leaves the road, which is what
+   * separates a gallop from a fast walk.
+   */
   gallop: [
-    [...withTail(HORSE_BODY, 1), ...HOOVES.gallopGather],
-    [...withTail(HORSE_BODY, 2), ...HOOVES.gallopExtend],
-    [...withTail(HORSE_BODY, 1), ...HOOVES.gallopSuspend],
-    [...withTail(HORSE_BODY, 2), ...HOOVES.gallopExtend],
+    horseFrame({ hindFar: 'tuck', hindNear: 'tuck', foreFar: 'tuck', foreNear: 'tuck' }, 'stream', 2),
+    horseFrame({ hindFar: 'back', hindNear: 'back', foreFar: 'reach', foreNear: 'reach' }, 'stream', 1),
+    horseFrame({ hindFar: 'back', hindNear: 'back', foreFar: 'plant', foreNear: 'fwd' }, 'stream'),
+    horseFrame({ hindFar: 'fwd', hindNear: 'plant', foreFar: 'lift', foreNear: 'back' }, 'stream'),
   ],
 };
 
@@ -339,10 +503,10 @@ const HORSE_FRAMES = {
 // Baking + public API
 // ---------------------------------------------------------------------------
 
-function bakeSet(frames) {
+function bakeSet(frames, key = KEY) {
   const out = {};
   for (const [name, list] of Object.entries(frames)) {
-    out[name] = list.map((rows) => bake({ key: KEY, rows }));
+    out[name] = list.map((rows) => bake({ key, rows }));
   }
   return out;
 }
@@ -364,11 +528,14 @@ export const HORSE_TIMING = {
 
 /**
  * Where the rider sprite sits relative to the horse's top-left corner, in
- * source pixels. Derived from the saddle at x 8..13, row 10.
+ * source pixels. Derived from the saddle: its seat runs x 9..14 with the top of
+ * the seat on row 13, and the rider's hips are row 17 of a 21-row sprite,
+ * centred on x 7.5. So x = 11.5 - 7.5 and y = 13 - 17.
  */
-export const RIDER_OFFSET = { x: 3, y: -6 };
+export const RIDER_OFFSET = { x: 4, y: -4 };
 
 export const PLAYER_SIZE = { w: 16, h: 24 };
+export const RIDER_SIZE = { w: 16, h: 21 };
 export const HORSE_SIZE = { w: 32, h: 24 };
 
 let cache = null;
@@ -385,14 +552,10 @@ export function getCharacterSprites() {
 }
 
 /**
- * Recolor helper — enemies reuse the player rig with a different poncho so the
+ * Recolor helper — enemies reuse the player rig with a different serape so the
  * duel screen can show a distinct silhouette without new art.
  */
 export function bakeEnemyVariant(ponchoLight, poncho, ponchoDark, hat = PALETTE.woodDeep) {
   const key = { ...KEY, p: poncho, P: ponchoDark, q: ponchoLight, h: hat, H: PALETTE.woodDark };
-  const out = {};
-  for (const [name, list] of Object.entries(PLAYER_FRAMES)) {
-    out[name] = list.map((rows) => bake({ key, rows }));
-  }
-  return out;
+  return bakeSet(PLAYER_FRAMES, key);
 }

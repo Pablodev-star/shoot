@@ -8,6 +8,7 @@
 
 import { drawSprite, frameAt } from '../art/pixel.js';
 import { getCharacterSprites, CHARACTER_TIMING } from '../art/sprites-character.js';
+import { getShieldSprites } from '../art/sprites-ui.js';
 import { createParallax } from '../explore/parallax.js';
 import * as weather from '../explore/weather.js';
 import { PALETTE } from '../art/palette.js';
@@ -17,6 +18,7 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
   const parallax = createParallax({ seed: (seed ^ (worldId * 31337)) >>> 0, groundRatio: 0.7 });
   parallax.setTint(tint);
   const player = getCharacterSprites().player;
+  const shield = getShieldSprites();
 
   const fx = {
     /** 'idle' | 'reload' | 'shield' | 'shoot' | 'hit' */
@@ -106,9 +108,8 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
       drawSprite(ctx, eFrame, enemyX, gy - eFrame.height * fs + fs, fs, true);
 
       // --- shields ---
-      const shieldY = gy - 12 * fs;
-      if (fx.playerPose === 'shield') drawShield(ctx, playerX + 8 * fs, shieldY, fs, elapsed);
-      if (fx.enemyPose === 'shield') drawShield(ctx, enemyX + 8 * fs, shieldY, fs, elapsed);
+      if (fx.playerPose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
+      if (fx.enemyPose === 'shield') drawShield(ctx, shield, enemyX, gy, fs, elapsed, true);
 
       // --- bullets ---
       for (const b of fx.bullets) {
@@ -169,16 +170,30 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
   return renderer;
 }
 
-function drawShield(ctx, x, y, s, elapsed) {
-  const pulse = 0.55 + Math.sin(elapsed / 120) * 0.18;
-  ctx.globalAlpha = pulse;
-  ctx.strokeStyle = PALETTE.blueLight;
-  ctx.lineWidth = Math.max(1, s);
-  ctx.beginPath();
-  ctx.ellipse(x, y, 13 * s, 18 * s, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = pulse * 0.22;
-  ctx.fillStyle = PALETTE.blue;
-  ctx.fill();
+/**
+ * Draw the shield move: a faceted aura around the fighter with the heater
+ * shield braced on the leading arm. Both are sprites drawn at the fighters'
+ * own integer scale — the aura used to be a stroked ellipse, which was the one
+ * curve on screen that did not live on the pixel grid.
+ *
+ * @param {number} x    left edge of the 16px fighter, in device pixels
+ * @param {number} gy   the ground line
+ * @param {number} fs   the fighters' draw scale
+ * @param {boolean} flip true for the fighter facing left
+ */
+function drawShield(ctx, shield, x, gy, fs, elapsed, flip) {
+  const pulse = 0.6 + Math.sin(elapsed / 220) * 0.2;
+
+  // Aura, wrapped around the whole 16 x 24 fighter.
+  const aura = shield.aura;
+  ctx.globalAlpha = pulse * 0.5;
+  drawSprite(ctx, aura, x + ((16 - aura.width) / 2) * fs, gy - (aura.height - 2) * fs, fs);
   ctx.globalAlpha = 1;
+
+  // Shield braced on the leading arm, covering the body but not the face, and
+  // riding a one-pixel bob so it does not look nailed to the sprite.
+  const plate = shield.plate[frameAt(shield.plate, elapsed, 180)];
+  const bob = Math.round(Math.sin(elapsed / 300)) * fs;
+  const lead = flip ? 16 - plate.width - 7 : 7;
+  drawSprite(ctx, plate, x + lead * fs, gy - (plate.height - 1) * fs + bob, fs, flip);
 }
