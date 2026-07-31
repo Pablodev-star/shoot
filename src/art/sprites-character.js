@@ -114,16 +114,6 @@ function shiftX(rows, dx) {
     dx > 0 ? ('.'.repeat(dx) + r).slice(0, w) : (r.slice(-dx) + '.'.repeat(-dx)));
 }
 
-/** Slide a whole frame vertically, keeping its height. Negative = up. */
-function shiftY(rows, dy) {
-  if (!dy) return rows;
-  const w = rows[0].length;
-  const empty = '.'.repeat(w);
-  const h = rows.length;
-  if (dy > 0) return [...Array(dy).fill(empty), ...rows].slice(0, h);
-  return [...rows.slice(-dy), ...Array(-dy).fill(empty)];
-}
-
 /** Swap palette characters — used for the hit flash and the empty holster. */
 function recolor(rows, map) {
   return rows.map((r) => r.replace(/./g, (c) => map[c] ?? c));
@@ -459,9 +449,8 @@ const LEG_Y = 17;
  * Compose one horse frame.
  * @param {{hindFar:string, hindNear:string, foreFar:string, foreNear:string}} gait
  * @param {keyof TAILS} tail
- * @param {number} lift vertical offset — the gallop's suspension phase
  */
-function horseFrame(gait, tail = 'hang', lift = 0) {
+function horseFrame(gait, tail = 'hang') {
   // Barrel, then the tail draped over the rump, then the far pair of legs, then
   // the near pair in front of everything.
   let rows = stamp(Array(24).fill('.'.repeat(32)), HORSE_BODY, 0, 0);
@@ -470,7 +459,7 @@ function horseFrame(gait, tail = 'hang', lift = 0) {
   rows = stamp(rows, farLeg(gait.foreFar), LEG_X.foreFar, LEG_Y);
   rows = stamp(rows, nearLeg(gait.hindNear), LEG_X.hindNear, LEG_Y);
   rows = stamp(rows, nearLeg(gait.foreNear), LEG_X.foreNear, LEG_Y);
-  return lift ? shiftY(rows, -lift) : rows;
+  return rows;
 }
 
 const HORSE_FRAMES = {
@@ -487,16 +476,31 @@ const HORSE_FRAMES = {
     horseFrame({ hindFar: 'plant', hindNear: 'lift', foreFar: 'lift', foreNear: 'plant' }, 'swish'),
   ],
   /**
-   * Gathered → extended → landing → drive. The two airborne frames are lifted
-   * clear of the ground so the whole animal leaves the road, which is what
-   * separates a gallop from a fast walk.
+   * Gathered → extended → landing → drive. The first two frames are airborne;
+   * see HORSE_FRAME_LIFT for how they leave the road.
    */
   gallop: [
-    horseFrame({ hindFar: 'tuck', hindNear: 'tuck', foreFar: 'tuck', foreNear: 'tuck' }, 'stream', 2),
-    horseFrame({ hindFar: 'back', hindNear: 'back', foreFar: 'reach', foreNear: 'reach' }, 'stream', 1),
+    horseFrame({ hindFar: 'tuck', hindNear: 'tuck', foreFar: 'tuck', foreNear: 'tuck' }, 'stream'),
+    horseFrame({ hindFar: 'back', hindNear: 'back', foreFar: 'reach', foreNear: 'reach' }, 'stream'),
     horseFrame({ hindFar: 'back', hindNear: 'back', foreFar: 'plant', foreNear: 'fwd' }, 'stream'),
     horseFrame({ hindFar: 'fwd', hindNear: 'plant', foreFar: 'lift', foreNear: 'back' }, 'stream'),
   ],
+};
+
+/**
+ * How far off the ground each frame sits, in source pixels.
+ *
+ * The lift is deliberately *not* baked into the sprites. The horse fills its
+ * 24-row canvas edge to edge — ears on row 0, hooves on row 23 — so shifting
+ * the art up inside its own frame would have to throw the ears away, and they
+ * would blink out and back on every stride. Offsetting at draw time keeps the
+ * whole animal intact, and carries the rider up with it, which is what a
+ * suspension phase should look like.
+ */
+export const HORSE_FRAME_LIFT = {
+  idle: [0, 0],
+  walk: [0, 0, 0, 0],
+  gallop: [2, 1, 0, 0],
 };
 
 // ---------------------------------------------------------------------------

@@ -28,6 +28,7 @@ import {
   getCharacterSprites,
   CHARACTER_TIMING,
   HORSE_TIMING,
+  HORSE_FRAME_LIFT,
   RIDER_OFFSET,
 } from '../art/sprites-character.js';
 import { createParallax } from './parallax.js';
@@ -172,10 +173,15 @@ export const ExploreScreen = {
         const heroX = Math.round(view.w * 0.26);
 
         if (getState().hasHorse) {
-          const horseFrames = walking ? sprites.horse.gallop : sprites.horse.idle;
+          const gait = walking ? 'gallop' : 'idle';
+          const horseFrames = sprites.horse[gait];
           const hTiming = walking ? HORSE_TIMING.gallop : HORSE_TIMING.idle;
-          const horse = horseFrames[frameAt(horseFrames, elapsed, hTiming)];
-          const hy = gy - horse.height * s + 2 * s;
+          const frameIndex = frameAt(horseFrames, elapsed, hTiming);
+          const horse = horseFrames[frameIndex];
+          // The gallop's airborne frames leave the road. Lifting here rather
+          // than inside the sprite keeps the rider on the horse's back.
+          const lift = HORSE_FRAME_LIFT[gait][frameIndex] ?? 0;
+          const hy = gy - horse.height * s + 2 * s - lift * s;
           drawSprite(ctx, horse, heroX, hy, s);
 
           const riderFrames = sprites.rider.ride;
