@@ -7,6 +7,7 @@
  */
 
 import { drawSprite, frameAt } from '../art/pixel.js';
+import { getView } from '../core/scene.js';
 import { getCharacterSprites, CHARACTER_TIMING } from '../art/sprites-character.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
 import { createParallax } from '../explore/parallax.js';
@@ -51,6 +52,14 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
 
     update(dt) {
       elapsed += dt;
+      /**
+       * The storm does not wait for the duel to finish. The walk engine is
+       * paused for the whole fight, so nothing else is ticking the weather —
+       * without this the rain hangs in the air behind the duellists. Weather's
+       * own paused flag still holds its remaining time, so a fight in the rain
+       * costs the rain nothing.
+       */
+      weather.update(dt, getView());
       if (fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt);
       if (fx.flash > 0) fx.flash = Math.max(0, fx.flash - dt);
       if (fx.bannerTimer > 0) {
@@ -78,16 +87,18 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
       ctx.save();
       ctx.translate(Math.round(ox), Math.round(oy));
 
-      parallax.render(ctx, view, cameraX);
       const gy = parallax.groundY(view);
+      weather.setGroundLine(gy);
+      // Backdrop now, light after the fighters — see parallax.applyLighting.
+      parallax.renderBackdrop(ctx, view, cameraX);
 
       const playerX = Math.round(view.w * 0.18);
       const enemyX = Math.round(view.w * 0.82 - 16 * fs);
 
-      // --- ground shadows, so the fighters are planted rather than floating ---
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
-      ctx.fillRect(playerX + 2 * fs, gy, 12 * fs, fs);
-      ctx.fillRect(enemyX + 2 * fs, gy, 12 * fs, fs);
+      // --- ground shadows, so the fighters are planted rather than floating.
+      // They lean away from the sun, so a duel at dusk casts two long ones. ---
+      parallax.drawGroundShadow(ctx, view, playerX, 16 * fs, gy);
+      parallax.drawGroundShadow(ctx, view, enemyX, 16 * fs, gy);
 
       // --- fighters ---
       const pFrames = poseFrames(player, fx.playerPose);
@@ -110,6 +121,15 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
       // --- shields ---
       if (fx.playerPose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
       if (fx.enemyPose === 'shield') drawShield(ctx, shield, enemyX, gy, fs, elapsed, true);
+
+      /**
+       * The light goes on here: everything above it (the road and both
+       * duellists) belongs to the scene and is lit by the hour of the day.
+       * Everything below it is *making* light — muzzle flash, tracer, the
+       * banner — and a muzzle flash that dims at dusk is a muzzle flash drawn
+       * as if it were paint.
+       */
+      parallax.applyLighting(ctx, view);
 
       // --- bullets ---
       for (const b of fx.bullets) {

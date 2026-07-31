@@ -58,7 +58,7 @@ export function getSlot() {
 export async function startNewRun(slot) {
   run.slot = slot;
   newRun();
-  daynight.setTime(0.32);
+  daynight.reset(0.32);
   weather.force('clear');
   hunger.reset();
   run.engine = createWalkEngine();

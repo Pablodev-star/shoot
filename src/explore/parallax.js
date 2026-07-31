@@ -1,8 +1,8 @@
 /**
  * SHOOT! — Parallax renderer (Block 3a).
  *
- * Draws the scrolling desert: sky gradient (from the day/night clock), stars,
- * sun/moon arc, five tiled depth layers, and the deterministic scatter of
+ * Draws the scrolling desert: the sky, the star field, the sun/moon arc, five
+ * tiled depth layers, the storm deck, and the deterministic scatter of
  * cacti/rocks/bones along the ground.
  *
  * COORDINATES
@@ -10,6 +10,31 @@
  * The world is measured in *source pixels*. `cameraX` is the player's travelled
  * distance in source pixels. Screen position = (worldX - cameraX * speed) *
  * view.scale. Every draw is rounded to the pixel grid.
+ *
+ * THE SKY IS DITHERED, NOT GRADIENTED
+ * ---------------------------------------------------------------------------
+ * A canvas linear gradient across a 900px window is 900 distinct colours: it is
+ * the one thing on screen that is not pixel art, and next to the dithered
+ * ridges it looked like a photograph glued behind them. Instead the ramp is
+ * quantised to steps of QUANTUM per channel and the boundary between two steps
+ * is broken up with a 4x4 ordered dither — the same trick a 256-colour machine
+ * used, and the reason those skies still look good.
+ *
+ * It is built into a 4 x rows tile and repeated, so the cost is a few hundred
+ * one-pixel fills whenever the colour actually changes (a few times a second at
+ * most) and a single pattern fill per frame.
+ *
+ * LIGHT IS APPLIED LAST, AND THE SKY AFTER THAT
+ * ---------------------------------------------------------------------------
+ * `renderBackdrop()` draws the world and `applyLighting()` puts the hour of the
+ * day over it. They are separate calls so a screen can draw its actors in
+ * between: the gunslinger, the horse and the enemy all stand *inside* the
+ * scene's light instead of being pasted on top of a scene that has already been
+ * lit. `render()` does both in one go for callers with nothing to insert.
+ *
+ * The sky is not painted until the very end, *underneath* everything, so that
+ * the light which falls on the desert never falls on the thing emitting it. See
+ * `drawSkyBehind`.
  *
  * SCATTER
  * ---------------------------------------------------------------------------
@@ -20,19 +45,57 @@
  */
 
 import { PALETTE } from '../art/palette.js';
-import { drawSprite } from '../art/pixel.js';
+import { drawSprite, makeCanvas } from '../art/pixel.js';
 import {
   getEnvironmentSprites,
   PARALLAX_MANIFEST,
   LAYER_TILE_W,
   SCATTER_TABLE,
   SKY_BODY_SIZE,
+  SKY_GLOW_SIZE,
 } from '../art/sprites-environment.js';
 import { makeRng } from '../core/rng.js';
 import { getSky } from './daynight.js';
+import { getWeatherState } from './weather.js';
 
-const SCATTER_CELL = 72;
+/**
+ * One prop per cell at most, placed inside the middle half of the cell. That
+ * single rule is what keeps the roadside from clumping: two neighbours can
+ * never be closer than half a cell, and never further than one and a half.
+ */
+const SCATTER_CELL = 76;
 const TOTAL_WEIGHT = SCATTER_TABLE.reduce((s, e) => s + e.weight, 0);
+
+/**
+ * Slack around the edge of every full-screen pass. The duel shakes the camera
+ * by translating the context, and a veil or a sky drawn to the exact viewport
+ * would slide off one edge and leave a bare strip on the other.
+ */
+const MARGIN = 48;
+
+/** Colour step the sky ramp is quantised to before dithering. */
+const QUANTUM = 10;
+
+/**
+ * 4x4 ordered (Bayer) dither thresholds, normalised. A 2x2 checker only has
+ * three states — off, half, on — so across a slow gradient half the screen ends
+ * up in the half state and the sky wears a visible fly screen. Sixteen
+ * thresholds break the same step into sixteen textures instead of one.
+ */
+const BAYER_N = 4;
+const BAYER = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+].map((v) => (v + 0.5) / 16);
+
+/**
+ * The overcast deck: how much of it each weather pulls over the sky. A
+ * sandstorm gets none — sand does not arrive under rain cloud, it arrives as
+ * the sky itself turning the colour of the ground, which the ochre haze does.
+ */
+const STORM_DECK = { cloudy: 0.85, rain: 1, sandstorm: 0 };
 
 export function createParallax(options = {}) {
   const env = getEnvironmentSprites();
@@ -59,59 +122,226 @@ export function createParallax(options = {}) {
     worldTint = tint;
   }
 
-  // --- sky ----------------------------------------------------------------
+  // --- sky ------------------------------------------------------------------
 
-  function drawSky(ctx, view, sky) {
-    const grad = ctx.createLinearGradient(0, 0, 0, view.h);
-    grad.addColorStop(0, sky.top);
-    grad.addColorStop(0.78, sky.bottom);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, view.w, view.h);
+  /**
+   * The star field. Fixed positions, three sizes, each with its own twinkle
+   * phase; the whole field slides west as the night turns, which is the one
+   * cue that tells the player time is passing even when they are standing
+   * still under a black sky.
+   */
+  const stars = (() => {
+    const rng = makeRng(seed ^ 0x5eed);
+    return Array.from({ length: 130 }, () => {
+      const r = rng();
+      return {
+        x: rng(),
+        y: rng() * 0.66,
+        size: r < 0.72 ? 1 : r < 0.95 ? 2 : 3,
+        phase: rng() * Math.PI * 2,
+        rate: rng.range(520, 1400),
+        base: rng.range(0.45, 1),
+      };
+    });
+  })();
 
-    if (sky.stars > 0.02) {
-      const rng = makeRng(seed ^ 0x5eed);
-      ctx.fillStyle = PALETTE.star;
-      for (let i = 0; i < 90; i++) {
-        const x = Math.round(rng() * view.w);
-        const y = Math.round(rng() * view.h * 0.62);
-        const twinkle = 0.55 + 0.45 * Math.sin(performance.now() / 700 + i);
-        ctx.globalAlpha = sky.stars * twinkle;
-        ctx.fillRect(x, y, view.scale, view.scale);
+  /** Shooting stars: rare, short, and only ever at night. */
+  const shooting = [];
+  let lastNow = 0;
+
+  let skyCache = { key: '', pattern: null };
+
+  function skyPattern(ctx, view, sky) {
+    const s = view.scale;
+    const rows = Math.ceil(view.h / s) + 1;
+    const { top, mid, bottom } = sky.rgb;
+    const key = `${rows}|${top}|${mid}|${bottom}`;
+    if (skyCache.key === key) return skyCache.pattern;
+
+    const { canvas, ctx: tile } = makeCanvas(BAYER_N, rows);
+    for (let y = 0; y < rows; y++) {
+      const k = y / (rows - 1);
+      // Zenith → mid at 55% of the screen → horizon.
+      const c = k < 0.55
+        ? top.map((v, i) => v + (mid[i] - v) * (k / 0.55))
+        : mid.map((v, i) => v + (bottom[i] - v) * ((k - 0.55) / 0.45));
+      for (let x = 0; x < BAYER_N; x++) {
+        const threshold = BAYER[(y % BAYER_N) * BAYER_N + (x % BAYER_N)];
+        const q = c.map((v) => {
+          const lo = Math.floor(v / QUANTUM) * QUANTUM;
+          return Math.min(255, (v - lo) / QUANTUM > threshold ? lo + QUANTUM : lo);
+        });
+        tile.fillStyle = `rgb(${q[0]},${q[1]},${q[2]})`;
+        tile.fillRect(x, y, 1, 1);
       }
-      ctx.globalAlpha = 1;
     }
+    skyCache = { key, pattern: ctx.createPattern(canvas, 'repeat') };
+    return skyCache.pattern;
+  }
 
-    /**
-     * Sun by day, moon by night — same arc, opposite phase. Both are sprites
-     * on the pixel grid rather than `arc()` fills, and the moon's crescent is
-     * cut out of the sprite instead of being painted over with a sky colour:
-     * the dark limb is transparent, so the gradient behind it shows through
-     * exactly and there is nothing there to see. Painting the bite could only
-     * ever match the sky at one height and one moment of the day/night clock.
-     */
+  /**
+   * The sky, painted UNDER everything already on the canvas.
+   *
+   * It goes on last and underneath for one reason: the sky is the light
+   * source, not a lit surface. Drawn first and tinted with everything else, a
+   * full moon came out the same grey as the rock below it and the stars went
+   * out — the scene got darker at midnight and so did the only two things in it
+   * that are supposed to be bright. Because `destination-over` puts each new
+   * draw *behind* the last, the ridges and the traveller still occlude the sun
+   * exactly as before, with no clipping and no second canvas.
+   *
+   * Everything here is therefore listed front-to-back, which is the reverse of
+   * how it reads: disc, halo, horizon band, stars, and the ramp behind them.
+   */
+  function drawSkyBehind(ctx, view, sky, gy) {
+    const s = view.scale;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+
     const p = sky.sunProgress;
     const isSun = p >= 0 && p <= 1;
     const arcT = isSun ? p : (p < 0 ? p + 1 : p - 1);
-    const bodyScale = view.scale;
-    const size = SKY_BODY_SIZE * bodyScale;
+    const size = SKY_BODY_SIZE * s;
     const cx = view.w * (0.1 + arcT * 0.8);
     const cy = view.h * 0.62 - Math.sin(arcT * Math.PI) * view.h * 0.5;
+
+    const gw = SKY_GLOW_SIZE * s;
+    const gx = Math.round((cx - gw / 2) / s) * s;
+    const gyy = Math.round((cy - gw / 2) / s) * s;
+    const bx = Math.round((cx - size / 2) / s) * s;
+    const by = Math.round((cy - size / 2) / s) * s;
+
     if (isSun) {
-      // Soft halo first, so the disc sits inside a glow rather than a ring.
-      const r = size / 2;
-      const halo = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 3.2);
-      halo.addColorStop(0, 'rgba(255, 226, 122, 0.32)');
-      halo.addColorStop(1, 'rgba(255, 226, 122, 0)');
-      ctx.fillStyle = halo;
-      ctx.fillRect(cx - r * 3.4, cy - r * 3.4, r * 6.8, r * 6.8);
+      // The sun fades from its red low tone to its white high one with
+      // elevation, and its halo does the same — a white noon sun wearing a
+      // sunset halo is the giveaway that the two were drawn by different rules.
+      // Under destination-over the hot pass goes down first at partial alpha
+      // and the cold one fills in solid beneath it: an exact cross-fade.
+      const hot = Math.min(1, sky.elevation * 1.4);
+      ctx.globalAlpha = hot;
+      drawSprite(ctx, env.sky.sun[1], bx, by, s);
+      ctx.globalAlpha = 1;
+      drawSprite(ctx, env.sky.sun[0], bx, by, s);
+      ctx.globalAlpha = hot;
+      drawSprite(ctx, env.sky.glow[1], gx, gyy, s);
+      ctx.globalAlpha = 1;
+      drawSprite(ctx, env.sky.glow[0], gx, gyy, s);
+    } else {
+      // The moon rises before the sky is done with the sun, and a full-strength
+      // disc hanging in an orange dusk looks stuck on. It comes up with the
+      // stars instead.
+      ctx.globalAlpha = 0.3 + sky.stars * 0.7;
+      drawSprite(ctx, env.sky.moon[sky.moonPhase], bx, by, s);
+      ctx.globalAlpha = 0.25 + sky.stars * 0.75;
+      drawSprite(ctx, env.sky.moonGlow, gx, gyy, s);
+      ctx.globalAlpha = 1;
     }
-    // Snap to the pixel grid so the disc never lands on a half pixel.
-    const bx = Math.round((cx - size / 2) / bodyScale) * bodyScale;
-    const by = Math.round((cy - size / 2) / bodyScale) * bodyScale;
-    drawSprite(ctx, isSun ? env.sky.sun : env.sky.moon, bx, by, bodyScale);
+
+    drawHorizonGlow(ctx, view, sky, gy, cx);
+    drawStars(ctx, view, sky);
+
+    const pattern = skyPattern(ctx, view, sky);
+    ctx.imageSmoothingEnabled = false;
+    ctx.scale(s, s);
+    ctx.fillStyle = pattern;
+    const m = MARGIN / s;
+    ctx.fillRect(-m, -m, view.w / s + m * 2, view.h / s + m * 2);
+    ctx.restore();
   }
 
-  // --- tiled layers -------------------------------------------------------
+  function drawStars(ctx, view, sky) {
+    if (sky.stars <= 0.02) return;
+    const s = view.scale;
+    const now = performance.now();
+    const drift = sky.skyRotation * 0.55;
+    ctx.fillStyle = PALETTE.star;
+    for (const st of stars) {
+      const wrapped = (((st.x - drift) % 1) + 1) % 1;
+      const x = Math.round((wrapped * view.w) / s) * s;
+      const y = Math.round((st.y * view.h) / s) * s;
+      const twinkle = 0.62 + 0.38 * Math.sin(now / st.rate + st.phase);
+      ctx.globalAlpha = Math.min(1, sky.stars * st.base * twinkle);
+      if (st.size === 3) {
+        // The bright ones get a one-pixel cross instead of a fat square.
+        ctx.fillRect(x, y - s, s, s * 3);
+        ctx.fillRect(x - s, y, s * 3, s);
+      } else {
+        ctx.fillRect(x, y, st.size * s, st.size * s);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // --- shooting stars ---
+    const dt = lastNow ? Math.min(64, now - lastNow) : 16;
+    lastNow = now;
+    if (sky.stars > 0.5 && shooting.length < 2 && Math.random() < dt / 14000) {
+      shooting.push({
+        x: Math.random() * 0.7 + 0.1,
+        y: Math.random() * 0.3,
+        vx: Math.random() < 0.5 ? -1 : 1,
+        t: 0,
+      });
+    }
+    for (let i = shooting.length - 1; i >= 0; i--) {
+      const sh = shooting[i];
+      sh.t += dt / 620;
+      if (sh.t >= 1) {
+        shooting.splice(i, 1);
+        continue;
+      }
+      const hx = (sh.x + sh.vx * sh.t * 0.28) * view.w;
+      const hy = (sh.y + sh.t * 0.16) * view.h;
+      // A four-pixel tail, fading behind the head.
+      for (let k = 0; k < 5; k++) {
+        ctx.globalAlpha = sky.stars * (1 - sh.t) * (1 - k / 5) * 0.9;
+        ctx.fillRect(
+          Math.round((hx - sh.vx * k * 2 * s) / s) * s,
+          Math.round((hy - k * s) / s) * s,
+          s,
+          s,
+        );
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * The band of light lying on the horizon. Quantised into steps rather than
+   * poured out of a gradient, for the same reason the sky is.
+   */
+  function drawHorizonGlow(ctx, view, sky, gy, bodyX) {
+    if (sky.glowA <= 0.02) return;
+    const s = view.scale;
+    const bands = 12;
+    const bandH = Math.max(s, Math.round((view.h * 0.16) / bands / s) * s);
+    // Anchored to the *skyline*, not to the walk line: the ridges stand up to
+    // fifty source pixels above the road, and a glow laid on the road is a glow
+    // nobody ever sees.
+    const horizon = gy - 50 * s;
+    ctx.fillStyle = sky.glow;
+    for (let i = 0; i < bands; i++) {
+      const y = horizon - (i + 1) * bandH;
+      if (y + bandH < 0) break;
+      ctx.globalAlpha = sky.glowA * 0.34 * (1 - i / bands) ** 1.7;
+      ctx.fillRect(0, y, view.w, bandH + 1);
+    }
+    ctx.globalAlpha = 1;
+    // A brighter pool directly under whichever body is near the horizon. Its
+    // scale is a whole number of screen pixels so the halo's own pixels stay
+    // square when it is blown up.
+    const pool = SKY_GLOW_SIZE * Math.max(1, Math.round(s * 2.2));
+    ctx.globalAlpha = sky.glowA * 0.5;
+    ctx.drawImage(
+      env.sky.glow[0],
+      Math.round((bodyX - pool / 2) / s) * s,
+      Math.round((horizon - pool * 0.45) / s) * s,
+      pool,
+      pool,
+    );
+    ctx.globalAlpha = 1;
+  }
+
+  // --- tiled layers ---------------------------------------------------------
 
   function drawLayer(ctx, view, layer, cameraX, gy) {
     const sprite = env.layers[layer.name];
@@ -135,45 +365,73 @@ export function createParallax(options = {}) {
     }
   }
 
-  // --- scatter ------------------------------------------------------------
+  /**
+   * The storm deck, faded in over the fair-weather clouds by how much weather
+   * is currently out. Rain used to fall out of a clear blue sky; now the sky
+   * closes over first, because that is the part of a storm you see coming.
+   */
+  function drawStormDeck(ctx, view, cameraX, gy) {
+    const w = getWeatherState();
+    const strength = (STORM_DECK[w.shownId] || 0) * w.intensity;
+    if (strength <= 0.01) return;
+    // Two passes at different heights and speeds: one deck of cloud has gaps
+    // in it by design, and a sky you can see blue through is not a storm.
+    ctx.globalAlpha = strength * 0.75;
+    drawLayer(ctx, view, { name: 'storm', speed: 0.05, y: -178 }, cameraX, gy);
+    ctx.globalAlpha = strength;
+    drawLayer(ctx, view, { name: 'storm', speed: 0.09, y: -124 }, cameraX, gy);
+    ctx.globalAlpha = 1;
+  }
 
+  // --- scatter --------------------------------------------------------------
+
+  /**
+   * Roadside props. Two rules, both of them things the old scatter got wrong:
+   *
+   *  1. EVERYTHING SITS ON THE WALK LINE. Props used to be lifted 6 and 13
+   *     pixels off the ground to fake depth, but the desert here is a flat
+   *     side-on strip with no receding plane to lift them into — so a raised
+   *     cactus did not read as further away, it read as hovering. They are all
+   *     planted on the same line now, and depth comes from the parallax layers
+   *     behind them, which is what those layers are for.
+   *  2. THEY KEEP THEIR DISTANCE. One prop per cell, placed in the middle half
+   *     of it, so no two are ever closer than half a cell.
+   */
   function drawScatter(ctx, view, cameraX, gy) {
     const s = view.scale;
-    const first = Math.floor((cameraX - 40) / SCATTER_CELL);
-    const last = Math.ceil((cameraX + view.w / s + 40) / SCATTER_CELL);
+    const first = Math.floor((cameraX - 60) / SCATTER_CELL);
+    const last = Math.ceil((cameraX + view.w / s + 60) / SCATTER_CELL);
 
     for (let cell = first; cell <= last; cell++) {
       const rng = makeRng((seed + cell * 2654435761) >>> 0);
-      const count = rng() < 0.55 ? 1 : rng() < 0.85 ? 2 : 0;
-      for (let i = 0; i < count; i++) {
-        let roll = rng() * TOTAL_WEIGHT;
-        let entry = SCATTER_TABLE[0];
-        for (const e of SCATTER_TABLE) {
-          roll -= e.weight;
-          if (roll <= 0) {
-            entry = e;
-            break;
-          }
+      if (rng() < 0.18) continue; // empty stretch of road
+
+      let roll = rng() * TOTAL_WEIGHT;
+      let entry = SCATTER_TABLE[0];
+      for (const e of SCATTER_TABLE) {
+        roll -= e.weight;
+        if (roll <= 0) {
+          entry = e;
+          break;
         }
-        const sprite = env.props[entry.name];
-        if (!sprite) continue;
-        const worldX = cell * SCATTER_CELL + rng() * SCATTER_CELL;
-        // Depth: props sit slightly above or below the walk line and shrink
-        // with distance, which reads as a road with a verge.
-        const depth = rng();
-        const scaleMul = depth < 0.35 ? 1 : depth < 0.75 ? 0.75 : 0.55;
-        const yOffset = depth < 0.35 ? 2 : depth < 0.75 ? -6 : -13;
-        const speed = depth < 0.35 ? 1 : depth < 0.75 ? 0.86 : 0.74;
-        const sx = (worldX - cameraX * speed) * s;
-        if (sx < -120 * s || sx > view.w + 120 * s) continue;
-        const drawScale = s * scaleMul;
-        const sy = gy + yOffset * s - sprite.height * drawScale;
-        drawSprite(ctx, sprite, sx, sy, drawScale);
       }
+      const sprite = env.props[entry.name];
+      if (!sprite) continue;
+
+      const worldX = cell * SCATTER_CELL + SCATTER_CELL * (0.25 + rng() * 0.5);
+      const sx = (worldX - cameraX) * s;
+      if (sx < -140 * s || sx > view.w + 140 * s) continue;
+      // Size varies by a whole pixel step, never a fraction: half-scaled pixel
+      // art is mush.
+      const drawScale = rng() < 0.3 ? Math.max(1, s - 1) : s;
+      // 1–2 source pixels of the base sit below the walk line, so the prop is
+      // bedded into the sand rather than balanced on the crust line.
+      const sink = (1 + (rng() < 0.4 ? 1 : 0)) * s;
+      drawSprite(ctx, sprite, sx, gy + sink - sprite.height * drawScale, drawScale);
     }
   }
 
-  // --- structures (shops / inns placed by the encounter generator) --------
+  // --- structures (shops / inns placed by the encounter generator) ----------
 
   function drawStructures(ctx, view, cameraX, gy) {
     const s = view.scale;
@@ -187,43 +445,125 @@ export function createParallax(options = {}) {
     }
   }
 
-  // --- ambient tint -------------------------------------------------------
+  // --- cast shadows ---------------------------------------------------------
 
-  function drawTint(ctx, view, sky) {
+  /**
+   * The shadow an actor throws on the road.
+   *
+   * It leans away from whatever is lighting the sky and stretches as that light
+   * drops, which is the cheapest honest cue that the figure is standing in this
+   * scene at this hour — a fixed blob under the boots says "sprite", a shadow
+   * that runs east at dawn and west at dusk says "six in the morning".
+   *
+   * @param {number} x    left edge of the actor, device pixels
+   * @param {number} w    actor width, device pixels
+   * @param {number} gy   the walk line
+   */
+  function drawGroundShadow(ctx, view, x, w, gy) {
+    const sky = getSky();
+    const s = view.scale;
+    const p = sky.sunProgress;
+    const arcT = p >= 0 && p <= 1 ? p : (p < 0 ? p + 1 : p - 1);
+    const bodyX = view.w * (0.1 + arcT * 0.8);
+    const cx = x + w / 2;
+    const dir = bodyX > cx ? -1 : 1;
+    const e = Math.max(0.05, sky.elevation);
+    const len = Math.min(w * 4, w * (0.55 + (1 - e) * 2.6));
+    const alpha = (0.1 + e * 0.2) * sky.light;
+
+    ctx.fillStyle = `rgba(24, 16, 12, ${alpha})`;
+    // The long cast, one pixel deep, then the darker patch under the feet.
+    ctx.fillRect(
+      Math.round((dir > 0 ? cx : cx - len) / s) * s,
+      gy,
+      Math.round(len / s) * s,
+      s,
+    );
+    ctx.fillRect(Math.round((x + w * 0.12) / s) * s, gy, Math.round((w * 0.76) / s) * s, s * 2);
+  }
+
+  // --- ambient light --------------------------------------------------------
+
+  /**
+   * The hour of the day — and then the sky behind it.
+   *
+   * The two veils are drawn `source-atop`, so they land on the desert, the
+   * props and whatever the caller drew on top of them, and on nothing else: the
+   * sky is still a hole in the canvas at this point, and it stays one until
+   * `drawSkyBehind` fills it in underneath. That is what keeps the moon a moon.
+   *
+   * Two veils, because one is not enough: a dark pass to take the light out and
+   * colour the shadows, then a warm pass to put the low sun's colour back into
+   * the faces that are still catching it. The dark pass alone gives you a
+   * daytime scene with the brightness pulled down; the pair gives you evening.
+   */
+  function applyLighting(ctx, view) {
+    const sky = getSky();
+    const gy = groundY(view);
     const darkness = 1 - sky.light;
     if (darkness > 0.02) {
       ctx.save();
-      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalCompositeOperation = 'source-atop';
       ctx.fillStyle = sky.tint;
-      ctx.globalAlpha = Math.min(0.62, darkness * 0.85);
-      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.globalAlpha = Math.min(0.78, darkness);
+      ctx.fillRect(-MARGIN, -MARGIN, view.w + MARGIN * 2, view.h + MARGIN * 2);
       ctx.restore();
     }
+    if (sky.warmA > 0.01) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = sky.warm;
+      ctx.globalAlpha = sky.warmA * 0.5;
+      ctx.fillRect(-MARGIN, -MARGIN, view.w + MARGIN * 2, view.h + MARGIN * 2);
+      ctx.restore();
+    }
+
+    drawSkyBehind(ctx, view, sky, gy);
+
+    // The world wash goes over the sky too — it is the world's colour, and a
+    // violet Galaxy with a plain blue sky over it would be two places at once.
     if (worldTint) {
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
       ctx.fillStyle = worldTint.color;
       ctx.globalAlpha = worldTint.alpha;
-      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.fillRect(-MARGIN, -MARGIN, view.w + MARGIN * 2, view.h + MARGIN * 2);
       ctx.restore();
     }
   }
 
   /**
-   * Render the whole backdrop.
+   * Render the world, unlit and with no sky behind it yet. Draw your actors on
+   * top of this, then call `applyLighting` — that lights the pair of you
+   * together and drops the sky in behind.
+   *
    * @param {CanvasRenderingContext2D} ctx
    * @param {{w:number,h:number,scale:number}} view
    * @param {number} cameraX travelled distance in source pixels
    */
-  function render(ctx, view, cameraX) {
-    const sky = getSky();
+  function renderBackdrop(ctx, view, cameraX) {
     const gy = groundY(view);
-    drawSky(ctx, view, sky);
-    for (const layer of PARALLAX_MANIFEST) drawLayer(ctx, view, layer, cameraX, gy);
+    for (const layer of PARALLAX_MANIFEST) {
+      drawLayer(ctx, view, layer, cameraX, gy);
+      if (layer.name === 'clouds') drawStormDeck(ctx, view, cameraX, gy);
+    }
     drawScatter(ctx, view, cameraX, gy);
     drawStructures(ctx, view, cameraX, gy);
-    drawTint(ctx, view, sky);
   }
 
-  return { render, groundY, setStructures, setTint };
+  /** Backdrop and light in one call, for scenes with nothing to insert. */
+  function render(ctx, view, cameraX) {
+    renderBackdrop(ctx, view, cameraX);
+    applyLighting(ctx, view);
+  }
+
+  return {
+    render,
+    renderBackdrop,
+    applyLighting,
+    drawGroundShadow,
+    groundY,
+    setStructures,
+    setTint,
+  };
 }

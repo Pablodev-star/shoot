@@ -63,7 +63,7 @@ export function startMenuScene() {
 
     render(ctx, view) {
       const s = view.scale;
-      parallax.render(ctx, view, cameraX);
+      parallax.renderBackdrop(ctx, view, cameraX);
       const gy = parallax.groundY(view);
 
       // --- tumbleweeds ---
@@ -93,6 +93,10 @@ export function startMenuScene() {
       const frame = idle[frameAt(idle, elapsed, CHARACTER_TIMING.idle)];
       const heroX = view.w * 0.8;
       drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s, true);
+
+      // The tumbleweeds and the waiting gunslinger are part of the desert, so
+      // the hour of the day is applied over them, not under them.
+      parallax.applyLighting(ctx, view);
 
       // --- dust motes ---
       ctx.fillStyle = '#f2e3c6';

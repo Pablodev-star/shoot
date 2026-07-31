@@ -11,8 +11,9 @@
  *  - The horse shortens the journey: it multiplies walking speed by
  *    HORSE_SPEED_MUL and the generated gaps by HORSE_TIME_MUL, so the time
  *    between encounters drops to roughly a third.
- *  - Hunger, the day/night clock and weather all advance on *travel* time, so
- *    pausing the walk pauses the world.
+ *  - Hunger, the day/night clock and the weather's countdown all advance on
+ *    *travel* time, so pausing the walk pauses the world. The weather's
+ *    animation is not part of that: see `update`.
  *
  * The engine is deliberately headless — rendering lives in explore-screen.js —
  * so it can be unit-tested or reused by a future auto-battler mode.
@@ -78,6 +79,11 @@ export function createWalkEngine() {
    * @param {{w:number,h:number,scale:number}} view for weather particles
    */
   function update(dt, view) {
+    // The sky is not part of the pause. `weather.update` only spends the
+    // weather's remaining time while the walk is running (it checks its own
+    // paused flag) — the rain itself keeps falling either way, so opening the
+    // saddlebag does not freeze the storm in mid-air.
+    weather.update(dt, view);
     if (paused || finished || !segment) return;
 
     const step = (speed() * dt) / 1000;
@@ -87,7 +93,6 @@ export function createWalkEngine() {
 
     hunger.update(dt);
     daynight.update(dt);
-    weather.update(dt, view);
 
     const event = nextEvent();
     if (event && distanceToNext() <= 0) {
