@@ -4,21 +4,14 @@
  * Contains four families of artwork:
  *
  *  1. PROPS — hand-authored pixel strings: cacti (3 variants), rocks, cow
- *     skull, sign post, tumbleweed (4-frame roll), carrot and apple.
- *  2. SKY BODIES — the sun and the moon, drawn on the same pixel grid as
- *     everything else instead of being stroked as circles.
+ *     skull, sign post, tumbleweed (4-frame roll), carrot and apple. Scenery
+ *     carries no ink outline; see the note above PROPS.
+ *  2. SKY BODIES — the sun (two tones, cross-faded by elevation) and the moon
+ *     (eight phases), rasterised on the same pixel grid as everything else
+ *     instead of being stroked as circles.
  *  3. BUILDINGS — the shop and the inn, drawn big and blocky so they read from
  *     far away while the camera scrolls past.
  *  4. PARALLAX LAYERS — generated procedurally from a seed at load time.
- *
- * THE MOON
- * ---------------------------------------------------------------------------
- * The crescent is cut out of the disc, not painted over it. Nothing draws the
- * dark limb: those pixels are transparent, so whatever the sky happens to be
- * at that height shows through exactly. That is the only way the bite stays
- * invisible against a gradient — a fill matched to one sky colour is wrong
- * everywhere else on the screen, and wrong again a minute later as the day/
- * night clock turns.
  *
  * PARALLAX SPEC (consumed by src/explore/parallax.js)
  * ---------------------------------------------------------------------------
@@ -91,203 +84,295 @@ function rotate90(rows) {
 // ---------------------------------------------------------------------------
 // Props
 //
-// Every prop is lit from the top left and carries a 1px ink outline, matching
-// the character sprites, and every one of them ends on a strip of sand so it
-// sits in the ground rather than on top of it.
+// SCENERY CARRIES NO OUTLINE
+// ---------------------------------------------------------------------------
+// The character, the enemies and the items are outlined in ink so they read as
+// *things the player acts on*, and pop off whatever is behind them. The
+// scenery is not one of those things: it is the picture the actors stand in
+// front of. A black keyline around every cactus and every pebble put the
+// backdrop on the same visual footing as the gunslinger, and in a scene lit by
+// a moving sun it also nailed each prop to a colour the light never touches.
+//
+// So these props are shaded instead of outlined: light from the top left, a
+// mid tone for the body, a dark tone of the SAME hue down the right-hand and
+// lower edges, and — where a prop meets the sand — a `z` contact shadow. The
+// silhouette is carried by contrast with the ground, which is how the parallax
+// ridges behind them have always worked.
+//
+// Every prop still ends on its own footprint (a scuff of sand or a contact
+// shadow) so the renderer can plant the bottom row straight on the walk line.
 // ---------------------------------------------------------------------------
 
 const PROPS = {
   /**
    * Saguaro. The arms leave the trunk low and turn upward — a cactus whose
    * arms hang down reads as a candelabra, which is the usual way this shape
-   * goes wrong.
+   * goes wrong. Ribbed with a lit column (G), a body column (g) and a shaded
+   * column (d) so the trunk keeps its round section without a keyline.
    */
   cactusTall: [
-    '....kkkk....',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '.kkkgGGgkkk.',
-    'kgGkgGGgkgGk',
-    'kgGkgGGgkgGk',
-    'kgGkgGGgkgGk',
-    'kgGkgGGgkgGk',
-    'kgGggGGgggGk',
-    'kgGggGGgggGk',
-    '.kgggGGgggk.',
-    '..kkgGGgkk..',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '...kgGGgk...',
-    '...kgddgk...',
-    '...kgddgk...',
-    '..krrrrrk...',
-    '.krrrrrrrk..',
+    '....gGgd....',
+    '....gGgd....',
+    '....gGgd....',
+    '....gGgd....',
+    'ggd.gGgd....',
+    'gGd.gGgd....',
+    'gGd.gGgd.ggd',
+    'gGd.gGgd.gGd',
+    'gGd.gGgd.gGd',
+    'gGgggGgd.gGd',
+    'gGgggGgd.gGd',
+    '.ddggGgdggGd',
+    '....gGgdggGd',
+    '....gGgd.ddd',
+    '....gGgd....',
+    '....gGgd....',
+    '....gGgd....',
+    '....gGgd....',
+    '....gddd....',
+    '....gddd....',
+    '..rRRRRRRr..',
+    '.zrRRRRRRrz.',
   ],
   cactusShort: [
-    '...kkk..',
-    '..kgGgk.',
-    '..kgGgk.',
-    'kkkgGgk.',
-    'kgGgGgk.',
-    'kgggGgk.',
-    '.kkgGgk.',
-    '..kgGgk.',
-    '..kgGgk.',
-    '..kgdgk.',
-    '.krrrrk.',
-    'krrrrrrk',
+    '...gGgd.',
+    '...gGgd.',
+    '...gGgd.',
+    'ggdgGgd.',
+    'gGdgGgd.',
+    'gGggGgd.',
+    '.ddgGgd.',
+    '...gGgd.',
+    '...gGgd.',
+    '...gddd.',
+    '.rRRRRr.',
+    'zrRRRRrz',
   ],
   /** Barrel cactus, ribbed and in flower. */
   cactusRound: [
-    '..keke...',
-    '.kkgGgkk.',
-    'kgGgGgGgk',
-    'kgGgGgGgk',
-    'kgGgGgGgk',
-    'kgGgGgGgk',
-    '.kgGgGgk.',
-    '..kgggk..',
-    '..kdddk..',
-    '.krrrrrk.',
+    '...e.e...',
+    '..EgGgE..',
+    '.gGgGgGd.',
+    'gGgGgGgGd',
+    'gGgGgGgGd',
+    'gGgGgGgGd',
+    '.gGgGgGd.',
+    '..gggdd..',
+    '..ddddd..',
+    '.zrRRRrz.',
   ],
   rockBig: [
-    '....kkk....',
-    '..kkRRRkk..',
-    '.kRRRRRRRk.',
-    'kRRSRRRRRRk',
-    'kRRRRRRRrrk',
-    '.krrrrrrrk.',
-    '..kkkkkkk..',
+    '....SSS....',
+    '..SSRRRRr..',
+    '.SRRRRRRrr.',
+    'SRRRRRRRrrr',
+    'SRRRRRRrrrr',
+    '.rRRRRrrrr.',
+    '..zzzzzzz..',
   ],
   rockSmall: [
-    '..kkk..',
-    '.kRRRk.',
-    'kRSRRRk',
-    'krrrrrk',
-    '.kkkkk.',
+    '..SSS..',
+    '.SRRRr.',
+    'SRRRRrr',
+    '.rRRrr.',
+    '..zzz..',
   ],
-  /** Longhorn skull. The horns are what make it read at a glance, not the eyes. */
+  /**
+   * Longhorn skull. The horns are what make it read at a glance, not the eyes,
+   * so the horns keep the lightest bone tone and the sockets are the only dark
+   * pixels on it — a hole, not a keyline.
+   */
   skull: [
-    '.k.......k.',
-    '.kk.....kk.',
-    'kbkk...kkbk',
-    'kbbkkkkkbbk',
-    '.kbbbbbbbk.',
-    '.kbkbbbkbk.',
-    '..kbbbbbk..',
-    '..kbkkbk...',
-    '...kbbk....',
+    '.b.......b.',
+    '.bB.....Bb.',
+    'bbB.....Bbb',
+    'bbbBBBBBbbb',
+    '.BbbbbbbbB.',
+    '.BbvbbbvbB.',
+    '..bbbbbbb..',
+    '..bBvvBb...',
+    '...bbbb....',
   ],
   sign: [
-    '.kkkkkkkkk.',
-    'kwWWWWWWWWk',
-    'kwWkkWkkWWk',
-    'kwWWWWWWWWk',
-    'kwWkWkkWWWk',
-    'kwWWWWWWWWk',
-    '.kkkkkkkkk.',
-    '....kxk....',
-    '....kxk....',
-    '....kxk....',
-    '...kkkkk...',
+    'wwwwwwwwwww',
+    'wWWWWWWWWWw',
+    'wWxxWxWxxWw',
+    'wWWWWWWWWWw',
+    'wWxWxxWxWWw',
+    'wWWWWWWWWWw',
+    'xxxxxxxxxxx',
+    '....wXx....',
+    '....wXx....',
+    '....wXx....',
+    '..zrRRRrz..',
   ],
   bones: [
-    'kk.....kk',
-    'kbbkkkbbk',
-    'kbbbbbbbk',
-    '.kk...kk.',
+    'bb.....bb',
+    'bbbbbbbbb',
+    'BBbBBBbBB',
+    '.zz...zz.',
   ],
   carrotGround: [
-    '..kGk.kGk.',
-    '.kGGkkGGk.',
-    '.kkGGGGkk.',
-    '..kOoooOk.',
-    '..kOoooOk.',
-    '...kouok..',
-    '...kouok..',
-    '....kok...',
-    '....kk....',
+    '..Gg..gG..',
+    '.GGg..gGG.',
+    '.gGGGGGGg.',
+    '..OoooooO.',
+    '..OoooooO.',
+    '...Oooou..',
+    '...oouu...',
+    '....ou....',
+    '....z.....',
   ],
   appleGround: [
-    '....kd....',
-    '...kdGk...',
-    '..kEEeek..',
-    '.kEEeeeek.',
-    '.kEeeeeek.',
-    '.kqeeeeqk.',
-    '..kqeeqk..',
-    '...kkkk...',
+    '....dg....',
+    '...dgG....',
+    '..EEeeee..',
+    '.EEeeeeee.',
+    '.Eeeeeeeq.',
+    '.qeeeeeeq.',
+    '..qeeeeq..',
+    '...zqqz...',
   ],
 };
 
 /**
  * Tumbleweed. One tangle, rolled a quarter turn per frame: a hand-drawn
  * four-frame cycle never quite keeps its mass, and this one cannot drift.
+ * Twigs only — the old ink lattice read as a black scribble once it started
+ * rolling across pale sand.
  */
 const WEED = [
-  '...kkk...',
-  '.kkwBwkk.',
-  '.kwkwkwk.',
-  'kwBkwkBwk',
-  'kBkwwwkBk',
-  'kwBkwkBwk',
-  '.kwkwkwk.',
-  '.kkwBwkk.',
-  '...kkk...',
+  '...xwx...',
+  '.xwBwBwx.',
+  '.wxwBwxw.',
+  'xwBxwxBwx',
+  'wBxwwwxBw',
+  'xwBxwxBwx',
+  '.wxwBwxw.',
+  '.xwBwBwx.',
+  '...xwx...',
 ];
 
 const TUMBLEWEED = [WEED, rotate90(WEED), rotate90(rotate90(WEED)), rotate90(rotate90(rotate90(WEED)))];
 
 // ---------------------------------------------------------------------------
 // Sky bodies
+//
+// Both discs are rasterised rather than hand-typed, for one reason: they are
+// the only art in the game that has to change. The sun is baked twice — a
+// white-hot noon disc and a red low disc — and the renderer cross-fades between
+// them by elevation. The moon is baked once per phase and walks the phases as
+// the days pass.
+//
+// THE MOON'S DARK SIDE
+// ---------------------------------------------------------------------------
+// The unlit part is not drawn at all. Those pixels are transparent, so whatever
+// the sky happens to be at that height shows through exactly. That is the only
+// way the bite stays invisible against a gradient — a fill matched to one sky
+// colour is wrong everywhere else on the screen, and wrong again a minute later
+// as the day/night clock turns.
 // ---------------------------------------------------------------------------
 
-/**
- * Waxing crescent, 16 x 16. 'b' is the lit face, 'B' the limb falling into
- * shadow, 'y' the maria; every other pixel is transparent, including the whole
- * dark side of the moon. See the note at the top of this file.
- */
-const MOON = [
-  '......BBB.......',
-  '....BBbbB.......',
-  '...Bbbbb........',
-  '..Bbbbb.........',
-  '.Bbbbb..........',
-  '.Bbybb..........',
-  'BBbyyb..........',
-  'BBbybb..........',
-  'BBbbbb..........',
-  '.Bbbbb..........',
-  '.Bbybb..........',
-  '..Bbbbb.........',
-  '..BBbbbb........',
-  '...BBbbB........',
-  '......BBB.......',
-  '................',
+/** Source-pixel size of the sun and moon sprites. */
+export const SKY_BODY_SIZE = 16;
+
+/** How many moon phases are baked. One step per in-game day. */
+export const MOON_PHASE_COUNT = 8;
+
+/** Sun tones: index 0 is the low, red sun; index 1 the high, white one. */
+const SUN_TONES = [
+  { rim: '#a83a12', body: '#e8642a', core: PALETTE.goldLight },
+  { rim: PALETTE.goldDark, body: PALETTE.gold, core: PALETTE.white },
 ];
 
-/** The sun: the same 16 x 16 grid, filled. */
-const SUN = [
-  '......uuu.......',
-  '....uOOOOOu.....',
-  '...uOOOOOOOuu...',
-  '..uOOOOOOOOOuu..',
-  '.uOOOOOOOOOOOu..',
-  '.uOOOOOOOOOOOu..',
-  'uuOOOOOOOOOOOuu.',
-  'uuOOOOOOOOOOOOu.',
-  'uuOOOOOOOOOOOOu.',
-  '.uOOOOOOOOOOOuu.',
-  '.uOOOOOOOOOOOu..',
-  '..uOOOOOOOOOuu..',
-  '..uuOOOOOOOuu...',
-  '...uuuuOOuuu....',
-  '......uuuu......',
-  '................',
-];
+function discPixels(size, plot) {
+  const { canvas, ctx } = makeCanvas(size, size);
+  const c = (size - 1) / 2;
+  const r = size / 2 - 0.5;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x - c;
+      const dy = y - c;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > r) continue;
+      const color = plot(dx, dy, d, r);
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  return canvas;
+}
+
+/** A sun disc: rim, body, and a core highlight sitting up and to the left. */
+function makeSun(tones) {
+  return discPixels(SKY_BODY_SIZE, (dx, dy, d, r) => {
+    if (d > r - 1.1) return tones.rim;
+    const core = Math.sqrt((dx + 1.6) ** 2 + (dy + 1.6) ** 2);
+    return core < r * 0.46 ? tones.core : tones.body;
+  });
+}
+
+/** Source-pixel size of the halo that sits behind a sky body. */
+export const SKY_GLOW_SIZE = 44;
+
+/**
+ * The halo behind the sun or the moon, as pixel art rather than a radial
+ * gradient. The falloff is quantised into six steps, so the glow reads as a set
+ * of concentric bands on the pixel grid instead of a smooth airbrushed blob
+ * that gives away that a canvas gradient was involved.
+ */
+function makeGlow(color, strength) {
+  const { canvas, ctx } = makeCanvas(SKY_GLOW_SIZE, SKY_GLOW_SIZE);
+  const c = (SKY_GLOW_SIZE - 1) / 2;
+  const r = SKY_GLOW_SIZE / 2;
+  const steps = 8;
+  for (let y = 0; y < SKY_GLOW_SIZE; y++) {
+    for (let x = 0; x < SKY_GLOW_SIZE; x++) {
+      const d = Math.sqrt((x - c) ** 2 + (y - c) ** 2) / r;
+      if (d >= 1) continue;
+      // A steep falloff, so the outermost band is almost nothing and the halo
+      // has no visible rim where it stops.
+      const falloff = (1 - d) ** 3.2;
+      const band = Math.round(falloff * steps) / steps;
+      if (band <= 0) continue;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = band * strength;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  ctx.globalAlpha = 1;
+  return canvas;
+}
+
+/**
+ * One moon phase. `age` is 0..1 through the synodic month: 0 new, 0.25 first
+ * quarter (lit on the right), 0.5 full, 0.75 last quarter (lit on the left).
+ * The terminator is the projection of the disc's own circle, so the crescent
+ * thins the way a real one does instead of being a circle cut by a circle.
+ */
+function makeMoonPhase(age) {
+  const cosA = Math.cos(age * Math.PI * 2);
+  const waxing = age <= 0.5;
+  // Three fixed maria, in disc coordinates, so the face never rotates.
+  const maria = [
+    { x: -1.5, y: -2.2, r: 1.9 },
+    { x: 1.8, y: 0.6, r: 2.4 },
+    { x: -2.2, y: 2.4, r: 1.5 },
+  ];
+  return discPixels(SKY_BODY_SIZE, (dx, dy, d, r) => {
+    const w = Math.sqrt(Math.max(0, r * r - dy * dy));
+    const term = w * cosA;
+    const lit = waxing ? dx >= term : dx <= -term;
+    if (!lit) return null;
+    // Limb darkening, and the same soft edge along the terminator.
+    if (d > r - 1 || Math.abs(dx - (waxing ? term : -term)) < 0.9) return PALETTE.boneDark;
+    for (const m of maria) {
+      if (Math.sqrt((dx - m.x) ** 2 + (dy - m.y) ** 2) < m.r) return PALETTE.boneDark;
+    }
+    return PALETTE.bone;
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Buildings — 40 x 34 source pixels, ground line on the last row.
@@ -472,10 +557,18 @@ function makeGroundLayer({ seed, height }) {
   return canvas;
 }
 
-/** Cloud band: soft blobs on transparent background, tileable. */
-function makeCloudLayer({ seed, height }) {
+/**
+ * Cloud band: soft blobs on a transparent background, tileable.
+ *
+ * `tones` is [top, base, underside]. The fair-weather band is white with a
+ * bone underside; the storm band is a bruised grey with a near-black belly and
+ * a bright top edge, so when the weather turns the sky above the player turns
+ * with it instead of the rain simply appearing out of a blue sky.
+ */
+function makeCloudLayer({ seed, height, count = 7, size = [3, 7], tones, sag = 0 }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
+  const [top, base, belly] = tones || [PALETTE.white, PALETTE.white, PALETTE.boneDark];
   const puff = (cx, cy, r, color) => {
     ctx.fillStyle = color;
     for (let y = -r; y <= r; y++) {
@@ -486,13 +579,15 @@ function makeCloudLayer({ seed, height }) {
       if (x + w * 2 > LAYER_TILE_W) ctx.fillRect(x - LAYER_TILE_W, cy + y, w * 2, 1);
     }
   };
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < count; i++) {
     const cx = rng.int(0, LAYER_TILE_W);
     const cy = rng.int(8, height - 8);
-    const r = rng.int(3, 7);
-    puff(cx, cy, r, PALETTE.white);
-    puff(cx + r, cy + 1, Math.max(2, r - 2), PALETTE.white);
-    puff(cx - r, cy + 2, Math.max(2, r - 3), PALETTE.boneDark);
+    const r = rng.int(size[0], size[1]);
+    puff(cx, cy, r, top);
+    puff(cx + r, cy + 1, Math.max(2, r - 2), base);
+    puff(cx - r, cy + 2, Math.max(2, r - 3), belly);
+    // Storm cells hang lower than they are wide: a rain shaft needs a base.
+    if (sag) puff(cx + rng.int(-r, r), cy + r - 1 + sag, Math.max(2, r - 2), belly);
   }
   return canvas;
 }
@@ -513,8 +608,19 @@ export function getEnvironmentSprites() {
     props,
     tumbleweed: TUMBLEWEED.map((rows) => bake({ key: KEY, rows })),
     sky: {
-      moon: bake({ key: KEY, rows: MOON }),
-      sun: bake({ key: KEY, rows: SUN }),
+      /** Low (red) and high (white) sun, cross-faded by elevation. */
+      sun: [makeSun(SUN_TONES[0]), makeSun(SUN_TONES[1])],
+      /**
+       * One canvas per phase. The range stops short of new moon at both ends:
+       * a night with literally no moon in it reads as a missing sprite, not as
+       * astronomy. Phase 4 of 8 is full.
+       */
+      moon: Array.from({ length: MOON_PHASE_COUNT }, (_, i) =>
+        makeMoonPhase(0.12 + (i / MOON_PHASE_COUNT) * 0.76),
+      ),
+      /** Halos: [low sun, high sun] and the moon's colder, tighter one. */
+      glow: [makeGlow('#ff9a4c', 0.55), makeGlow(PALETTE.goldLight, 0.38)],
+      moonGlow: makeGlow('#b9c9ff', 0.26),
     },
     buildings: {
       shop: bakeBuilding(SHOP, SIGNS.shop),
@@ -522,6 +628,18 @@ export function getEnvironmentSprites() {
     },
     layers: {
       clouds: makeCloudLayer({ seed: 7717, height: 48 }),
+      /**
+       * The overcast deck. Not in the manifest — the parallax renderer fades it
+       * in on top of the fair-weather band, by how much weather is out.
+       */
+      storm: makeCloudLayer({
+        seed: 3391,
+        height: 72,
+        count: 11,
+        size: [5, 11],
+        sag: 3,
+        tones: [PALETTE.grey, PALETTE.greyDark, '#2b2b33'],
+      }),
       far: makeRidgeLayer({
         seed: 4242,
         height: 72,
@@ -551,9 +669,6 @@ export function getEnvironmentSprites() {
   };
   return cache;
 }
-
-/** Source-pixel size of the sun and moon sprites. */
-export const SKY_BODY_SIZE = 16;
 
 /**
  * Parallax layer manifest. The renderer walks this array in order (back to

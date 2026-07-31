@@ -30,6 +30,8 @@ import {
   HORSE_TIMING,
   HORSE_FRAME_LIFT,
   RIDER_OFFSET,
+  PLAYER_SIZE,
+  HORSE_SIZE,
 } from '../art/sprites-character.js';
 import { createParallax } from './parallax.js';
 import * as weather from './weather.js';
@@ -167,12 +169,21 @@ export const ExploreScreen = {
         lastView = view;
         const s = view.scale;
         const cameraX = engine.getCameraX();
-        parallax.render(ctx, view, cameraX);
         const gy = parallax.groundY(view);
+        // The rain needs to know where the road is before it can break on it.
+        weather.setGroundLine(gy);
+        // Backdrop only: the light goes on after the traveller is in the scene,
+        // so he stands in the hour of the day instead of in front of it.
+        parallax.renderBackdrop(ctx, view, cameraX);
         const walking = !engine.isPaused();
         const heroX = Math.round(view.w * 0.26);
 
-        if (getState().hasHorse) {
+        // The traveller's shadow, thrown by whatever is up in the sky. A horse
+        // is twice as wide as a man and throws twice the shadow.
+        const mounted = getState().hasHorse;
+        parallax.drawGroundShadow(ctx, view, heroX, (mounted ? HORSE_SIZE.w : PLAYER_SIZE.w) * s, gy);
+
+        if (mounted) {
           const gait = walking ? 'gallop' : 'idle';
           const horseFrames = sprites.horse[gait];
           const hTiming = walking ? HORSE_TIMING.gallop : HORSE_TIMING.idle;
@@ -205,6 +216,8 @@ export const ExploreScreen = {
           ctx.globalAlpha = 1;
         }
 
+        // Everything above is lit together, traveller included.
+        parallax.applyLighting(ctx, view);
         weather.render(ctx, view);
 
         // Starving: a red pulse creeping in from the edges.
