@@ -82,6 +82,9 @@ export async function loadRun(slot, data) {
   }
 
   daynight.restore(data.daynight);
+  // The biome first: it decides which weathers are legal, and `restore` drops
+  // any that this one cannot have.
+  weather.setBiome(getWorld(getState().world).biome);
   weather.restore(data.weather);
   hunger.reset();
   run.engine = createWalkEngine();
@@ -102,7 +105,11 @@ export async function beginWorld(worldId, opts = {}) {
   const world = getWorld(worldId);
   const seed = (getState().seed + worldId * 7919) >>> 0;
   run.engine.loadSegment(worldId, seed);
-  weather.force(worldId === FINAL_WORLD ? 'clear' : 'clear');
+  // Each world hands the weather its biome's table, then opens clear: the
+  // first thing a player sees of a new place should be the place itself, not
+  // whatever squall the last one happened to end on.
+  weather.setBiome(world.biome);
+  weather.force('clear');
   await save();
   if (opts.intro !== false) await go('worldIntro', { worldId, name: world.name, subtitle: world.subtitle });
   else await go('explore');

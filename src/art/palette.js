@@ -27,6 +27,35 @@ export const PALETTE = {
   sandDark: '#9a6b34',
   sandDeep: '#6f4a24',
 
+  // --- Grass / prairie ----------------------------------------------------
+  // A five-step green ramp, exactly parallel to the sand ramp above: the two
+  // biomes are the same picture painted in two families, so anything authored
+  // against sandLight..sandDeep has a green counterpart at the same value.
+  grassLight: '#a9d95f',
+  grass: '#79b544',
+  grassMid: '#559133',
+  grassDark: '#3a6d28',
+  grassDeep: '#24491c',
+  moss: '#4e8a3a',
+  mossLight: '#7fb85a',
+
+  // Turned earth: the trail worn through the grass, and what buildings stand on.
+  soilLight: '#b98f5d',
+  soil: '#8f6a3f',
+  soilDark: '#5f4527',
+  soilDeep: '#3f2d18',
+
+  // The distant hills, drained towards the sky the further back they sit.
+  hillHazeLight: '#b7cfb8',
+  hillHaze: '#8fae97',
+  hillHazeDark: '#6a8b7c',
+
+  // Wildflowers. Three heads only — a meadow with a dozen flower colours in it
+  // reads as confetti, not as a field.
+  bloomPink: '#f08ab0',
+  bloomBlue: '#8fb4ff',
+  bloomCream: '#fdf3cf',
+
   // --- Wood / leather -----------------------------------------------------
   woodLight: '#a3703c',
   wood: '#7b4f27',

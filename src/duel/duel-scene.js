@@ -15,8 +15,12 @@ import * as weather from '../explore/weather.js';
 import { PALETTE } from '../art/palette.js';
 import { drawTextCentered } from '../art/font.js';
 
-export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnabled = true }) {
-  const parallax = createParallax({ seed: (seed ^ (worldId * 31337)) >>> 0, groundRatio: 0.7 });
+export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shakeEnabled = true }) {
+  const parallax = createParallax({
+    seed: (seed ^ (worldId * 31337)) >>> 0,
+    groundRatio: 0.7,
+    biome,
+  });
   parallax.setTint(tint);
   const player = getCharacterSprites().player;
   const shield = getShieldSprites();
@@ -60,6 +64,7 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
        * costs the rain nothing.
        */
       weather.update(dt, getView());
+      parallax.updateAmbient(dt);
       if (fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt);
       if (fx.flash > 0) fx.flash = Math.max(0, fx.flash - dt);
       if (fx.bannerTimer > 0) {
@@ -130,6 +135,9 @@ export function createDuelScene({ worldId, tint, seed, enemySprites, shakeEnable
        * as if it were paint.
        */
       parallax.applyLighting(ctx, view);
+      // Fireflies and the like: lights of their own, so they go on after the
+      // hour of the day has been laid over the fight.
+      parallax.renderAmbient(ctx, view);
 
       // --- bullets ---
       for (const b of fx.bullets) {
