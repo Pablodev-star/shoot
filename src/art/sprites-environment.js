@@ -384,25 +384,35 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
 
   if (!tumbleweedCache) tumbleweedCache = TUMBLEWEED.map((rows) => bake({ key: KEY, rows }));
 
+  /**
+   * Everything a biome declares passes straight through — `id`, `manifest`,
+   * `scatter`, `scatterCell`, `groundFill`, `dust` — so adding a field to a
+   * biome module never needs a matching line in here to carry it. It was a
+   * missing line of exactly that kind that stranded the prairie on the
+   * desert's scatter spacing when `scatterCell` was first added.
+   *
+   * Only the build-time entries are named, and they are pulled OUT of the
+   * pass-through rather than copied into it: two of them are called here and
+   * their results replace them, and the third is only meaningful while the
+   * buildings are being baked.
+   */
+  const { props: propRows, buildLayers, ambient, structureGround, ...declared } = art;
+
   const props = {};
-  for (const [name, rows] of Object.entries(art.props)) props[name] = bake({ key: KEY, rows });
+  for (const [name, rows] of Object.entries(propRows)) props[name] = bake({ key: KEY, rows });
 
   const bundle = {
-    id: art.id,
+    ...declared,
     props,
     tumbleweed: tumbleweedCache,
     sky: getSkyArt(),
     buildings: {
-      shop: bakeBuilding(SHOP, SIGNS.shop, art.structureGround),
-      inn: bakeBuilding(INN, SIGNS.inn, art.structureGround),
+      shop: bakeBuilding(SHOP, SIGNS.shop, structureGround),
+      inn: bakeBuilding(INN, SIGNS.inn, structureGround),
     },
-    layers: { ...art.buildLayers(), storm: getStormLayer() },
-    manifest: art.manifest,
-    scatter: art.scatter,
-    groundFill: art.groundFill,
-    dust: art.dust,
+    layers: { ...buildLayers(), storm: getStormLayer() },
     /** Factory for the biome's drifting life, or null if it has none. */
-    createAmbient: art.ambient,
+    createAmbient: ambient,
   };
   bundles.set(art.id, bundle);
   return bundle;
