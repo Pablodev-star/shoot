@@ -48,11 +48,13 @@ import { PALETTE } from '../art/palette.js';
 import { drawTextCentered, measureText, GLYPH_H } from '../art/font.js';
 import { bakeMapBackground, getMapMarkers, MARKER_SIZE } from '../art/map-art.js';
 import { getState } from '../game/player.js';
+import { getEngine } from '../game/run.js';
 import { getWorld } from '../game/worlds.js';
 import { getBiome } from '../game/biomes.js';
 import { HORSE_TIME_MUL } from '../game/progression.js';
 import { effectiveDistance, ENCOUNTER_LABELS } from '../explore/encounters.js';
 import { closeButton, iconButton } from './widgets.js';
+import { toast } from './toast.js';
 
 // --- Layout, in map units (one map unit is one source pixel) ----------------
 /**
@@ -661,6 +663,24 @@ function drawPlayer(ctx, view, model, travelled, time) {
   ctx.restore();
 
   drawLabel(ctx, 'You', sx, sy + 16, 1);
+}
+
+/**
+ * Open the map for the run in progress.
+ *
+ * The saddlebag can be opened from four places, and "Open" on the Map has to
+ * mean the same thing in all of them. A screen that is standing STILL on the
+ * road — the shop, the inn — has no walk to hold, so this is everything it
+ * needs. The exploration screen wires `openTrailMap` up itself because it also
+ * has to pause and resume around the panel, and the duel does not offer the
+ * Map at all: you are being shot at.
+ *
+ * @returns {{close: () => void}|null}
+ */
+export function openTrailMapForRun() {
+  const panel = openTrailMap({ engine: getEngine() });
+  if (!panel) toast('The road ahead is blank', 'bad');
+  return panel;
 }
 
 /** One entry of the legend: the marker itself, at half size, and its name. */

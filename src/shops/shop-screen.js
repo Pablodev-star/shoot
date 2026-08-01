@@ -19,6 +19,7 @@ import { getState, addItem, spendGold, canAfford, canHold } from '../game/player
 import { generateStock, shopSeed, DISCOUNT_RATE } from './shop.js';
 import { finishEncounter } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
+import { openTrailMapForRun } from '../ui/map-panel.js';
 import { icon, rarityChip } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { toast } from '../ui/toast.js';
@@ -129,7 +130,15 @@ export const ShopScreen = {
       ]),
       el('div.screen-footer', {}, [
         el('button.btn.btn--ghost', {
-          onclick: () => openInventory({ context: 'shop' }),
+          // The Map opens here too, and this is the counter it matters most at:
+          // "food or a potion" is a different question when the map says the
+          // next two things on the road are a duel and the boss.
+          onclick: () => openInventory({
+            context: 'shop',
+            onUse: (id, result) => {
+              if (result.effect === 'map') openTrailMapForRun();
+            },
+          }),
         }, [icon('shopTag', 1.1), 'Saddlebag']),
         el('button.btn.btn--primary', { onclick: () => finishEncounter() }, ['Back to the road']),
       ]),
