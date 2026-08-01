@@ -2,7 +2,7 @@
  * SHOOT! — Inventory overlay.
  *
  * One component, three contexts:
- *   'walk'  — eat, heal, read the Map, sell anything
+ *   'walk'  — eat, heal, open the Map, sell anything
  *   'shop'  — the same, with selling to hand
  *   'duel'  — only duel-legal items are actionable
  *
@@ -80,7 +80,7 @@ export function openInventory(opts = {}) {
   function actionLabel(item) {
     if (item.food) return 'Eat';
     if (item.heal) return 'Use';
-    if (item.context === 'utility') return 'Read';
+    if (item.context === 'utility') return 'Open';
     return 'Throw';
   }
 

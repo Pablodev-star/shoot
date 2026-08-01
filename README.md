@@ -77,6 +77,11 @@ There is no level select. You walk, and the road decides what you meet.
   everything).
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
+- **The trail map** is a drawn map of the road you are on, not a list: the
+  ground of the biome you are walking, the road winding through it, and every
+  duel, shop, inn and boss marked on it, with your own position as a blue
+  circle. Drag it, zoom it, and open it as often as you like — it is bought
+  once and kept, not spent per look. It still shows no numbers.
 - **Every enemy is somebody.** Twenty-seven hand-drawn archetypes — the
   Sombrero Outlaw, the Bone Marshal, the Reed Wraith, the Ash Widow, the Iron
   Kiln, the Star Reaver — each with its own head, torso, palette and set of
@@ -129,6 +134,8 @@ src/
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
+    map-art.js            the trail map: ground, markers, road, compass
+  ui/                    shared widgets, saddlebag, trail map, toasts, dialogs
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens

@@ -307,10 +307,10 @@ export function useItem(id, opts = {}) {
   }
 
   if (item.context === 'utility') {
-    // Utility items are spent on the information they give. The caller reads
-    // the encounter list and shows it; the copy is consumed here so one Map
-    // cannot reveal every stretch of road forever.
-    removeItem(id, 1);
+    // NOT consumed. A utility item is a tool you own — the Map opens the trail
+    // map and stays in the bag. It used to spend a copy per look, which taught
+    // players to carry it and never open it; a tool nobody uses is worse than
+    // no tool. The caller draws whatever it shows.
     return { ok: true, effect: 'map' };
   }
 

@@ -121,15 +121,25 @@ export const ITEMS = {
   },
 
   // --- Utility -------------------------------------------------------------
+  /**
+   * The Map is a TOOL, NOT A CHARGE.
+   *
+   * It used to be a five-stack consumable that spent one copy to print three
+   * words in a toast. That made it something you hoarded and never used: the
+   * information was worth less than the copy it cost, so the correct play was
+   * always to keep it. Now it is bought once, kept forever, and opened as often
+   * as you like — see `src/ui/map-panel.js`. The stack is 1 because a second
+   * copy of a permanent tool does nothing, and the price carries the change.
+   */
   map: {
     id: 'map',
     name: 'Map',
     icon: 'map',
     rarity: 'rare',
-    basePrice: 140,
+    basePrice: 180,
     context: 'utility',
-    stack: 5,
-    desc: 'Reveals what is waiting further down this stretch of road.',
+    stack: 1,
+    desc: 'Opens the trail map: every duel, shop, inn and boss on the road ahead. Never runs out.',
   },
 
   // --- Special -------------------------------------------------------------
