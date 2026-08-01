@@ -35,6 +35,16 @@ The rule set has not changed since the first prototype:
 Both duellists shoot in the same turn → both lose a life. First to zero lives
 loses. Lives are red diamonds, and always will be.
 
+A round is played out rather than announced. Both fighters go for their guns —
+hand to the holster, barrel out of leather, arm up, levelled — and only then
+does anyone fire: a muzzle flash off the barrel, a tracer crossing the road,
+the case out of the cylinder, and powder smoke left hanging. A life is lost
+when the round arrives, not when the gun appears.
+
+Poison, dynamite, bullet steal and mind control are shown as pixel icons on the
+fighter they belong to, never as printed names — an ability lights its own icon
+when it goes off, and a timed one carries its countdown.
+
 ## Story mode
 
 There is no level select. You walk, and the road decides what you meet.
@@ -50,7 +60,9 @@ There is no level select. You walk, and the road decides what you meet.
   and inns, then shuffles their order and spacing. An inn always sits just past
   a shop.
 - **Hunger** drains while you travel. At zero you lose a life every 12 seconds,
-  so food is a real purchase, not a nicety.
+  so food is a real purchase, not a nicety. A sandstorm burns it half again as
+  fast, and the meter says so — the multiplier sits next to the label and the
+  bar looks scoured, so the change is never something you find out by dying.
 - **A horse** roughly halves travel time.
 - **Day and night** run on a continuous clock, and the **weather** turns —
   overcast, rain, sandstorm, fog. Both reach into combat: rain misfires, and a
@@ -65,7 +77,13 @@ There is no level select. You walk, and the road decides what you meet.
   everything).
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
-- **Five worlds plus the Galaxy**, where a two-phase boss is waiting.
+- **Every enemy is somebody.** Twenty-seven hand-drawn archetypes — the
+  Sombrero Outlaw, the Bone Marshal, the Reed Wraith, the Ash Widow, the Iron
+  Kiln, the Star Reaver — each with its own head, torso, palette and set of
+  names, and each world drawing from its own roster. The name always describes
+  the sprite, because the names were written from the art.
+- **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
+  phase two is a different sprite, not a refilled bar.
 
 Three save slots. Progress writes after every encounter.
 
@@ -101,7 +119,11 @@ src/
   art/                   every sprite, drawn from character maps at load time
     palette.js            the one palette the whole game uses
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
-    sprites-character.js  player, rider and horse animations (Block 2a)
+    sprites-character.js  the fighter rig: player, rider, horse, the draw and
+                          the revolver that comes out of it (Block 2a)
+    sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
+                          composed on the rig
+    sprites-fx.js         muzzle flash, powder smoke, spent brass, impact
     env-kit.js            the colour key + the shared layer generators
     biomes/               one file per landscape: props, layers, ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
@@ -159,6 +181,22 @@ world never rebalances it.
 Nothing else needs editing — the parallax renderer holds no landscape
 constants. Worlds 3 to 5 are named for biomes that are not drawn yet and say so
 in a comment; each is a one-line change once its art exists.
+
+## Adding an enemy
+
+Enemies are composed, not drawn from scratch. One entry in `ARCHETYPES` in
+`src/art/sprites-enemies.js` is a whole new opponent:
+
+1. Pick or write a `head` (11 rows) and a `torso` (7 rows) in the same file.
+   Custom `legs` are optional — a skirt and a trailing hem already exist.
+2. Give it a palette and a `look`: the one line the sprite is supposed to say.
+3. Give it `names` that all describe that look. If a name and the sprite ever
+   disagree, the sprite is right and the name is a bug.
+4. Add its id to a world's `enemy.roster` in `src/game/worlds.js`, or to a
+   boss's `archetype`.
+
+It is animated the moment it exists: the walk, the four-frame draw, the recoil
+and the hit stagger all come from the rig in `src/art/sprites-character.js`.
 
 ## Adding audio
 

@@ -18,7 +18,8 @@ import { el } from '../core/dom.js';
 import { EVENTS, on } from '../core/events.js';
 import { getState, expProgress } from '../game/player.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
-import { HUNGER_MAX } from '../game/progression.js';
+import { HUNGER_MAX, HUNGER_DRAIN_SANDSTORM_MUL } from '../game/progression.js';
+import { getWeatherState } from '../explore/weather.js';
 import { livesRow, updateLivesRow, meter, goldChip, uiIcon } from './widgets.js';
 
 /**
@@ -73,10 +74,31 @@ export function trailBand(opts = {}) {
   ];
 
   if (hunger) {
+    /**
+     * A sandstorm eats your rations half again as fast. The meter says so
+     * rather than leaving the player to notice that the bar is emptying while
+     * the sky happens to be orange: a badge on the label, and a bar that looks
+     * scoured — see `.bar.is-sandblasted`.
+     */
+    const syncWeatherFlag = () => {
+      const sandstorm = getWeatherState().id === 'sandstorm';
+      hunger.setFlag(
+        sandstorm
+          ? {
+              text: `×${HUNGER_DRAIN_SANDSTORM_MUL}`,
+              tip: 'The sandstorm is burning your rations faster',
+              state: 'is-sandblasted',
+            }
+          : null,
+      );
+    };
+    syncWeatherFlag();
+
     unsubs.push(
       on(EVENTS.HUNGER_CHANGED, ({ hunger: h }) =>
         hunger.set(h / HUNGER_MAX, `${Math.round(h)}%`),
       ),
+      on(EVENTS.WEATHER_CHANGED, syncWeatherFlag),
     );
   }
 

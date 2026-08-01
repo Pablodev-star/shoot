@@ -50,8 +50,9 @@
   border-radius: 1px;
 }
 
-/* The hunger meter lives in the band, sized to itself. */
-.trailband .meter { max-width: 190px; flex: 0 1 190px; }
+/* The hunger meter lives in the band, sized to itself. It carries a rate
+   badge in bad weather, so it gets the width for one. */
+.trailband .meter { max-width: 214px; flex: 0 1 214px; }
 
 .trailband-actions { display: flex; align-items: center; gap: var(--sp-2); }
 
@@ -477,6 +478,68 @@
 .fighter-card.is-enemy .fighter-name {
   color: var(--red-light);
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* --- Effects -------------------------------------------------------------
+   Poison, dynamite, bullet steal, mind control, the vest, the diadem. Every
+   one of them is a 16px icon on a plate, never a printed name: the duel screen
+   already asks the player to read a callout and three buttons, and an ability
+   is something they should recognise, not parse. The name lives in the tooltip
+   and in aria-label. */
+
+.effect-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.fighter-card.is-enemy .effect-row { justify-content: flex-end; }
+
+.effect-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  line-height: 0;
+}
+
+/* An ability the enemy *has*. Blue, like everything rare. */
+.effect-badge { border-color: var(--blue-dark); }
+/* An effect currently working on this fighter. */
+.effect-badge.is-active { border-color: var(--green); box-shadow: 0 0 8px rgba(122, 212, 106, 0.35); }
+.effect-badge.is-good { border-color: var(--gold-dark); }
+.effect-badge.is-blocked { border-color: var(--gold-light); }
+
+/* The countdown on a timed effect — poison has three rounds to run. */
+.effect-count {
+  position: absolute;
+  right: -4px;
+  bottom: -5px;
+  min-width: 14px;
+  padding: 0 3px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  color: #10240c;
+  background: var(--green-light);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+}
+
+/* The moment an ability actually goes off. */
+.effect-badge.is-firing { animation: effect-fire 620ms var(--ease-out) both; }
+
+@keyframes effect-fire {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 226, 122, 0.9); }
+  35% { transform: scale(1.35); box-shadow: 0 0 14px 4px rgba(255, 226, 122, 0.75); }
+  100% { transform: scale(1); box-shadow: inset 0 1px 0 var(--edge-highlight); }
 }
 
 /* --- The cylinder --------------------------------------------------------

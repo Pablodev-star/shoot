@@ -22,9 +22,11 @@
  *   PLAYER.walk   — 4 frames @ 130ms  contact / passing / contact / passing,
  *                   the classic 4-pose cycle, with a 1px body bob so the
  *                   passing poses sit high and the contacts sit low.
- *   PLAYER.duel   — 3 frames @ 160ms  hand on the holster, revolver clearing
- *                   leather, revolver levelled. The holster empties as the
- *                   gun comes out.
+ *   PLAYER.aim    — 4 frames @ 130ms  hand on the holster, revolver clearing
+ *                   leather, arm rising, arm levelled. The holster empties as
+ *                   the gun comes out.
+ *   PLAYER.fire   — 3 frames @ 60/110/90ms  the shot: the gun driven back into
+ *                   the hand, the muzzle kicked up, then dropping back on line.
  *   PLAYER.hit    — 2 frames @ 120ms  knocked back a pixel and lit up, then a
  *                   stagger onto the back foot.
  *   RIDER.ride    — 2 frames @ 200ms  seated upper body + a leg in the stirrup.
@@ -39,10 +41,30 @@
  * carries no binary assets. Limbs are stamped onto the body rather than
  * re-typed per frame: a leg pose is drawn once and placed four times, which is
  * what keeps a 4-beat gait consistent from frame to frame.
+ *
+ * THE REVOLVER IS NOT PART OF THE BODY
+ * ---------------------------------------------------------------------------
+ * It used to be: three grey pixels typed into the last column of the duel
+ * poses, because that is all a 16-wide canvas has room for once a man is
+ * standing in it. A gun drawn that way can never be more than a smudge, can
+ * never leave the silhouette, and gives the muzzle flash nowhere to be.
+ *
+ * The gun is now its own sprite (see REVOLVERS below) with a grip anchor and a
+ * muzzle anchor, drawn over the fighter at the hand pixel of whichever pose is
+ * up. That buys three things at once: a revolver with a barrel, a cylinder and
+ * a hammer; a muzzle the flash can be pinned to exactly; and one place to
+ * change if a fighter should ever hold something else.
+ *
+ * ONE RIG, EVERY FIGHTER
+ * ---------------------------------------------------------------------------
+ * `composeFighter()` takes a head, a torso and a set of legs and returns the
+ * whole animation set. The player is what you get when you pass nothing; the
+ * enemies in src/art/sprites-enemies.js are what you get when you pass their
+ * parts. Nobody re-implements a walk cycle to put a different hat on a man.
  */
 
 import { PALETTE } from './palette.js';
-import { bake } from './pixel.js';
+import { bake, makeCanvas } from './pixel.js';
 
 // Shared color key for every character-side sprite.
 const KEY = {
@@ -90,7 +112,7 @@ const KEY = {
  * Draw `art` onto a copy of `rows` at (x, y).
  * '.' in the stamp leaves whatever is underneath; ' ' punches a hole.
  */
-function stamp(rows, art, x, y) {
+export function stamp(rows, art, x, y) {
   const out = rows.map((r) => r.split(''));
   for (let dy = 0; dy < art.length; dy++) {
     const ty = y + dy;
@@ -115,7 +137,7 @@ function shiftX(rows, dx) {
 }
 
 /** Swap palette characters — used for the hit flash and the empty holster. */
-function recolor(rows, map) {
+export function recolor(rows, map) {
   return rows.map((r) => r.replace(/./g, (c) => map[c] ?? c));
 }
 
@@ -125,10 +147,15 @@ function recolor(rows, map) {
 //   rows  0..10  hat, face, neckerchief
 //   rows 11..17  serape and gun belt
 //   rows 18..23  legs and boots
+//
+// Every fighter in the game — the player and all of src/art/sprites-enemies.js
+// — is built on exactly this skeleton, so a head is interchangeable with a
+// head and a torso with a torso. `composeFighter` at the bottom of the file is
+// the only thing that knows how the three stack up.
 // ---------------------------------------------------------------------------
 
 /** Hat, face and neckerchief. Identical in every ground animation. */
-const HEAD = [
+export const HEAD = [
   '................',
   '.....kkkkk......',
   '....kHHHHHk.....',
@@ -147,7 +174,7 @@ const HEAD = [
  * reading as one red block at 16px, and the two skin pixels on row 15 are the
  * hands showing under the hem.
  */
-const TORSO = [
+export const TORSO = [
   '...kqqqqqqqqk...',
   '..kqppppppppqk..',
   '..kpwwwwwwwwpk..',
@@ -157,13 +184,14 @@ const TORSO = [
   '...kTttllttTk...',
 ];
 
-/** The serape flaring out as the body swings through a stride. */
-const TORSO_FLARE = stamp(TORSO, ['..kPPPPPPPPPPk..'], 0, 5);
+/**
+ * Holstered revolver on the leading hip: butt and hammer above the leather,
+ * the pouch below it. Removed from the moment the gun clears leather, so the
+ * hip is empty for exactly as long as the gun is in the hand.
+ */
+export const HOLSTER = ['Gk', 'Tt', 'Tt'];
 
-/** Holstered revolver on the leading hip; removed once the gun is drawn. */
-const HOLSTER = ['G', 'T', 'T'];
-
-const LEGS = {
+export const LEGS = {
   stand: [
     '...kbbbbbbbbk...',
     '...kbbk..kbbk...',
@@ -215,58 +243,171 @@ function ground(upper, legs) {
   return [...upper, ...legs];
 }
 
-const UPPER = [...HEAD, ...TORSO];
-const UPPER_FLARE = [...HEAD, ...TORSO_FLARE];
-const UPPER_LOW = settle(UPPER);
-const UPPER_LOW_FLARE = settle(UPPER_FLARE);
+// ---------------------------------------------------------------------------
+// THE DRAW
+//
+// Six arm poses, each one a stamp laid over whatever torso the fighter is
+// wearing, and each one saying where the gun hand ends up. Because they are
+// stamps rather than whole frames, a skeleton and a gunslinger draw with the
+// same timing and the same reach without either of them being redrawn.
+//
+// The stamps are deliberately NARROW: they only paint the three or four
+// columns the arm actually occupies, and leave the rest of the torso row
+// alone. A stamp that rewrote the whole row would work for the player's
+// serape and quietly flatten every ribcage, lapel and chest lamp behind it.
+//
+//   `at`   the fighter row the stamp starts on
+//   `hand` the pixel the grip sits in, in fighter space
+//   `gun`  which revolver sprite is in that hand, if any
+// ---------------------------------------------------------------------------
 
-/** Everything but the duel poses wears the revolver on its hip. */
-const holstered = (rows) => stamp(rows, HOLSTER, 13, 17);
-
-const PLAYER_FRAMES = {
-  idle: [
-    holstered(ground(UPPER, LEGS.stand)),
-    holstered(ground(UPPER_LOW, LEGS.stand)),
-    holstered(ground(UPPER, LEGS.stand)),
-    holstered(ground(UPPER_LOW_FLARE, LEGS.stand)),
-  ],
+const DRAW_POSES = {
+  /** Weight settled, gun hand hanging over the holster. Nothing drawn yet. */
+  ready: {
+    at: 16,
+    rows: ['............ksk.'],
+    holstered: true,
+    gun: null,
+  },
+  /** Barrel out of leather, still pointed at the road. Holster empty now. */
+  clear: {
+    at: 15,
+    rows: ['............ksk.'],
+    holstered: false,
+    gun: { art: 'raised', hand: { x: 13, y: 15 } },
+  },
+  /** Arm swinging up, gun coming round with it. */
+  rising: {
+    at: 13,
+    rows: ['.............kss', '.............skk'],
+    holstered: false,
+    gun: { art: 'raised', hand: { x: 14, y: 13 } },
+  },
+  /** Levelled: arm dead flat, barrel on the rival's chest. */
+  level: {
+    at: 14,
+    rows: ['.............ss.', '............kkk.'],
+    holstered: false,
+    gun: { art: 'level', hand: { x: 14, y: 14 } },
+  },
   /**
-   * Contacts sit a pixel low (weight on the planted foot) and the passing
-   * poses ride high, which is the whole trick to a walk that does not look
-   * like a sprite sliding along the ground.
+   * The instant of the shot. The arm has not moved yet — it cannot, the bullet
+   * is already gone — but the gun is driven back a pixel into the hand. One
+   * pixel of compression before the kick is what stops the recoil reading as
+   * the arm deciding to point somewhere else.
    */
-  walk: [
-    holstered(ground(UPPER_LOW_FLARE, LEGS.contactA)),
-    holstered(ground(UPPER, LEGS.passingA)),
-    holstered(ground(UPPER_LOW_FLARE, LEGS.contactB)),
-    holstered(ground(UPPER, LEGS.passingB)),
-  ],
-  duel: [
-    // Hand dropped onto the holster, gun still in leather.
-    holstered(
-      stamp(ground(UPPER, LEGS.stand), ['..kspPPPPPPPpk..', '...kPPPPPPPPsk..'], 0, 15),
-    ),
-    // Arm up, barrel clearing leather. The holster is empty from here on.
-    stamp(
-      ground(UPPER, LEGS.stand),
-      ['..kpwwwwwwwwpkG.', '..kpPPPPPPPPpsgk', '..kspPPPPPPpk...'],
-      0,
-      13,
-    ),
-    // Levelled, dead flat, muzzle at the sprite edge where the flash lands.
-    stamp(
-      ground(UPPER, LEGS.stand),
-      ['..kpPPPPPPPPsGgg', '..kspPPPPPPpk...'],
-      0,
-      14,
-    ),
-  ],
-  hit: [
-    // Knocked back a pixel and washed out by the impact.
-    shiftX(recolor(holstered(ground(UPPER, LEGS.stand)), { P: 'p', p: 'q', q: 'w' }), -1),
-    // Stagger: weight thrown onto the trailing foot.
-    holstered(ground(UPPER_LOW, LEGS.contactB)),
-  ],
+  recoil: {
+    at: 14,
+    rows: ['.............ss.', '............kkk.'],
+    holstered: false,
+    gun: { art: 'level', hand: { x: 13, y: 14 } },
+  },
+  /** The kick: muzzle thrown up and back over the shoulder line. */
+  kicked: {
+    at: 12,
+    rows: ['..............ss', '.............sk.'],
+    holstered: false,
+    gun: { art: 'raised', hand: { x: 14, y: 12 } },
+  },
+};
+
+/** The order the poses play in. `fire` runs once and hands back to `level`. */
+const AIM_SEQUENCE = ['ready', 'clear', 'rising', 'level'];
+const FIRE_SEQUENCE = ['recoil', 'kicked', 'level'];
+
+/** Milliseconds each frame of the shot is held. See CHARACTER_TIMING.fire. */
+export const FIRE_FRAME_MS = [60, 110, 90];
+
+// ---------------------------------------------------------------------------
+// THE REVOLVER
+//
+// Two sprites, drawn over the fighter rather than into it: one levelled, one
+// raised (used both on the way out of leather and on the way up off the kick).
+// Each carries the two anchors the scene needs — `hand`, the pixel the grip is
+// held by, and `muzzle`, where the flash and the smoke come out.
+// ---------------------------------------------------------------------------
+
+const REVOLVERS = {
+  /**
+   * Levelled. Hammer back over the frame, a brass round showing in the
+   * cylinder, five pixels of barrel and a grip falling away under the fist.
+   *
+   * The two columns left of the grip are deliberately empty from the hand row
+   * down: that is where the fist is, and a backstrap drawn across it turns the
+   * gunslinger's forearm into a grey bar with no hand on the end of it.
+   */
+  level: {
+    hand: { x: 2, y: 5 },
+    muzzle: { x: 9, y: 3 },
+    rows: [
+      '..kk.....',
+      '.kggk....',
+      'kkggkkkkk',
+      'kgogggggk',
+      'kgGGGGGGk',
+      '..Ttkkkk.',
+      '.kTTk....',
+      '..kTk....',
+    ],
+  },
+  /** Coming out of leather, and coming down off the kick: the same arc. */
+  raised: {
+    hand: { x: 2, y: 6 },
+    muzzle: { x: 7, y: -1 },
+    rows: [
+      '......kk.',
+      '.....kggk',
+      '....kggk.',
+      '...kggk..',
+      '..kggk...',
+      '.kgok....',
+      '.kTtk....',
+      '..kTk....',
+    ],
+  },
+};
+
+/**
+ * Gun metal, for fighters who should not be carrying the same blued steel as
+ * everyone else. The key is otherwise the fighter's own.
+ */
+export const GUN_FINISHES = {
+  steel: {},
+  brass: { g: PALETTE.gold, G: PALETTE.goldDark, o: PALETTE.bone },
+  bone: { g: PALETTE.bone, G: PALETTE.boneDark, o: PALETTE.red, T: PALETTE.greyDark, t: PALETTE.grey },
+  void: { g: PALETTE.purple, G: PALETTE.purpleDark, o: PALETTE.star, T: PALETTE.cosmic, t: PALETTE.purpleDark },
+};
+
+const GUN_KEY = { ...KEY, o: PALETTE.goldLight };
+
+const gunCache = new Map();
+
+/**
+ * Baked revolver art for one finish.
+ * @returns {Record<'level'|'raised', {sprite: HTMLCanvasElement, hand: {x,y}, muzzle: {x,y}}>}
+ */
+export function getRevolverSprites(finish = 'steel') {
+  if (gunCache.has(finish)) return gunCache.get(finish);
+  const key = { ...GUN_KEY, ...(GUN_FINISHES[finish] || {}) };
+  const out = {};
+  for (const [name, def] of Object.entries(REVOLVERS)) {
+    out[name] = { sprite: bake({ key, rows: def.rows }), hand: def.hand, muzzle: def.muzzle };
+  }
+  gunCache.set(finish, out);
+  return out;
+}
+
+/**
+ * Where the gun is, for every frame of every pose list a fighter can be in.
+ * The renderer looks a pose up by name and frame index; nothing else needs to
+ * know that a revolver is a separate sprite at all.
+ */
+export const GUN_TRACK = {
+  idle: [null, null, null, null],
+  walk: [null, null, null, null],
+  hit: [null, null],
+  aim: AIM_SEQUENCE.map((name) => DRAW_POSES[name].gun),
+  fire: FIRE_SEQUENCE.map((name) => DRAW_POSES[name].gun),
 };
 
 // ---------------------------------------------------------------------------
@@ -515,11 +656,107 @@ function bakeSet(frames, key = KEY) {
   return out;
 }
 
+/**
+ * Build one fighter's whole animation set from a head, a torso and a leg set.
+ *
+ * This is the rig. The player passes nothing and gets the gunslinger; every
+ * enemy archetype passes its own parts and gets the same five animations, at
+ * the same timings, holding the same revolver. That is deliberate: a skeleton
+ * that draws on a different beat from the man it is shooting at is a skeleton
+ * the player cannot read.
+ *
+ * @param {object} [parts]
+ * @param {string[]} [parts.head]   11 rows
+ * @param {string[]} [parts.torso]  7 rows
+ * @param {string[]} [parts.flare]  7 rows — the torso mid-stride; defaults to
+ *   the torso with its hem kicked out one row
+ * @param {object}  [parts.legs]    a LEGS-shaped set of 6-row poses
+ * @param {string[]|null} [parts.holster] hip art, or null for a fighter who
+ *   carries no holster (the gun simply appears in the hand)
+ * @param {Record<string, string|null>} [parts.key] palette overrides
+ */
+export function composeFighter(parts = {}) {
+  const head = parts.head || HEAD;
+  const torso = parts.torso || TORSO;
+  const flare = parts.flare || stamp(torso, ['..kPPPPPPPPPPk..'], 0, 5);
+  const legs = parts.legs || LEGS;
+  const holsterArt = parts.holster === undefined ? HOLSTER : parts.holster;
+  const key = parts.key ? { ...KEY, ...parts.key } : KEY;
+
+  const upper = [...head, ...torso];
+  const upperFlare = [...head, ...flare];
+  const low = settle(upper);
+  const lowFlare = settle(upperFlare);
+
+  const holstered = (rows) => (holsterArt ? stamp(rows, holsterArt, 13, 17) : rows);
+  const standing = (up) => ground(up, legs.stand);
+
+  /** One frame of the draw: the arm stamp over a standing body. */
+  const drawPose = (name) => {
+    const pose = DRAW_POSES[name];
+    const body = stamp(standing(upper), pose.rows, 0, pose.at);
+    return pose.holstered ? holstered(body) : body;
+  };
+
+  const frames = {
+    idle: [
+      holstered(standing(upper)),
+      holstered(standing(low)),
+      holstered(standing(upper)),
+      holstered(ground(lowFlare, legs.stand)),
+    ],
+    /**
+     * Contacts sit a pixel low (weight on the planted foot) and the passing
+     * poses ride high, which is the whole trick to a walk that does not look
+     * like a sprite sliding along the ground.
+     */
+    walk: [
+      holstered(ground(lowFlare, legs.contactA)),
+      holstered(ground(upper, legs.passingA)),
+      holstered(ground(lowFlare, legs.contactB)),
+      holstered(ground(upper, legs.passingB)),
+    ],
+    aim: AIM_SEQUENCE.map(drawPose),
+    fire: FIRE_SEQUENCE.map(drawPose),
+    hit: [
+      // Knocked back a pixel and washed out by the impact.
+      shiftX(recolor(holstered(standing(upper)), { P: 'p', p: 'q', q: 'w' }), -1),
+      // Stagger: weight thrown onto the trailing foot.
+      holstered(ground(low, legs.contactB)),
+    ],
+  };
+
+  const baked = bakeSet(frames, key);
+  baked.finish = parts.gun || 'steel';
+  baked.portrait = makePortrait(baked, baked.finish);
+  return baked;
+}
+
+/**
+ * A single composed still — fighter levelled, revolver in hand — for the parts
+ * of the interface that want a picture of someone rather than an animation.
+ * The gun lives in its own sprite now, so a portrait has to be assembled; a
+ * raw pose frame would show a man aiming an empty fist.
+ */
+function makePortrait(set, finish) {
+  const pose = DRAW_POSES.level;
+  const gun = getRevolverSprites(finish)[pose.gun.art];
+  const body = set.aim[AIM_SEQUENCE.indexOf('level')];
+  const gx = pose.gun.hand.x - gun.hand.x;
+  const gy = pose.gun.hand.y - gun.hand.y;
+  const width = Math.max(body.width, gx + gun.sprite.width);
+  const { canvas, ctx } = makeCanvas(width, body.height);
+  ctx.drawImage(body, 0, 0);
+  ctx.drawImage(gun.sprite, gx, gy);
+  return canvas;
+}
+
 /** Milliseconds per frame for each animation. */
 export const CHARACTER_TIMING = {
   idle: 220,
   walk: 130,
-  duel: 160,
+  /** The draw. Fast: a slow draw is a dead gunslinger. */
+  aim: 130,
   hit: 120,
   ride: 200,
 };
@@ -548,18 +785,9 @@ let cache = null;
 export function getCharacterSprites() {
   if (cache) return cache;
   cache = {
-    player: bakeSet(PLAYER_FRAMES),
+    player: composeFighter(),
     rider: bakeSet(RIDER_FRAMES),
     horse: bakeSet(HORSE_FRAMES),
   };
   return cache;
-}
-
-/**
- * Recolor helper — enemies reuse the player rig with a different serape so the
- * duel screen can show a distinct silhouette without new art.
- */
-export function bakeEnemyVariant(ponchoLight, poncho, ponchoDark, hat = PALETTE.woodDeep) {
-  const key = { ...KEY, p: poncho, P: ponchoDark, q: ponchoLight, h: hat, H: PALETTE.woodDark };
-  return bakeSet(PLAYER_FRAMES, key);
 }

@@ -91,6 +91,14 @@ export const HUNGER_MAX = 100;
 export const HUNGER_DRAIN_PER_SEC = 0.85;
 /** Riding covers ground faster but burns hunger slightly faster too. */
 export const HUNGER_DRAIN_HORSE_MUL = 1.15;
+/**
+ * Walking into a sandstorm costs you. Half again as much hunger per second:
+ * you are leaning into the wind, breathing through a kerchief and covering
+ * less ground for the same effort. This is the only weather that reaches the
+ * player's body rather than only the duel, so the meter says so out loud —
+ * see the sand-blasted state in src/ui/statusbar.js.
+ */
+export const HUNGER_DRAIN_SANDSTORM_MUL = 1.5;
 /** Once hunger hits zero, one life is lost every this many milliseconds. */
 export const STARVATION_INTERVAL_MS = 12000;
 

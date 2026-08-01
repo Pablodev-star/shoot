@@ -8,15 +8,26 @@
  * At zero the player starts starving: one life is lost every
  * STARVATION_INTERVAL_MS — progressive, never instant, so there is always time
  * to open the inventory and eat something.
+ *
+ * WHAT MAKES IT DRAIN FASTER
+ * ---------------------------------------------------------------------------
+ * Two things multiply the base rate: the horse (you cover more ground, so you
+ * burn more), and a sandstorm (you are fighting the wind for every step). Both
+ * live in `drainMultiplier()` rather than being inlined in the update, because
+ * the travel band draws that number — a hunger bar that quietly empties half
+ * again as fast is a difficulty spike the player can only find out about by
+ * dying of it.
  */
 
 import { EVENTS, emit } from '../core/events.js';
 import {
   HUNGER_DRAIN_PER_SEC,
   HUNGER_DRAIN_HORSE_MUL,
+  HUNGER_DRAIN_SANDSTORM_MUL,
   STARVATION_INTERVAL_MS,
 } from '../game/progression.js';
 import { getState, setHunger, loseLife } from '../game/player.js';
+import { getWeatherState } from './weather.js';
 import { toast } from '../ui/toast.js';
 
 const state = { paused: true, starveTimer: 0 };
@@ -31,6 +42,21 @@ export function reset() {
 }
 
 /**
+ * Everything currently multiplying the base drain rate.
+ *
+ * @returns {{total: number, horse: boolean, sandstorm: boolean}}
+ */
+export function drainMultiplier() {
+  const horse = !!getState().hasHorse;
+  const sandstorm = getWeatherState().id === 'sandstorm';
+  return {
+    horse,
+    sandstorm,
+    total: (horse ? HUNGER_DRAIN_HORSE_MUL : 1) * (sandstorm ? HUNGER_DRAIN_SANDSTORM_MUL : 1),
+  };
+}
+
+/**
  * Advance hunger. Call once per frame from the walk loop with the elapsed
  * milliseconds; skipped entirely while paused.
  */
@@ -39,7 +65,7 @@ export function update(dt) {
   const player = getState();
 
   if (player.hunger > 0) {
-    const drain = (HUNGER_DRAIN_PER_SEC * dt) / 1000 * (player.hasHorse ? HUNGER_DRAIN_HORSE_MUL : 1);
+    const drain = ((HUNGER_DRAIN_PER_SEC * dt) / 1000) * drainMultiplier().total;
     const before = player.hunger;
     setHunger(player.hunger - drain);
     // Warn once as it crosses the quarter mark.

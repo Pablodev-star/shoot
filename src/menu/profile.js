@@ -57,7 +57,7 @@ export const ProfileScreen = {
 
       el('div.screen-body', {}, [
         el('div.panel.panel--braced.profile-card', {}, [
-          el('div.avatar-plate', {}, [pixelImg(sprites.player.duel[2], 4)]),
+          el('div.avatar-plate', {}, [pixelImg(sprites.player.portrait, 4)]),
           el('div.col', { style: { gap: 'var(--sp-3)' } }, [
             el('div.field', {}, [
               el('label', { text: 'Gunslinger name' }),

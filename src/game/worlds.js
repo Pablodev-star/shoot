@@ -8,8 +8,12 @@
  *   encounters  parameters for the guided-random sequence generator
  *   rarity      shop rarity weights (higher worlds tilt towards legendary)
  *   priceMul    multiplier on top of the exponential price curve
- *   enemy       enemy life distribution + ability chances
- *   boss        the world's final fight
+ *   enemy       enemy life distribution, ability chances, and the ROSTER of
+ *               archetypes that ride here — see src/art/sprites-enemies.js.
+ *               A world's cast is a list of looks, and each look brings its
+ *               own names with it, so nobody is ever called something the
+ *               sprite does not show.
+ *   boss        the world's final fight, including the archetype it wears
  *   tint        canvas colour wash that gives each world its identity
  *
  * Everything is parameterised — to rebalance the game you edit numbers here,
@@ -51,9 +55,10 @@ export const WORLDS = [
       abilityChance: 0.05,
       abilities: ['bulletSteal'],
       accuracy: 0.42,       // how often the AI reads your move correctly
-      names: ['Drifter', 'Cattle Thief', 'Bar Brawler', 'Saddle Tramp'],
+      /** Who rides this stretch — see src/art/sprites-enemies.js. */
+      roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
     },
-    boss: { name: 'Big Jed', lives: 5, abilities: ['dynamite'], accuracy: 0.55 },
+    boss: { name: 'Big Jed', archetype: 'bossJed', lives: 5, abilities: ['dynamite'], accuracy: 0.55 },
   },
   {
     id: 2,
@@ -77,9 +82,15 @@ export const WORLDS = [
       abilityChance: 0.14,
       abilities: ['bulletSteal', 'poison'],
       accuracy: 0.48,
-      names: ['Fence Cutter', 'Cattle Rustler', 'Creek Bandit', 'Hay Thief'],
+      roster: ['sombrero', 'scarecrow', 'gambler', 'strawhat', 'bandana'],
     },
-    boss: { name: 'Barbwire Bill', lives: 6, abilities: ['poison', 'bulletSteal'], accuracy: 0.6 },
+    boss: {
+      name: 'Barbwire Bill',
+      archetype: 'bossBarbwire',
+      lives: 6,
+      abilities: ['poison', 'bulletSteal'],
+      accuracy: 0.6,
+    },
   },
   {
     id: 3,
@@ -98,9 +109,15 @@ export const WORLDS = [
       abilityChance: 0.24,
       abilities: ['bulletSteal', 'poison', 'dynamite'],
       accuracy: 0.54,
-      names: ['Snow Blind', 'Frost Trapper', 'Pass Wolfer', 'Avalanche Kid'],
+      roster: ['goggles', 'furhood', 'bonemarshal', 'drifter'],
     },
-    boss: { name: 'Whiteout Kate', lives: 7, abilities: ['dynamite', 'poison'], accuracy: 0.64 },
+    boss: {
+      name: 'Whiteout Kate',
+      archetype: 'bossWhiteout',
+      lives: 7,
+      abilities: ['dynamite', 'poison'],
+      accuracy: 0.64,
+    },
   },
   {
     id: 4,
@@ -119,9 +136,15 @@ export const WORLDS = [
       abilityChance: 0.34,
       abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
       accuracy: 0.6,
-      names: ['Marsh Runner', 'Reed Ghost', 'Swamp Preacher', 'Gator Bait'],
+      roster: ['preacher', 'wraith', 'skeleton', 'gambler'],
     },
-    boss: { name: 'Colonel Sable', lives: 8, abilities: ['mindControl', 'dynamite'], accuracy: 0.68 },
+    boss: {
+      name: 'Colonel Sable',
+      archetype: 'bossSable',
+      lives: 8,
+      abilities: ['mindControl', 'dynamite'],
+      accuracy: 0.68,
+    },
   },
   {
     id: 5,
@@ -140,9 +163,15 @@ export const WORLDS = [
       abilityChance: 0.45,
       abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
       accuracy: 0.66,
-      names: ['Cinder Rider', 'Ash Widow', 'Smoke Eater', 'The Kiln'],
+      roster: ['emberrider', 'ashwidow', 'ironkiln', 'horned', 'bonemarshal'],
     },
-    boss: { name: 'Old Scratch', lives: 10, abilities: ['mindControl', 'poison', 'dynamite'], accuracy: 0.72 },
+    boss: {
+      name: 'Old Scratch',
+      archetype: 'bossScratch',
+      lives: 10,
+      abilities: ['mindControl', 'poison', 'dynamite'],
+      accuracy: 0.72,
+    },
   },
   {
     id: 6,
@@ -162,7 +191,7 @@ export const WORLDS = [
       abilityChance: 0.6,
       abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
       accuracy: 0.72,
-      names: ['Star Reaver', 'Void Sheriff', 'Comet Rustler', 'The Unnamed'],
+      roster: ['starhelm', 'voidsheriff', 'nameless', 'ironkiln'],
     },
     /** Two phases — see src/duel/duel-engine.js `phases`. */
     boss: {
@@ -170,10 +199,19 @@ export const WORLDS = [
       lives: 9,
       abilities: ['mindControl', 'dynamite', 'poison'],
       accuracy: 0.78,
+      archetype: 'bossStranger',
       phases: [
-        { name: 'The Stranger', lives: 9, accuracy: 0.78, abilities: ['poison', 'dynamite'] },
+        {
+          name: 'The Stranger',
+          archetype: 'bossStranger',
+          lives: 9,
+          accuracy: 0.78,
+          abilities: ['poison', 'dynamite'],
+        },
         {
           name: 'The Stranger · Unmasked',
+          /** The cloak comes off: phase two is a different sprite, not a bar refill. */
+          archetype: 'bossStrangerUnmasked',
           lives: 12,
           accuracy: 0.88,
           abilities: ['mindControl', 'dynamite', 'poison', 'bulletSteal'],

@@ -5,6 +5,15 @@
  * steadily tougher and more likely to carry an ability as the worlds go by.
  * Bosses are fixed, hand-authored fights; the Galaxy boss has two phases.
  *
+ * THE NAME IS THE SPRITE
+ * ---------------------------------------------------------------------------
+ * A world no longer carries a list of names and a bag of poncho colours to
+ * roll independently. It carries a ROSTER: the archetypes that ride that
+ * stretch of road, each of which is a look with its own art and its own set of
+ * names (src/art/sprites-enemies.js). Rolling an enemy picks one archetype and
+ * then one of that archetype's names, so "Bone Marshal" is always a skull in a
+ * hat, and never a man in a green poncho who happens to have drawn that card.
+ *
  * ABILITIES
  *   bulletSteal  takes one bullet from the player
  *   poison       1 damage after 3 rounds, ignores shields
@@ -16,27 +25,17 @@
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
-import { PALETTE } from '../art/palette.js';
-import { bakeEnemyVariant } from '../art/sprites-character.js';
+import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 
-/** Poncho colour sets so enemies are visually distinct from the player. */
-const OUTFITS = [
-  { light: '#6f7f9a', mid: '#47566f', dark: '#2b3648' },
-  { light: '#8a6f4a', mid: '#5e4a2f', dark: '#3b2d1a' },
-  { light: '#7c9a6a', mid: '#4f6b3f', dark: '#2f4227' },
-  { light: '#9a6a86', mid: '#6b4258', dark: '#432838' },
-  { light: '#a08a4a', mid: '#6f5c2c', dark: '#463819' },
-];
-
-const BOSS_OUTFIT = { light: PALETTE.purple, mid: PALETTE.purpleDark, dark: '#2a1145' };
-
-const spriteCache = new Map();
-
-function spritesFor(key, outfit) {
-  if (!spriteCache.has(key)) {
-    spriteCache.set(key, bakeEnemyVariant(outfit.light, outfit.mid, outfit.dark));
-  }
-  return spriteCache.get(key);
+/** Everything the rest of the game needs to know about one enemy's look. */
+function appearance(archetypeId, rng) {
+  const archetype = ARCHETYPES[archetypeId] || ARCHETYPES.drifter;
+  return {
+    archetype: archetypeId,
+    look: archetype.look,
+    sprites: getEnemySprites(archetypeId),
+    name: rng ? rng.pick(archetype.names) : archetype.names[0],
+  };
 }
 
 /**
@@ -58,18 +57,19 @@ export function generateEnemy(worldId, seed) {
     if (!abilities.includes(extra)) abilities.push(extra);
   }
 
-  const outfitIndex = rng.int(0, OUTFITS.length - 1);
-  const name = rng.pick(profile.names);
+  const { name, look, sprites, archetype } = appearance(rng.pick(profile.roster), rng);
 
   return {
     name,
+    look,
+    archetype,
     lives,
     maxLives: lives,
     bullets: 0,
     accuracy: profile.accuracy,
     abilities,
     isBoss: false,
-    sprites: spritesFor(`enemy${outfitIndex}`, OUTFITS[outfitIndex]),
+    sprites,
   };
 }
 
@@ -78,8 +78,11 @@ export function generateBoss(worldId) {
   const world = getWorld(worldId);
   const cfg = world.boss;
   const phase = cfg.phases ? cfg.phases[0] : cfg;
+  const { look, sprites } = appearance(phase.archetype || cfg.archetype);
   return {
     name: phase.name || cfg.name,
+    look,
+    archetype: phase.archetype || cfg.archetype,
     lives: phase.lives,
     maxLives: phase.lives,
     bullets: phase.startBullets || 0,
@@ -89,7 +92,7 @@ export function generateBoss(worldId) {
     isBoss: true,
     phaseIndex: 0,
     phases: cfg.phases || null,
-    sprites: spritesFor('boss', BOSS_OUTFIT),
+    sprites,
   };
 }
 
@@ -99,6 +102,9 @@ export function nextBossPhase(boss) {
   const index = boss.phaseIndex + 1;
   if (index >= boss.phases.length) return null;
   const phase = boss.phases[index];
+  // A phase with its own archetype is a different-looking fight, which is the
+  // whole point of the Stranger taking the cloak off.
+  const look = phase.archetype ? appearance(phase.archetype) : null;
   return {
     ...boss,
     name: phase.name,
@@ -109,6 +115,7 @@ export function nextBossPhase(boss) {
     abilities: phase.abilities || boss.abilities,
     abilityChanceMul: phase.abilityChanceMul || 1,
     phaseIndex: index,
+    ...(look ? { look: look.look, archetype: phase.archetype, sprites: look.sprites } : {}),
   };
 }
 
