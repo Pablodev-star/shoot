@@ -4,6 +4,7 @@
  * Five themed worlds plus the final "Galaxy". Each world is a single data
  * object that every other system reads:
  *
+ *   biome       which landscape you walk through — see src/game/biomes.js
  *   encounters  parameters for the guided-random sequence generator
  *   rarity      shop rarity weights (higher worlds tilt towards legendary)
  *   priceMul    multiplier on top of the exponential price curve
@@ -13,7 +14,23 @@
  *
  * Everything is parameterised — to rebalance the game you edit numbers here,
  * never formulas elsewhere.
+ *
+ * BIOME AND WORLD ARE NOT THE SAME THING
+ * ---------------------------------------------------------------------------
+ * The game used to be six stretches of the same desert wearing six colour
+ * washes, which is why worlds 2 to 5 were all named after rock and sand: the
+ * names were describing the art, not the journey. Each world now names a place
+ * the ride could plausibly reach, and points at the biome that draws it.
+ *
+ * Two of those biomes exist: `desert` and `meadow`. The worlds whose landscape
+ * has not been drawn yet ride the desert and say so in a comment above the
+ * `biome` line — they are named for what they will be, and the wash is the
+ * placeholder that hints at it. Building one of them is a matter of adding
+ * `src/art/biomes/<id>.js` plus a weather table, then changing one line here;
+ * no other system needs to know.
  */
+
+import { getBiome } from './biomes.js';
 
 export const FINAL_WORLD = 6;
 
@@ -22,6 +39,7 @@ export const WORLDS = [
     id: 1,
     name: 'Dust Flats',
     subtitle: 'Where every story starts',
+    biome: 'desert',
     tint: null,
     priceMul: 1,
     goldMul: 1,
@@ -39,9 +57,16 @@ export const WORLDS = [
   },
   {
     id: 2,
-    name: 'Redrock Canyon',
-    subtitle: 'The walls remember every shot',
-    tint: { color: '#c0552f', alpha: 0.2 },
+    name: 'Wildgrass Prairie',
+    subtitle: 'Green country, and none of it yours',
+    biome: 'meadow',
+    /**
+     * No wash at all. The prairie is the first world with its own art, and a
+     * colour laid over it would only be arguing with paint that is already
+     * the right colour — the washes below exist because those worlds are
+     * still wearing the desert.
+     */
+    tint: null,
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
@@ -52,15 +77,17 @@ export const WORLDS = [
       abilityChance: 0.14,
       abilities: ['bulletSteal', 'poison'],
       accuracy: 0.48,
-      names: ['Canyon Rider', 'Powder Monkey', 'Red Bandana', 'Rock Hopper'],
+      names: ['Fence Cutter', 'Cattle Rustler', 'Creek Bandit', 'Hay Thief'],
     },
-    boss: { name: 'The Vulture', lives: 6, abilities: ['poison', 'bulletSteal'], accuracy: 0.6 },
+    boss: { name: 'Barbwire Bill', lives: 6, abilities: ['poison', 'bulletSteal'], accuracy: 0.6 },
   },
   {
     id: 3,
-    name: 'Bone Desert',
-    subtitle: 'Nothing grows, everything waits',
-    tint: { color: '#e6d2a8', alpha: 0.22 },
+    name: 'Whitecrown Pass',
+    subtitle: 'Above the trees, under the storm',
+    /** TODO: a `snow` biome. Riding the desert until it is drawn. */
+    biome: 'desert',
+    tint: { color: '#9fc0e0', alpha: 0.24 },
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
@@ -71,15 +98,17 @@ export const WORLDS = [
       abilityChance: 0.24,
       abilities: ['bulletSteal', 'poison', 'dynamite'],
       accuracy: 0.54,
-      names: ['Bone Picker', 'Sun-Struck', 'Mirage Walker', 'Grave Digger'],
+      names: ['Snow Blind', 'Frost Trapper', 'Pass Wolfer', 'Avalanche Kid'],
     },
-    boss: { name: 'Ossuary Kate', lives: 7, abilities: ['dynamite', 'poison'], accuracy: 0.64 },
+    boss: { name: 'Whiteout Kate', lives: 7, abilities: ['dynamite', 'poison'], accuracy: 0.64 },
   },
   {
     id: 4,
-    name: 'Thunder Mesa',
-    subtitle: 'The sky shoots back',
-    tint: { color: '#4a5a86', alpha: 0.3 },
+    name: 'Blackwater Bayou',
+    subtitle: 'The water keeps what it takes',
+    /** TODO: a `swamp` biome. Riding the desert until it is drawn. */
+    biome: 'desert',
+    tint: { color: '#4a6a52', alpha: 0.32 },
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
@@ -90,15 +119,17 @@ export const WORLDS = [
       abilityChance: 0.34,
       abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
       accuracy: 0.6,
-      names: ['Storm Chaser', 'Iron Preacher', 'Mesa Ghost', 'Lightning Kid'],
+      names: ['Marsh Runner', 'Reed Ghost', 'Swamp Preacher', 'Gator Bait'],
     },
     boss: { name: 'Colonel Sable', lives: 8, abilities: ['mindControl', 'dynamite'], accuracy: 0.68 },
   },
   {
     id: 5,
-    name: 'Ghost Territory',
-    subtitle: 'The last town on any map',
-    tint: { color: '#5c4a7a', alpha: 0.34 },
+    name: 'Brimstone Basin',
+    subtitle: 'Hell got tired of waiting',
+    /** TODO: an `inferno` biome. Riding the desert until it is drawn. */
+    biome: 'desert',
+    tint: { color: '#b83a22', alpha: 0.36 },
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
@@ -109,14 +140,16 @@ export const WORLDS = [
       abilityChance: 0.45,
       abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
       accuracy: 0.66,
-      names: ['Hollow Man', 'Pale Rider', 'The Quiet One', 'Widow Maker'],
+      names: ['Cinder Rider', 'Ash Widow', 'Smoke Eater', 'The Kiln'],
     },
-    boss: { name: 'Marshal Nowhere', lives: 10, abilities: ['mindControl', 'poison', 'dynamite'], accuracy: 0.72 },
+    boss: { name: 'Old Scratch', lives: 10, abilities: ['mindControl', 'poison', 'dynamite'], accuracy: 0.72 },
   },
   {
     id: 6,
     name: 'Galaxy',
     subtitle: 'Past the last horizon',
+    /** TODO: a `void` biome. The Galaxy has its own intro scene either way. */
+    biome: 'desert',
     tint: { color: '#4c2f80', alpha: 0.45 },
     priceMul: 2.4,
     goldMul: 5,
@@ -155,6 +188,11 @@ export const WORLDS = [
 
 export function getWorld(id) {
   return WORLDS.find((w) => w.id === id) || WORLDS[0];
+}
+
+/** The biome record a world is set in. Never null — falls back to the desert. */
+export function getWorldBiome(id) {
+  return getBiome(getWorld(id).biome);
 }
 
 export const WORLD_COUNT = WORLDS.length;

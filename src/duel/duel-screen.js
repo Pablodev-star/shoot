@@ -79,6 +79,7 @@ export const DuelScreen = {
 
     const scene = createDuelScene({
       worldId: player.world,
+      biome: world.biome,
       tint: world.tint,
       seed: player.seed,
       enemySprites: enemy.sprites,

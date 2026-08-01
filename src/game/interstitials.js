@@ -30,7 +30,8 @@ export const WorldIntroScreen = {
       setRenderer(createGalaxyScene());
       playMusic('themeGalaxy');
     } else {
-      startMenuScene();
+      // The card names the place; the backdrop should be it.
+      startMenuScene({ biome: world.biome, tint: world.tint });
     }
 
     let done = false;
@@ -129,9 +130,10 @@ export const GameOverScreen = {
   id: 'gameOver',
 
   mount(root, params = {}) {
-    startMenuScene();
-    play('lose');
     const world = getWorld(params.world || getState().world);
+    // You went down somewhere in particular — show that somewhere.
+    startMenuScene({ biome: world.biome, tint: world.tint });
+    play('lose');
     const player = getState();
 
     const screen = el('div.screen.screen--centered.ending-screen', {}, [

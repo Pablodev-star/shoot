@@ -52,6 +52,7 @@ const WEATHER_BLURB = {
   cloudy: 'Clouds are gathering',
   rain: 'Rain is coming down',
   sandstorm: 'Sand whips across the road',
+  fog: 'Mist settles over the grass',
 };
 
 export const ExploreScreen = {
@@ -62,7 +63,10 @@ export const ExploreScreen = {
     const player = getState();
     const world = getWorld(player.world);
     const sprites = getCharacterSprites();
-    const parallax = createParallax({ seed: (player.seed ^ (player.world * 7919)) >>> 0 });
+    const parallax = createParallax({
+      seed: (player.seed ^ (player.world * 7919)) >>> 0,
+      biome: world.biome,
+    });
     parallax.setTint(world.tint);
 
     playMusic('themeWalk');
@@ -162,6 +166,10 @@ export const ExploreScreen = {
       update(dt) {
         elapsed += dt;
         engine.update(dt, lastView);
+        // The prairie's fluff and fireflies drift on regardless of the walk —
+        // the same rule the weather follows. A world that stops the moment the
+        // saddlebag opens is a world the player can tell is a backdrop.
+        parallax.updateAmbient(dt);
         parallax.setStructures(engine.visibleStructures());
       },
 
@@ -205,9 +213,12 @@ export const ExploreScreen = {
           drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s);
         }
 
-        // Footfall dust while travelling.
+        // Footfall dust while travelling — sand in the desert, dry earth off
+        // the prairie trail. The colour comes from the biome; kicking up pale
+        // sand on green grass was the giveaway that the ground had changed and
+        // nothing else had.
         if (walking) {
-          ctx.fillStyle = 'rgba(240, 214, 154, 0.5)';
+          ctx.fillStyle = parallax.dust;
           for (let i = 0; i < 3; i++) {
             const phase = (elapsed / 260 + i * 0.33) % 1;
             ctx.globalAlpha = 0.45 * (1 - phase);
@@ -218,6 +229,9 @@ export const ExploreScreen = {
 
         // Everything above is lit together, traveller included.
         parallax.applyLighting(ctx, view);
+        // Then the things that are making their own light, or floating in
+        // front of the scene rather than sitting in it.
+        parallax.renderAmbient(ctx, view);
         weather.render(ctx, view);
 
         // Starving: a red pulse creeping in from the edges.

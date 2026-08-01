@@ -1,10 +1,15 @@
 /**
- * SHOOT! — Ambient menu backdrop.
+ * SHOOT! — Ambient backdrop.
  *
- * The menu is never still: the desert drifts by on its own slow camera,
- * tumbleweeds roll across the ground, dust motes catch the light and a lone
- * silhouette waits at the far right of the road. It reuses the exploration
- * parallax renderer, so the menu and the game share one look.
+ * The menu is never still: the land drifts by on its own slow camera, dust
+ * motes catch the light and a lone silhouette waits at the far right of the
+ * road. It reuses the exploration parallax renderer, so the menu and the game
+ * share one look.
+ *
+ * The title screen always shows the desert — it is where the game starts and
+ * it is the picture on the box. The world-intro and game-over cards pass their
+ * own biome instead, so walking into the prairie shows you the prairie behind
+ * the card rather than the desert you have just left.
  */
 
 import { setRenderer } from '../core/scene.js';
@@ -18,11 +23,20 @@ import { makeRng } from '../core/rng.js';
 /** Menu camera drift, in source pixels per second. */
 const DRIFT = 9;
 
-export function startMenuScene() {
-  const parallax = createParallax({ seed: 987654 });
-  const env = getEnvironmentSprites();
+/**
+ * @param {object} [options]
+ * @param {string} [options.biome] landscape to drift past. Defaults to desert.
+ * @param {object} [options.tint]  the world's colour wash, if it has one.
+ */
+export function startMenuScene(options = {}) {
+  const biome = options.biome || 'desert';
+  const parallax = createParallax({ seed: 987654, biome });
+  if (options.tint) parallax.setTint(options.tint);
+  const env = getEnvironmentSprites(biome);
   const chars = getCharacterSprites();
   const rng = makeRng(4711);
+  /** Tumbleweed is desert scenery. Nothing rolls across wet grass. */
+  const rollsWeeds = biome === 'desert';
 
   let cameraX = 0;
   let elapsed = 0;
@@ -52,6 +66,7 @@ export function startMenuScene() {
       elapsed += dt;
       cameraX += (DRIFT * dt) / 1000;
       updateDayNight(dt * 0.35); // menu time passes slower than travel time
+      parallax.updateAmbient(dt);
       for (const m of motes) {
         m.x += m.vx * (dt / 16.67) * 0.01;
         m.y += m.vy * (dt / 16.67) * 0.01;
@@ -67,7 +82,7 @@ export function startMenuScene() {
       const gy = parallax.groundY(view);
 
       // --- tumbleweeds ---
-      if (weeds.length < 3 && Math.random() < 0.004) weeds.push(spawnWeed(view));
+      if (rollsWeeds && weeds.length < 3 && Math.random() < 0.004) weeds.push(spawnWeed(view));
       for (let i = weeds.length - 1; i >= 0; i--) {
         const w = weeds[i];
         w.x += (w.vx / 1000) * 16.67;
@@ -94,9 +109,10 @@ export function startMenuScene() {
       const heroX = view.w * 0.8;
       drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s, true);
 
-      // The tumbleweeds and the waiting gunslinger are part of the desert, so
-      // the hour of the day is applied over them, not under them.
+      // The tumbleweeds and the waiting gunslinger are part of the landscape,
+      // so the hour of the day is applied over them, not under them.
       parallax.applyLighting(ctx, view);
+      parallax.renderAmbient(ctx, view);
 
       // --- dust motes ---
       ctx.fillStyle = '#f2e3c6';

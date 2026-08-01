@@ -1,9 +1,22 @@
 /**
  * SHOOT! — Parallax renderer (Block 3a).
  *
- * Draws the scrolling desert: the sky, the star field, the sun/moon arc, five
- * tiled depth layers, the storm deck, and the deterministic scatter of
- * cacti/rocks/bones along the ground.
+ * Draws the scrolling landscape: the sky, the star field, the sun/moon arc,
+ * five tiled depth layers, the storm deck, the deterministic scatter of props
+ * along the ground, and whatever the biome has drifting through the air.
+ *
+ * IT DOES NOT KNOW WHAT A DESERT IS
+ * ---------------------------------------------------------------------------
+ * Every landscape-specific thing here used to be a constant: the manifest of
+ * layers, the scatter table, the colour under the road. All three now come out
+ * of the biome bundle handed over at construction, so this file is the *shape*
+ * of a side-scrolling world and the biome modules are what it is made of. A
+ * new biome changes nothing in here.
+ *
+ * The sky, the sun, the moon and the storm deck are deliberately NOT biome
+ * data. They are the same sky over every place in the game, and one of the
+ * things holding the six worlds together as one journey is that the sun
+ * setting looks identical in all of them.
  *
  * COORDINATES
  * ---------------------------------------------------------------------------
@@ -39,7 +52,7 @@
  * SCATTER
  * ---------------------------------------------------------------------------
  * Props are not stored in a list — the world is infinite. Instead the ground is
- * divided into fixed cells of SCATTER_CELL source pixels, and each cell's
+ * divided into fixed cells of the biome's scatter-cell size, and each cell's
  * contents are derived from a seeded RNG keyed by the cell index. Same cell,
  * same props, forever, with no memory cost.
  */
@@ -48,9 +61,7 @@ import { PALETTE } from '../art/palette.js';
 import { drawSprite, makeCanvas } from '../art/pixel.js';
 import {
   getEnvironmentSprites,
-  PARALLAX_MANIFEST,
   LAYER_TILE_W,
-  SCATTER_TABLE,
   SKY_BODY_SIZE,
   SKY_GLOW_SIZE,
 } from '../art/sprites-environment.js';
@@ -62,9 +73,13 @@ import { getWeatherState } from './weather.js';
  * One prop per cell at most, placed inside the middle half of the cell. That
  * single rule is what keeps the roadside from clumping: two neighbours can
  * never be closer than half a cell, and never further than one and a half.
+ *
+ * The cell size is the biome's, because it is really a statement about how
+ * crowded the place is: the desert is empty by definition and a saguaro every
+ * seventy-six pixels is already generous, while a prairie at that spacing
+ * reads as a lawn somebody mowed.
  */
-const SCATTER_CELL = 76;
-const TOTAL_WEIGHT = SCATTER_TABLE.reduce((s, e) => s + e.weight, 0);
+const DEFAULT_SCATTER_CELL = 76;
 
 /**
  * Slack around the edge of every full-screen pass. The duel shakes the camera
@@ -95,11 +110,21 @@ const BAYER = [
  * sandstorm gets none — sand does not arrive under rain cloud, it arrives as
  * the sky itself turning the colour of the ground, which the ochre haze does.
  */
-const STORM_DECK = { cloudy: 0.6, rain: 1, sandstorm: 0 };
+const STORM_DECK = { cloudy: 0.6, rain: 1, sandstorm: 0, fog: 0.45 };
 
+/**
+ * @param {object} options
+ * @param {string} [options.biome] which landscape to draw. Defaults to the
+ *   desert, which is what the menu backdrop wants and what every world rode
+ *   before the biomes existed.
+ */
 export function createParallax(options = {}) {
-  const env = getEnvironmentSprites();
+  const env = getEnvironmentSprites(options.biome);
   const seed = options.seed ?? 20260730;
+  const scatterWeight = env.scatter.reduce((s, e) => s + e.weight, 0);
+  const scatterCell = env.scatterCell || DEFAULT_SCATTER_CELL;
+  /** Seed fluff, fireflies, whatever else this biome keeps in the air. */
+  const ambient = env.createAmbient ? env.createAmbient(seed ^ 0xa1b2c3) : null;
   /** Buildings placed by the encounter system: [{ worldX, kind }] */
   let structures = [];
   /** Palette shift applied per world (Galaxy tints everything violet). */
@@ -354,7 +379,7 @@ export function createParallax(options = {}) {
     if (layer.name === 'ground') {
       const bottom = y + h;
       if (bottom < view.h) {
-        ctx.fillStyle = PALETTE.sandDeep;
+        ctx.fillStyle = env.groundFill;
         ctx.fillRect(0, Math.round(bottom), view.w, view.h - bottom + 1);
       }
     }
@@ -394,16 +419,16 @@ export function createParallax(options = {}) {
    */
   function drawScatter(ctx, view, cameraX, gy) {
     const s = view.scale;
-    const first = Math.floor((cameraX - 60) / SCATTER_CELL);
-    const last = Math.ceil((cameraX + view.w / s + 60) / SCATTER_CELL);
+    const first = Math.floor((cameraX - 60) / scatterCell);
+    const last = Math.ceil((cameraX + view.w / s + 60) / scatterCell);
 
     for (let cell = first; cell <= last; cell++) {
       const rng = makeRng((seed + cell * 2654435761) >>> 0);
       if (rng() < 0.18) continue; // empty stretch of road
 
-      let roll = rng() * TOTAL_WEIGHT;
-      let entry = SCATTER_TABLE[0];
-      for (const e of SCATTER_TABLE) {
+      let roll = rng() * scatterWeight;
+      let entry = env.scatter[0];
+      for (const e of env.scatter) {
         roll -= e.weight;
         if (roll <= 0) {
           entry = e;
@@ -413,7 +438,7 @@ export function createParallax(options = {}) {
       const sprite = env.props[entry.name];
       if (!sprite) continue;
 
-      const worldX = cell * SCATTER_CELL + SCATTER_CELL * (0.25 + rng() * 0.5);
+      const worldX = cell * scatterCell + scatterCell * (0.25 + rng() * 0.5);
       const sx = (worldX - cameraX) * s;
       if (sx < -140 * s || sx > view.w + 140 * s) continue;
       // Size varies by a whole pixel step, never a fraction: half-scaled pixel
@@ -538,7 +563,7 @@ export function createParallax(options = {}) {
    */
   function renderBackdrop(ctx, view, cameraX) {
     const gy = groundY(view);
-    for (const layer of PARALLAX_MANIFEST) {
+    for (const layer of env.manifest) {
       drawLayer(ctx, view, layer, cameraX, gy);
       if (layer.name === 'clouds') drawStormDeck(ctx, view, cameraX, gy);
     }
@@ -546,19 +571,43 @@ export function createParallax(options = {}) {
     drawStructures(ctx, view, cameraX, gy);
   }
 
+  // --- ambient life ---------------------------------------------------------
+
+  /**
+   * Move whatever the biome keeps in the air. Safe to call for a biome with
+   * nothing in it — the desert's air is empty and the call is a no-op.
+   */
+  function updateAmbient(dt) {
+    if (ambient) ambient.update(dt);
+  }
+
+  /**
+   * Draw it. This goes AFTER `applyLighting`, unlike everything else: a
+   * firefly that dims at night is not a firefly. Each population decides for
+   * itself how the hour affects it, from the sky snapshot it is handed.
+   */
+  function renderAmbient(ctx, view) {
+    if (ambient) ambient.render(ctx, view, getSky());
+  }
+
   /** Backdrop and light in one call, for scenes with nothing to insert. */
   function render(ctx, view, cameraX) {
     renderBackdrop(ctx, view, cameraX);
     applyLighting(ctx, view);
+    renderAmbient(ctx, view);
   }
 
   return {
     render,
     renderBackdrop,
     applyLighting,
+    updateAmbient,
+    renderAmbient,
     drawGroundShadow,
     groundY,
     setStructures,
     setTint,
+    /** The colour of the dust this ground throws up under boots and hooves. */
+    dust: env.dust,
   };
 }

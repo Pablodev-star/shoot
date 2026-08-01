@@ -1,7 +1,7 @@
 /**
  * SHOOT! — Dynamic weather (Block 3b).
  *
- * Four states, each with its own visual treatment and a limited duration before
+ * Five states, each with its own visual treatment and a limited duration before
  * the sky clears again:
  *
  *   clear      — nothing drawn
@@ -11,9 +11,20 @@
  *   sandstorm  — three depths of driven sand, tumbling grit, gusting dust
  *                sheets and heavy ochre haze; the harshest weather to be
  *                caught in
+ *   fog        — still, banked mist that thickens towards the ground and eats
+ *                the horizon; nothing falls, and that stillness is the point
  *
  * `getWeatherState()` is the global read-only handle the duel system uses to
  * apply combat modifiers when a fight starts in bad weather.
+ *
+ * NOT EVERY SKY BELONGS TO EVERY PLACE
+ * ---------------------------------------------------------------------------
+ * Which of the five a world can actually get is the *biome's* business, not
+ * this file's: `setBiome()` installs the transition table from
+ * `src/game/biomes.js` and the roll can never leave it. So sand only blows
+ * where there is sand to blow, fog only banks up over the wet grass of the
+ * prairie, and adding a snowfall later means adding one state here and listing
+ * it in one biome — not rewriting a global table that every world shares.
  *
  * EVERYTHING IS DRAWN ON THE PIXEL GRID
  * ---------------------------------------------------------------------------
@@ -41,6 +52,7 @@
 import { EVENTS, emit } from '../core/events.js';
 import { makeRng } from '../core/rng.js';
 import { play } from '../core/audio.js';
+import { getBiome } from '../game/biomes.js';
 import { getSky } from './daynight.js';
 
 export const WEATHER = {
@@ -79,14 +91,20 @@ export const WEATHER = {
     /** Sand in the eyes: the enemy AI reads your move less reliably. */
     duel: { enemyAccuracyPenalty: 0.18, misfireChance: 0.04 },
   },
-};
-
-/** Transition weights: from -> { to: weight }. Clear is the hub state. */
-const TRANSITIONS = {
-  clear: { clear: 0, cloudy: 5, rain: 2, sandstorm: 2 },
-  cloudy: { clear: 5, rain: 3, sandstorm: 1 },
-  rain: { clear: 4, cloudy: 4 },
-  sandstorm: { clear: 5, cloudy: 2 },
+  fog: {
+    id: 'fog',
+    label: 'Fog',
+    visibility: 0.58,
+    /** Mist outlasts a squall — it sits on the grass until the sun burns it off. */
+    minMs: 24000,
+    maxMs: 52000,
+    /**
+     * Neither of you can read the other properly, but the powder stays dry:
+     * a duel in fog is a guessing game, not a coin toss over whether the gun
+     * goes off at all.
+     */
+    duel: { enemyAccuracyPenalty: 0.14 },
+  },
 };
 
 /**
@@ -120,6 +138,17 @@ const SAND_DEPTHS = [
 const RAIN_COLOR = [186, 214, 255];
 const SAND_COLOR = [240, 214, 154];
 
+/**
+ * The drifting sheets. Sand throws thin, fast gusts across the road; fog is
+ * the same primitive slowed almost to a stop and made deep, which is exactly
+ * the difference between weather that is arriving and weather that has settled
+ * in and is not going anywhere.
+ */
+const SHEETS = {
+  sandstorm: { count: 5, h: [4, 16], vx: [-9, -4], alpha: [0.08, 0.18], color: 'rgb(214, 172, 104)' },
+  fog: { count: 8, h: [10, 34], vx: [-1.6, -0.4], alpha: [0.1, 0.22], color: 'rgb(222, 230, 226)' },
+};
+
 const rng = makeRng(0xc0ffee);
 
 const state = {
@@ -140,7 +169,9 @@ const state = {
   bolt: null,          // the strike currently on screen
   particles: [],
   splashes: [],
-  sheets: [],          // sandstorm dust gusts
+  sheets: [],          // drifting sand gusts / fog banks
+  /** The biome whose weather table the roll is drawn from. */
+  biome: getBiome('desert'),
   /** Walk line in device pixels; the screens hand it over each frame. */
   groundY: null,
 };
@@ -151,8 +182,34 @@ function clearParticles() {
   state.sheets = [];
 }
 
+/**
+ * Move the weather to the biome the player has just entered.
+ *
+ * If the sky is currently doing something this biome cannot do — walking out
+ * of a sandstorm and into the prairie — it is cleared rather than carried
+ * over. The alternative is sand still blowing across the grass for the next
+ * twenty seconds because the countdown had not run out yet.
+ *
+ * Call this BEFORE `restore()`, so a save written in one biome cannot reinstate
+ * a weather the biome it is being loaded into has never heard of.
+ */
+export function setBiome(id) {
+  state.biome = getBiome(id);
+  if (!allowed(state.current.id)) force('clear');
+}
+
+/** Is this state one the current biome can be in at all? */
+function allowed(id) {
+  return id === 'clear' || !!state.biome.weather[id];
+}
+
+/** Where the sky can go from where it is, in this biome. */
+function transitionsFrom(id) {
+  return state.biome.weather[id] || state.biome.weather.clear || { clear: 1 };
+}
+
 function roll(next) {
-  const cfg = WEATHER[next];
+  const cfg = WEATHER[next] || WEATHER.clear;
   state.current = cfg;
   state.remaining = rng.range(cfg.minMs, cfg.maxMs);
   if (next === 'sandstorm') play('wind');
@@ -181,7 +238,7 @@ function groundOf(view) {
 export function update(dt, view) {
   if (!state.paused) {
     state.remaining -= dt;
-    if (state.remaining <= 0) roll(rng.weighted(TRANSITIONS[state.current.id]));
+    if (state.remaining <= 0) roll(rng.weighted(transitionsFrom(state.current.id)));
   }
 
   state.clock += dt;
@@ -267,8 +324,13 @@ function stepParticles(dt, view) {
       if (p.grit) p.y += Math.sin(state.clock / 260 + p.phase) * 0.28 * step;
       if (p.x < -40 || p.y > H + 10 || p.y < -10) Object.assign(p, spawn(W, H, id, gy));
     }
-    stepSheets(dt, W, H);
+    stepSheets(dt, W, H, SHEETS.sandstorm);
+    return;
   }
+
+  // Fog has no particles at all: it is banks and haze, and nothing in it is
+  // travelling fast enough to be a grain of anything.
+  if (id === 'fog') stepSheets(dt, W, H, SHEETS.fog, gy);
 }
 
 /**
@@ -332,27 +394,36 @@ function stepSplashes(dt) {
   }
 }
 
-// --- sandstorm dust sheets --------------------------------------------------
+// --- drifting sheets (sand gusts / fog banks) -------------------------------
 
-function stepSheets(dt, W, H) {
+/**
+ * @param {object} cfg one of SHEETS
+ * @param {number} [gy] walk line in source pixels. Fog passes it so its banks
+ *   pile up against the ground instead of spreading evenly up the screen —
+ *   mist that is as thick at the top of the sky as it is on the grass is
+ *   smoke, not fog.
+ */
+function stepSheets(dt, W, H, cfg, gy = null) {
   const step = dt / 16.67;
-  while (state.sheets.length < 5) {
-    state.sheets.push({
-      x: rng.range(0, W * 1.6),
-      y: rng.range(H * 0.3, H * 0.95),
-      w: rng.range(W * 0.35, W * 0.9),
-      h: rng.range(4, 16),
-      vx: rng.range(-9, -4),
-      a: rng.range(0.08, 0.18),
-    });
+  const top = gy === null ? H * 0.3 : gy * 0.45;
+  const bottom = gy === null ? H * 0.95 : Math.min(H, gy + H * 0.1);
+  const respawn = (sh, fresh) => {
+    sh.x = fresh ? rng.range(0, W * 1.6) : W + rng.range(10, W * 0.6);
+    sh.y = rng.range(top, bottom);
+    sh.w = rng.range(W * 0.35, W * 0.9);
+    sh.h = rng.range(cfg.h[0], cfg.h[1]);
+    sh.vx = rng.range(cfg.vx[0], cfg.vx[1]);
+    sh.a = rng.range(cfg.alpha[0], cfg.alpha[1]);
+  };
+  while (state.sheets.length < cfg.count) {
+    const sh = {};
+    respawn(sh, true);
+    state.sheets.push(sh);
   }
+  while (state.sheets.length > cfg.count) state.sheets.pop();
   for (const sh of state.sheets) {
     sh.x += sh.vx * step;
-    if (sh.x + sh.w < -20) {
-      sh.x = W + rng.range(10, W * 0.6);
-      sh.y = rng.range(H * 0.3, H * 0.95);
-      sh.h = rng.range(4, 16);
-    }
+    if (sh.x + sh.w < -20) respawn(sh, false);
   }
 }
 
@@ -500,11 +571,38 @@ export function render(ctx, view) {
     // Sand takes the sky first. Half the point of a sandstorm is that the blue
     // goes out of the world entirely, which a light ochre veil never did.
     bandWash(ctx, view, 'rgb(198, 148, 74)', 0, view.h, 0.66 * k, 0.74 * k);
-    drawSheets(ctx, view, k);
+    drawSheets(ctx, view, k, SHEETS.sandstorm.color);
     drawSand(ctx, view, k, light);
     // Heavier haze from the horizon down — where the sand is actually coming
     // from — in the same quantised bands as everything else.
     bandWash(ctx, view, 'rgb(176, 124, 58)', view.h * 0.3, view.h, 0, 0.55 * k);
+    return;
+  }
+
+  if (id === 'fog') {
+    /**
+     * Fog is built the other way up from every other weather here. The rest
+     * are things falling *through* the air; this is the air itself, so it is
+     * drawn as three washes of increasing weight from the horizon down, with
+     * the banks in between them, and nothing at all in front.
+     *
+     * It is also the only weather with no motion to speak of. Two earlier
+     * passes gave the banks a sandstorm's speed and the result read as smoke
+     * blowing off something on fire — mist that visibly travels is not mist.
+     * The banks now cross the screen in about a minute, which is slow enough
+     * that the eye reads them as depth rather than as movement.
+     */
+    const grey = 210 + Math.round(getSky().light * 24);
+    const pale = `rgb(${grey}, ${grey + 6}, ${grey + 2})`;
+
+    // A thin veil over everything, so even the sky loses its edge.
+    bandWash(ctx, view, pale, 0, view.h, 0.16 * k, 0.3 * k);
+    // The body of it, banked from the horizon down to the walk line.
+    bandWash(ctx, view, pale, view.h * 0.25, gy, 0, 0.5 * k);
+    drawSheets(ctx, view, k, SHEETS.fog.color);
+    // And the densest layer of all, lying on the ground the way it does at
+    // first light: the traveller's boots go into it.
+    bandWash(ctx, view, pale, gy - view.h * 0.1, view.h, 0.18 * k, 0.62 * k);
   }
 }
 
@@ -619,14 +717,18 @@ function drawSand(ctx, view, k, light) {
 }
 
 /**
- * The gusts: broad, faint sheets of dust crossing in front of everything. Each
- * one is drawn as three stacked bands, the outer two shorter and fainter, so it
- * thins out at its edges instead of ending on a hard vertical line — a rectangle
- * of haze sliding across the desert reads as a rendering fault, not as wind.
+ * The gusts: broad, faint sheets crossing in front of everything. Each one is
+ * drawn as three stacked bands, the outer two shorter and fainter, so it thins
+ * out at its edges instead of ending on a hard vertical line — a rectangle of
+ * haze sliding across the desert reads as a rendering fault, not as wind.
+ *
+ * The sandstorm and the fog share this: the difference between a gust of grit
+ * and a bank of mist turns out to be its speed, its depth and its colour, and
+ * all three of those live in SHEETS.
  */
-function drawSheets(ctx, view, k) {
+function drawSheets(ctx, view, k, color) {
   const s = view.scale;
-  ctx.fillStyle = 'rgb(214, 172, 104)';
+  ctx.fillStyle = color;
   for (const sh of state.sheets) {
     const x = Math.round(sh.x) * s;
     const y = Math.round(sh.y) * s;
@@ -673,7 +775,10 @@ export function serialize() {
 }
 
 export function restore(data) {
-  if (data && WEATHER[data.id]) {
+  // A slot written before the biomes existed — or written in one biome and
+  // reloaded into another — can name a weather this place cannot have. Drop
+  // it and let the sky roll fresh rather than importing someone else's storm.
+  if (data && WEATHER[data.id] && allowed(data.id)) {
     roll(data.id);
     state.shown = state.current;
     clearParticles();

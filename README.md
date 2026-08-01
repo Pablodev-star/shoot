@@ -1,7 +1,7 @@
 # SHOOT!
 
 **Shoot!** is a turn-based western duel in pixel art. Reload, shield yourself, or
-shoot before your rival. Walk the desert, manage hunger, buy at shops, rest at
+shoot before your rival. Walk the trail, manage hunger, buy at shops, rest at
 inns, and ride through five worlds to the final boss.
 
 Three years, four versions, one duel. This is the definitive one: plain
@@ -39,8 +39,13 @@ loses. Lives are red diamonds, and always will be.
 
 There is no level select. You walk, and the road decides what you meet.
 
-- **Auto-walk** through a side-scrolling desert with five parallax layers. No
+- **Auto-walk** through a side-scrolling landscape with five parallax layers. No
   progress bar, no timer — you only ever see your character walking.
+- **Every world is a place.** The road opens in the **Dust Flats** and crosses
+  the **Wildgrass Prairie**, **Whitecrown Pass**, the **Blackwater Bayou** and
+  **Brimstone Basin** before the Galaxy. Each world names a biome; two of them
+  are drawn (`desert`, `meadow`), and the rest ride the desert with a colour
+  wash until their own art lands — see *Adding a biome* below.
 - **Guided randomness**: every world guarantees a minimum number of duels, shops
   and inns, then shuffles their order and spacing. An inn always sits just past
   a shop.
@@ -48,8 +53,12 @@ There is no level select. You walk, and the road decides what you meet.
   so food is a real purchase, not a nicety.
 - **A horse** roughly halves travel time.
 - **Day and night** run on a continuous clock, and the **weather** turns —
-  overcast, rain, sandstorm. Both reach into combat: rain misfires, a sandstorm
-  or nightfall throws off your opponent's read on you.
+  overcast, rain, sandstorm, fog. Both reach into combat: rain misfires, and a
+  sandstorm, fog or nightfall throws off your opponent's read on you.
+- **Weather belongs to the place.** Each biome carries its own table of what the
+  sky can do, so sand only blows where there is sand: the desert gets
+  sandstorms, the prairie gets river fog and far more rain, and walking out of
+  one biome into another clears any weather the new one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
 - **Inns** sell a basic bed (heals more in later worlds) or a premium bed (heals
@@ -93,7 +102,9 @@ src/
     palette.js            the one palette the whole game uses
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
     sprites-character.js  player, rider and horse animations (Block 2a)
-    sprites-environment.js props, buildings, sun/moon, parallax layers (Block 2b)
+    env-kit.js            the colour key + the shared layer generators
+    biomes/               one file per landscape: props, layers, ambient life
+    sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
   menu/                  title, online, profile, settings, credits
@@ -122,11 +133,32 @@ Three rules hold the architecture together:
 Balance lives in data, not in code:
 
 - `src/game/worlds.js` — per-world difficulty, rarity tables, price and reward
-  multipliers, encounter guarantees, bosses.
+  multipliers, encounter guarantees, bosses, and which biome each world is in.
+- `src/game/biomes.js` — per-biome weather tables (which skies a place can have
+  and how it moves between them).
 - `src/game/progression.js` — every curve: exp, gold, prices, inn healing,
   hunger drain, walking speed, the horse discount.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up.
+
+## Adding a biome
+
+A biome is a landscape; a world is a difficulty curve with a name. They are
+separate on purpose, so several worlds can share one landscape and retheming a
+world never rebalances it.
+
+1. Write `src/art/biomes/<id>.js` exporting the same shape `desert.js` and
+   `meadow.js` do: `props` (pixel strings), `buildLayers()`, `manifest`,
+   `scatter`, `groundFill`, `dust`, and optionally `scatterCell`,
+   `structureGround` and an `ambient` factory.
+2. Register it in `BIOME_ART` in `src/art/sprites-environment.js`.
+3. Give it a weather table in `src/game/biomes.js`. Add the state itself to
+   `src/explore/weather.js` first if it needs one that does not exist yet.
+4. Point a world at it: `biome: '<id>'` in `src/game/worlds.js`.
+
+Nothing else needs editing — the parallax renderer holds no landscape
+constants. Worlds 3 to 5 are named for biomes that are not drawn yet and say so
+in a comment; each is a one-line change once its art exists.
 
 ## Adding audio
 
