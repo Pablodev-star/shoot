@@ -128,11 +128,29 @@ const RAIN_DEPTHS = [
   { len: 5, vy: 6.4, alpha: 0.78, w: 1, land: 11, share: 0.24 },
 ];
 
-/** Sandstorm depths, same units. Sand travels sideways, not down. */
+/**
+ * Sandstorm depths, same units. Sand travels sideways, not down.
+ *
+ * SAND DOES NOT TELEPORT
+ * ---------------------------------------------------------------------------
+ * The near layer used to run at 19 source pixels per frame. That is more than
+ * the gunslinger is wide, every frame: the eye never sees a grain travel, it
+ * sees it in one place and then in another, which reads as flickering rather
+ * than as wind. Nineteen is also far past the point where the extra speed says
+ * anything — the storm was already unreadable at seven.
+ *
+ * So the near layer now runs at what used to be the *far* one — the slowest
+ * speed the storm had — and the two behind it are a shade slower still, which
+ * is all the parallax needs. Depth is carried by opacity and dash length from
+ * here on, and both of those survive being looked at. The storm reads exactly
+ * as hard, because the density and the haze were always doing that work.
+ */
 const SAND_DEPTHS = [
-  { vx: -7, len: [2, 6], alpha: 0.3, h: 1, share: 0.4 },
-  { vx: -12, len: [3, 7], alpha: 0.48, h: 1, share: 0.36 },
-  { vx: -19, len: [4, 9], alpha: 0.7, h: 1, share: 0.24 },
+  // Dashes come in with the speed: a 9px streak is motion blur, and there is
+  // no longer 9px of motion in a frame to blur.
+  { vx: -5.5, len: [2, 5], alpha: 0.3, h: 1, share: 0.4 },
+  { vx: -6.2, len: [2, 6], alpha: 0.48, h: 1, share: 0.36 },
+  { vx: -7, len: [3, 7], alpha: 0.7, h: 1, share: 0.24 },
 ];
 
 const RAIN_COLOR = [186, 214, 255];
@@ -145,7 +163,10 @@ const SAND_COLOR = [240, 214, 154];
  * in and is not going anywhere.
  */
 const SHEETS = {
-  sandstorm: { count: 5, h: [4, 16], vx: [-9, -4], alpha: [0.08, 0.18], color: 'rgb(214, 172, 104)' },
+  // The gusts ride with the sand rather than through it: a sheet of haze
+  // overtaking the grains it is supposedly made of was the other half of the
+  // storm's speed problem.
+  sandstorm: { count: 5, h: [4, 16], vx: [-7, -3], alpha: [0.08, 0.18], color: 'rgb(214, 172, 104)' },
   fog: { count: 8, h: [10, 34], vx: [-1.6, -0.4], alpha: [0.1, 0.22], color: 'rgb(222, 230, 226)' },
 };
 

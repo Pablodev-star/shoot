@@ -8,7 +8,15 @@
  *
  * Icon list: bandage, poison, dynamite, potion, vest, diadem (anti-effect),
  * map, bullet, life (red diamond), coin, carrot, apple, horse token, skull
- * (enemy marker), bed (inn), shop tag.
+ * (enemy marker), bed (inn), shop tag, hunger, and the two duel abilities that
+ * are not also items — bullet steal and mind control.
+ *
+ * EVERY EFFECT IN THE GAME HAS A PICTURE
+ * ---------------------------------------------------------------------------
+ * That last pair is why: an enemy's abilities used to be listed as words under
+ * their feet, because two of the four had no icon to show. They do now, so the
+ * duel screen shows all four the same way it shows everything else — see
+ * EFFECT_ICONS in src/duel/duel-screen.js.
  */
 
 import { PALETTE, RARITY_COLORS } from './palette.js';
@@ -51,6 +59,9 @@ const KEY = {
   z: PALETTE.sandDark,
   x: PALETTE.grey,
   X: PALETTE.greyDark,
+  // Skin, for the two icons that have a person in them.
+  c: PALETTE.skin,
+  C: PALETTE.skinDark,
 };
 
 const ICONS = {
@@ -346,6 +357,52 @@ const ICONS = {
     '..kOkOOOOOOOOOk.',
     '...kOOOOOOOOOOk.',
     '....kkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+  ],
+  /**
+   * Bullet Steal — a hand closing on a round that is not its own.
+   *
+   * This and `mindControl` below exist because the duel used to name an
+   * enemy's abilities in words under their feet, and the two that had no icon
+   * were the reason the whole row was text. Poison and dynamite have been
+   * drawn since the shop needed them; these two complete the set, so an
+   * ability can always be shown rather than spelled.
+   */
+  bulletSteal: [
+    '................',
+    '..........kk....',
+    '.........kOOk...',
+    '.........kOOk...',
+    '........kyooyk..',
+    '........kSssSk..',
+    '........kSssSk..',
+    '..kk....kSSSSk..',
+    '.ktTk....kkkk...',
+    '.ktTkkkkk.......',
+    '.ktTTTTTTk......',
+    '.ktTTTTTTk......',
+    '..kTTTTTTk......',
+    '..kTTTTTk.......',
+    '...kkkkkk.......',
+    '................',
+  ],
+  /** Mind Control — a head with a spiral turning where the thinking goes. */
+  mindControl: [
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '...kkccccccck...',
+    '...kcUUUUUcck...',
+    '...kcUuuuucck...',
+    '...kcUuUUUcck...',
+    '...kcUuuuUcck...',
+    '...kcUUUuUcck...',
+    '...kcccccccck...',
+    '....kcccccck....',
+    '....kcCCCcck....',
+    '.....kkkkkk.....',
     '................',
     '................',
     '................',

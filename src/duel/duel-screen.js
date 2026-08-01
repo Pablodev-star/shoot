@@ -15,7 +15,13 @@
  *    knows them.
  *  - One callout line states the situation, and it sits directly above the
  *    controls so it never covers the duellists.
- *  - The enemy's abilities are listed up front, so nothing is a surprise twice.
+ *  - The enemy's abilities are shown up front, so nothing is a surprise twice —
+ *    as icons, not as words. Poison, dynamite, bullet steal and mind control
+ *    are things the player should recognise on sight, and the row of names they
+ *    used to be was the only part of the screen asking to be read twice. The
+ *    names are still on the tooltip and on `aria-label`.
+ *  - What is currently *happening* to a fighter is separate from what they can
+ *    do: live effects sit in their own row and count down.
  *
  * All rules live in duel-engine.js. This file never decides an outcome.
  */
@@ -29,6 +35,7 @@ import { generateEnemy, generateBoss, nextBossPhase, ABILITY_LABELS } from '../g
 import { createDuel, MOVES } from './duel-engine.js';
 import { createLocalAgent, createAiAgent } from './duel-ai.js';
 import { createDuelScene } from './duel-scene.js';
+import { CHARACTER_TIMING } from '../art/sprites-character.js';
 import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
 import { resolveDuel } from '../game/run.js';
@@ -47,6 +54,16 @@ import { MAX_BULLETS } from './duel-engine.js';
 import { getSettings } from '../core/settings.js';
 import { toast } from '../ui/toast.js';
 import { openHowToPlay } from '../ui/help.js';
+
+/**
+ * How long the screen waits on each beat of a round, in milliseconds.
+ *
+ * DRAW_MS covers the four-frame draw in src/art/sprites-character.js, so the
+ * guns are levelled before either of them fires; BULLET_MS covers the tracer's
+ * flight, so a life is only lost once the round has actually arrived.
+ */
+const DRAW_MS = 4 * CHARACTER_TIMING.aim;
+const BULLET_MS = 260;
 
 /** Combine weather and night into the modifier set the engine understands. */
 function buildModifiers() {
@@ -115,32 +132,69 @@ export const DuelScreen = {
     const enemyLives = livesRow(enemy.lives, enemy.maxLives, { large: true });
     const playerCylinder = cylinder(0, MAX_BULLETS);
     const enemyCylinder = cylinder(enemy.bullets || 0, MAX_BULLETS);
-    const enemyName = el('div.fighter-name', { text: enemy.name });
-    const enemyAbilities = el('div.row.row--tight');
+    // The tooltip is the archetype's own one-line description of itself, so
+    // hovering a name says what you are looking at rather than repeating it.
+    const enemyName = el('div.fighter-name', { text: enemy.name, 'data-tip': enemy.look || null });
+    const enemyAbilities = el('div.effect-row');
+    // What is currently working on each fighter, as opposed to what they can
+    // do. Rebuilt every round from the engine's own state.
+    const playerStatus = el('div.effect-row');
+    const enemyStatus = el('div.effect-row');
     const playerCard = el('div.fighter-card', {}, [
       el('div.fighter-name', { text: 'You' }),
       playerLives,
       playerCylinder,
+      playerStatus,
     ]);
     const enemyCard = el('div.fighter-card.is-enemy', {}, [
       enemyName,
       enemyLives,
       enemyCylinder,
       enemyAbilities,
+      enemyStatus,
     ]);
 
+    /**
+     * The enemy's abilities, as pictures.
+     *
+     * They used to be a row of words under the fighter — "Bullet Steal",
+     * "Mind Control" — which is the same information the icon carries, in the
+     * one form that has to be read rather than recognised, on a screen where
+     * the player is already reading a callout and three buttons. Every one of
+     * these has had an icon since src/art/sprites-items.js grew the last two.
+     * The name is still there for anyone who hovers or is using a reader.
+     */
     function renderAbilities() {
       clearNode(enemyAbilities);
-      (enemy.abilities || []).forEach((a) =>
-        enemyAbilities.append(
-          el('span.chip.chip--rare', {
-            text: ABILITY_LABELS[a] || a,
-            'data-tip': ABILITY_TIPS[a] || '',
-          }),
-        ),
-      );
+      (enemy.abilities || []).forEach((a) => enemyAbilities.append(effectBadge(a)));
       if (isImmuneToEffects() && (enemy.abilities || []).length) {
-        enemyAbilities.append(el('span.chip.chip--legendary', { text: 'Blocked by diadem' }));
+        enemyAbilities.append(
+          effectBadge('immune', { label: 'Blocked by diadem', tone: 'is-blocked' }),
+        );
+      }
+    }
+
+    /**
+     * Live status on a fighter: what is currently working on them, as opposed
+     * to what they are capable of. Poison is the one the engine tracks, and it
+     * counts down, so the badge carries the number of rounds left.
+     */
+    function renderStatus(row, side) {
+      clearNode(row);
+      if (side.poison > 0) {
+        row.append(
+          effectBadge('poison', {
+            label: `Poisoned — ${side.poison} round${side.poison === 1 ? '' : 's'} left`,
+            tone: 'is-active',
+            count: side.poison,
+          }),
+        );
+      }
+      if (side.hasVest) {
+        row.append(effectBadge('vest', { label: 'Vest — stops one fatal shot', tone: 'is-good' }));
+      }
+      if (side.immune) {
+        row.append(effectBadge('immune', { label: 'Diadem — effects cannot touch you', tone: 'is-good' }));
       }
     }
 
@@ -268,6 +322,8 @@ export const DuelScreen = {
       updateLivesRow(enemyLives, sides.enemy.lives, sides.enemy.maxLives);
       updateCylinder(playerCylinder, sides.player.bullets);
       updateCylinder(enemyCylinder, sides.enemy.bullets);
+      renderStatus(playerStatus, sides.player);
+      renderStatus(enemyStatus, sides.enemy);
       roundPill.textContent = `Round ${Math.max(1, duel.getRound() + (localAgent.isWaiting() ? 1 : 0))}`;
 
       // Shoot swaps its cost strip for "Empty" when the cylinder is out, so a
@@ -343,46 +399,69 @@ export const DuelScreen = {
         scene.fx.banner = 'VEST HOLDS!';
         scene.fx.bannerTimer = 900;
       }
-      if (event.type === 'ability-blocked') toast('The diadem blocked it', 'good');
+      // An ability going off lights its own icon rather than printing its name
+      // over the fight: the picture is already on screen, and the player has
+      // been looking at it since the round started.
+      if (event.type === 'ability') flashEffect(enemyAbilities, event.ability);
+      if (event.type === 'ability-blocked') {
+        flashEffect(enemyStatus, 'immune');
+        toast('The diadem blocked it', 'good');
+      }
       if (event.type === 'phase') {
         scene.fx.banner = 'PHASE TWO';
         scene.fx.bannerTimer = 1400;
+        scene.fx.whiteout = 400;
+        scene.fx.shake = 500;
       }
     }
 
-    // --- round animation ---------------------------------------------------
+    /**
+     * The round, played out.
+     *
+     * The beats are deliberately uneven. Both fighters go for their guns at the
+     * same time — that is the draw, and it is the same length every round so
+     * the player learns it. Then the shot: a flash, a tracer crossing the road,
+     * and only after it lands does anyone lose a life. Lives used to drop on
+     * the same frame the gun came out, which meant the bullet was a decoration
+     * arriving after the fact.
+     */
     async function animate(res) {
+      const draws = (move) => move === MOVES.SHOOT || move === MOVES.RELOAD;
       const poseFor = (move) =>
-        move === MOVES.SHOOT ? 'shoot' : move === MOVES.SHIELD ? 'shield' : 'idle';
-      scene.fx.playerPose = poseFor(res.playerMove);
-      scene.fx.enemyPose = poseFor(res.enemyMove);
+        move === MOVES.SHIELD ? 'shield' : draws(move) ? 'aim' : 'idle';
+
+      scene.setPose('player', poseFor(res.playerMove));
+      scene.setPose('enemy', poseFor(res.enemyMove));
 
       if (res.playerMove) setCallout(`${moveWord(res.playerMove)} vs ${moveWord(res.enemyMove)}`);
-      await wait(280);
+      // Long enough for the four-frame draw to finish: the guns are up before
+      // either of them can go off.
+      await wait(DRAW_MS);
 
       if (res.playerFires || res.enemyFires) {
-        scene.fx.flash = 140;
-        scene.fx.flashSide =
-          res.playerFires && res.enemyFires ? 'both' : res.playerFires ? 'player' : 'enemy';
-        if (res.playerFires) scene.spawnBullet('player');
-        if (res.enemyFires) scene.spawnBullet('enemy');
+        if (res.playerFires) scene.fire('player');
+        if (res.enemyFires) scene.fire('enemy');
         play('shot');
-        await wait(280);
+        // A single shot rocks the frame; a simultaneous trade rocks it harder.
+        scene.fx.shake = res.playerFires && res.enemyFires ? 220 : 140;
+        await wait(BULLET_MS);
       }
       if (res.playerDry || res.enemyDry) play('emptyGun');
       if (res.playerMisfired || res.enemyMisfired) toast('Wet powder — misfire!', 'bad');
 
       if (res.hits.player) {
-        scene.fx.playerPose = 'hit';
-        scene.fx.shake = 320;
+        scene.impact('player');
+        scene.setPose('player', 'hit');
+        scene.fx.shake = 340;
         playerCard.classList.remove('is-hit');
         void playerCard.offsetWidth;
         playerCard.classList.add('is-hit');
         play('hit');
       }
       if (res.hits.enemy) {
-        scene.fx.enemyPose = 'hit';
-        scene.fx.shake = 240;
+        scene.impact('enemy');
+        scene.setPose('enemy', 'hit');
+        scene.fx.shake = 260;
         enemyCard.classList.remove('is-hit');
         void enemyCard.offsetWidth;
         enemyCard.classList.add('is-hit');
@@ -393,8 +472,8 @@ export const DuelScreen = {
       const [text, tone] = describe(res);
       setCallout(text, tone);
       await wait(res.hits.player || res.hits.enemy ? 640 : 400);
-      scene.fx.playerPose = 'idle';
-      scene.fx.enemyPose = 'idle';
+      scene.setPose('player', 'idle');
+      scene.setPose('enemy', 'idle');
     }
 
     function moveWord(move) {
@@ -450,7 +529,11 @@ export const DuelScreen = {
               // The new agent has to go into the engine, not just this closure.
               aiAgent = createAiAgent(enemy, modifiers, { thinkMs: 120 });
               duel.setEnemy(next, aiAgent);
+              // …and the new art has to go into the scene.
+              scene.setEnemySprites(next.sprites);
               enemyName.textContent = next.name;
+              if (next.look) enemyName.dataset.tip = next.look;
+              else delete enemyName.dataset.tip;
               renderAbilities();
               syncBars();
               setCallout('They are not finished…', 'is-bad');
@@ -560,10 +643,53 @@ export const DuelScreen = {
   },
 };
 
-/** Plain-language explanations for the enemy ability chips. */
+/** Plain-language explanations for the enemy ability icons. */
 const ABILITY_TIPS = {
   bulletSteal: 'They can take one of your bullets',
   poison: 'Poison costs you a life three rounds later',
   dynamite: 'Dynamite ignores your shield',
   mindControl: 'They can scramble your chosen move',
 };
+
+/**
+ * Effect → the icon that stands for it. Adding an effect to the game means
+ * adding a line here and a sprite in src/art/sprites-items.js; there is no
+ * text path any more, on purpose.
+ */
+const EFFECT_ICONS = {
+  bulletSteal: 'bulletSteal',
+  poison: 'poison',
+  dynamite: 'dynamite',
+  mindControl: 'mindControl',
+  vest: 'vest',
+  immune: 'diadem',
+};
+
+/** Kick the animation on one badge in a row, if that effect is showing. */
+function flashEffect(row, effect) {
+  const badge = row?.querySelector(`[data-effect="${effect}"]`);
+  if (!badge) return;
+  badge.classList.remove('is-firing');
+  void badge.offsetWidth; // restart the animation
+  badge.classList.add('is-firing');
+}
+
+/**
+ * One effect, as a framed pixel icon. The word it replaces is still carried by
+ * `data-tip` and `aria-label`, so hovering explains it and a screen reader
+ * reads it out — the icon replaces the *printed* label, not the information.
+ */
+function effectBadge(effect, { label, tone = '', count } = {}) {
+  const name = label || ABILITY_LABELS[effect] || effect;
+  const tip = ABILITY_TIPS[effect] ? `${name} — ${ABILITY_TIPS[effect]}` : name;
+  return el('span.effect-badge', {
+    class: tone,
+    dataset: { effect },
+    'data-tip': tip,
+    role: 'img',
+    'aria-label': tip,
+  }, [
+    icon(EFFECT_ICONS[effect] || 'skull', 1.15),
+    count != null ? el('span.effect-count', { text: String(count) }) : null,
+  ]);
+}

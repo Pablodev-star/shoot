@@ -670,6 +670,56 @@
 
 .meter-value { color: var(--text); font-variant-numeric: tabular-nums; }
 
+/* The label row has to survive a narrow band: the text can be squeezed, the
+   icon and the multiplier badge cannot — a 14px icon flexed down to 3px reads
+   as a rendering fault. */
+.meter-head > .row { min-width: 0; }
+.meter-head img.pixel,
+.meter-head .meter-flag { flex: 0 0 auto; }
+
+/* A meter being drained faster than normal wears its multiplier next to the
+   label, and the bar behind it shows the reason. */
+.meter-flag {
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px 2px;
+  border-radius: 999px;
+  color: #2a1a06;
+  background: linear-gradient(180deg, var(--sand-light), var(--sand-mid));
+  border: 1px solid var(--sand-deep);
+  box-shadow: 0 0 8px rgba(220, 180, 108, 0.45);
+  animation: flag-throb 1.5s var(--ease-in-out) infinite;
+}
+
+@keyframes flag-throb {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.09); }
+}
+
+/* Sand-blasted: grit drives across the bar in the same direction it drives
+   across the road, so the meter and the sky are telling one story. */
+.bar.is-sandblasted { border-color: var(--sand-dark); }
+
+.bar.is-sandblasted::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    108deg,
+    rgba(240, 214, 154, 0.34) 0 2px,
+    rgba(240, 214, 154, 0) 2px 9px
+  );
+  background-size: 18px 100%;
+  animation: sand-scour 0.75s linear infinite;
+}
+
+@keyframes sand-scour {
+  from { background-position: 18px 0; }
+  to { background-position: 0 0; }
+}
+
 /* ==========================================================================
    Stats
    ========================================================================== */

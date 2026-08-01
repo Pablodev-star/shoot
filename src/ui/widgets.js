@@ -136,19 +136,33 @@ export function goldChip(gold, tip = 'Gold') {
 
 /**
  * Labelled meter: a title row with a value, plus a bar.
- * @returns {{node: HTMLElement, bar: HTMLElement, set(ratio: number, text?: string): void}}
+ *
+ * `setFlag` is how a meter says it is being drained faster than normal — a
+ * badge next to the label, and a state class on the bar so the bar itself can
+ * show the reason (see the sand-blasted hunger meter in styles/ui.css). A rate
+ * change the player cannot see is a difficulty change they can only discover
+ * by losing to it.
+ *
+ * @returns {{
+ *   node: HTMLElement,
+ *   bar: HTMLElement,
+ *   set(ratio: number, text?: string): void,
+ *   setFlag(flag: {text: string, tip?: string, state?: string} | null): void,
+ * }}
  */
 export function meter({ label, iconName, ratio = 1, value = '', variant = '' }) {
   const fill = el('div.fill', { style: { width: `${clamp01(ratio) * 100}%` } });
   const bar = el('div.bar', { class: variant }, [fill]);
   const valueNode = el('span.meter-value', { text: value });
+  const flagNode = el('span.meter-flag', { hidden: true });
   const node = el('div.meter', {}, [
     el('div.meter-head', {}, [
-      el('span.row.row--tight', {}, [iconName ? icon(iconName, 0.9) : null, label]),
+      el('span.row.row--tight', {}, [iconName ? icon(iconName, 0.9) : null, label, flagNode]),
       valueNode,
     ]),
     bar,
   ]);
+  let flagState = null;
   return {
     node,
     bar,
@@ -158,6 +172,15 @@ export function meter({ label, iconName, ratio = 1, value = '', variant = '' }) 
       bar.classList.toggle('is-warn', r <= 0.45 && r > 0.2);
       bar.classList.toggle('is-low', r <= 0.2);
       if (nextValue != null) valueNode.textContent = nextValue;
+    },
+    setFlag(flag) {
+      if (flagState) bar.classList.remove(flagState);
+      flagState = flag?.state || null;
+      flagNode.hidden = !flag;
+      flagNode.textContent = flag?.text || '';
+      if (flag?.tip) flagNode.dataset.tip = flag.tip;
+      else delete flagNode.dataset.tip;
+      if (flagState) bar.classList.add(flagState);
     },
   };
 }
