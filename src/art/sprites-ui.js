@@ -123,6 +123,49 @@ const ICONS = {
     '................',
   ],
 
+  /** The other half of a zoom control. Struck from the same bar as `plus`. */
+  minus: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '..kkkkkkkkkkkk..',
+    '..kOOOOOOOOOOk..',
+    '..kOOOOOOOOOOk..',
+    '..kyyyyyyyyyyk..',
+    '..kkkkkkkkkkkk..',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ],
+
+  /**
+   * Recentre. A sight ring with a gap at each cardinal point, so it reads as
+   * something you look *through* rather than a wheel.
+   */
+  crosshair: [
+    '................',
+    '................',
+    '......kwwk......',
+    '....kkkwwkkk....',
+    '...kwwwkkwwwk...',
+    '..kwwk....kwwk..',
+    '..kwk..kk..kwk..',
+    '.kwk..kwwk..kwk.',
+    '.kwk..kwwk..kwk.',
+    '..kwk..kk..kwk..',
+    '..kwwk....kwwk..',
+    '...kwwwkkwwwk...',
+    '....kkkwwkkk....',
+    '......kwwk......',
+    '................',
+    '................',
+  ],
+
   /** Help. A stencilled question mark, punched like a sign. */
   question: [
     '................',

@@ -20,6 +20,7 @@ import { generateOffers, innSeed } from './inn.js';
 import { DISCOUNT_RATE } from './shop.js';
 import { finishEncounter } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
+import { openTrailMapForRun } from '../ui/map-panel.js';
 import { livesRow, updateLivesRow, icon } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { toast } from '../ui/toast.js';
@@ -145,7 +146,13 @@ export const InnScreen = {
       ]),
       el('div.screen-footer', {}, [
         el('button.btn.btn--ghost', {
-          onclick: () => openInventory({ context: 'walk', onClose: renderBeds }),
+          onclick: () => openInventory({
+            context: 'walk',
+            onClose: renderBeds,
+            onUse: (id, result) => {
+              if (result.effect === 'map') openTrailMapForRun();
+            },
+          }),
         }, [icon('shopTag', 1.1), 'Saddlebag']),
         el('button.btn.btn--primary', { onclick: () => finishEncounter() }, ['Back to the road']),
       ]),

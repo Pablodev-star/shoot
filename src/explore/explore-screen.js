@@ -17,6 +17,9 @@
  *    Weather and nightfall arrive as a toast when they change and are visible
  *    in the sky the rest of the time.
  *  - The saddlebag is one tap away at all times and pauses the walk while open.
+ *  - So is the trail map, once you own one. It is the only readout of what is
+ *    coming that the road has, and it is drawn rather than written — see
+ *    src/ui/map-panel.js.
  */
 
 import { el } from '../core/dom.js';
@@ -37,12 +40,12 @@ import { createParallax } from './parallax.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { getEngine, quitToMenu } from '../game/run.js';
-import { getState, getInventory } from '../game/player.js';
+import { getState, getInventory, countOf } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { icon, iconButton } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { openInventory } from '../ui/inventory-panel.js';
-import { peekAhead, ENCOUNTER_LABELS } from './encounters.js';
+import { openTrailMap } from '../ui/map-panel.js';
 import { toast } from '../ui/toast.js';
 import { confirmDialog } from '../ui/confirm.js';
 import { openHowToPlay } from '../ui/help.js';
@@ -88,6 +91,21 @@ export const ExploreScreen = {
       'data-tip': 'Eat, use or sell what you are carrying',
     }, [icon('shopTag', 1.1), el('span', { text: 'Saddlebag' }), bagCount, el('span.kbd', { text: 'I' })]);
 
+    /**
+     * The Map is a tool you own rather than a charge you spend, so it gets its
+     * own button on the road: digging through the saddlebag every time you want
+     * to know what is coming is the friction that made the old Map dead weight.
+     * The button only exists while you actually carry one.
+     */
+    const mapButton = el('button.btn.map-button', {
+      onclick: () => openMap(),
+      'data-tip': 'See the road ahead',
+    }, [icon('map', 1.1), el('span', { text: 'Map' }), el('span.kbd', { text: 'M' })]);
+
+    function syncMapButton() {
+      mapButton.hidden = countOf('map') === 0;
+    }
+
     function totalItems() {
       return getInventory().reduce((sum, e) => sum + e.qty, 0);
     }
@@ -100,7 +118,7 @@ export const ExploreScreen = {
       openInventory({
         context: 'walk',
         onUse: (id, result) => {
-          if (result.effect === 'map') revealMap();
+          if (result.effect === 'map') openMap();
         },
         onClose: () => {
           bagOpen = false;
@@ -109,15 +127,31 @@ export const ExploreScreen = {
       });
     }
 
-    /** The Map item: reveals what is coming, in vague terms only. */
-    function revealMap() {
-      const segment = engine.getSegment();
-      const ahead = peekAhead(segment, engine.nextIndex(), engine.getTravelled(), 3);
-      if (ahead.length === 0) {
+    /**
+     * The trail map. It pauses the walk on its own account: it can be opened
+     * from the road as well as from inside the saddlebag, and in the second
+     * case the bag is already holding the pause.
+     */
+    let mapOpen = false;
+    function openMap() {
+      if (mapOpen) return;
+      if (countOf('map') === 0) {
+        toast('You are not carrying a map', 'bad');
+        return;
+      }
+      const panel = openTrailMap({
+        engine,
+        onClose: () => {
+          mapOpen = false;
+          if (!bagOpen) engine.resume();
+        },
+      });
+      if (!panel) {
         toast('The road ahead is blank', 'bad');
         return;
       }
-      toast(ahead.map((a) => `${ENCOUNTER_LABELS[a.type]} ${a.proximity}`).join('   '), 'gold');
+      mapOpen = true;
+      engine.pause();
     }
 
     async function leave() {
@@ -133,21 +167,24 @@ export const ExploreScreen = {
 
     const onKey = (e) => {
       if (e.key === 'i' || e.key === 'I') openBag();
+      if ((e.key === 'm' || e.key === 'M') && !mapOpen && !bagOpen) openMap();
     };
     window.addEventListener('keydown', onKey);
 
     const screen = el('div.screen.explore-screen', {}, [
       band,
-      el('div.explore-actions', {}, [bagButton]),
+      el('div.explore-actions', {}, [mapButton, bagButton]),
     ]);
 
     root.append(screen);
     attachButtonSounds(screen);
+    syncMapButton();
 
     // --- live bindings -----------------------------------------------------
     const unsubs = [
       on(EVENTS.INVENTORY_CHANGED, () => {
         bagCount.textContent = String(totalItems());
+        syncMapButton();
       }),
       on(EVENTS.WEATHER_CHANGED, (w) => {
         if (WEATHER_BLURB[w.id]) toast(WEATHER_BLURB[w.id], w.id === 'sandstorm' ? 'bad' : 'info');

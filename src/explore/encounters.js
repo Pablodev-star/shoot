@@ -93,23 +93,32 @@ export function generateSegment(worldId, seed) {
 }
 
 /**
- * What the Map item reveals: the next `count` encounters with a rough distance
- * ("just ahead" / "a short ride" / "far off") instead of exact numbers — the
- * spec is explicit that the player must never see a precise progress readout.
+ * Where an encounter actually sits on the road, in travelled pixels.
+ *
+ * The horse does not move the encounters — it shortens the *gap* in front of
+ * each one, which is a different thing and the reason this is a function rather
+ * than a field. Everything that has to place an event against `travelled` (the
+ * walk engine, the approaching buildings, the trail map) goes through here, so
+ * a mounted player's map and a mounted player's road agree.
+ *
+ * @param {{distance:number, gap:number}} event
+ * @param {boolean} mounted
+ * @param {number} timeMul the mounted gap multiplier (HORSE_TIME_MUL)
  */
-export function peekAhead(segment, currentIndex, travelled, count = 3) {
-  const upcoming = segment.events.slice(currentIndex, currentIndex + count);
-  return upcoming.map((event) => {
-    const away = event.distance - travelled;
-    let proximity = 'far off';
-    if (away < 250) proximity = 'just ahead';
-    else if (away < 700) proximity = 'a short walk';
-    else if (away < 1300) proximity = 'a fair ride';
-    return { type: event.type, proximity, index: event.index };
-  });
+export function effectiveDistance(event, mounted, timeMul) {
+  return event.distance - event.gap + event.gap * (mounted ? timeMul : 1);
 }
 
-/** Human-readable label for an encounter type. */
+/**
+ * Human-readable label for an encounter type. Used by the trail map's markers
+ * and its legend.
+ *
+ * There used to be a `peekAhead` here as well, which returned the next three
+ * encounters with a vague distance attached ("Shop just ahead"). It existed
+ * only to fill the toast the Map item printed, and the map replaced both — the
+ * road drawn to scale says everything the proximity words were approximating,
+ * and it still never shows a number.
+ */
 export const ENCOUNTER_LABELS = {
   enemy: 'Duel',
   shop: 'Shop',

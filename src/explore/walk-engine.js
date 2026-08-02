@@ -22,7 +22,7 @@
 import { EVENTS, emit } from '../core/events.js';
 import { WALK_SPEED, HORSE_SPEED_MUL, HORSE_TIME_MUL } from '../game/progression.js';
 import { getState, addDistance } from '../game/player.js';
-import { generateSegment } from './encounters.js';
+import { generateSegment, effectiveDistance } from './encounters.js';
 import * as hunger from './hunger.js';
 import * as daynight from './daynight.js';
 import * as weather from './weather.js';
@@ -63,10 +63,7 @@ export function createWalkEngine() {
   function distanceToNext() {
     const event = nextEvent();
     if (!event) return Infinity;
-    const mounted = getState().hasHorse;
-    const start = event.distance - event.gap;
-    const gap = event.gap * (mounted ? HORSE_TIME_MUL : 1);
-    return start + gap - travelled;
+    return effectiveDistance(event, getState().hasHorse, HORSE_TIME_MUL) - travelled;
   }
 
   function speed() {
@@ -148,9 +145,7 @@ export function createWalkEngine() {
     for (const event of segment.events) {
       if (event.type !== 'shop' && event.type !== 'inn') continue;
       if (event.resolved) continue;
-      const start = event.distance - event.gap;
-      const gap = event.gap * (mounted ? HORSE_TIME_MUL : 1);
-      const worldX = start + gap;
+      const worldX = effectiveDistance(event, mounted, HORSE_TIME_MUL);
       if (worldX - travelled > 700) continue; // still over the horizon
       out.push({ worldX, kind: event.type });
     }

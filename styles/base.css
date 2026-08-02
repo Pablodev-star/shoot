@@ -376,6 +376,13 @@ textarea {
   inset: 0;
   z-index: 60;
   pointer-events: none;
+  /* The two doors park just outside this box between wipes, and a door parked
+     off the right edge is 672px of scrollable width on #app. Nothing shows a
+     scrollbar — but anything that scrolls an element into view (focusing a
+     button with Tab, a browser restoring focus) then slides the ENTIRE game
+     sideways, and it will not slide back. Clipping them here is what stops the
+     off-screen half of the wipe from being part of the page. */
+  overflow: hidden;
 }
 
 #transition::before,
