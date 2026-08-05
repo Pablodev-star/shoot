@@ -92,13 +92,22 @@ export const HUNGER_DRAIN_PER_SEC = 0.85;
 /** Riding covers ground faster but burns hunger slightly faster too. */
 export const HUNGER_DRAIN_HORSE_MUL = 1.15;
 /**
- * Walking into a sandstorm costs you. Half again as much hunger per second:
- * you are leaning into the wind, breathing through a kerchief and covering
- * less ground for the same effort. This is the only weather that reaches the
- * player's body rather than only the duel, so the meter says so out loud —
- * see the sand-blasted state in src/ui/statusbar.js.
+ * Weather that costs you rations to walk through.
+ *
+ * A sandstorm is the worst of it — you are leaning into the wind, breathing
+ * through a kerchief and covering less ground for the same effort. Snow is
+ * nearly as bad for a different reason (you are burning fuel to stay warm as
+ * well as to move), and ashfall a shade behind that.
+ *
+ * These are the only things in the game besides the horse that reach the
+ * player's *body* rather than the duel, so the meter says so out loud — see
+ * the harsh state in src/ui/statusbar.js. Each number is attached to its
+ * weather in `src/explore/weather.js`; nothing outside that table names a
+ * particular sky.
  */
 export const HUNGER_DRAIN_SANDSTORM_MUL = 1.5;
+export const HUNGER_DRAIN_SNOW_MUL = 1.4;
+export const HUNGER_DRAIN_ASH_MUL = 1.3;
 /** Once hunger hits zero, one life is lost every this many milliseconds. */
 export const STARVATION_INTERVAL_MS = 12000;
 

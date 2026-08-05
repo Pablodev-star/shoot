@@ -1,8 +1,8 @@
 /**
  * SHOOT! — Dynamic weather (Block 3b).
  *
- * Five states, each with its own visual treatment and a limited duration before
- * the sky clears again:
+ * Eight states, each with its own visual treatment and a limited duration
+ * before the sky clears again:
  *
  *   clear      — nothing drawn
  *   cloudy     — a light grey wash under the storm deck, mild visibility loss
@@ -13,6 +13,22 @@
  *                caught in
  *   fog        — still, banked mist that thickens towards the ground and eats
  *                the horizon; nothing falls, and that stillness is the point
+ *   snow       — flakes that drift rather than fall, settle where they land,
+ *                and cost you rations to walk through
+ *   ash        — the basin's fallout: slow grey flakes with live embers riding
+ *                up through them, and a dry brown haze over everything
+ *   starfall   — meteors crossing the void, in flights rather than singly.
+ *                The one weather with nothing between you and it
+ *
+ * ADDING ONE IS THREE EDITS AND NO NEW MACHINERY
+ * ---------------------------------------------------------------------------
+ * The three states above `starfall` were added long after the first five, and
+ * between them they needed exactly one new primitive (`settle`, the snow lying
+ * on the ground). Everything else came out of what the rain and the sandstorm
+ * already had: a particle population with depths, drifting sheets, banded
+ * washes and a pixel-grid line drawer. A weather is a table entry, a spawn
+ * case, a step case and a draw case — see `snow` for the shortest complete
+ * example of all four.
  *
  * `getWeatherState()` is the global read-only handle the duel system uses to
  * apply combat modifiers when a fight starts in bad weather.
@@ -53,6 +69,11 @@ import { EVENTS, emit } from '../core/events.js';
 import { makeRng } from '../core/rng.js';
 import { play } from '../core/audio.js';
 import { getBiome } from '../game/biomes.js';
+import {
+  HUNGER_DRAIN_SANDSTORM_MUL,
+  HUNGER_DRAIN_SNOW_MUL,
+  HUNGER_DRAIN_ASH_MUL,
+} from '../game/progression.js';
 import { getSky } from './daynight.js';
 
 export const WEATHER = {
@@ -72,6 +93,7 @@ export const WEATHER = {
     minMs: 20000,
     maxMs: 45000,
     duel: {},
+    blurb: 'Clouds are gathering',
   },
   rain: {
     id: 'rain',
@@ -81,6 +103,7 @@ export const WEATHER = {
     maxMs: 38000,
     /** Wet powder: shots occasionally misfire for BOTH duellists. */
     duel: { misfireChance: 0.08 },
+    blurb: 'Rain is coming down',
   },
   sandstorm: {
     id: 'sandstorm',
@@ -90,6 +113,21 @@ export const WEATHER = {
     maxMs: 30000,
     /** Sand in the eyes: the enemy AI reads your move less reliably. */
     duel: { enemyAccuracyPenalty: 0.18, misfireChance: 0.04 },
+    /**
+     * WEATHER THAT COSTS YOU SOMETHING TO WALK THROUGH
+     * -----------------------------------------------------------------------
+     * `hungerMul` multiplies the rate hunger drains at while you are on the
+     * road in it. It used to be a lone constant in `progression.js` that
+     * hunger.js checked for the string "sandstorm", which meant a second harsh
+     * weather could not exist without a second `if`. It is a field now, and
+     * the travel band reads the same field to draw the multiplier next to the
+     * meter — a hunger bar that quietly empties half again as fast is a
+     * difficulty spike the player can only find out about by dying of it.
+     */
+    hungerMul: HUNGER_DRAIN_SANDSTORM_MUL,
+    /** Toast wording, and the one line the player is told about it. */
+    blurb: 'Sand whips across the road',
+    tone: 'bad',
   },
   fog: {
     id: 'fog',
@@ -104,6 +142,56 @@ export const WEATHER = {
      * goes off at all.
      */
     duel: { enemyAccuracyPenalty: 0.14 },
+    blurb: 'Mist settles over the grass',
+  },
+
+  snow: {
+    id: 'snow',
+    label: 'Snowfall',
+    visibility: 0.62,
+    /** It comes on for a long time up there, and it goes off slowly. */
+    minMs: 26000,
+    maxMs: 58000,
+    /**
+     * Cold hands and a white sky. Nobody's aim is helped, and unlike the rain
+     * the powder stays dry — a snowstorm is a visibility problem, which is
+     * why it reads as a milder sandstorm rather than as a wetter one.
+     */
+    duel: { enemyAccuracyPenalty: 0.12 },
+    hungerMul: HUNGER_DRAIN_SNOW_MUL,
+    blurb: 'Snow is coming down over the pass',
+  },
+
+  ash: {
+    id: 'ash',
+    label: 'Ashfall',
+    visibility: 0.56,
+    minMs: 18000,
+    maxMs: 40000,
+    /**
+     * Grit in the eyes and no clean air to breathe: it throws the enemy off
+     * as hard as sand does, and it lights the odd cartridge that should not
+     * have gone off.
+     */
+    duel: { enemyAccuracyPenalty: 0.16, misfireChance: 0.05 },
+    hungerMul: HUNGER_DRAIN_ASH_MUL,
+    blurb: 'Ash is falling across the basin',
+    tone: 'bad',
+  },
+
+  starfall: {
+    id: 'starfall',
+    label: 'Starfall',
+    /**
+     * It takes almost nothing out of the view — there is no air out here to
+     * hold anything up. What it does is throw moving light across a scene
+     * that has none, which is worth more to a duel than a haze would be.
+     */
+    visibility: 0.9,
+    minMs: 16000,
+    maxMs: 34000,
+    duel: { enemyAccuracyPenalty: 0.1 },
+    blurb: 'Something is falling through the dark',
   },
 };
 
@@ -153,8 +241,50 @@ const SAND_DEPTHS = [
   { vx: -7, len: [3, 7], alpha: 0.7, h: 1, share: 0.24 },
 ];
 
+/**
+ * Snow depths. A flake is a whole pixel — never a two-pixel block, which at
+ * this scale is a snowball — and it falls at a fifth of the speed of rain,
+ * because the single thing that separates snow from rain on screen is how long
+ * it takes to cross it. `wander` is how far it swings sideways on the way
+ * down: snow does not fall, it *drifts*, and a flake on rails is hail.
+ */
+const SNOW_DEPTHS = [
+  { vy: 0.5, alpha: 0.42, wander: 0.9, rate: 3200, share: 0.42 },
+  { vy: 0.8, alpha: 0.66, wander: 1.4, rate: 2400, share: 0.34 },
+  { vy: 1.2, alpha: 0.92, wander: 2, rate: 1700, share: 0.24 },
+];
+
+/**
+ * Ash depths. Between the two above: it falls like snow and it is the colour
+ * of the sand. The near layer carries live embers — the basin is still
+ * burning somewhere upwind — and those are the only particles in the game that
+ * travel *up*.
+ */
+const ASH_DEPTHS = [
+  { vy: 0.6, alpha: 0.3, wander: 0.7, rate: 3000, share: 0.44 },
+  { vy: 0.95, alpha: 0.48, wander: 1.1, rate: 2200, share: 0.36 },
+  { vy: 1.35, alpha: 0.7, wander: 1.6, rate: 1500, share: 0.2 },
+];
+
+/**
+ * Starfall depths. These are not particles falling *on* you — they are a long
+ * way off, which is why the far layer is slow and short and the near one is
+ * fast and long. They travel down and to the left at a fixed rake, because
+ * meteors in one shower are parallel: they are all coming from the same place.
+ */
+const METEOR_DEPTHS = [
+  { v: 3.2, len: 5, alpha: 0.4, share: 0.46 },
+  { v: 5.4, len: 9, alpha: 0.68, share: 0.34 },
+  { v: 8, len: 15, alpha: 1, share: 0.2 },
+];
+
+/** How far a meteor leans: one pixel down for every this many across. */
+const METEOR_RAKE = 0.42;
+
 const RAIN_COLOR = [186, 214, 255];
 const SAND_COLOR = [240, 214, 154];
+const SNOW_COLOR = [244, 250, 255];
+const ASH_COLOR = [168, 160, 168];
 
 /**
  * The drifting sheets. Sand throws thin, fast gusts across the road; fog is
@@ -168,6 +298,12 @@ const SHEETS = {
   // storm's speed problem.
   sandstorm: { count: 5, h: [4, 16], vx: [-7, -3], alpha: [0.08, 0.18], color: 'rgb(214, 172, 104)' },
   fog: { count: 8, h: [10, 34], vx: [-1.6, -0.4], alpha: [0.1, 0.22], color: 'rgb(222, 230, 226)' },
+  // Snow's banks are fog's, moving at a walking pace rather than a standstill:
+  // a squall is mist with somewhere to be.
+  snow: { count: 6, h: [8, 26], vx: [-3.4, -1.2], alpha: [0.08, 0.2], color: 'rgb(238, 246, 255)' },
+  // Smoke, not haze: fewer, deeper, darker, and the only sheets in the game
+  // that take light *out* of the scene rather than putting a veil over it.
+  ash: { count: 5, h: [10, 30], vx: [-2.6, -0.8], alpha: [0.1, 0.24], color: 'rgb(96, 88, 96)' },
 };
 
 const rng = makeRng(0xc0ffee);
@@ -190,7 +326,8 @@ const state = {
   bolt: null,          // the strike currently on screen
   particles: [],
   splashes: [],
-  sheets: [],          // drifting sand gusts / fog banks
+  sheets: [],          // drifting sand gusts / fog banks / snow squalls / smoke
+  settled: [],         // flakes lying where they landed, until the sky changes
   /** The biome whose weather table the roll is drawn from. */
   biome: getBiome('desert'),
   /** Walk line in device pixels; the screens hand it over each frame. */
@@ -201,6 +338,7 @@ function clearParticles() {
   state.particles = [];
   state.splashes = [];
   state.sheets = [];
+  state.settled = [];
 }
 
 /**
@@ -233,7 +371,8 @@ function roll(next) {
   const cfg = WEATHER[next] || WEATHER.clear;
   state.current = cfg;
   state.remaining = rng.range(cfg.minMs, cfg.maxMs);
-  if (next === 'sandstorm') play('wind');
+  // Anything driven by wind announces itself before you can see it properly.
+  if (next === 'sandstorm' || next === 'snow' || next === 'ash') play('wind');
   emit(EVENTS.WEATHER_CHANGED, getWeatherState());
 }
 
@@ -299,9 +438,24 @@ export function update(dt, view) {
 // desktop instead of being scale/2 device pixels wide on both.
 // ---------------------------------------------------------------------------
 
+/** How many particles each weather wants on screen at full strength. */
+const PARTICLE_COUNT = {
+  rain: 300,
+  sandstorm: 300,
+  // Fewer than the rain, and each one lasts far longer on screen. Three
+  // hundred flakes drifting at a fifth of the speed is a blizzard, and a
+  // blizzard is a different weather from a snowfall.
+  snow: 190,
+  ash: 150,
+  // A shower is not a downpour. Twenty-two streaks is already more meteors
+  // than any real one puts up, and the number is doing the same job the
+  // sandstorm's three hundred grains do: it is what makes it a *fall*.
+  starfall: 22,
+};
+
 function stepParticles(dt, view) {
   const id = state.shown.id;
-  const wanted = id === 'sandstorm' ? 300 : id === 'rain' ? 300 : 0;
+  const wanted = PARTICLE_COUNT[id] || 0;
   const count = Math.round(wanted * state.intensity);
   const W = view.w / view.scale;
   const H = view.h / view.scale;
@@ -351,7 +505,80 @@ function stepParticles(dt, view) {
 
   // Fog has no particles at all: it is banks and haze, and nothing in it is
   // travelling fast enough to be a grain of anything.
-  if (id === 'fog') stepSheets(dt, W, H, SHEETS.fog, gy);
+  if (id === 'fog') {
+    stepSheets(dt, W, H, SHEETS.fog, gy);
+    return;
+  }
+
+  if (id === 'snow' || id === 'ash') {
+    // One shared wind for the whole sky, so every flake leans the same way at
+    // the same moment. Independent per-flake drift reads as static.
+    const wind = -0.7 * (1 + 0.5 * Math.sin(state.clock / 4200) + 0.22 * Math.sin(state.clock / 1300));
+    for (const p of state.particles) {
+      if (p.ember) {
+        // Embers rise, wander, and burn out rather than landing.
+        p.y -= p.vy * step;
+        p.x += Math.sin(state.clock / p.rate + p.phase) * 0.25 * step;
+        p.life -= dt;
+        if (p.life <= 0 || p.y < -6) Object.assign(p, spawn(W, H, id, gy));
+        continue;
+      }
+      p.y += p.vy * step;
+      // The swing is a sine on the flake's own clock, plus the shared wind:
+      // that combination is what makes a fall look soft instead of striped.
+      p.x += (Math.sin(state.clock / p.rate + p.phase) * p.wander + wind * 0.35) * step;
+      const landY = gy + p.landOffset;
+      if (p.y >= landY) {
+        // Snow lies where it lands. Ash does not — it is too hot and too fine,
+        // and a grey crust building up over a lava field would read as snow.
+        if (id === 'snow' && p.depth > 0) addSettled(p.x, landY, p.depth);
+        Object.assign(p, spawn(W, H, id, gy));
+        p.y = -rng.range(2, 24);
+      } else if (p.x < -40 || p.x > W + 40) {
+        Object.assign(p, spawn(W, H, id, gy));
+      }
+    }
+    stepSheets(dt, W, H, id === 'snow' ? SHEETS.snow : SHEETS.ash, id === 'ash' ? gy : null);
+    stepSettled(dt);
+    return;
+  }
+
+  if (id === 'starfall') {
+    for (const p of state.particles) {
+      p.x += p.vx * step;
+      p.y += p.vy * step;
+      p.t += dt;
+      // A meteor is not recycled at the edge of the screen — it burns out on
+      // its own clock, wherever it happens to be, and the next one starts
+      // somewhere else. Nothing in a meteor shower crosses the whole sky.
+      if (p.t >= p.life || p.y > H + 20 || p.x < -60) Object.assign(p, spawn(W, H, id, gy));
+    }
+  }
+}
+
+// --- settled snow -----------------------------------------------------------
+
+/**
+ * A flake that has landed. It sits on the walk line, fades, and goes.
+ *
+ * This is the only weather in the game that leaves anything behind, and it is
+ * capped hard: at a hundred and twenty the road is dusted, and past that the
+ * ground reads as a solid white bar rather than as snow lying on it. They are
+ * *not* stored against the world — the camera moves and they do not, because
+ * they are a suggestion of settling rather than a simulation of it, and a
+ * player watching for that on a horse would be watching very hard indeed.
+ */
+function addSettled(x, y, depth) {
+  if (state.settled.length > 120) return;
+  state.settled.push({ x, y, depth, t: 0, life: rng.range(2600, 6000) });
+}
+
+function stepSettled(dt) {
+  for (let i = state.settled.length - 1; i >= 0; i--) {
+    const s = state.settled[i];
+    s.t += dt;
+    if (s.t >= s.life) state.settled.splice(i, 1);
+  }
 }
 
 /**
@@ -360,6 +587,51 @@ function stepParticles(dt, view) {
  * from whatever the ground happens to be when it gets there.
  */
 function spawn(W, H, id, gy = H * 0.78) {
+  if (id === 'snow' || id === 'ash') {
+    const table = id === 'snow' ? SNOW_DEPTHS : ASH_DEPTHS;
+    const depth = pickDepth(table);
+    const d = table[depth];
+    // One flake in twelve on the near ash layer is a live ember going the
+    // other way. Rare, because two of them on screen at once stops reading as
+    // "something is burning upwind" and starts reading as fireworks.
+    const ember = id === 'ash' && depth === 2 && rng.chance(0.12);
+    return {
+      depth,
+      ember,
+      x: rng.range(-30, W + 30),
+      y: ember ? rng.range(gy - 10, gy + 6) : rng.range(-H, 0),
+      vy: ember ? rng.range(0.5, 1.1) : d.vy * rng.range(0.85, 1.2),
+      wander: d.wander * rng.range(0.7, 1.3),
+      rate: d.rate * rng.range(0.75, 1.35),
+      phase: rng.range(0, Math.PI * 2),
+      a: d.alpha * rng.range(0.75, 1.1),
+      life: ember ? rng.range(900, 2600) : 0,
+      /** How far below the walk line this flake settles, in source pixels. */
+      landOffset: [0, 5, 11][depth] + rng.range(-3, 3),
+    };
+  }
+
+  if (id === 'starfall') {
+    const depth = pickDepth(METEOR_DEPTHS);
+    const d = METEOR_DEPTHS[depth];
+    const v = d.v * rng.range(0.85, 1.15);
+    return {
+      depth,
+      // Meteors only ever appear in the upper part of the frame: one climbing
+      // out of the ground would be a rocket.
+      x: rng.range(-20, W + 60),
+      y: rng.range(-30, H * 0.45),
+      vx: -v,
+      vy: v * METEOR_RAKE,
+      len: d.len * rng.range(0.8, 1.25),
+      a: d.alpha * rng.range(0.8, 1.1),
+      t: 0,
+      life: rng.range(500, 1600),
+      /** A few of them are worth more than the rest — the ones you look up for. */
+      bright: rng.chance(0.18),
+    };
+  }
+
   if (id === 'sandstorm') {
     const depth = pickDepth(SAND_DEPTHS);
     const d = SAND_DEPTHS[depth];
@@ -600,6 +872,56 @@ export function render(ctx, view) {
     return;
   }
 
+  if (id === 'snow') {
+    /**
+     * Snow is drawn light, not dark. Every other weather in the game takes
+     * value out of the scene; this one puts it in — the sky goes pale, the
+     * ground goes paler, and the contrast in the middle distance drops away
+     * until the peaks are barely there. That is what falling snow does to a
+     * view, and it is the reason the wash is nearly white while the fog's,
+     * which is a similar colour, is a veil rather than a fill.
+     */
+    const glare = 232 + Math.round(getSky().light * 20);
+    const pale = `rgb(${glare}, ${glare + 4}, ${Math.min(255, glare + 10)})`;
+    bandWash(ctx, view, pale, 0, view.h, 0.34 * k, 0.2 * k);
+    drawSheets(ctx, view, k, SHEETS.snow.color);
+    drawSettled(ctx, view, k);
+    drawFlakes(ctx, view, k, light, SNOW_COLOR, SNOW_DEPTHS);
+    // A last thin wash lying on the ground, so the road is the brightest part
+    // of the frame rather than the sky.
+    bandWash(ctx, view, pale, gy - view.h * 0.08, view.h, 0.1 * k, 0.4 * k);
+    return;
+  }
+
+  if (id === 'ash') {
+    /**
+     * The basin's own colour pulled up over the sky: dry, brown and lightless.
+     *
+     * It is deliberately lighter than the sandstorm's, which is the opposite
+     * of what the first pass assumed. A sandstorm can afford to blind you
+     * because the sand it is made of is the brightest thing in the desert —
+     * the scene stays legible while being nearly white. Ash is dark, and the
+     * basin under it is darker, so the same weight of haze turned the world
+     * into one flat brown rectangle with a hat moving across it. Half as much
+     * says the same thing and leaves a place underneath.
+     */
+    bandWash(ctx, view, 'rgb(84, 70, 64)', 0, view.h, 0.34 * k, 0.44 * k);
+    drawSheets(ctx, view, k, SHEETS.ash.color);
+    drawFlakes(ctx, view, k, light, ASH_COLOR, ASH_DEPTHS);
+    // Heavier towards the ground, where it is coming from and where it is
+    // piling up — the same shape as the sandstorm's haze, in soot.
+    bandWash(ctx, view, 'rgb(60, 48, 48)', view.h * 0.4, view.h, 0, 0.32 * k);
+    return;
+  }
+
+  if (id === 'starfall') {
+    // Almost no wash at all: a veil over open space is a contradiction. What
+    // little there is cools the frame rather than dimming it.
+    bandWash(ctx, view, 'rgb(38, 24, 72)', 0, view.h, 0.24 * k, 0.1 * k);
+    drawMeteors(ctx, view, k);
+    return;
+  }
+
   if (id === 'fog') {
     /**
      * Fog is built the other way up from every other weather here. The rest
@@ -680,6 +1002,90 @@ function drawSplashes(ctx, view, k, light) {
       ctx.globalAlpha = 0.5;
       ctx.fillRect(x - s, y, s * 3, s);
       ctx.globalAlpha = 1;
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Snow and ash, which are the same routine: a population of single pixels
+ * falling slowly, plus — for the ash — the embers riding up through them.
+ *
+ * A flake is one pixel at every depth. The three depths are told apart by
+ * opacity and by speed and by nothing else, which is the same rule the sand
+ * follows and the reason a squall never reads as gravel.
+ */
+function drawFlakes(ctx, view, k, light, color, depths) {
+  const s = view.scale;
+  const c = color.map((v) => Math.round(v * light));
+  for (const p of state.particles) {
+    const x = Math.round(p.x) * s;
+    const y = Math.round(p.y) * s;
+    if (p.ember) {
+      // An ember dims as it burns out, and it carries one dark pixel of the
+      // ash it came off behind it.
+      const fade = Math.max(0, Math.min(1, p.life / 900));
+      ctx.fillStyle = `rgba(255, 190, 82, ${fade * k})`;
+      ctx.fillRect(x, y, s, s);
+      ctx.fillStyle = `rgba(255, 127, 34, ${fade * k * 0.35})`;
+      ctx.fillRect(x - s, y - s, s * 3, s * 3);
+      continue;
+    }
+    const d = depths[p.depth];
+    ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${p.a * k})`;
+    ctx.fillRect(x, y, s, s);
+    // The nearest layer gets a second pixel, which at this size is the whole
+    // difference between "a flake in front of you" and "a flake behind".
+    if (p.depth === 2 && d) ctx.fillRect(x, y + s, s, s);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Snow already on the ground: a short bright dash, fading out as it melts. */
+function drawSettled(ctx, view, k) {
+  const s = view.scale;
+  for (const sp of state.settled) {
+    const a = (1 - sp.t / sp.life) * k * (sp.depth === 2 ? 0.75 : 0.5);
+    if (a <= 0.02) continue;
+    ctx.fillStyle = `rgba(244, 250, 255, ${a})`;
+    ctx.fillRect(Math.round(sp.x) * s, Math.round(sp.y) * s, s * 2, s);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Meteors. Each one is a tapering streak: a bright head, a body that thins
+ * behind it, and nothing at all where it has already been. The taper is drawn
+ * as whole pixels stepping down in alpha rather than as a gradient, for the
+ * same reason the rest of this file has no gradients in it.
+ */
+function drawMeteors(ctx, view, k) {
+  const s = view.scale;
+  for (const p of state.particles) {
+    // In and out: a meteor that appears at full brightness is a scratch on
+    // the film. Both ends of its life are a fade.
+    const age = p.t / p.life;
+    const fade = Math.min(1, Math.min(age * 6, (1 - age) * 3));
+    const a = p.a * k * fade;
+    if (a <= 0.02) continue;
+    const steps = Math.max(2, Math.round(p.len));
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      // Behind the head, along the direction of travel.
+      const x = Math.round(p.x + t * p.len) * s;
+      const y = Math.round(p.y - t * p.len * METEOR_RAKE) * s;
+      const tail = (1 - t) ** 1.6;
+      ctx.fillStyle = p.bright
+        ? `rgba(255, 240, 200, ${a * tail})`
+        : `rgba(200, 230, 255, ${a * tail})`;
+      ctx.fillRect(x, y, s, s);
+    }
+    // The head itself, one step brighter and one pixel wider on the bright ones.
+    ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+    ctx.fillRect(Math.round(p.x) * s, Math.round(p.y) * s, s, s);
+    if (p.bright) {
+      ctx.fillStyle = `rgba(162, 247, 236, ${a * 0.4})`;
+      ctx.fillRect(Math.round(p.x) * s - s, Math.round(p.y) * s - s, s * 3, s * 3);
     }
   }
   ctx.globalAlpha = 1;
@@ -788,6 +1194,14 @@ export function getWeatherState() {
     intensity: state.intensity,
     /** What is on screen right now, which lags `id` through a change. */
     shownId: state.shown.id,
+    /**
+     * What this sky does to the hunger meter, and what to say when it arrives.
+     * Both are read straight off the table so that adding a weather never
+     * means editing the HUD or the road — see the note on `hungerMul`.
+     */
+    hungerMul: state.current.hungerMul || 1,
+    blurb: state.current.blurb || null,
+    tone: state.current.tone || 'info',
   };
 }
 

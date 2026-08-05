@@ -95,14 +95,31 @@ export function createWalkEngine() {
     if (event && distanceToNext() <= 0) {
       event.resolved = true;
       pause();
-      if (event.type === 'boss') {
-        emit(EVENTS.ENCOUNTER_REACHED, { ...event, isBoss: true });
-      } else {
-        emit(EVENTS.ENCOUNTER_REACHED, { ...event });
-      }
+      /**
+       * THE ENCOUNTER CARRIES ITS OWN WORLD, AND THE TICK ENDS HERE
+       * -----------------------------------------------------------------
+       * `worldId` rides along because the screen that opens next must fight
+       * the world this segment belongs to, not whatever `player.world` says
+       * by the time it mounts — see the note in src/duel/duel-screen.js.
+       *
+       * And the `return` is the other half of the same bug. The boss is the
+       * last event in a segment, so resolving it used to fall straight
+       * through into the "segment cleared" check below and fire that in the
+       * *same tick*: the run controller moved the player into the next world
+       * while the boss duel was still being routed, and the fight that
+       * opened was the next world's boss. Nothing is cleared in the tick
+       * that resolves an encounter; the boss duel routes the transition
+       * itself when it ends.
+       */
+      emit(EVENTS.ENCOUNTER_REACHED, {
+        ...event,
+        worldId: segment.worldId,
+        ...(event.type === 'boss' ? { isBoss: true } : {}),
+      });
+      return;
     }
 
-    if (!nextEvent() && !finished) {
+    if (!event && !finished) {
       finished = true;
       emit(EVENTS.SEGMENT_CLEARED, { worldId: segment.worldId });
     }

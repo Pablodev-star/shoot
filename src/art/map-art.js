@@ -28,8 +28,10 @@
  * biome gets a new map for free: write `src/art/biomes/<id>.js`, and its map is
  * its own props on its own ground.
  *
- * Worlds whose landscape has not been drawn yet ride the desert here exactly as
- * they do on the road, and wear the same colour wash — see `worlds.js`.
+ * Every world has its own landscape now, so every world has its own map: sand,
+ * grass, snow, black water, basalt and the shelf out past the last horizon.
+ * What differs between them is only the TERRAIN entry below and the props the
+ * bundle hands over — no map code is aware of any particular place.
  */
 
 import { PALETTE } from './palette.js';
@@ -40,18 +42,17 @@ import { makeRng } from '../core/rng.js';
 import { getEnvironmentSprites } from './sprites-environment.js';
 
 /**
- * The shared environment key plus the handful of colours only map furniture
- * needs. One letter is still one colour — see the note in `env-kit.js`.
+ * The markers are drawn with the shared environment key and nothing else.
+ *
+ * There used to be a MAP_KEY here: the shared key plus six letters of its own
+ * for white, shadow and three blues. Half of them were never used by any
+ * marker, and when the last four biomes arrived every one of those letters had
+ * been claimed by a landscape — so the map was quietly baking `L` as shadow
+ * while the bayou was baking it as bog water, which is precisely the thing the
+ * shared key exists to prevent. The two colours the markers actually needed are
+ * both already in the key (`1` is white, `k` is the game's hole colour), so the
+ * override is gone rather than renamed.
  */
-const MAP_KEY = {
-  ...KEY,
-  D: PALETTE.steelDark,
-  L: PALETTE.shadow,
-  Z: PALETTE.white,
-  Q: PALETTE.blue,
-  U: PALETTE.blueLight,
-  V: PALETTE.blueDark,
-};
 
 /** Source size of every marker. They are square so they can be centred blind. */
 export const MARKER_SIZE = 16;
@@ -94,7 +95,7 @@ const MARKERS = {
    */
   duel: [
     '................',
-    '..Zk........Zk..',
+    '..1k........1k..',
     '..Yk........Yk..',
     '...Yk......Yk...',
     '....Yk....Yk....',
@@ -120,7 +121,7 @@ const MARKERS = {
     '...WXOOOOOOXW...',
     '...WXXXXXXXXW...',
     '..wWWWWWWWWWWw..',
-    '..weZeZeZeZeZw..',
+    '..we1e1e1e1e1w..',
     '..wWWWWWWWWWWw..',
     '..wWcCcWWcCcWw..',
     '..wWcCcWWcCcWw..',
@@ -161,9 +162,9 @@ const MARKERS = {
     '..kkkkkkkkkkkk..',
     '....bbbbbbbb....',
     '...bbbbbbbbbb...',
-    '...bbLLbbLLbb...',
-    '...bbLLbbLLbb...',
-    '....bbbLLbbb....',
+    '...bbkkbbkkbb...',
+    '...bbkkbbkkbb...',
+    '....bbbkkbbb....',
     '....bbbbbbbb....',
     '....bBbBbBbB....',
     '.....bbbbbb.....',
@@ -184,7 +185,7 @@ export function getMapMarkers(scale = 2) {
   if (cached) return cached;
   const baked = {};
   for (const [name, rows] of Object.entries(MARKERS)) {
-    baked[name] = bake({ key: MAP_KEY, rows }, scale);
+    baked[name] = bake({ key: KEY, rows }, scale);
   }
   markerCache.set(scale, baked);
   return baked;
@@ -202,7 +203,21 @@ export function getMapMarkers(scale = 2) {
  * pick which texture pass runs — sand lies in wind-blown arcs, grass stands up
  * in short strokes, and swapping the two is the fastest way to make a biome
  * look like the other one wearing a filter.
+ *
+ * `ponds` is how many pools of standing water to try to place, and `water`
+ * says what they are made of. A prairie pond is blue because it is holding the
+ * sky; a bayou pool is black because it is holding nothing, and the basin's
+ * "ponds" are lava. Same routine, three completely different readings — which
+ * is exactly the split that made it worth passing the colours in rather than
+ * writing a second painter.
  */
+const POND_WATER = {
+  rim: PALETTE.grassDark,
+  body: PALETTE.blueDark,
+  top: PALETTE.blue,
+  glint: PALETTE.blueLight,
+  reed: PALETTE.grassDark,
+};
 const TERRAIN = {
   desert: {
     ground: PALETTE.sand,
@@ -225,7 +240,95 @@ const TERRAIN = {
     edge: PALETTE.grassDeep,
     blades: true,
     ponds: 2,
+    water: POND_WATER,
     blooms: [PALETTE.bloomPink, PALETTE.bloomBlue, PALETTE.bloomCream],
+  },
+
+  /**
+   * The pass. Ripples rather than blades — wind does the same thing to snow
+   * that it does to sand, and sastrugi from above are the desert's arcs in a
+   * colder ramp. The range along the top is the only place on any map where
+   * the peaks are lighter than the ground they stand on.
+   */
+  snow: {
+    ground: PALETTE.snow,
+    patches: [PALETTE.snowLight, PALETTE.snowMid],
+    grit: [PALETTE.snowMid, PALETTE.snowShade],
+    road: { worn: PALETTE.snowMid, dash: PALETTE.snowDeep, lit: PALETTE.snowLight },
+    clearing: PALETTE.snowMid,
+    range: { body: PALETTE.snowShade, light: PALETTE.snowLight, dark: PALETTE.snowDeep },
+    edge: PALETTE.snowDeep,
+    ripples: true,
+    ponds: 2,
+    water: {
+      rim: PALETTE.snowShade,
+      body: PALETTE.iceDark,
+      top: PALETTE.ice,
+      glint: PALETTE.iceLight,
+      reed: PALETTE.snowDeep,
+    },
+  },
+
+  /**
+   * The bayou. The most water of any map by a distance, and the darkest sheet
+   * the panel ever shows — which is the point: it is the one map where the
+   * road is easier to find than the ground is.
+   */
+  swamp: {
+    ground: PALETTE.bog,
+    patches: [PALETTE.bogLight, PALETTE.bogDark],
+    grit: [PALETTE.bogDark, PALETTE.grassDeep],
+    road: { worn: PALETTE.soil, dash: PALETTE.soilDeep, lit: PALETTE.soilLight },
+    clearing: PALETTE.soilDark,
+    range: { body: PALETTE.bogHaze, light: PALETTE.lichen, dark: PALETTE.bogDark },
+    edge: PALETTE.bogDeep,
+    blades: true,
+    blooms: [PALETTE.algae, PALETTE.lichen, PALETTE.bogLight],
+    ponds: 6,
+    water: {
+      rim: PALETTE.grassDeep,
+      body: PALETTE.bogDeep,
+      top: PALETTE.bogDark,
+      glint: PALETTE.bogLight,
+      reed: PALETTE.algae,
+    },
+  },
+
+  /** The basin, where the standing water is not water. */
+  inferno: {
+    ground: PALETTE.char,
+    patches: [PALETTE.charLight, PALETTE.charDark],
+    grit: [PALETTE.charLight, PALETTE.charDark],
+    road: { worn: PALETTE.charLight, dash: PALETTE.charDark, lit: PALETTE.grey },
+    clearing: PALETTE.charLight,
+    range: { body: PALETTE.charLight, light: PALETTE.grey, dark: PALETTE.charDark },
+    edge: PALETTE.shadow,
+    ripples: true,
+    ponds: 4,
+    water: {
+      rim: PALETTE.charDark,
+      body: PALETTE.magmaDeep,
+      top: PALETTE.magma,
+      glint: PALETTE.emberGlow,
+      reed: PALETTE.charDark,
+    },
+  },
+
+  /**
+   * The void. No ponds at all — there is nothing out there to hold a liquid —
+   * and the "range" along the top edge is the far shelf, drawn in the same
+   * violet it is drawn in on the road.
+   */
+  void: {
+    ground: PALETTE.voidRock,
+    patches: [PALETTE.voidRockLight, PALETTE.voidRockDark],
+    grit: [PALETTE.voidRockLight, PALETTE.voidRockDark],
+    road: { worn: PALETTE.voidRockLight, dash: PALETTE.cosmicHigh, lit: PALETTE.astralDark },
+    clearing: PALETTE.voidRockDark,
+    range: { body: PALETTE.voidRockDark, light: PALETTE.voidRock, dark: PALETTE.cosmicHigh },
+    edge: PALETTE.cosmicHigh,
+    ripples: true,
+    ponds: 0,
   },
 };
 
@@ -262,7 +365,10 @@ function paintRipples(ctx, w, h, rng, terrain) {
       const y = Math.round(y0 - Math.sin((t / len) * Math.PI) * amp);
       ctx.fillStyle = terrain.grit[1];
       ctx.fillRect(x, y + 1, 1, 1);
-      ctx.fillStyle = PALETTE.sandLight;
+      // The lit crest of the ripple is the biome's own brightest patch tone,
+      // never sand: wind carves snow and cinder into the same arcs, and only
+      // the colour of them changes from one world to the next.
+      ctx.fillStyle = terrain.patches[0];
       ctx.fillRect(x, y, 1, 1);
     }
   }
@@ -276,6 +382,7 @@ function paintBlades(ctx, w, h, rng, terrain) {
     ctx.fillStyle = rng.pick(terrain.grit);
     ctx.fillRect(x, y, 1, rng.int(1, 3));
   }
+  if (!terrain.blooms) return;
   for (let i = 0; i < 260; i++) {
     const x = rng.int(0, w - 1);
     const y = rng.int(0, h - 1);
@@ -297,24 +404,24 @@ function paintGrit(ctx, w, h, rng, terrain) {
  * one step lighter, and reeds around the edge so it sits *in* the field rather
  * than on top of it.
  */
-function paintPond(ctx, cx, cy, rx, ry, rng) {
-  ctx.fillStyle = PALETTE.grassDark;
+function paintPond(ctx, cx, cy, rx, ry, rng, water) {
+  ctx.fillStyle = water.rim;
   fillEllipse(ctx, cx, cy, rx + 2, ry + 2);
-  ctx.fillStyle = PALETTE.blueDark;
+  ctx.fillStyle = water.body;
   fillEllipse(ctx, cx, cy, rx, ry);
-  ctx.fillStyle = PALETTE.blue;
+  ctx.fillStyle = water.top;
   fillEllipse(ctx, cx, cy - 1, rx - 2, ry - 2);
   for (let i = 0; i < 6; i++) {
     const gx = cx + rng.int(-rx + 3, rx - 6);
     const gy = cy + rng.int(-ry + 2, ry - 3);
-    ctx.fillStyle = PALETTE.blueLight;
+    ctx.fillStyle = water.glint;
     ctx.fillRect(gx, gy, rng.int(2, 5), 1);
   }
   for (let i = 0; i < 14; i++) {
     const a = rng.range(0, Math.PI * 2);
     const gx = Math.round(cx + Math.cos(a) * rx);
     const gy = Math.round(cy + Math.sin(a) * ry);
-    ctx.fillStyle = PALETTE.grassDark;
+    ctx.fillStyle = water.reed;
     ctx.fillRect(gx, gy - 3, 1, 4);
   }
 }
@@ -497,7 +604,7 @@ export function bakeMapBackground({
     const cx = rng.int(rx + 6, width - rx - 6);
     const cy = rng.int(topBand + ry + 10, height - ry - 10);
     if (nearRoad(samples, cx, cy, rx + 16)) continue;
-    paintPond(ctx, cx, cy, rx, ry, rng);
+    paintPond(ctx, cx, cy, rx, ry, rng, terrain.water || POND_WATER);
   }
 
   paintRange(ctx, width, topBand, rng, terrain.range);

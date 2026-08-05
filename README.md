@@ -51,26 +51,43 @@ There is no level select. You walk, and the road decides what you meet.
 
 - **Auto-walk** through a side-scrolling landscape with five parallax layers. No
   progress bar, no timer — you only ever see your character walking.
-- **Every world is a place.** The road opens in the **Dust Flats** and crosses
-  the **Wildgrass Prairie**, **Whitecrown Pass**, the **Blackwater Bayou** and
-  **Brimstone Basin** before the Galaxy. Each world names a biome; two of them
-  are drawn (`desert`, `meadow`), and the rest ride the desert with a colour
-  wash until their own art lands — see *Adding a biome* below.
-- **Guided randomness**: every world guarantees a minimum number of duels, shops
-  and inns, then shuffles their order and spacing. An inn always sits just past
-  a shop.
+- **Every world is a place, and every place is drawn.** The road opens in the
+  **Dust Flats** and crosses the **Wildgrass Prairie**, **Whitecrown Pass**, the
+  **Blackwater Bayou** and **Brimstone Basin** before the Galaxy. Six worlds,
+  six biomes, no reskins: sand and saguaro, then grass and wildflowers, then a
+  snow-capped pass above the treeline, then a mud causeway through black water,
+  then a basalt floor with the fire still under it, and finally a shelf of
+  broken violet stone hanging in open space. Each one has its own props, its own
+  five depth layers, its own ground, its own weather and its own life in the air
+  — spindrift and an aurora on the pass, will-o'-the-wisps over the bayou,
+  embers rising through falling ash in the basin, dust that falls upward in the
+  void.
+- **Guided randomness**: a world's difficulty is a number of duels, and its
+  shops and inns are rolled around them. One or two shops and — separately — one
+  or two inns, usually two of each, shuffled into the road with at least a
+  couple of fights between any two of them. So a stretch can offer a shop, three
+  duels and another shop with no bed anywhere in between, or two inns and a
+  single store. Nothing is ever adjacent to anything of its own kind, and no
+  building is ever stumbled into: they are always approached.
 - **Hunger** drains while you travel. At zero you lose a life every 12 seconds,
-  so food is a real purchase, not a nicety. A sandstorm burns it half again as
-  fast, and the meter says so — the multiplier sits next to the label and the
-  bar looks scoured, so the change is never something you find out by dying.
+  so food is a real purchase, not a nicety. Harsh weather burns it faster — a
+  sandstorm half again as fast, snow and ashfall close behind — and the meter
+  says so: the multiplier sits next to the label and the bar looks scoured, so
+  the change is never something you find out by dying.
 - **A horse** roughly halves travel time.
 - **Day and night** run on a continuous clock, and the **weather** turns —
-  overcast, rain, sandstorm, fog. Both reach into combat: rain misfires, and a
-  sandstorm, fog or nightfall throws off your opponent's read on you.
+  overcast, rain, sandstorm, fog, snow, ashfall, and a meteor shower out past
+  the last horizon. All of it reaches into combat: rain misfires, and sand,
+  snow, ash, fog, falling stars or plain nightfall throw off your opponent's
+  read on you.
 - **Weather belongs to the place.** Each biome carries its own table of what the
   sky can do, so sand only blows where there is sand: the desert gets
-  sandstorms, the prairie gets river fog and far more rain, and walking out of
-  one biome into another clears any weather the new one cannot have.
+  sandstorms, the prairie gets river fog and far more rain, the pass is under
+  snow more often than it is clear, the bayou fogs back up every time the rain
+  stops, nothing falls on the basin that is not on fire, and the Galaxy — which
+  has no weather at all in any honest sense — gets the one thing that does cross
+  open space. Walking out of one biome into another clears any weather the new
+  one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
 - **Inns** sell a basic bed (heals more in later worlds) or a premium bed (heals
@@ -130,7 +147,8 @@ src/
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact
     env-kit.js            the colour key + the shared layer generators
-    biomes/               one file per landscape: props, layers, ambient life
+    biomes/               one file per landscape — desert, meadow, snow, swamp,
+                          inferno, void: props, layers, ground, ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
@@ -162,7 +180,11 @@ Three rules hold the architecture together:
 Balance lives in data, not in code:
 
 - `src/game/worlds.js` — per-world difficulty, rarity tables, price and reward
-  multipliers, encounter guarantees, bosses, and which biome each world is in.
+  multipliers, how many duels the road holds, bosses, and which biome each world
+  is in.
+- `src/explore/encounters.js` — how the road is laid out: how many shops and
+  inns a world rolls, how far apart they have to be, and the spacing between
+  everything on it.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
 - `src/game/progression.js` — every curve: exp, gold, prices, inn healing,
@@ -176,18 +198,24 @@ A biome is a landscape; a world is a difficulty curve with a name. They are
 separate on purpose, so several worlds can share one landscape and retheming a
 world never rebalances it.
 
-1. Write `src/art/biomes/<id>.js` exporting the same shape `desert.js` and
-   `meadow.js` do: `props` (pixel strings), `buildLayers()`, `manifest`,
-   `scatter`, `groundFill`, `dust`, and optionally `scatterCell`,
-   `structureGround` and an `ambient` factory.
-2. Register it in `BIOME_ART` in `src/art/sprites-environment.js`.
-3. Give it a weather table in `src/game/biomes.js`. Add the state itself to
-   `src/explore/weather.js` first if it needs one that does not exist yet.
-4. Point a world at it: `biome: '<id>'` in `src/game/worlds.js`.
+1. Write `src/art/biomes/<id>.js` exporting the same shape the six existing
+   ones do: `props` (pixel strings), `buildLayers()`, `manifest`, `scatter`,
+   `groundFill`, `dust`, and optionally `scatterCell`, `structureGround` and an
+   `ambient` factory.
+2. Give any new colours a home in `src/art/palette.js` and a character of their
+   own in `KEY` in `src/art/env-kit.js`. One character means one colour
+   *everywhere in the game* — which is why the last four biomes are drawn in
+   digits and punctuation, the letters having run out.
+3. Register it in `BIOME_ART` in `src/art/sprites-environment.js`, and give it a
+   `TERRAIN` entry in `src/art/map-art.js` so the trail map knows what its
+   ground looks like from above.
+4. Give it a weather table in `src/game/biomes.js`. Add the state itself to
+   `src/explore/weather.js` first if it needs one that does not exist yet — a
+   weather is a table entry, a spawn case, a step case and a draw case.
+5. Point a world at it: `biome: '<id>'` in `src/game/worlds.js`.
 
-Nothing else needs editing — the parallax renderer holds no landscape
-constants. Worlds 3 to 5 are named for biomes that are not drawn yet and say so
-in a comment; each is a one-line change once its art exists.
+Nothing else needs editing — the parallax renderer holds no landscape constants,
+and the trail map draws itself out of the biome's own props.
 
 ## Adding an enemy
 
