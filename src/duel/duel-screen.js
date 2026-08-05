@@ -434,10 +434,18 @@ export const DuelScreen = {
         toast('The diadem blocked it', 'good');
       }
       if (event.type === 'phase') {
+        // Not a banner and a flash any more: a crash zoom onto whatever just
+        // stood up, speed lines, a shockwave and the frame coming apart. The
+        // camera returns on its own a beat later — see the phase branch in
+        // `loop`, which is what puts it back.
         scene.fx.banner = 'PHASE TWO';
         scene.fx.bannerTimer = 1400;
-        scene.fx.whiteout = 400;
-        scene.fx.shake = 500;
+        scene.fx.whiteout = 500;
+        scene.fx.shake = 900;
+        scene.fx.rays = 1;
+        scene.fx.ring = 0;
+        scene.fx.slam = 180;
+        play('toll');
       }
     }
 
@@ -558,6 +566,10 @@ export const DuelScreen = {
               // …and the new art — and the new size — into the scene.
               scene.setEnemySprites(next.sprites);
               scene.setEnemyScale(next.scale || 1);
+              // The fire he was carrying doubles. This is the moment the fight
+              // gets serious and it has to look like it before the player has
+              // taken a single round of the new phase.
+              scene.setAura(next.aura || 0);
               enemyName.textContent = next.name;
               if (next.look) enemyName.dataset.tip = next.look;
               else delete enemyName.dataset.tip;
@@ -567,7 +579,13 @@ export const DuelScreen = {
               // the new phase is bigger — both inputs to how tall he is drawn.
               requestAnimationFrame(syncHud);
               setCallout('They are not finished…', 'is-bad');
-              await wait(1000);
+              // A held shot of the thing that just changed, then back out to
+              // the fight. Two seconds, because the player has just won a
+              // phase and is owed a look at what they have to do again.
+              scene.lookAt({ side: 'enemy', x: 8, y: 5.5, fill: 11, ms: 420 });
+              await wait(1400);
+              scene.lookAt({ ms: 620 });
+              await wait(700);
               continue;
             }
           }
@@ -676,16 +694,32 @@ export const DuelScreen = {
      * the screen underneath is the screen the player is about to use and it
      * should already be there when the bars pull off.
      */
+    /**
+     * THE FIGHT IS ON SCREEN THE WHOLE TIME
+     * -----------------------------------------------------------------------
+     * The scene is installed before the entrance runs, not after it. The
+     * cut-scene is not a different picture — it is this one, filmed: the
+     * director moves the scene's own camera and both fighters are standing on
+     * the road under every shot of it (src/duel/boss-intro.js).
+     *
+     * What is hidden is the interface, and only the interface. The round loop
+     * has not started, so nothing behind the camera can desync; the controls
+     * are disabled rather than removed, so the screen the player is about to
+     * use is already there when the bars pull off.
+     */
+    setRenderer(scene);
+    scene.setAura(enemy.aura || 0);
+
     let intro = null;
     (async () => {
       if (enemy.intro?.lines?.length) {
         setControlsEnabled(false);
-        // The whole interface steps out of the way: a cut-scene with a life
-        // bar and three buttons over it is a fight with a picture on it.
         screen.classList.add('is-cinematic');
         intro = playBossIntro({
+          scene,
           enemy,
           intro: enemy.intro,
+          enemyPortrait: getPortrait(enemy.portrait),
           playerPortrait: getPortrait('gunslinger'),
         });
         await intro.promise;
@@ -693,7 +727,6 @@ export const DuelScreen = {
         screen.classList.remove('is-cinematic');
       }
       if (finished) return;
-      setRenderer(scene);
       loop();
     })();
 

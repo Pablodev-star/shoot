@@ -71,7 +71,7 @@ export const WORLDS = [
       /** Who rides this stretch — see src/art/sprites-enemies.js. */
       roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
     },
-    boss: { name: 'Big Jed', archetype: 'bossJed', lives: 5, abilities: ['dynamite'], accuracy: 0.55 },
+    boss: { name: 'Big Jed', archetype: 'bossJed', lives: 3, abilities: ['dynamite'], accuracy: 0.55 },
   },
   {
     id: 2,
@@ -94,7 +94,7 @@ export const WORLDS = [
     boss: {
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
-      lives: 6,
+      lives: 4,
       abilities: ['poison', 'bulletSteal'],
       accuracy: 0.6,
     },
@@ -120,7 +120,7 @@ export const WORLDS = [
     boss: {
       name: 'Whiteout Kate',
       archetype: 'bossWhiteout',
-      lives: 7,
+      lives: 4,
       abilities: ['dynamite', 'poison'],
       accuracy: 0.64,
     },
@@ -147,7 +147,7 @@ export const WORLDS = [
     boss: {
       name: 'Colonel Sable',
       archetype: 'bossSable',
-      lives: 8,
+      lives: 5,
       abilities: ['mindControl', 'dynamite'],
       accuracy: 0.68,
     },
@@ -178,7 +178,7 @@ export const WORLDS = [
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
-      lives: 10,
+      lives: 6,
       abilities: ['mindControl', 'poison', 'dynamite'],
       accuracy: 0.72,
     },
@@ -212,10 +212,12 @@ export const WORLDS = [
     /** Two phases — see src/duel/duel-engine.js `phases`. */
     boss: {
       name: 'THE STRANGER',
-      lives: 9,
+      lives: 5,
       abilities: ['mindControl', 'dynamite', 'poison'],
       accuracy: 0.78,
       archetype: 'bossStranger',
+      /** The second line of the name card the entrance slams up. */
+      cardSub: 'PAST THE LAST HORIZON',
 
       /**
        * THE ENTRANCE
@@ -237,19 +239,19 @@ export const WORLDS = [
        */
       intro: {
         lines: [
-          { who: 'enemy', shot: 'eyes', text: 'Six worlds. Six roads. I laid every one of them for you.' },
-          { who: 'enemy', shot: 'wide', text: 'You buried the men I sent. You ate, you slept, you grew.' },
-          { who: 'enemy', shot: 'low', text: 'A gun is a small thing to carry that far, stranger.', shake: 260 },
-          { who: 'player', shot: 'face', text: 'I did not walk it to stand still at the end of it.' },
-          { who: 'enemy', shot: 'eyes', text: 'No. You walked it so I could see what I made.', shake: 420 },
-          { who: 'enemy', shot: 'face', text: 'Draw.', shake: 700 },
+          { who: 'enemy', shot: 'low', text: 'Six worlds. Six roads. I laid every one of them for you.' },
+          { who: 'enemy', shot: 'bust', text: 'You buried the men I sent. You ate, you slept, you grew.' },
+          { who: 'enemy', shot: 'face', text: 'A gun is a small thing to carry that far.', shake: 260, rumble: true },
+          { who: 'player', shot: 'bust', text: 'I did not walk it to stand still at the end of it.', cut: true },
+          { who: 'enemy', shot: 'eyes', text: 'No. You walked it so I could see what I made.', shake: 420, cut: true },
+          { who: 'enemy', shot: 'face', text: 'Draw.', shake: 700, cut: true },
         ],
       },
       phases: [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 9,
+          lives: 5,
           accuracy: 0.78,
           abilities: ['poison', 'dynamite'],
         },
@@ -257,7 +259,7 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 12,
+          lives: 7,
           accuracy: 0.88,
           abilities: ['mindControl', 'dynamite', 'poison', 'bulletSteal'],
           /** Phase two starts with a bullet already chambered and fires faster. */

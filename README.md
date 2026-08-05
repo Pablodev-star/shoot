@@ -111,16 +111,26 @@ There is no level select. You walk, and the road decides what you meet.
   bed at the inn is still the only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
   phase two is a different sprite, not a refilled bar.
-- **The last fight has an entrance.** Cut to black, letterbox, and the camera
-  crawls up the Stranger's face at nine times its own size while he talks. He
-  gets six lines, you get one of them back, and each line is a *shot* — the
-  camera cuts to a framing chosen per line, and the reply cuts to your own face.
-  Then a crash zoom, speed lines, three white impact frames, a shockwave and the
-  name card, and the fight is already underway. `ESC` skips it.
-- **The Stranger is enormous.** Twice the size of the man across the road from
-  him, drawn on a grid twice as coarse, and bigger again when the cowl comes
-  off. He is sized against the frame rather than against the interface, so what
-  happens when he grows is that the camera backs away and *you* get smaller.
+- **The last fight has an entrance, and it is the fight.** The duel scene has a
+  camera. The sequence is not a cut-scene played somewhere else — it is this
+  fight, filmed: both duellists are standing on the road under every shot of
+  it, the weather is running, and `lookAt` frames a point of a fighter in that
+  fighter's own pixels. Cut to black, letterbox, then the wide shot of the two
+  of them as the dark lifts and his fire comes up; the camera walks in; he
+  talks and every line is a framing; you answer and it cuts to your face; a beat
+  of silence on your gun hand and on his eyes; then a crash zoom, speed lines, a
+  shockwave, impact frames and the name card along the top. `ESC` skips it.
+- **The Stranger is enormous, and he is on fire.** Twice the size of the man
+  across the road from him, drawn on a grid twice as coarse, and bigger again
+  when the cowl comes off. He is sized against the frame rather than against
+  the interface, so what happens when he grows is that the camera backs away
+  and *you* get smaller. Purple fire burns all over him for the whole fight —
+  pooled at his feet, up his sides, around the crown, with sparks coming off
+  it — and taking the cowl off doubles it and adds arcs of white light. The
+  phase change is a crash zoom, a shockwave and the frame coming apart.
+- **Bosses hit harder than they last.** Every world's boss carries about three
+  fifths of the lives it used to. A boss fight was a long exchange you could
+  grind down; it is a short one you can lose.
 
 Speech is a general system, not part of that one scene: a portrait, a name
 plate and a line typing itself out, for anybody on either side of the road.
@@ -254,10 +264,15 @@ intro: {
 }
 ```
 
-`shot` is a camera framing (`eyes`, `face`, `wide`, `low`) and `shake` kicks the
-frame on the beat the line lands. The speaker needs a `portrait` on its
-archetype — a 32 x 32 face in `src/art/sprites-portraits.js` — and that same
-face is what the speech box shows.
+`shot` is a camera framing (`eyes`, `face`, `bust`, `low`, `hands`, `wide`),
+`cut: true` hard-cuts to it instead of travelling, and `shake` kicks the frame
+on the beat the line lands. The speaker needs a `portrait` on its archetype —
+a 32 x 32 face in `src/art/sprites-portraits.js` — and that same face is what
+the speech box shows.
+
+The framings are measured in the fighter's OWN source pixels (`fill` is how
+many of them span the height of the screen), so one number frames the player
+and a boss drawn two and a half times larger identically.
 
 ## Adding an enemy
 
