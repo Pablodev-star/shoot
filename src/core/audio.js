@@ -34,6 +34,10 @@ export const AUDIO_MANIFEST = {
   horse: 'horse-neigh.wav',
   thunder: 'thunder.wav',
   wind: 'sandstorm-loop.wav',     // looping ambience
+  type: 'speech-tick.wav',        // one character of a spoken line
+  heartbeat: 'heartbeat.wav',     // the cut-scene's pulse under a held shot
+  rumble: 'rumble.wav',           // something very large moving
+  toll: 'bell-toll.wav',          // the beat a boss arrives on
   themeMenu: 'theme-menu.ogg',    // looping music
   themeWalk: 'theme-walk.ogg',
   themeDuel: 'theme-duel.ogg',
@@ -79,6 +83,18 @@ const SYNTH = {
   horse: { type: 'sawtooth', freq: 400, dur: 0.4, gain: 0.12, slide: -180 },
   thunder: { noise: true, dur: 0.9, gain: 0.3, lowpass: 400 },
   wind: { noise: true, dur: 0.6, gain: 0.08, lowpass: 900 },
+  /**
+   * Speech. Very short, very quiet, and pitched low: this fires once every
+   * couple of characters, so anything with a tail on it turns a three-line
+   * conversation into a fax machine.
+   */
+  type: { type: 'square', freq: 190, dur: 0.022, gain: 0.035, slide: -30 },
+  /** The cut-scene's pulse. Two of these under a held shot is a held breath. */
+  heartbeat: { type: 'sine', freq: 68, dur: 0.34, gain: 0.3, slide: -26 },
+  /** Something very large moving, somewhere off screen. */
+  rumble: { noise: true, dur: 1.4, gain: 0.26, lowpass: 180 },
+  /** The beat a boss arrives on. */
+  toll: { type: 'triangle', freq: 96, dur: 1.5, gain: 0.28, slide: -40 },
 };
 
 function playSynth(cue) {

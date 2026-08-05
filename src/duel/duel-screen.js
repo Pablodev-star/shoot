@@ -35,6 +35,8 @@ import { generateEnemy, generateBoss, nextBossPhase, ABILITY_LABELS } from '../g
 import { createDuel, MOVES } from './duel-engine.js';
 import { createLocalAgent, createAiAgent } from './duel-ai.js';
 import { createDuelScene } from './duel-scene.js';
+import { playBossIntro } from './boss-intro.js';
+import { getPortrait } from '../art/sprites-portraits.js';
 import { CHARACTER_TIMING } from '../art/sprites-character.js';
 import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
@@ -110,9 +112,9 @@ export const DuelScreen = {
       tint: world.tint,
       seed: player.seed,
       enemySprites: enemy.sprites,
+      enemyScale: enemy.scale || 1,
       shakeEnabled: getSettings().screenShake,
     });
-    setRenderer(scene);
 
     const localAgent = createLocalAgent();
     let aiAgent = createAiAgent(enemy, modifiers, { thinkMs: 120 });
@@ -324,6 +326,20 @@ export const DuelScreen = {
     attachButtonSounds(screen);
     renderAbilities();
     syncBars();
+
+    /**
+     * Tell the scene where the interface stops.
+     *
+     * Only an oversized fighter cares, and only because his head would
+     * otherwise be behind his own life bar. It is measured rather than
+     * guessed: the card is as tall as the enemy's name and abilities make it,
+     * and the Stranger's second phase has a two-line name and four icons.
+     */
+    function syncHud() {
+      scene.setHudBox(enemyCard.getBoundingClientRect());
+    }
+    requestAnimationFrame(syncHud);
+    window.addEventListener('resize', syncHud);
 
     // --- state sync --------------------------------------------------------
     function syncBars() {
@@ -539,13 +555,17 @@ export const DuelScreen = {
               // The new agent has to go into the engine, not just this closure.
               aiAgent = createAiAgent(enemy, modifiers, { thinkMs: 120 });
               duel.setEnemy(next, aiAgent);
-              // …and the new art has to go into the scene.
+              // …and the new art — and the new size — into the scene.
               scene.setEnemySprites(next.sprites);
+              scene.setEnemyScale(next.scale || 1);
               enemyName.textContent = next.name;
               if (next.look) enemyName.dataset.tip = next.look;
               else delete enemyName.dataset.tip;
               renderAbilities();
               syncBars();
+              // The card just changed height (a longer name, more icons), and
+              // the new phase is bigger — both inputs to how tall he is drawn.
+              requestAnimationFrame(syncHud);
               setCallout('They are not finished…', 'is-bad');
               await wait(1000);
               continue;
@@ -643,12 +663,46 @@ export const DuelScreen = {
       return '—';
     }
 
-    loop();
+    /**
+     * THE FIGHT DOES NOT START UNTIL THE ENTRANCE IS OVER
+     * -----------------------------------------------------------------------
+     * A boss with an `intro` gets a cut-scene (src/duel/boss-intro.js), and it
+     * owns the canvas while it runs: the duel scene is not installed and the
+     * round loop has not started, so there is nothing behind it to desync.
+     * Everyone else — every ordinary duel, every other boss — takes the branch
+     * that has always existed and is on the road one frame after mounting.
+     *
+     * The controls are disabled for the duration rather than hidden, because
+     * the screen underneath is the screen the player is about to use and it
+     * should already be there when the bars pull off.
+     */
+    let intro = null;
+    (async () => {
+      if (enemy.intro?.lines?.length) {
+        setControlsEnabled(false);
+        // The whole interface steps out of the way: a cut-scene with a life
+        // bar and three buttons over it is a fight with a picture on it.
+        screen.classList.add('is-cinematic');
+        intro = playBossIntro({
+          enemy,
+          intro: enemy.intro,
+          playerPortrait: getPortrait('gunslinger'),
+        });
+        await intro.promise;
+        intro = null;
+        screen.classList.remove('is-cinematic');
+      }
+      if (finished) return;
+      setRenderer(scene);
+      loop();
+    })();
 
     return () => {
       finished = true;
+      intro?.skip();
       localAgent.cancel();
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', syncHud);
     };
   },
 };

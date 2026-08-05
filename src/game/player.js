@@ -146,12 +146,25 @@ export function addExp(amount) {
     levelled += 1;
   }
   if (levelled > 0) {
-    // Levelling refills lives immediately — the classic reward from version 2.
-    state.lives = state.maxLives;
+    /**
+     * A LEVEL IS ONE LIFE, NOT A FULL HEAL
+     * -----------------------------------------------------------------------
+     * It used to refill the bar. That made levelling the cheapest healing in
+     * the game — better than any bed at any inn, free, and delivered right in
+     * the middle of the stretch where you were supposed to be deciding whether
+     * you could afford one. Two things followed from it: the inn stopped being
+     * a real purchase for anybody tracking their exp bar, and walking into a
+     * world on one life was survivable as long as a level was due.
+     *
+     * You now get exactly what the level adds: one more maximum life, and one
+     * more life to go in it. A player at full stays full, a player at 1 of 5
+     * comes out at 2 of 6, and the bed is still the only way back to the top.
+     */
+    state.lives = Math.min(state.maxLives, state.lives + LIVES_PER_LEVEL * levelled);
     emit(EVENTS.LIVES_CHANGED, { lives: state.lives, maxLives: state.maxLives });
     emit(EVENTS.LEVEL_UP, { level: state.level, maxLives: state.maxLives, gained: levelled });
     play('levelUp');
-    toast(`Level ${state.level}! Max lives ${state.maxLives}`, 'gold');
+    toast(`Level ${state.level}! +${LIVES_PER_LEVEL * levelled} life`, 'gold');
   }
   emit(EVENTS.EXP_CHANGED, {
     exp: state.exp,

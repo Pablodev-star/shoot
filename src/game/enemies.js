@@ -27,7 +27,14 @@ import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 
-/** Everything the rest of the game needs to know about one enemy's look. */
+/**
+ * Everything the rest of the game needs to know about one enemy's look.
+ *
+ * `scale` and `portrait` are almost always absent, and that is the point: a
+ * fighter is drawn at the fighters' size and has no face beyond its sprite.
+ * The two that carry them are the Stranger's phases — see the note on
+ * `bossStranger` in src/art/sprites-enemies.js.
+ */
 function appearance(archetypeId, rng) {
   const archetype = ARCHETYPES[archetypeId] || ARCHETYPES.drifter;
   return {
@@ -35,6 +42,8 @@ function appearance(archetypeId, rng) {
     look: archetype.look,
     sprites: getEnemySprites(archetypeId),
     name: rng ? rng.pick(archetype.names) : archetype.names[0],
+    scale: archetype.scale || 1,
+    portrait: archetype.portrait || null,
   };
 }
 
@@ -78,7 +87,7 @@ export function generateBoss(worldId) {
   const world = getWorld(worldId);
   const cfg = world.boss;
   const phase = cfg.phases ? cfg.phases[0] : cfg;
-  const { look, sprites } = appearance(phase.archetype || cfg.archetype);
+  const { look, sprites, scale, portrait } = appearance(phase.archetype || cfg.archetype);
   return {
     name: phase.name || cfg.name,
     look,
@@ -93,6 +102,10 @@ export function generateBoss(worldId) {
     phaseIndex: 0,
     phases: cfg.phases || null,
     sprites,
+    scale,
+    portrait,
+    /** The lines this boss says before the fight, if it has any. */
+    intro: cfg.intro || null,
   };
 }
 
@@ -103,7 +116,8 @@ export function nextBossPhase(boss) {
   if (index >= boss.phases.length) return null;
   const phase = boss.phases[index];
   // A phase with its own archetype is a different-looking fight, which is the
-  // whole point of the Stranger taking the cloak off.
+  // whole point of the Stranger taking the cloak off — and it can be a
+  // different *size*, which is the point of him growing when he does.
   const look = phase.archetype ? appearance(phase.archetype) : null;
   return {
     ...boss,
@@ -115,7 +129,15 @@ export function nextBossPhase(boss) {
     abilities: phase.abilities || boss.abilities,
     abilityChanceMul: phase.abilityChanceMul || 1,
     phaseIndex: index,
-    ...(look ? { look: look.look, archetype: phase.archetype, sprites: look.sprites } : {}),
+    ...(look
+      ? {
+          look: look.look,
+          archetype: phase.archetype,
+          sprites: look.sprites,
+          scale: look.scale,
+          portrait: look.portrait,
+        }
+      : {}),
   };
 }
 
