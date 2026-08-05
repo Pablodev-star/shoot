@@ -44,6 +44,7 @@ function appearance(archetypeId, rng) {
     name: rng ? rng.pick(archetype.names) : archetype.names[0],
     scale: archetype.scale || 1,
     portrait: archetype.portrait || null,
+    aura: archetype.aura || 0,
   };
 }
 
@@ -87,7 +88,7 @@ export function generateBoss(worldId) {
   const world = getWorld(worldId);
   const cfg = world.boss;
   const phase = cfg.phases ? cfg.phases[0] : cfg;
-  const { look, sprites, scale, portrait } = appearance(phase.archetype || cfg.archetype);
+  const { look, sprites, scale, portrait, aura } = appearance(phase.archetype || cfg.archetype);
   return {
     name: phase.name || cfg.name,
     look,
@@ -104,8 +105,11 @@ export function generateBoss(worldId) {
     sprites,
     scale,
     portrait,
+    aura,
     /** The lines this boss says before the fight, if it has any. */
     intro: cfg.intro || null,
+    /** Second line of the name card the entrance puts up. */
+    cardSub: cfg.cardSub || null,
   };
 }
 
@@ -136,6 +140,7 @@ export function nextBossPhase(boss) {
           sprites: look.sprites,
           scale: look.scale,
           portrait: look.portrait,
+          aura: look.aura,
         }
       : {}),
   };

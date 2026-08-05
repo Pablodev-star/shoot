@@ -36,12 +36,12 @@ import { SELL_RATIO } from './items.js';
  *
  * Cumulative exp needed, and where the road actually delivers it:
  *
- *   level 2 |    245 · mid world 1        level 6 | 2,392 · world 4
- *   level 3 |    573 · early world 2      level 7 | 3,450 · world 5
- *   level 4 |  1,013 · world 2/3          level 8 | 4,868 · world 5
- *   level 5 |  1,602 · world 3            level 9 | 6,769 · world 6
+ *   level 2 |    195 · mid world 1        level 6 | 1,904 · world 4
+ *   level 3 |    456 · early world 2      level 7 | 2,746 · world 5
+ *   level 4 |    806 · world 2/3          level 8 | 3,875 · world 5
+ *   level 5 |  1,275 · world 3            level 9 | 5,388 · world 6
  */
-export const EXP_BASE = 245;
+export const EXP_BASE = 195;
 export const EXP_GROWTH = 1.34;
 
 export function expForNextLevel(level) {

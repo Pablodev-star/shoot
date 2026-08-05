@@ -43,8 +43,15 @@
 import { el, pixelImg } from '../core/dom.js';
 import { play } from '../core/audio.js';
 
-/** Milliseconds per character. Fast enough to read along with, not to wait on. */
-const CHAR_MS = 22;
+/**
+ * Milliseconds per character.
+ *
+ * Slow. Slower than a text box that exists to get out of the way, because this
+ * one does not: a line spoken over a held close-up is the scene, and the pace
+ * it types at IS the pace of the scene. At twenty-two it read as a chat window
+ * scrolling; at forty it reads as somebody speaking.
+ */
+const CHAR_MS = 40;
 
 /**
  * Extra beats after punctuation, in milliseconds. This is the whole of the
@@ -62,9 +69,15 @@ const PUNCTUATION_MS = {
   '…': 380,
 };
 
-/** How long a finished line is held before it moves on by itself. */
-const DWELL_BASE_MS = 600;
-const DWELL_PER_CHAR_MS = 14;
+/**
+ * How long a finished line is held before it moves on by itself.
+ *
+ * Long enough to read the whole line a second time. A line that vanishes on
+ * the last character was only ever readable by someone who read it as it
+ * typed, and the shot it is sitting on deserves the beat anyway.
+ */
+const DWELL_BASE_MS = 1000;
+const DWELL_PER_CHAR_MS = 26;
 
 /**
  * @param {object} [opts]

@@ -1013,6 +1013,8 @@ export const ARCHETYPES = {
     holster: null,
     /** Twice the player's size, and drawn on a grid twice as coarse. */
     scale: 2,
+    /** Purple fire, burning for the whole fight. See `stepAura` in duel-scene. */
+    aura: 1,
     /** The face the cut-scene and the speech box use. */
     portrait: 'strangerCowl',
     key: palette({
@@ -1033,6 +1035,8 @@ export const ARCHETYPES = {
     holster: null,
     /** Bigger than the cowl was. Taking it off was not a concession. */
     scale: 2.4,
+    /** Four times the fire, sparks that reach the top of the frame, and arcs. */
+    aura: 2,
     portrait: 'strangerSkull',
     key: palette({
       hat: PALETTE.star, hatLit: PALETTE.white,

@@ -28,6 +28,37 @@
  * can never disagree about where the barrel is.
  *
  * The screen sets poses and calls `fire()`; it never positions anything.
+ *
+ * THERE IS A CAMERA
+ * ---------------------------------------------------------------------------
+ * The scene can be looked at from anywhere: `lookAt({ side, x, y, fill })`
+ * frames a point of a fighter — in that fighter's own source pixels — and says
+ * how many of those pixels should fill the height of the screen. Six is an
+ * extreme close-up of a pair of eyes; thirteen is a head; no camera at all is
+ * the two of them on the road.
+ *
+ * It moves the WHOLE scene, not the fighter: the road, the ridges, the sky and
+ * the weather all magnify together, because the entire point of a close-up in
+ * a western is that it is a close-up *of somewhere*. A cut-scene that draws a
+ * face on a black card is a menu with a portrait in it — this is the same
+ * duel, seen from four inches away.
+ *
+ * The transform is applied around everything the world contains and dropped
+ * before the weather and the interface, so rain stays rain-sized and a letter
+ * stays a letter. The camera is clamped so the visible rectangle never leaves
+ * the drawn world, which is what stops a hard zoom from showing the edge of
+ * the sky.
+ *
+ * AND A FEW THINGS THAT ONLY THE LAST FIGHT USES
+ * ---------------------------------------------------------------------------
+ * The letterbox, the black veil, the name card, the impact frames, the speed
+ * lines and the shockwave all live in `fx` alongside the shake, because they
+ * are the same kind of thing: whole-frame effects a screen turns on. They are
+ * drawn in screen space after the camera is dropped.
+ *
+ * So is the AURA — the purple fire and the sparks the Stranger carries. That
+ * one is not a cut-scene effect at all: it burns for the whole fight, and it
+ * doubles when he takes the cowl off.
  */
 
 import { drawSprite, frameAt } from '../art/pixel.js';
@@ -108,6 +139,22 @@ export function createDuelScene({
     bannerTimer: 0,
     /** A white wash over the whole frame — only for the boss's phase change. */
     whiteout: 0,
+
+    // --- the cut-scene's furniture. All screen space, all off by default. ---
+    /** Black over everything. 1 is a cut to black. */
+    veil: 0,
+    /** Letterbox bar height, as a fraction of the view. */
+    bars: 0,
+    /** `ESC TO SKIP`, printed in the top bar. */
+    hint: false,
+    /** The name card: { text, sub, t } with `t` running 0 → 1 as it slams in. */
+    card: null,
+    /** Impact frames — a held flat colour, in milliseconds. */
+    slam: 0,
+    /** Radial speed lines, 0..1, fading on their own. */
+    rays: 0,
+    /** Shockwave, 0..1.4 as it expands. -1 when idle. */
+    ring: -1,
   };
 
   // Everything a shot leaves behind, all in device pixels: once a shell is in
@@ -135,6 +182,22 @@ export function createDuelScene({
   let hudBottom = null;
   /** The left edge of the enemy's card, so a giant can stand inboard of it. */
   let hudLeft = null;
+  /** The last view the scene drew into — the camera needs its height. */
+  let lastView = null;
+
+  /**
+   * The camera. `zoom` 1 is the whole road; anything above it is a push in on
+   * (x, y), a point in the scene's own device-pixel space. It eases between
+   * framings on its own clock so a caller can say `lookAt(...)` and walk away.
+   */
+  const camera = { zoom: 1, x: 0, y: 0, from: null, to: null, t: 1, ms: 600 };
+
+  /**
+   * The Stranger's fire. 0 for everybody else, 1 while he is cowled, 2 once he
+   * is not — see `stepAura`.
+   */
+  let auraLevel = 0;
+  const aura = [];
 
   function setPose(side, pose) {
     const actor = actors[side];
@@ -292,6 +355,50 @@ export function createDuelScene({
       hudLeft = Number.isFinite(box?.left) ? box.left : null;
     },
 
+    /** How much fire the enemy is carrying. See `stepAura`. */
+    setAura(level) {
+      auraLevel = Math.max(0, level || 0);
+    },
+
+    /**
+     * Frame a point of a fighter.
+     *
+     * @param {object} shot
+     * @param {'player'|'enemy'} [shot.side]
+     * @param {number} [shot.x] across the fighter, in ITS source pixels (0..16)
+     * @param {number} [shot.y] down the fighter, in its source pixels (0..24)
+     * @param {number} [shot.fill] how many of those source pixels should fill
+     *   the height of the screen. Smaller is closer. Omit for the wide shot.
+     * @param {number} [shot.ms] travel time; 0 cuts.
+     */
+    lookAt(shot = {}) {
+      const view = lastView;
+      if (!view || !layout) return;
+      const target = shot.fill
+        ? framing(shot.side || 'enemy', shot.x ?? 8, shot.y ?? 5, shot.fill, view, shot.bias || 0)
+        : { zoom: 1, x: view.w / 2, y: view.h / 2 };
+      const ms = shot.ms ?? 600;
+      if (ms <= 0) {
+        camera.zoom = target.zoom;
+        camera.x = target.x;
+        camera.y = target.y;
+        camera.t = 1;
+        return;
+      }
+      camera.from = { zoom: camera.zoom, x: camera.x, y: camera.y };
+      camera.to = target;
+      camera.ms = ms;
+      camera.t = 0;
+    },
+
+    /** Back to the whole road, instantly. */
+    resetCamera() {
+      camera.zoom = 1;
+      camera.t = 1;
+      camera.from = null;
+      camera.to = null;
+    },
+
     /** What the enemy is currently drawn at, for anything framing him. */
     getEnemyScale: () => bossScale,
 
@@ -325,6 +432,26 @@ export function createDuelScene({
         if (fx.bannerTimer <= 0) fx.banner = null;
       }
 
+      // --- the camera ---
+      if (camera.t < 1 && camera.to) {
+        camera.t = Math.min(1, camera.t + dt / camera.ms);
+        const k = easeInOut(camera.t);
+        camera.zoom = lerp(camera.from.zoom, camera.to.zoom, k);
+        camera.x = lerp(camera.from.x, camera.to.x, k);
+        camera.y = lerp(camera.from.y, camera.to.y, k);
+      }
+
+      // --- the cut-scene's own clocks ---
+      if (fx.slam > 0) fx.slam = Math.max(0, fx.slam - dt);
+      if (fx.rays > 0) fx.rays = Math.max(0, fx.rays - dt / 900);
+      if (fx.ring >= 0) {
+        fx.ring += dt / 700;
+        if (fx.ring > 1.4) fx.ring = -1;
+      }
+      if (fx.card && fx.card.t < 1) fx.card.t = Math.min(1, fx.card.t + dt / 260);
+
+      stepAura(dt);
+
       step(flashes, dt, FX_TIMING.flash.reduce((a, b) => a + b, 0));
       step(impacts, dt, FX_TIMING.impact.reduce((a, b) => a + b, 0));
       for (const p of smoke) {
@@ -351,6 +478,7 @@ export function createDuelScene({
 
     render(ctx, view) {
       const s = view.scale;
+      lastView = view;
       /**
        * A duel is a close-up: fighters are drawn larger than on the road. The
        * cap keeps the two of them apart on a phone, where doubling the scale
@@ -361,13 +489,8 @@ export function createDuelScene({
       const ox = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
       const oy = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
 
-      ctx.save();
-      ctx.translate(Math.round(ox), Math.round(oy));
-
       const gy = parallax.groundY(view);
       weather.setGroundLine(gy);
-      // Backdrop now, light after the fighters — see parallax.applyLighting.
-      parallax.renderBackdrop(ctx, view, cameraX);
 
       /**
        * THE TWO SIDES DO NOT HAVE TO BE THE SAME SIZE
@@ -376,37 +499,19 @@ export function createDuelScene({
        * "a duel is two men of the same height". It is per side now: the enemy
        * gets `fs * bossScale`, and everything that has to know where anything
        * is — the muzzle, the flash, the brass, the tracer, the shadow, the
-       * shield — reads the scale out of that side's own layout entry.
+       * shield, the camera — reads the scale out of that side's own layout
+       * entry.
        *
-       * The enemy is anchored by its FEET, not by its box: a fighter drawn at
-       * two and a half times the size has to stand on the same road, so `topY`
-       * is worked back from the ground line rather than shared.
-       */
-      /**
-       * THE CAMERA PULLS BACK RATHER THAN LETTING HIM LEAVE THE FRAME
-       * ---------------------------------------------------------------------
-       * A fighter drawn at two and a half times the size does not fit under
-       * the fighter cards, and the first pass had the Stranger's crown behind
-       * his own life bar.
+       * The enemy is anchored by its FEET: a fighter drawn at two and a half
+       * times the size has to stand on the same road, so `topY` is worked back
+       * from the ground line rather than shared.
        *
-       * So the ENEMY's height is what is capped — to the headroom between the
-       * road and the cards — and the player's scale is worked back from it.
-       * That has exactly the property the fight wants: when the cowl comes off
-       * and he grows from 2x to 2.4x, he is already as tall as the frame
-       * allows, so what actually happens on screen is that *the player gets
-       * smaller*. The camera backing away from him is a better reading of "he
-       * grew" than him growing would have been.
-       */
-      /**
-       * He is sized by the whole frame and moved out from under the card,
-       * rather than being shrunk to fit beneath it.
-       *
-       * The first attempt reserved the card's full height across the whole
-       * width, and the Stranger came out barely half again the player's size —
-       * the interface had eaten the boss. What the card actually occupies is a
-       * *corner*, so the fix is to stand him inboard of its left edge and let
-       * him have the full height of the road. He ends up head-and-shoulders
-       * into the sky with the fight's own HUD beside him rather than over him.
+       * He is also sized by the whole frame and moved out from under the
+       * fighter card rather than shrunk to fit beneath it. An earlier attempt
+       * reserved the card's full height across the whole width and the
+       * Stranger came out barely half again the player's size — the interface
+       * had eaten the boss. What the card occupies is a *corner*, so he stands
+       * inboard of its left edge and keeps the full height of the road.
        */
       const efsMax = Math.max(s, Math.floor((gy - view.h * 0.06) / FIGHTER_H));
       const efs = Math.max(s, Math.min(Math.round(baseFs * bossScale), efsMax));
@@ -428,6 +533,24 @@ export function createDuelScene({
         enemy: { originX: enemyX, topY: enemyTopY, fs: efs, flip: true },
       };
 
+      /**
+       * From here to `ctx.restore()` below, everything drawn is IN THE WORLD:
+       * the camera transform is on, so a close-up magnifies the road and the
+       * ridges and the sky along with the face. The weather and the interface
+       * are deliberately outside it.
+       */
+      ctx.save();
+      ctx.translate(Math.round(ox), Math.round(oy));
+      const cam = cameraTransform(view);
+      if (cam) {
+        ctx.save();
+        ctx.translate(cam.tx, cam.ty);
+        ctx.scale(cam.z, cam.z);
+      }
+
+      // Backdrop now, light after the fighters — see parallax.applyLighting.
+      parallax.renderBackdrop(ctx, view, cameraX);
+
       // --- ground shadows, so the fighters are planted rather than floating.
       // They lean away from the sun, so a duel at dusk casts two long ones. ---
       parallax.drawGroundShadow(ctx, view, playerX, FIGHTER_W * fs, gy);
@@ -437,6 +560,9 @@ export function createDuelScene({
       // so the road reads as bearing it rather than as being stood on.
       if (bossScale > 1) drawPresence(ctx, enemyX, gy, efs);
 
+      // Fire goes behind him; the sparks it throws go in front. Both are
+      // world-space, so a close-up on his face is a close-up on the fire too.
+      drawAura(ctx, 'back');
       drawFighter(ctx, 'player');
       drawFighter(ctx, 'enemy');
 
@@ -456,12 +582,17 @@ export function createDuelScene({
       // hour of the day has been laid over the fight.
       parallax.renderAmbient(ctx, view);
 
+      drawAura(ctx, 'front');
       drawSmoke(ctx);
       drawShells(ctx);
       drawBullets(ctx);
       drawFlashes(ctx);
       drawImpacts(ctx);
 
+      if (cam) ctx.restore();
+
+      // Rain is rain-sized however close the camera is: it is between the lens
+      // and the scene, not in it.
       weather.render(ctx, view);
 
       // --- centre banner (round call-outs) ---
@@ -485,6 +616,11 @@ export function createDuelScene({
 
       ctx.restore();
 
+      // Everything the cut-scene puts over the picture: bars, veil, the name
+      // card, impact frames, speed lines, the shockwave. Screen space, and
+      // outside the shake so the frame itself stays steady under them.
+      drawCinematics(ctx, view);
+
       // Vignette (never shaken, so the frame stays steady).
       const vg = ctx.createRadialGradient(
         view.w / 2, view.h / 2, Math.min(view.w, view.h) * 0.3,
@@ -496,6 +632,391 @@ export function createDuelScene({
       ctx.fillRect(0, 0, view.w, view.h);
     },
   };
+
+  // --- the camera -------------------------------------------------------------
+
+  /**
+   * Work a framing out into a camera position.
+   *
+   * `fill` is how many of the fighter's OWN source pixels should span the
+   * height of the screen, which is the only unit that means the same thing on
+   * both sides of the road: the Stranger is drawn at two and a half times the
+   * player's scale, so "six pixels tall" frames his eyes exactly as tightly as
+   * it frames the player's, without anybody having to know either scale.
+   */
+  function framing(side, sx, sy, fill, view, bias = 0) {
+    const L = layout[side] || layout.player;
+    /**
+     * `bias` pushes the camera DOWN, which pushes the subject UP the frame.
+     *
+     * It exists because the bottom third of the screen belongs to the speech
+     * box whenever anybody is talking, and a face composed dead-centre is a
+     * face with a box across its chin. It is a fraction of `fill`, so the
+     * shift is the same *proportion of the frame* at every zoom.
+     */
+    return {
+      zoom: Math.max(1, view.h / (fill * L.fs)),
+      x: place(L.originX, L.fs, sx, 1, L.flip),
+      y: L.topY + (sy + bias * fill) * L.fs,
+    };
+  }
+
+  /**
+   * The transform, or null when the camera is at rest.
+   *
+   * The centre is clamped so the visible rectangle never leaves the world the
+   * scene actually draws — everything is painted across `view.w` x `view.h`,
+   * and a camera that wanders past that edge shows the end of the sky.
+   */
+  function cameraTransform(view) {
+    if (camera.zoom <= 1.002) return null;
+    const z = camera.zoom;
+    const halfW = view.w / (2 * z);
+    const halfH = view.h / (2 * z);
+    const cx = Math.min(Math.max(camera.x, halfW), Math.max(halfW, view.w - halfW));
+    const cy = Math.min(Math.max(camera.y, halfH), Math.max(halfH, view.h - halfH));
+    return {
+      z,
+      tx: Math.round(view.w / 2 - cx * z),
+      ty: Math.round(view.h / 2 - cy * z),
+    };
+  }
+
+  // --- the aura ---------------------------------------------------------------
+
+  /**
+   * The Stranger's fire.
+   *
+   * Purple, because everything of his is, and because there is no warm colour
+   * anywhere else in that world for it to be confused with. It is made of
+   * three populations and nothing else:
+   *
+   *   flame  short columns licking up off the ground he is standing on and off
+   *          the hem of him, flickering on their own clocks
+   *   spark  single pixels thrown up and out, falling back under gravity
+   *   arc    only at level two: brief vertical strokes of white-hot light that
+   *          snap on for two frames somewhere on his body
+   *
+   * Level 1 is a fire he is standing in. Level 2 — the cowl off — is roughly
+   * four times the fire, sparks that reach the top of the frame, and the arcs,
+   * which is the whole point: the second phase has to LOOK like the moment the
+   * fight got serious before the player has taken a single round of it.
+   */
+  const AURA = {
+    1: { flames: 18, sparkRate: 0.02, arcRate: 0, rise: 0.9, spread: 0.55 },
+    2: { flames: 34, sparkRate: 0.07, arcRate: 0.005, rise: 1.5, spread: 0.85 },
+  };
+
+  function stepAura(dt) {
+    const cfg = AURA[auraLevel];
+    if (!cfg || !layout) {
+      if (aura.length) aura.length = 0;
+      return;
+    }
+    const L = layout.enemy;
+    const w = FIGHTER_W * L.fs;
+    const h = FIGHTER_H * L.fs;
+    const base = L.topY + h;
+
+    // Flames are a fixed population that respawn where they die, so the fire
+    // is always the same size rather than pulsing with the frame rate.
+    const flames = aura.filter((p) => p.kind === 'flame').length;
+    for (let i = flames; i < cfg.flames; i++) {
+      aura.push(spawnFlame(L, w, base, cfg));
+    }
+
+    if (Math.random() < cfg.sparkRate * dt) {
+      aura.push({
+        kind: 'spark',
+        x: L.originX + (Math.random() * 1.3 - 0.15) * w,
+        y: base - Math.random() * h,
+        /**
+         * All three are in device pixels per MILLISECOND, which is the unit
+         * every emitter in this file works in and the one that is easy to get
+         * wrong by an order of magnitude. A spark leaving at 0.3 crosses about
+         * three hundred pixels a second — up past his head and out of frame in
+         * a second and a half. The first pass had these ten times higher and
+         * every particle left the screen inside two frames, which is why the
+         * fire was invisible in every shot that was not the wide one.
+         */
+        vx: (Math.random() - 0.5) * 0.012 * L.fs,
+        vy: -(0.006 + Math.random() * 0.02) * L.fs * cfg.rise,
+        g: 0.00003 * L.fs,
+        t: 0,
+        life: 700 + Math.random() * 900,
+        hot: Math.random() < 0.3,
+      });
+    }
+    if (cfg.arcRate && Math.random() < cfg.arcRate * dt) {
+      aura.push({
+        kind: 'arc',
+        x: L.originX + w * (0.2 + Math.random() * 0.6),
+        y: L.topY + h * (0.15 + Math.random() * 0.5),
+        len: L.fs * (2 + Math.random() * 4),
+        t: 0,
+        life: 110,
+      });
+    }
+
+    for (let i = aura.length - 1; i >= 0; i--) {
+      const p = aura[i];
+      p.t += dt;
+      if (p.kind === 'flame') {
+        p.y -= p.vy * dt;
+        p.x += Math.sin(p.t / p.wobble) * 0.02 * L.fs;
+        if (p.t >= p.life) Object.assign(p, spawnFlame(L, w, base, cfg));
+      } else {
+        p.x += (p.vx || 0) * dt;
+        p.y += (p.vy || 0) * dt;
+        if (p.g) p.vy += p.g * dt;
+        if (p.t >= p.life) aura.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Where one flame starts.
+   *
+   * IT BURNS ALL OVER HIM, NOT JUST AT HIS FEET
+   * -------------------------------------------------------------------------
+   * The first version spawned every flame on the ground under him, which looks
+   * right in the wide shot and is nothing at all in a close-up — the camera
+   * comes to rest on his face and there is no fire within a hundred pixels of
+   * it. So the fire is distributed over his whole silhouette: mostly at the
+   * feet, where it pools, some licking up his sides, and a fifth of it around
+   * the crown, which is the part any shot of his face is going to hold.
+   */
+  function spawnFlame(L, w, base, cfg) {
+    const h = FIGHTER_H * L.fs;
+    const roll = Math.random();
+    let x;
+    let y;
+    let scale = 1;
+    if (roll < 0.4) {
+      // The pool at his feet.
+      x = L.originX + w * (0.5 + (Math.random() - 0.5) * (1 + cfg.spread));
+      y = base + L.fs * Math.random();
+    } else if (roll < 0.7) {
+      // Up the sides of him.
+      x = L.originX + (Math.random() < 0.5 ? -L.fs : w + L.fs) + (Math.random() - 0.5) * w * 0.3;
+      y = base - h * (0.15 + Math.random() * 0.6);
+      scale = 0.7;
+    } else {
+      // Around the crown — the part a close-up is looking at.
+      x = L.originX + w * (0.15 + Math.random() * 0.7);
+      y = L.topY + h * 0.08 + Math.random() * L.fs * 2;
+      scale = 0.6;
+    }
+    return {
+      kind: 'flame',
+      x,
+      y,
+      vy: (0.002 + Math.random() * 0.006) * L.fs * cfg.rise,
+      wobble: 90 + Math.random() * 220,
+      height: L.fs * (1.5 + Math.random() * 4 * cfg.rise) * scale,
+      life: 500 + Math.random() * 700,
+      /**
+       * A third of the fire is drawn IN FRONT of him.
+       *
+       * All of it used to be behind, which is the tidy choice and the wrong
+       * one: behind a silhouette this solid, fire is only visible where it
+       * clears his outline, so every close-up came out with no fire in it at
+       * all. Some of it licking over him is both truer — he is burning, not
+       * standing in front of a bonfire — and the only version that survives
+       * the camera coming in.
+       */
+      front: Math.random() < 0.5,
+      t: 0,
+    };
+  }
+
+  /**
+   * Draw it. A flame is a stack of three blocks — deep, mid, hot — which is
+   * exactly how fire was drawn before anyone could afford more, and it is
+   * still the only way to make one out of whole pixels. The stack shortens as
+   * the flame ages, so it burns down rather than fading out.
+   */
+  function drawAura(ctx, pass) {
+    if (!auraLevel || !layout) return;
+    /**
+     * A flame is ONE PIXEL wide — the scene's pixel, not the fighter's.
+     *
+     * The first version sized these blocks against the enemy's own draw scale,
+     * which is twelve device pixels for the Stranger, and the fire came out as
+     * a scatter of squares the size of his eye. Everything else on screen sits
+     * on the `view.scale` grid; the fire does too, so it magnifies with the
+     * camera exactly as the art does and still reads as fire at ten times the
+     * size.
+     */
+    const unit = Math.max(1, lastView ? lastView.scale : 3);
+    for (const p of aura) {
+      const k = 1 - p.t / p.life;
+      if (k <= 0) continue;
+      if (p.kind === 'flame') {
+        if (pass !== (p.front ? 'front' : 'back')) continue;
+        const h = Math.max(unit, p.height * k);
+        const x = Math.round(p.x);
+        const y = Math.round(p.y);
+        ctx.globalAlpha = 0.6 * k;
+        ctx.fillStyle = PALETTE.purpleDark;
+        ctx.fillRect(x - unit, Math.round(y - h), unit * 3, Math.round(h));
+        ctx.globalAlpha = 0.95 * k;
+        ctx.fillStyle = PALETTE.purple;
+        ctx.fillRect(x, Math.round(y - h * 0.8), unit, Math.round(h * 0.8));
+        ctx.globalAlpha = k;
+        ctx.fillStyle = PALETTE.astralLight;
+        ctx.fillRect(x, Math.round(y - h * 0.3), unit, Math.round(h * 0.3));
+      } else if (p.kind === 'spark') {
+        if (pass !== 'front') continue;
+        ctx.globalAlpha = Math.min(1, k * 1.6);
+        ctx.fillStyle = p.hot ? PALETTE.astralLight : PALETTE.purple;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), unit, unit);
+        ctx.globalAlpha = k * 0.35;
+        ctx.fillStyle = PALETTE.purpleDark;
+        ctx.fillRect(Math.round(p.x) - unit, Math.round(p.y) - unit, unit * 3, unit * 3);
+      } else if (p.kind === 'arc') {
+        if (pass !== 'front') continue;
+        ctx.globalAlpha = k;
+        ctx.fillStyle = PALETTE.white;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), unit, Math.round(p.len));
+        ctx.globalAlpha = k * 0.5;
+        ctx.fillStyle = PALETTE.astralLight;
+        ctx.fillRect(Math.round(p.x) - unit, Math.round(p.y), unit * 3, Math.round(p.len));
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- the cut-scene's furniture ----------------------------------------------
+
+  function drawCinematics(ctx, view) {
+    const s = view.scale;
+
+    if (fx.rays > 0) drawRays(ctx, view, fx.rays);
+    if (fx.ring >= 0) drawRing(ctx, view, fx.ring);
+
+    if (fx.veil > 0.001) {
+      ctx.globalAlpha = Math.min(1, fx.veil);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.globalAlpha = 1;
+    }
+
+    if (fx.slam > 0) {
+      // White, then one frame of black. An impact frame is a hole punched in
+      // the film; white alone reads as a bug.
+      ctx.fillStyle = fx.slam > 90 ? PALETTE.white : PALETTE.ink;
+      ctx.globalAlpha = Math.min(1, fx.slam / 120);
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.globalAlpha = 1;
+    }
+
+    if (fx.bars > 0) {
+      const h = Math.round(view.h * fx.bars);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, view.w, h);
+      ctx.fillRect(0, view.h - h, view.w, h);
+      if (fx.hint && h > 8) {
+        ctx.globalAlpha = 0.4;
+        drawTextCentered(ctx, 'ESC TO SKIP', view.w / 2, view.h - h / 2, {
+          scale: Math.max(1, s - 1),
+          color: PALETTE.grey,
+        });
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    /**
+     * The name card, along the TOP of the frame.
+     *
+     * It used to sit in the middle, over the face it was naming, which is the
+     * one place a title cannot go. Up here it lands in the letterbox bar with
+     * the picture untouched underneath — which is where a film would put it.
+     */
+    if (fx.card) {
+      const k = easeOut(fx.card.t);
+      const bandH = Math.round(view.h * 0.13);
+      const top = Math.round(view.h * fx.bars) + Math.round(view.h * 0.015);
+      const w = view.w * k;
+      const x = Math.round((view.w - w) / 2);
+
+      ctx.globalAlpha = 0.82 * k;
+      ctx.fillStyle = PALETTE.shadow;
+      ctx.fillRect(x, top, Math.round(w), bandH);
+      ctx.globalAlpha = k;
+      ctx.fillStyle = PALETTE.astralDark;
+      ctx.fillRect(x, top, Math.round(w), Math.max(1, Math.round(s / 2)));
+      ctx.fillRect(x, top + bandH - Math.max(1, Math.round(s / 2)), Math.round(w), Math.max(1, Math.round(s / 2)));
+
+      // The letters come in from the right and stop dead — a card arrives.
+      const slide = (1 - k) * view.w * 0.25;
+      ctx.globalAlpha = Math.min(1, fx.card.t * 1.6);
+      drawTextCentered(ctx, fx.card.text, view.w / 2 + slide, top + bandH * (fx.card.sub ? 0.38 : 0.5), {
+        scale: Math.max(3, s + 1),
+        color: PALETTE.star,
+        shadow: PALETTE.cosmicHigh,
+      });
+      if (fx.card.sub) {
+        drawTextCentered(ctx, fx.card.sub, view.w / 2 + slide * 0.6, top + bandH * 0.76, {
+          scale: Math.max(1, s - 1),
+          color: PALETTE.astral,
+          shadow: PALETTE.cosmicHigh,
+        });
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /**
+   * Speed lines. A hundred blocks pointing at the middle of the screen, drawn
+   * from the edge inwards and stopping short of the centre so they frame the
+   * face rather than cover it.
+   */
+  function drawRays(ctx, view, strength) {
+    const s = view.scale;
+    const cx = view.w / 2;
+    const cy = view.h / 2;
+    const reach = Math.max(view.w, view.h);
+    const count = 56;
+    ctx.fillStyle = PALETTE.white;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.sin(elapsed / 240 + i) * 0.02;
+      const inner = reach * (0.24 + (1 - strength) * 0.5);
+      const len = reach * 0.6 * (0.4 + ((i * 37) % 100) / 160);
+      ctx.globalAlpha = strength * (0.22 + ((i * 17) % 10) / 26);
+      for (let t = 0; t < len; t += s * 2) {
+        ctx.fillRect(
+          Math.round((cx + Math.cos(a) * (inner + t)) / s) * s,
+          Math.round((cy + Math.sin(a) * (inner + t)) / s) * s,
+          s,
+          s,
+        );
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** A shockwave: one ring of blocks, thinning as it goes. */
+  function drawRing(ctx, view, k) {
+    const s = view.scale;
+    const cx = view.w / 2;
+    const cy = view.h / 2;
+    const r = k * Math.max(view.w, view.h) * 0.75;
+    const alpha = Math.max(0, 1 - k) ** 1.5;
+    const steps = Math.max(28, Math.round(r / (s * 1.5)));
+    ctx.fillStyle = PALETTE.astralLight;
+    ctx.globalAlpha = alpha * 0.9;
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      ctx.fillRect(
+        Math.round((cx + Math.cos(a) * r) / s) * s,
+        Math.round((cy + Math.sin(a) * r * 0.72) / s) * s,
+        s * 2,
+        s * 2,
+      );
+    }
+    ctx.globalAlpha = 1;
+  }
 
   // --- drawing ---------------------------------------------------------------
 
@@ -702,4 +1223,17 @@ function drawShield(ctx, shield, x, gy, fs, elapsed, flip) {
   const bob = Math.round(Math.sin(elapsed / 300)) * fs;
   const lead = flip ? FIGHTER_W - plate.width - 7 : 7;
   drawSprite(ctx, plate, x + lead * fs, gy - (plate.height - 1) * fs + bob, fs, flip);
+}
+
+/** Camera easing: slow out of a cut, slow into the next one. */
+function easeInOut(k) {
+  return k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+}
+
+function easeOut(k) {
+  return 1 - (1 - k) ** 3;
+}
+
+function lerp(a, b, k) {
+  return a + (b - a) * k;
 }
