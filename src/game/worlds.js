@@ -5,7 +5,8 @@
  * object that every other system reads:
  *
  *   biome       which landscape you walk through — see src/game/biomes.js
- *   encounters  parameters for the guided-random sequence generator
+ *   encounters  how many duels the road holds; the shops and inns around them
+ *               are rolled per run — see src/explore/encounters.js
  *   rarity      shop rarity weights (higher worlds tilt towards legendary)
  *   priceMul    multiplier on top of the exponential price curve
  *   enemy       enemy life distribution, ability chances, and the ROSTER of
@@ -26,12 +27,24 @@
  * names were describing the art, not the journey. Each world now names a place
  * the ride could plausibly reach, and points at the biome that draws it.
  *
- * Two of those biomes exist: `desert` and `meadow`. The worlds whose landscape
- * has not been drawn yet ride the desert and say so in a comment above the
- * `biome` line — they are named for what they will be, and the wash is the
- * placeholder that hints at it. Building one of them is a matter of adding
- * `src/art/biomes/<id>.js` plus a weather table, then changing one line here;
- * no other system needs to know.
+ * All six of those biomes are now drawn: `desert`, `meadow`, `snow`, `swamp`,
+ * `inferno` and `void`.
+ *
+ * WHAT A TINT IS FOR, NOW THAT IT IS NOT A PLACEHOLDER
+ * ---------------------------------------------------------------------------
+ * The washes used to be stand-ins for art that did not exist: four worlds wore
+ * the desert, and a blue one said "this is the cold place" over a picture of
+ * sand. Every one of those is gone, because a wash laid over a landscape that
+ * is already the right colour does nothing but drain it — the pass is white
+ * because it is drawn white.
+ *
+ * Three worlds keep one, and for the opposite reason: the *sky* over them is
+ * not Earth's. The sky is deliberately shared by the whole game (see the note
+ * in src/explore/parallax.js) — the sun setting the same way in all six worlds
+ * is part of what makes the journey one journey — so the only way to say "the
+ * air here is not air" is to put the world's own colour over the top of it.
+ * A bayou needs the blue taken down, the basin should not have a summer sky at
+ * all, and the Galaxy has no sky in the first place.
  */
 
 import { getBiome } from './biomes.js';
@@ -48,7 +61,7 @@ export const WORLDS = [
     priceMul: 1,
     goldMul: 1,
     expMul: 1,
-    encounters: { total: 10, minEnemies: 6, minShops: 2, minInns: 2 },
+    encounters: { duels: 7 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
       lives: { 1: 80, 2: 18, 3: 2 },
@@ -65,17 +78,11 @@ export const WORLDS = [
     name: 'Wildgrass Prairie',
     subtitle: 'Green country, and none of it yours',
     biome: 'meadow',
-    /**
-     * No wash at all. The prairie is the first world with its own art, and a
-     * colour laid over it would only be arguing with paint that is already
-     * the right colour — the washes below exist because those worlds are
-     * still wearing the desert.
-     */
     tint: null,
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
-    encounters: { total: 12, minEnemies: 7, minShops: 2, minInns: 2 },
+    encounters: { duels: 8 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
       lives: { 1: 66, 2: 26, 3: 8 },
@@ -96,13 +103,12 @@ export const WORLDS = [
     id: 3,
     name: 'Whitecrown Pass',
     subtitle: 'Above the trees, under the storm',
-    /** TODO: a `snow` biome. Riding the desert until it is drawn. */
-    biome: 'desert',
-    tint: { color: '#9fc0e0', alpha: 0.24 },
+    biome: 'snow',
+    tint: null,
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
-    encounters: { total: 15, minEnemies: 8, minShops: 3, minInns: 3 },
+    encounters: { duels: 10 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
       lives: { 1: 50, 2: 32, 3: 14, 4: 4 },
@@ -123,13 +129,13 @@ export const WORLDS = [
     id: 4,
     name: 'Blackwater Bayou',
     subtitle: 'The water keeps what it takes',
-    /** TODO: a `swamp` biome. Riding the desert until it is drawn. */
-    biome: 'desert',
-    tint: { color: '#4a6a52', alpha: 0.32 },
+    biome: 'swamp',
+    /** The blue taken out of the sky, and a little green put into the air. */
+    tint: { color: '#5c7f6a', alpha: 0.2 },
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { total: 16, minEnemies: 9, minShops: 3, minInns: 3 },
+    encounters: { duels: 11 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
       lives: { 1: 36, 2: 34, 3: 22, 4: 8 },
@@ -150,13 +156,17 @@ export const WORLDS = [
     id: 5,
     name: 'Brimstone Basin',
     subtitle: 'Hell got tired of waiting',
-    /** TODO: an `inferno` biome. Riding the desert until it is drawn. */
-    biome: 'desert',
-    tint: { color: '#b83a22', alpha: 0.36 },
+    biome: 'inferno',
+    /**
+     * The basin's own light. Strong enough to take the summer out of the sky
+     * and turn the sun the colour of the ground, and no stronger — past about
+     * a third the black rock goes brown and the whole world reads as rust.
+     */
+    tint: { color: '#c2451c', alpha: 0.26 },
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
-    encounters: { total: 17, minEnemies: 10, minShops: 3, minInns: 3 },
+    encounters: { duels: 12 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
       lives: { 1: 24, 2: 32, 3: 28, 4: 12, 5: 4 },
@@ -177,14 +187,20 @@ export const WORLDS = [
     id: 6,
     name: 'Galaxy',
     subtitle: 'Past the last horizon',
-    /** TODO: a `void` biome. The Galaxy has its own intro scene either way. */
-    biome: 'desert',
+    /** The walk is the void; the intro card is still the galaxy scene. */
+    biome: 'void',
+    /**
+     * The heaviest wash in the game, and the only one doing structural work:
+     * out here the "sky" is a blue gradient with a sun crossing it, and this
+     * is what makes it space. It goes over the sun as well, which is correct —
+     * whatever that is, it is not the star the first five worlds walked under.
+     */
     tint: { color: '#4c2f80', alpha: 0.45 },
     priceMul: 2.4,
     goldMul: 5,
     expMul: 4.5,
     /** The Galaxy is short and brutal: a corridor straight to the boss. */
-    encounters: { total: 7, minEnemies: 5, minShops: 1, minInns: 1 },
+    encounters: { duels: 5 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
       lives: { 2: 30, 3: 34, 4: 24, 5: 12 },

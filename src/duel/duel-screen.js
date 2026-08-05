@@ -84,18 +84,28 @@ export const DuelScreen = {
 
   mount(root, params = {}) {
     const player = getState();
-    const world = getWorld(player.world);
+    /**
+     * THE FIGHT BELONGS TO THE SEGMENT THAT SPAWNED IT
+     * -----------------------------------------------------------------------
+     * Not to `player.world`. The encounter carries the world its segment was
+     * generated for (see src/explore/walk-engine.js), and that is the one
+     * authority here: if anything ever moves the player on while a duel is
+     * being routed, the fight that opens is still the one the road offered.
+     * The boss used to be a world ahead for exactly that reason.
+     */
+    const worldId = params.encounter?.worldId ?? player.world;
+    const world = getWorld(worldId);
     const isBoss = !!params.isBoss;
     const modifiers = buildModifiers();
 
     let enemy = isBoss
-      ? generateBoss(player.world)
-      : generateEnemy(player.world, (player.seed ^ ((params.encounter?.index ?? 0) * 2246822519)) >>> 0);
+      ? generateBoss(worldId)
+      : generateEnemy(worldId, (player.seed ^ ((params.encounter?.index ?? 0) * 2246822519)) >>> 0);
 
-    playMusic(player.world === FINAL_WORLD ? 'themeGalaxy' : 'themeDuel');
+    playMusic(worldId === FINAL_WORLD ? 'themeGalaxy' : 'themeDuel');
 
     const scene = createDuelScene({
-      worldId: player.world,
+      worldId,
       biome: world.biome,
       tint: world.tint,
       seed: player.seed,
@@ -608,7 +618,7 @@ export const DuelScreen = {
             el('button.btn.btn--primary', {
               onclick: () => {
                 overlay.remove();
-                resolveDuel({ won, enemy, isBoss });
+                resolveDuel({ won, enemy, isBoss, worldId });
               },
             }, [won ? 'Back to the road' : 'Continue']),
           ]),

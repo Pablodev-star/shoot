@@ -56,6 +56,64 @@ export const PALETTE = {
   bloomBlue: '#8fb4ff',
   bloomCream: '#fdf3cf',
 
+  // --- Snow / ice / spruce (Whitecrown Pass) ------------------------------
+  // A five-step cold ramp, parallel to the sand and grass ones. It runs a lot
+  // wider in value than either — snow in sun is the brightest thing the game
+  // ever draws and snow in shadow is nearly blue-black — because that spread
+  // is the only way a white landscape has any form in it at all.
+  snowLight: '#ffffff',
+  snow: '#e9f2fc',
+  snowMid: '#c7d9ee',
+  snowShade: '#9cb4d2',
+  snowDeep: '#6c84a6',
+  // Ice is not snow with the saturation up: it is the one thing up there you
+  // can see *into*, so it keeps its own colder, greener ramp.
+  iceLight: '#c2ecf7',
+  ice: '#7ac8e2',
+  iceDark: '#3f82a6',
+  // Spruce. The grass greens are too warm to sit under snow — they go khaki
+  // the moment the light drops — so the conifers get a blue-green of their own.
+  pineLight: '#4e8763',
+  pine: '#2d5c44',
+  pineDeep: '#193a2c',
+
+  // --- Bog (Blackwater Bayou) ---------------------------------------------
+  // Standing water that has not moved in a hundred years. The lightest step is
+  // the scum on top of it, not a highlight: black water has no highlight
+  // except the sky lying on it, and that comes from the sky.
+  bogLight: '#55705f',
+  bog: '#2f4a45',
+  bogDark: '#1b2f2e',
+  bogDeep: '#0f1f1f',
+  algae: '#86ab4e',
+  lichen: '#a3b177',
+  bogHaze: '#53706a',
+  rot: '#6b5f43',
+
+  // --- Brimstone (Brimstone Basin) ----------------------------------------
+  // Molten rock, and the rock it broke out of. The char ramp is deliberately
+  // violet-grey rather than neutral: basalt beside orange light goes blue, and
+  // a neutral grey next to magma reads as dirty snow.
+  magma: '#ff7f22',
+  magmaDeep: '#c33a0d',
+  emberGlow: '#ffbe52',
+  charLight: '#584b53',
+  char: '#3a3038',
+  charDark: '#231d26',
+  sulfur: '#d9c34b',
+  sulfurLight: '#f4e281',
+
+  // --- The void (the Galaxy) ----------------------------------------------
+  // Broken violet stone lit by nothing in particular, and the cold aquamarine
+  // that everything alive out here glows in. The two are opposites on the
+  // wheel, which is what keeps a scene with no sun in it readable.
+  voidRockLight: '#6b50a0',
+  voidRock: '#493471',
+  voidRockDark: '#2c1c4c',
+  astralLight: '#a2f7ec',
+  astral: '#4fcac6',
+  astralDark: '#2a7f88',
+
   // --- Wood / leather -----------------------------------------------------
   woodLight: '#a3703c',
   wood: '#7b4f27',

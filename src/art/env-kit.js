@@ -17,6 +17,21 @@
  * does not use it, and reaches for `H` (grass) instead. A per-biome key would
  * let the same character map bake two different sprites, which is the fastest
  * way to lose track of what a piece of art actually looks like.
+ *
+ * WHICH IS WHY THE LAST FOUR BIOMES ARE DRAWN IN DIGITS AND PUNCTUATION
+ * ---------------------------------------------------------------------------
+ * Two biomes used every lowercase letter and most of the uppercase ones. Four
+ * more needed another thirty-three colours, and there is no thirty-third
+ * letter — so the pass is drawn in `1`-`5` (snow), `6`-`8` (ice) and `9`,`0`,`D`
+ * (spruce), the bayou in what uppercase was left, and the basin and the void in
+ * punctuation. It is uglier to read in the art than `h` for grass ever was, and
+ * it is still the right trade: a character map that bakes one colour everywhere
+ * can be moved between files, quoted in a comment, or read next to a sibling
+ * sprite, and none of that survives a key that means different things in
+ * different rooms.
+ *
+ * Each block below is a ramp, ordered light to dark, so a run like `^%$` shades
+ * the same way `sSz` or `hHj` does.
  */
 
 import { PALETTE } from './palette.js';
@@ -76,6 +91,45 @@ export const KEY = {
   v: PALETTE.greyDark,
   c: PALETTE.skyDay,
   C: PALETTE.skyDayHigh,
+  // Snow ramp, light to dark
+  1: PALETTE.snowLight,
+  2: PALETTE.snow,
+  3: PALETTE.snowMid,
+  4: PALETTE.snowShade,
+  5: PALETTE.snowDeep,
+  // Ice
+  6: PALETTE.iceLight,
+  7: PALETTE.ice,
+  8: PALETTE.iceDark,
+  // Spruce
+  9: PALETTE.pineLight,
+  0: PALETTE.pine,
+  D: PALETTE.pineDeep,
+  // Bog water, light to dark, then what grows on and around it
+  F: PALETTE.bogLight,
+  I: PALETTE.bog,
+  L: PALETTE.bogDark,
+  Q: PALETTE.bogDeep,
+  U: PALETTE.algae,
+  V: PALETTE.lichen,
+  Z: PALETTE.bogHaze,
+  '+': PALETTE.rot,
+  // Molten rock, then the burnt rock around it, then brimstone
+  '<': PALETTE.magma,
+  '>': PALETTE.magmaDeep,
+  '~': PALETTE.emberGlow,
+  '^': PALETTE.charLight,
+  '%': PALETTE.char,
+  $: PALETTE.charDark,
+  '#': PALETTE.sulfur,
+  '@': PALETTE.sulfurLight,
+  // Void stone, then the light in it
+  '!': PALETTE.voidRockLight,
+  '?': PALETTE.voidRock,
+  '&': PALETTE.voidRockDark,
+  '=': PALETTE.astralLight,
+  ':': PALETTE.astral,
+  ';': PALETTE.astralDark,
 };
 
 /** Layer tile width in source pixels. Every scrolling layer uses this. */

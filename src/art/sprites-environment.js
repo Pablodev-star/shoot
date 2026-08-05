@@ -25,10 +25,11 @@
  * each, plus a manifest giving each one a scroll `speed` (the fraction of the
  * camera's movement it travels at) and a `y` offset from the walk line:
  *
- *   clouds   speed 0.05   soft cloud band
+ *   clouds   speed 0.05   soft cloud band (a nebula, out in the void)
  *   far      speed 0.15   distant range
  *   mid      speed 0.40   middle hills / mesas
- *   dunes|hills speed 0.70   the rise just behind the walk line
+ *   dunes|hills|drifts|bank|crags|shelf   speed 0.70   the rise just behind
+ *                         the walk line, named for whatever it is made of
  *   ground   speed 1.00   the strip the character walks on
  *
  * The layer *names* are the biome's own — the desert's fourth layer is
@@ -49,13 +50,29 @@ import { drawText, measureText } from './font.js';
 import { KEY, LAYER_TILE_W, makeCloudLayer, rotate90 } from './env-kit.js';
 import { DESERT_ART } from './biomes/desert.js';
 import { MEADOW_ART } from './biomes/meadow.js';
+import { SNOW_ART } from './biomes/snow.js';
+import { SWAMP_ART } from './biomes/swamp.js';
+import { INFERNO_ART } from './biomes/inferno.js';
+import { VOID_ART } from './biomes/void.js';
 
 export { LAYER_TILE_W };
 
-/** Every biome the art layer knows how to draw. */
+/**
+ * Every biome the art layer knows how to draw — one per world, in road order.
+ *
+ * The fourth layer's *name* differs from biome to biome (`dunes`, `hills`,
+ * `drifts`, `bank`, `crags`, `shelf`) and nothing outside each module cares,
+ * because the renderer only ever reaches layers through the manifest. That is
+ * worth keeping: the name is a note to whoever reads the file about what the
+ * rise in front of the horizon actually is.
+ */
 const BIOME_ART = {
   desert: DESERT_ART,
   meadow: MEADOW_ART,
+  snow: SNOW_ART,
+  swamp: SWAMP_ART,
+  inferno: INFERNO_ART,
+  void: VOID_ART,
 };
 
 export const DEFAULT_BIOME = 'desert';

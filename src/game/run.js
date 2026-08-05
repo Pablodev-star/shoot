@@ -161,9 +161,15 @@ export async function finishEncounter() {
   await go('explore', { resume: true });
 }
 
-/** Duel resolution — rewards, stats and the boss/world transition. */
-export async function resolveDuel({ won, enemy, isBoss }) {
-  const worldId = getState().world;
+/**
+ * Duel resolution — rewards, stats and the boss/world transition.
+ *
+ * `worldId` comes from the encounter that opened the fight rather than from the
+ * player's current world, for the same reason the duel screen builds its enemy
+ * that way: the segment that offered the fight is what the fight is worth.
+ */
+export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
+  const worldId = from ?? getState().world;
   if (won) {
     const gold = goldForEnemy({ worldId, lives: enemy.maxLives, isBoss });
     const exp = expForEnemy({ worldId, lives: enemy.maxLives, isBoss });

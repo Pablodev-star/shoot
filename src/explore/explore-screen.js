@@ -50,13 +50,13 @@ import { toast } from '../ui/toast.js';
 import { confirmDialog } from '../ui/confirm.js';
 import { openHowToPlay } from '../ui/help.js';
 
-/** Plain-language notice when the weather turns. Shown once, then gone. */
-const WEATHER_BLURB = {
-  cloudy: 'Clouds are gathering',
-  rain: 'Rain is coming down',
-  sandstorm: 'Sand whips across the road',
-  fog: 'Mist settles over the grass',
-};
+/**
+ * The plain-language notice when the weather turns used to be a table in this
+ * file, keyed by weather id. It lives on the weather itself now — a sky that
+ * knows how long it lasts and what it does to a duel may as well know what to
+ * say when it arrives, and a table out here is one more place to forget to
+ * edit when a new one is added.
+ */
 
 export const ExploreScreen = {
   id: 'explore',
@@ -187,7 +187,7 @@ export const ExploreScreen = {
         syncMapButton();
       }),
       on(EVENTS.WEATHER_CHANGED, (w) => {
-        if (WEATHER_BLURB[w.id]) toast(WEATHER_BLURB[w.id], w.id === 'sandstorm' ? 'bad' : 'info');
+        if (w.blurb) toast(w.blurb, w.tone);
       }),
       on(EVENTS.HUNGER_EMPTY, () => toast('Starving — eat something', 'bad')),
     ];

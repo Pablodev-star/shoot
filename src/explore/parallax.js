@@ -106,11 +106,18 @@ const BAYER = [
 ].map((v) => (v + 0.5) / 16);
 
 /**
- * The overcast deck: how much of it each weather pulls over the sky. A
- * sandstorm gets none — sand does not arrive under rain cloud, it arrives as
+ * The overcast deck: how much of it each weather pulls over the sky.
+ *
+ * A sandstorm gets none — sand does not arrive under rain cloud, it arrives as
  * the sky itself turning the colour of the ground, which the ochre haze does.
+ * Ashfall is the same argument at half strength: some of what is up there is
+ * genuinely smoke, and the basin's own cloud band is already drawn as smoke.
+ * Snow gets the most of anyone, because snow really does come out of a closed
+ * white sky and almost never out of an open one. Starfall gets none at all:
+ * you cannot see a meteor through a cloud, and there is nothing out there for
+ * a cloud to be made of.
  */
-const STORM_DECK = { cloudy: 0.6, rain: 1, sandstorm: 0, fog: 0.45 };
+const STORM_DECK = { cloudy: 0.6, rain: 1, sandstorm: 0, fog: 0.45, snow: 0.85, ash: 0.35, starfall: 0 };
 
 /**
  * @param {object} options
