@@ -12,22 +12,61 @@ import { SELL_RATIO } from './items.js';
 // Experience & levels
 // ---------------------------------------------------------------------------
 
-/** exp needed to go from `level` to `level + 1`. Exponential, tunable. */
-export const EXP_BASE = 60;
+/**
+ * exp needed to go from `level` to `level + 1`. Exponential, tunable.
+ *
+ * A LEVEL IS ABOUT SEVEN TENTHS OF A WORLD
+ * ---------------------------------------------------------------------------
+ * The pace is the number these two constants and `expForEnemy` exist to hit:
+ * roughly 1.4 levels per world, so a run that reaches the Galaxy is somewhere
+ * around level 9 and finishes with eleven lives.
+ *
+ * It used to be more than twice that. Clearing every world put the player up
+ * two and a bit levels, they arrived at the Stranger around fourteen with
+ * sixteen lives, and the last two worlds' difficulty curve — which is built
+ * around a fight you can lose — was being outrun by a life bar that grew
+ * faster than anything could empty it. Levelling is meant to be the slow
+ * background reward the whole journey pays out; the fast one is gold.
+ *
+ * Both knobs moved to get there, and deliberately: an enemy is worth less than
+ * it was (see `expForEnemy`), and the ladder is steeper from the very first
+ * rung. Only raising the ladder would have left the toasts reading "+29 exp"
+ * against a bar wanting three hundred, which reads as a bug rather than as a
+ * long climb.
+ *
+ * Cumulative exp needed, and where the road actually delivers it:
+ *
+ *   level 2 |    245 · mid world 1        level 6 | 2,392 · world 4
+ *   level 3 |    573 · early world 2      level 7 | 3,450 · world 5
+ *   level 4 |  1,013 · world 2/3          level 8 | 4,868 · world 5
+ *   level 5 |  1,602 · world 3            level 9 | 6,769 · world 6
+ */
+export const EXP_BASE = 245;
 export const EXP_GROWTH = 1.34;
 
 export function expForNextLevel(level) {
   return Math.round(EXP_BASE * Math.pow(EXP_GROWTH, level - 1));
 }
 
-/** Lives granted per level-up. Levelling also refills lives immediately. */
+/**
+ * Lives granted per level-up. The level-up itself hands you exactly this many
+ * lives as well as the room to hold them — it is not a refill. See `addExp` in
+ * src/game/player.js.
+ */
 export const LIVES_PER_LEVEL = 1;
 export const STARTING_LIVES = 3;
 
-/** exp awarded for beating an enemy. */
+/**
+ * exp awarded for beating an enemy.
+ *
+ * Worth about two thirds of what it used to be, which is half of how the pace
+ * above is reached — the other half is the ladder. A tougher enemy is still
+ * worth more, and the per-life term is the smaller of the two so that a world
+ * full of one-life drifters is not worthless.
+ */
 export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
   const world = getWorld(worldId);
-  const base = 18 + lives * 9;
+  const base = 15 + lives * 7;
   return Math.round(base * world.expMul * (isBoss ? 3.2 : 1));
 }
 

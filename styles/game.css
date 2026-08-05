@@ -541,6 +541,25 @@
 
 .duel-screen > * { pointer-events: auto; }
 
+/* A boss entrance owns the frame.
+
+   Everything the duel screen normally shows steps out of the way — cards,
+   round pill, callout, the three move plates — because a cut-scene playing
+   behind a life bar is a fight with a picture on it. They fade rather than
+   vanish, so the interface is visibly *returning* when the bars pull off, and
+   they keep their space in the layout so nothing jumps at the handover. */
+.duel-screen.is-cinematic > * {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-panel, 220ms) var(--ease-out);
+}
+
+.duel-screen > * {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--dur-panel, 220ms) var(--ease-out);
+}
+
 .duel-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);

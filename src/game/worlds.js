@@ -216,6 +216,35 @@ export const WORLDS = [
       abilities: ['mindControl', 'dynamite', 'poison'],
       accuracy: 0.78,
       archetype: 'bossStranger',
+
+      /**
+       * THE ENTRANCE
+       * -----------------------------------------------------------------
+       * The cut-scene that plays before the last fight in the game, as data:
+       * a list of lines, each one a speaker, a camera framing and a sentence.
+       * The machinery is in src/duel/boss-intro.js and knows nothing about
+       * the Stranger — give any boss an `intro` and it gets an entrance.
+       *
+       * `shot` names a framing (`eyes`, `face`, `wide`, `low`) and `shake`
+       * kicks the camera on the beat the line lands. The player answers, and
+       * the answer cuts to the player's own face: a conversation shot from
+       * one angle is a monologue with an audience.
+       *
+       * The lines are written to be read in about a second each. Every one of
+       * them is doing a job — the first says he has been watching, the second
+       * says the whole journey was his, the third makes it personal, the
+       * player's says no, and the last is the only order he gives.
+       */
+      intro: {
+        lines: [
+          { who: 'enemy', shot: 'eyes', text: 'Six worlds. Six roads. I laid every one of them for you.' },
+          { who: 'enemy', shot: 'wide', text: 'You buried the men I sent. You ate, you slept, you grew.' },
+          { who: 'enemy', shot: 'low', text: 'A gun is a small thing to carry that far, stranger.', shake: 260 },
+          { who: 'player', shot: 'face', text: 'I did not walk it to stand still at the end of it.' },
+          { who: 'enemy', shot: 'eyes', text: 'No. You walked it so I could see what I made.', shake: 420 },
+          { who: 'enemy', shot: 'face', text: 'Draw.', shake: 700 },
+        ],
+      },
       phases: [
         {
           name: 'The Stranger',

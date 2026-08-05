@@ -305,6 +305,56 @@ const HEADS = {
     '....kdssssk.....',
     '...kpqqqqqqpk...',
   ],
+
+  /**
+   * THE STRANGER, phase one.
+   *
+   * A crown of broken points over a cowl with a sky inside it. Every other
+   * head in this file is a hat with a face under it, and the whole problem
+   * with the old Stranger was that he was one too — a cloak and two dots, the
+   * same silhouette as the Nameless he shares the Galaxy with.
+   *
+   * Three things make this one different at a glance, and all three are the
+   * silhouette rather than the colours: it is the only head that breaks the
+   * top row of the sprite, the only one whose outline is not a closed curve,
+   * and the only one wider at the crown than at the jaw. You can tell it from
+   * everything else in the game as a black shape at the far side of the road,
+   * which is the test.
+   */
+  voidCrown: [
+    '.k..k.k...k.k..k',
+    '.khkkhkhkkhkhkhk',
+    '..khhhhhhhhhhhk.',
+    '.khhhhhhhhhhhhhk',
+    'khhKKKKKKKKKKhhk',
+    'khKKKzKKKKzKKKhk',
+    'khKKKKKKKKKKKKhk',
+    'khhKKKKKKKKKKhhk',
+    '.khhKKKKKKKKhhk.',
+    '.khhhhhhhhhhhhk.',
+    'khhhhhhhhhhhhhhk',
+  ],
+
+  /**
+   * THE STRANGER, phase two — the cowl comes off.
+   *
+   * A skull with a star in it. It keeps the crown, broken shorter, so the two
+   * phases read as the same creature: the player has to see the thing that was
+   * under the hood, not a second boss.
+   */
+  starSkull: [
+    '...k...k...k....',
+    '..khk.khk.khk...',
+    '...kwwwwwwwwk...',
+    '..kwwwwwwwwwwk..',
+    '..kwKKKwwKKKwk..',
+    '..kwKzKwwKzKwk..',
+    '..kwKKKwwKKKwk..',
+    '...kwwKKwwwwk...',
+    '...kwwwwwwwwk...',
+    '...kKwKwKwKwk...',
+    '..kwwwwwwwwwwk..',
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -420,6 +470,47 @@ const TORSOS = {
     '..kspPPPPPPpsk..',
     '..kPPPPPPPPPPk..',
     '.kPPPPPPPPPPPPk.',
+  ],
+
+  /**
+   * THE STRANGER, phase one — the mantle.
+   *
+   * Shoulders that run the full sixteen pixels, which no other torso in the
+   * file does: every one of them is inset by two or three, because a man has
+   * a neck. This is the shape of something wearing the sky, and the width is
+   * doing the same job the crown does above it — it makes the silhouette
+   * broader than a person's at any distance, before scale is even involved.
+   *
+   * Inside the mantle is not cloth. There are four stars in it, which is the
+   * detail worth having: it says the cloak has no back.
+   */
+  mantle: [
+    'kqqPPPPPPPPPPqqk',
+    'kqppppppppppppqk',
+    'kpPPzPPPPPPzPPpk',
+    'kpPPPPPzPPPPPPpk',
+    'kpPPPPPPPPPzPPpk',
+    'kpPPPPPPPPPPPPpk',
+    '.kPPkPPkkPPkPPk.',
+  ],
+
+  /**
+   * THE STRANGER, phase two — the ribs.
+   *
+   * The mantle is gone and what it was covering is an open cage with a star
+   * caught in it. The bone is bright, the gaps are ink, and the light is
+   * coming out through the gaps rather than sitting on the bone: the whole
+   * phase-two design is one idea, which is that he is a container that has
+   * failed, and this is where it is stated.
+   */
+  voidRibs: [
+    'kwwkkkkkkkkkkwwk',
+    'kwwwwwwwwwwwwwwk',
+    'kwKKKKzzzzKKKKwk',
+    'kwwwwwzzzzwwwwwk',
+    'kwKKKKzzzzKKKKwk',
+    'kwwwwwKzzKwwwwwk',
+    '.kwKKKKKKKKKKwk.',
   ],
 };
 
@@ -899,32 +990,56 @@ export const ARCHETYPES = {
     }),
   },
 
+  /**
+   * THE STRANGER.
+   *
+   * He used to be `shade` over `tatters` — the same head and the same torso as
+   * the Nameless who rides the Galaxy under him, in slightly colder colours.
+   * The last fight in the game was against a palette swap of a regular
+   * encounter, and the player met three of those on the way to it.
+   *
+   * Both phases are now bespoke, and both carry `scale`: the duel scene draws
+   * them at that multiple of the fighters' own size (see `createDuelScene`), so
+   * he is physically twice the man across the road from him and grows again
+   * when the cowl comes off. Nothing else in the game is drawn at a scale it
+   * did not earn.
+   */
   bossStranger: {
-    look: 'A cloak, and two cold lights where the face is',
+    look: 'A crown of broken light over a cowl with a sky inside it',
     names: ['The Stranger'],
-    head: 'shade',
-    torso: 'tatters',
+    head: 'voidCrown',
+    torso: 'mantle',
     legs: LEGS_TRAIL,
     holster: null,
+    /** Twice the player's size, and drawn on a grid twice as coarse. */
+    scale: 2,
+    /** The face the cut-scene and the speech box use. */
+    portrait: 'strangerCowl',
     key: palette({
       hat: PALETTE.cosmic, hatLit: PALETTE.purpleDark,
       cloth: PALETTE.purpleDark, clothDark: PALETTE.cosmic, clothLit: PALETTE.purple,
-      accent: PALETTE.star, glow: PALETTE.star, shade: PALETTE.cosmicHigh,
+      accent: PALETTE.star, glow: PALETTE.astralLight, shade: PALETTE.cosmicHigh,
       trouser: PALETTE.cosmic, boot: PALETTE.purpleDark,
     }),
     gun: 'void',
   },
 
   bossStrangerUnmasked: {
-    look: 'The cloak gone: a skull lit from inside, in a starlit coat',
+    look: 'A skull with a star caught in its ribs, and nothing holding it in',
     names: ['The Stranger · Unmasked'],
-    head: 'skull',
-    torso: 'ribs',
+    head: 'starSkull',
+    torso: 'voidRibs',
+    legs: LEGS_TRAIL,
+    holster: null,
+    /** Bigger than the cowl was. Taking it off was not a concession. */
+    scale: 2.4,
+    portrait: 'strangerSkull',
     key: palette({
-      cloth: PALETTE.star, clothDark: PALETTE.purple, clothLit: PALETTE.white,
-      accent: PALETTE.star, glow: PALETTE.star,
+      hat: PALETTE.star, hatLit: PALETTE.white,
+      cloth: PALETTE.astralLight, clothDark: PALETTE.purple, clothLit: PALETTE.white,
+      accent: PALETTE.star, accentDark: PALETTE.boneDark,
+      glow: PALETTE.astralLight, shade: PALETTE.cosmicHigh,
       trouser: PALETTE.purpleDark, boot: PALETTE.purple,
-      belt: PALETTE.purple, beltDark: PALETTE.cosmic,
       skin: { s: PALETTE.star, d: PALETTE.purple },
     }),
     gun: 'void',

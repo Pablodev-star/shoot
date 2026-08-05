@@ -57,7 +57,21 @@ const FIRE_MS = FIRE_FRAME_MS.reduce((a, b) => a + b, 0);
 const SMOKE_LIFE = 810;
 const SHELL_LIFE = 560;
 
-export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shakeEnabled = true }) {
+/**
+ * @param {object} o
+ * @param {number} [o.enemyScale] how many times the fighters' own size the
+ *   enemy is drawn at. 1 for everybody in the game except the Stranger, who is
+ *   2 and then 2.4 — see the note on `drawFighter`.
+ */
+export function createDuelScene({
+  worldId,
+  biome,
+  tint,
+  seed,
+  enemySprites,
+  enemyScale = 1,
+  shakeEnabled = true,
+}) {
   const parallax = createParallax({
     seed: (seed ^ (worldId * 31337)) >>> 0,
     groundRatio: 0.7,
@@ -108,6 +122,19 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
   const cameraX = 1200; // a fixed, pleasant stretch of road
   /** Filled in by render(); the emitters need last frame's geometry. */
   let layout = null;
+  /** How much bigger than the player the thing across the road is. */
+  let bossScale = enemyScale;
+  /**
+   * Where the interface stops, in device pixels from the top of the canvas.
+   *
+   * The screen measures its own fighter card and tells us, because the card's
+   * height depends on the enemy's name wrapping and on how many ability icons
+   * it is carrying — a guess in here was wrong for the Stranger's second phase
+   * the moment his name went to two lines.
+   */
+  let hudBottom = null;
+  /** The left edge of the enemy's card, so a giant can stand inboard of it. */
+  let hudLeft = null;
 
   function setPose(side, pose) {
     const actor = actors[side];
@@ -203,6 +230,9 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
           vx: m.dir * (0.004 + Math.random() * 0.005) * m.fs,
           vy: -(0.002 + Math.random() * 0.003) * m.fs,
           rise: 0.000004 * m.fs,
+          // Each puff remembers the scale of the gun it came off, so smoke
+          // from something twice the size is twice the size.
+          fs: m.fs,
           t: -i * 40,
         });
       }
@@ -212,6 +242,7 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
         vx: -m.dir * (0.008 + Math.random() * 0.006) * m.fs,
         vy: -0.045 * m.fs,
         g: 0.00035 * m.fs,
+        fs: m.fs,
         t: 0,
       });
     }
@@ -225,6 +256,7 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
     impacts.push({
       x: place(originX, fs, FIGHTER_W / 2, 1, flip),
       y: topY + 13 * fs,
+      fs,
       t: 0,
     });
   }
@@ -245,6 +277,23 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
       sprites.enemy = set;
       guns.enemy = getRevolverSprites(set.finish);
     },
+
+    /** A phase that is bigger than the last one. See `drawFighter`. */
+    setEnemyScale(scale) {
+      bossScale = Math.max(1, scale || 1);
+    },
+
+    /**
+     * Where the enemy's card is, so an oversized fighter can stand clear of
+     * it instead of behind it.
+     */
+    setHudBox(box) {
+      hudBottom = Number.isFinite(box?.bottom) ? box.bottom : null;
+      hudLeft = Number.isFinite(box?.left) ? box.left : null;
+    },
+
+    /** What the enemy is currently drawn at, for anything framing him. */
+    getEnemyScale: () => bossScale,
 
     update(dt) {
       elapsed += dt;
@@ -307,7 +356,7 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
        * cap keeps the two of them apart on a phone, where doubling the scale
        * would have them standing shoulder to shoulder.
        */
-      const fs = Math.max(s, Math.min(s * 2, Math.floor((view.w * 0.26) / FIGHTER_W)));
+      const baseFs = Math.max(s, Math.min(s * 2, Math.floor((view.w * 0.26) / FIGHTER_W)));
       const shakeAmp = shakeEnabled ? Math.min(6, fx.shake / 26) : 0;
       const ox = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
       const oy = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
@@ -320,25 +369,80 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
       // Backdrop now, light after the fighters — see parallax.applyLighting.
       parallax.renderBackdrop(ctx, view, cameraX);
 
+      /**
+       * THE TWO SIDES DO NOT HAVE TO BE THE SAME SIZE
+       * ---------------------------------------------------------------------
+       * `fs` used to be one number for the whole scene, which quietly encoded
+       * "a duel is two men of the same height". It is per side now: the enemy
+       * gets `fs * bossScale`, and everything that has to know where anything
+       * is — the muzzle, the flash, the brass, the tracer, the shadow, the
+       * shield — reads the scale out of that side's own layout entry.
+       *
+       * The enemy is anchored by its FEET, not by its box: a fighter drawn at
+       * two and a half times the size has to stand on the same road, so `topY`
+       * is worked back from the ground line rather than shared.
+       */
+      /**
+       * THE CAMERA PULLS BACK RATHER THAN LETTING HIM LEAVE THE FRAME
+       * ---------------------------------------------------------------------
+       * A fighter drawn at two and a half times the size does not fit under
+       * the fighter cards, and the first pass had the Stranger's crown behind
+       * his own life bar.
+       *
+       * So the ENEMY's height is what is capped — to the headroom between the
+       * road and the cards — and the player's scale is worked back from it.
+       * That has exactly the property the fight wants: when the cowl comes off
+       * and he grows from 2x to 2.4x, he is already as tall as the frame
+       * allows, so what actually happens on screen is that *the player gets
+       * smaller*. The camera backing away from him is a better reading of "he
+       * grew" than him growing would have been.
+       */
+      /**
+       * He is sized by the whole frame and moved out from under the card,
+       * rather than being shrunk to fit beneath it.
+       *
+       * The first attempt reserved the card's full height across the whole
+       * width, and the Stranger came out barely half again the player's size —
+       * the interface had eaten the boss. What the card actually occupies is a
+       * *corner*, so the fix is to stand him inboard of its left edge and let
+       * him have the full height of the road. He ends up head-and-shoulders
+       * into the sky with the fight's own HUD beside him rather than over him.
+       */
+      const efsMax = Math.max(s, Math.floor((gy - view.h * 0.06) / FIGHTER_H));
+      const efs = Math.max(s, Math.min(Math.round(baseFs * bossScale), efsMax));
+      const fs = Math.max(s, Math.min(baseFs, Math.round(efs / bossScale)));
+
       const playerX = Math.round(view.w * 0.18);
-      const enemyX = Math.round(view.w * 0.82 - FIGHTER_W * fs);
+      const rightEdge = bossScale > 1 && hudLeft != null
+        ? Math.min(hudLeft - s * 2, view.w * 0.84)
+        : view.w * 0.84;
+      // …but never so far in that he is standing on the player.
+      const enemyX = Math.max(
+        playerX + FIGHTER_W * fs + s * 6,
+        Math.round(rightEdge - FIGHTER_W * efs),
+      );
       const topY = gy - FIGHTER_H * fs + fs;
+      const enemyTopY = gy - FIGHTER_H * efs + efs;
       layout = {
         player: { originX: playerX, topY, fs, flip: false },
-        enemy: { originX: enemyX, topY, fs, flip: true },
+        enemy: { originX: enemyX, topY: enemyTopY, fs: efs, flip: true },
       };
 
       // --- ground shadows, so the fighters are planted rather than floating.
       // They lean away from the sun, so a duel at dusk casts two long ones. ---
       parallax.drawGroundShadow(ctx, view, playerX, FIGHTER_W * fs, gy);
-      parallax.drawGroundShadow(ctx, view, enemyX, FIGHTER_W * fs, gy);
+      parallax.drawGroundShadow(ctx, view, enemyX, FIGHTER_W * efs, gy);
+
+      // Something this big has weight: a wide, soft pool of its own under it,
+      // so the road reads as bearing it rather than as being stood on.
+      if (bossScale > 1) drawPresence(ctx, enemyX, gy, efs);
 
       drawFighter(ctx, 'player');
       drawFighter(ctx, 'enemy');
 
       // --- shields ---
       if (actors.player.pose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
-      if (actors.enemy.pose === 'shield') drawShield(ctx, shield, enemyX, gy, fs, elapsed, true);
+      if (actors.enemy.pose === 'shield') drawShield(ctx, shield, enemyX, gy, efs, elapsed, true);
 
       /**
        * The light goes on here: everything above it (the road and both
@@ -353,8 +457,8 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
       parallax.renderAmbient(ctx, view);
 
       drawSmoke(ctx);
-      drawShells(ctx, fs);
-      drawBullets(ctx, fs);
+      drawShells(ctx);
+      drawBullets(ctx);
       drawFlashes(ctx);
       drawImpacts(ctx);
 
@@ -394,6 +498,33 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
   };
 
   // --- drawing ---------------------------------------------------------------
+
+  /**
+   * The weight of something too big for the road.
+   *
+   * Three flat bands of dark on the ground under it, widest at the back and
+   * pulled in towards the feet, plus a slow ring of cold light that breathes.
+   * The ordinary cast shadow is still drawn — this goes *under* it — because
+   * the cast shadow says where the sun is and this says how much of the road
+   * he is taking up. Without it a fighter at two and a half times the size
+   * reads as a sprite scaled up rather than as a thing that arrived.
+   */
+  function drawPresence(ctx, originX, gy, efs) {
+    const cx = originX + (FIGHTER_W / 2) * efs;
+    const pulse = 0.75 + Math.sin(elapsed / 620) * 0.25;
+    for (let i = 3; i >= 1; i--) {
+      const w = FIGHTER_W * efs * (0.6 + i * 0.28);
+      const h = Math.max(efs, Math.round(efs * i * 0.9));
+      ctx.globalAlpha = 0.16 * (4 - i) * 0.5;
+      ctx.fillStyle = PALETTE.cosmicHigh;
+      ctx.fillRect(Math.round(cx - w / 2), Math.round(gy - h / 2), Math.round(w), h);
+    }
+    ctx.globalAlpha = 0.3 * pulse;
+    ctx.fillStyle = PALETTE.purpleDark;
+    const rw = FIGHTER_W * efs * 1.15;
+    ctx.fillRect(Math.round(cx - rw / 2), Math.round(gy - efs / 2), Math.round(rw), Math.max(1, efs / 2));
+    ctx.globalAlpha = 1;
+  }
 
   function drawFighter(ctx, side) {
     const { originX, topY, fs, flip } = layout[side];
@@ -448,29 +579,29 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
       const index = frameOf(p.t, FX_TIMING.impact);
       if (index < 0) continue;
       const sprite = combat.impact[index];
-      const fs = layout.player.fs;
+      const fs = p.fs || layout.player.fs;
       drawSprite(ctx, sprite, p.x - IMPACT_ANCHOR.x * fs, p.y - IMPACT_ANCHOR.y * fs, fs);
     }
   }
 
   function drawSmoke(ctx) {
-    const fs = layout.player.fs;
     for (const p of smoke) {
       if (p.t < 0) continue;
       const index = frameOf(p.t, FX_TIMING.smoke);
       if (index < 0) continue;
+      const fs = p.fs || layout.player.fs;
       ctx.globalAlpha = 0.55 * (1 - p.t / SMOKE_LIFE);
       drawSprite(ctx, combat.smoke[index], p.x - SMOKE_ANCHOR.x * fs, p.y - SMOKE_ANCHOR.y * fs, fs);
       ctx.globalAlpha = 1;
     }
   }
 
-  function drawShells(ctx, fs) {
+  function drawShells(ctx) {
     for (const sh of shells) {
       // The case tumbles: half the time it is edge-on and one pixel wide.
       const spinning = Math.floor(sh.t / 70) % 2 === 1;
       ctx.globalAlpha = Math.min(1, 3.2 - sh.t / (SHELL_LIFE * 0.45));
-      drawSprite(ctx, combat.shell, sh.x, sh.y, fs, spinning);
+      drawSprite(ctx, combat.shell, sh.x, sh.y, sh.fs || layout.player.fs, spinning);
       ctx.globalAlpha = 1;
     }
   }
@@ -480,16 +611,19 @@ export function createDuelScene({ worldId, biome, tint, seed, enemySprites, shak
    * the muzzle it left and the chest it is arriving at — both read from the
    * live layout, so it lands where the rival actually is.
    */
-  function drawBullets(ctx, fs) {
+  function drawBullets(ctx) {
     for (const b of bullets) {
       const from = layout[b.side];
       const other = b.side === 'player' ? 'enemy' : 'player';
       const to = layout[other];
+      // The round is the shooter's size and it arrives at the target's chest,
+      // which is a different height on each side once one of them is a giant.
+      const fs = from.fs;
       const m = muzzleOf(b.side, 'fire', 0);
       const x0 = m ? m.x : from.originX + FIGHTER_W * fs;
       const y0 = m ? m.y : from.topY + 12 * fs;
-      const x1 = to.originX + (b.side === 'player' ? 2 : FIGHTER_W - 2) * fs;
-      const y1 = to.topY + 13 * fs;
+      const x1 = to.originX + (b.side === 'player' ? 2 : FIGHTER_W - 2) * to.fs;
+      const y1 = to.topY + 13 * to.fs;
       const x = x0 + (x1 - x0) * b.t;
       const y = y0 + (y1 - y0) * b.t;
       const dir = Math.sign(x1 - x0) || 1;

@@ -104,8 +104,27 @@ There is no level select. You walk, and the road decides what you meet.
   Kiln, the Star Reaver — each with its own head, torso, palette and set of
   names, and each world drawing from its own roster. The name always describes
   the sprite, because the names were written from the art.
+- **Levelling is the slow reward.** Roughly 1.4 levels per world, so a run that
+  reaches the Galaxy is around level 9. A level grants **one life** — one more
+  maximum, and one more in the bar to go with it. It is not a refill: if you
+  arrive at a level-up on your last life you leave it on your second, and the
+  bed at the inn is still the only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
   phase two is a different sprite, not a refilled bar.
+- **The last fight has an entrance.** Cut to black, letterbox, and the camera
+  crawls up the Stranger's face at nine times its own size while he talks. He
+  gets six lines, you get one of them back, and each line is a *shot* — the
+  camera cuts to a framing chosen per line, and the reply cuts to your own face.
+  Then a crash zoom, speed lines, three white impact frames, a shockwave and the
+  name card, and the fight is already underway. `ESC` skips it.
+- **The Stranger is enormous.** Twice the size of the man across the road from
+  him, drawn on a grid twice as coarse, and bigger again when the cowl comes
+  off. He is sized against the frame rather than against the interface, so what
+  happens when he grows is that the camera backs away and *you* get smaller.
+
+Speech is a general system, not part of that one scene: a portrait, a name
+plate and a line typing itself out, for anybody on either side of the road.
+Tapping catches the typing up; tapping again moves on.
 
 Three save slots. Progress writes after every encounter.
 
@@ -150,14 +169,16 @@ src/
     biomes/               one file per landscape — desert, meadow, snow, swamp,
                           inferno, void: props, layers, ground, ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
+    sprites-portraits.js  32 x 32 faces, for speech and for the cut-scene (2e)
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
     map-art.js            the trail map: ground, markers, road, compass
-  ui/                    shared widgets, saddlebag, trail map, toasts, dialogs
+  ui/                    shared widgets, saddlebag, trail map, toasts, dialogs,
+                         speech
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens
-  duel/                  duel engine, agents, scene, screen
+  duel/                  duel engine, agents, scene, screen, boss entrances
   game/                  items, worlds, progression maths, player state,
                          enemies, save slots, run controller, interstitials
 ```
@@ -187,8 +208,9 @@ Balance lives in data, not in code:
   everything on it.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
-- `src/game/progression.js` — every curve: exp, gold, prices, inn healing,
-  hunger drain, walking speed, the horse discount.
+- `src/game/progression.js` — every curve: exp and the level ladder (tuned
+  together to hit ~1.4 levels per world), gold, prices, inn healing, hunger
+  drain, walking speed, the horse discount.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up.
 
@@ -216,6 +238,26 @@ world never rebalances it.
 
 Nothing else needs editing — the parallax renderer holds no landscape constants,
 and the trail map draws itself out of the biome's own props.
+
+## Giving a boss an entrance
+
+The cut-scene machinery knows nothing about the Stranger. Any boss gets one by
+adding an `intro` to its entry in `src/game/worlds.js`:
+
+```js
+intro: {
+  lines: [
+    { who: 'enemy',  shot: 'eyes', text: 'You are a long way from the flats.' },
+    { who: 'player', shot: 'face', text: 'I know exactly how far I am.' },
+    { who: 'enemy',  shot: 'face', text: 'Draw.', shake: 700 },
+  ],
+}
+```
+
+`shot` is a camera framing (`eyes`, `face`, `wide`, `low`) and `shake` kicks the
+frame on the beat the line lands. The speaker needs a `portrait` on its
+archetype — a 32 x 32 face in `src/art/sprites-portraits.js` — and that same
+face is what the speech box shows.
 
 ## Adding an enemy
 
