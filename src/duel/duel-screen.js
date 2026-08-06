@@ -31,7 +31,8 @@ import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
 import { getState, setLives, hasVest, consumeVest, isImmuneToEffects, countOf } from '../game/player.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
-import { generateEnemy, generateBoss, nextBossPhase, ABILITY_LABELS } from '../game/enemies.js';
+import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
+import { getAbility, getSpecial, specialDamage } from '../game/world-abilities.js';
 import { createDuel, MOVES } from './duel-engine.js';
 import { createLocalAgent, createAiAgent } from './duel-ai.js';
 import { createDuelScene } from './duel-scene.js';
@@ -138,6 +139,8 @@ export const DuelScreen = {
     const roundLog = [];
     let vestConsumed = false;
     let finished = false;
+    /** True once the fight proper has started — see `onFrame`. */
+    let clockRunning = false;
 
     // --- fighter cards -----------------------------------------------------
     const playerLives = livesRow(player.lives, player.maxLives, { large: true });
@@ -183,6 +186,31 @@ export const DuelScreen = {
         enemyAbilities.append(
           effectBadge('immune', { label: 'Blocked by diadem', tone: 'is-blocked' }),
         );
+      }
+      /**
+       * The special sits on the card from the first round, like everything
+       * else: a volcano is not a twist, it is a thing this one can do, and
+       * the player is owed the chance to fight faster because of it. Once it
+       * has been spent the badge stays and goes red — it is not a warning any
+       * more, it is the weather.
+       */
+      const spec = duel.getSpecialSpec();
+      if (spec) {
+        const raised = !!duel.getHazard();
+        const cost = specialDamage(spec);
+        enemyAbilities.append(
+          effectBadge(spec.id, {
+            label: spec.label,
+            iconName: spec.icon,
+            tone: raised ? 'is-special is-raised' : 'is-special',
+            // The tip is the deal in one line: what it costs and how often.
+            // `getAbility` knows nothing about specials, so it is spelled here.
+          }),
+        );
+        const badge = enemyAbilities.lastElementChild;
+        const tip = `${spec.label} — ${spec.tip}. ${cost} ${cost === 1 ? 'life' : 'lives'} an eruption`;
+        badge.dataset.tip = tip;
+        badge.setAttribute('aria-label', tip);
       }
     }
 
@@ -230,6 +258,17 @@ export const DuelScreen = {
         : null,
       isBoss ? el('span.chip.chip--legendary', { text: 'Boss' }) : null,
     ].filter(Boolean);
+
+    /**
+     * The hazard clock, once one is up.
+     *
+     * A special runs on real time, and a rule the player cannot see the clock
+     * for is a rule they can only learn by dying to it. So the countdown is on
+     * screen: twelve seconds to the next eruption is information you are meant
+     * to be spending — finish the fight, or shield and wait it out.
+     */
+    const hazardChip = el('span.chip.chip--danger.chip--hazard', { hidden: true });
+    let hazardChipKey = '';
 
     // --- controls ----------------------------------------------------------
     const buttons = {};
@@ -311,7 +350,7 @@ export const DuelScreen = {
     const screen = el('div.screen.duel-screen', {}, [
       el('div.duel-top', {}, [
         playerCard,
-        el('div.duel-center', {}, [roundPill, ...atmosChips]),
+        el('div.duel-center', {}, [roundPill, ...atmosChips, hazardChip]),
         enemyCard,
       ]),
       // The bag and the guide sit on the callout line rather than on a row of
@@ -428,7 +467,23 @@ export const DuelScreen = {
       // An ability going off lights its own icon rather than printing its name
       // over the fight: the picture is already on screen, and the player has
       // been looking at it since the round started.
-      if (event.type === 'ability') flashEffect(enemyAbilities, event.ability);
+      //
+      // What it also does now is HAPPEN on the road. A themed trick carries a
+      // motion and three colours (src/game/world-abilities.js) and the scene
+      // plays it over the fighter it landed on, so a hornet sting and an ember
+      // bite are told apart by watching rather than by reading the tooltip.
+      if (event.type === 'ability') {
+        flashEffect(enemyAbilities, event.ability);
+        const ability = getAbility(event.ability);
+        scene.castAbilityFx(ability.fx, 'player');
+        if (ability.banner) {
+          scene.fx.banner = ability.banner;
+          scene.fx.bannerTimer = 900;
+        }
+      }
+      if (event.type === 'hazard-warn') handleHazardWarn();
+      if (event.type === 'hazard-erupt') handleHazardErupt();
+      if (event.type === 'hazard-strike') handleHazardStrike(event);
       if (event.type === 'ability-blocked') {
         flashEffect(enemyStatus, 'immune');
         toast('The diadem blocked it', 'good');
@@ -447,6 +502,115 @@ export const DuelScreen = {
         scene.fx.slam = 180;
         play('toll');
       }
+    }
+
+    // --- the world special -------------------------------------------------
+
+    /**
+     * The enemy calls it up.
+     *
+     * This is the one beat in an ordinary duel that stops the fight to look at
+     * something, and it earns it: what arrives is going to be there until
+     * somebody wins, and the player has to see where it is standing before it
+     * starts throwing. A push onto the caster, the frame coming apart, and
+     * then out to the wide shot with a mountain in it that was not there when
+     * the round started.
+     */
+    async function announceSpecial(spec) {
+      scene.setHazard(spec);
+      scene.fx.banner = spec.banner;
+      scene.fx.bannerTimer = 1700;
+      scene.fx.shake = 900;
+      scene.fx.rays = 0.85;
+      scene.fx.slam = 150;
+      play(spec.sfx || 'toll');
+      setCallout(`${enemy.name} calls up the ${spec.label.toLowerCase()}`, 'is-bad');
+      renderAbilities();
+      hazardChip.hidden = false;
+
+      scene.lookAt({ side: 'enemy', x: 8, y: 5, fill: 12, ms: 340 });
+      await wait(820);
+      if (finished) return;
+      scene.lookAt({ ms: 700 });
+      await wait(900);
+    }
+
+    /** The sky turning. Nothing has been thrown yet — that is the point. */
+    function handleHazardWarn() {
+      const spec = duel.getHazard()?.spec;
+      if (!spec) return;
+      scene.fx.banner = spec.warnBanner || 'IT IS WAKING';
+      scene.fx.bannerTimer = 1400;
+      scene.fx.shake = Math.max(scene.fx.shake, 260);
+      play(spec.sfx || 'rumble');
+    }
+
+    function handleHazardErupt() {
+      const spec = duel.getHazard()?.spec;
+      if (!spec) return;
+      scene.fx.shake = 700;
+      scene.fx.rays = 0.5;
+      play(spec.sfx || 'rumble');
+    }
+
+    /**
+     * One strike landing. The engine has already taken the life — this throws
+     * the thing that took it, and the scene hangs the impact and the shake off
+     * where it lands rather than off this call.
+     */
+    function handleHazardStrike(event) {
+      scene.hazardStrike('player');
+      playerCard.classList.remove('is-hit');
+      void playerCard.offsetWidth;
+      playerCard.classList.add('is-hit');
+      play('hit');
+      if (event.steal) toast('The blast knocked a round out of your gun', 'bad');
+      syncBars();
+    }
+
+    /**
+     * The real-time half of the fight, driven off the canvas frame loop.
+     *
+     * Everything else in this screen happens because somebody pressed
+     * something. This does not: it runs while the player is reading the
+     * buttons, while the saddlebag is open, and while nothing at all is
+     * happening, which is the whole reason a special is worth having.
+     */
+    function onFrame(dt) {
+      if (finished || !clockRunning) return;
+      duel.tick(dt);
+      const hz = duel.getHazard();
+      if (hz) {
+        scene.setHazardState(hz.getState());
+        updateHazardChip(hz);
+      }
+      /**
+       * A rock can kill you while the engine is still waiting for a move. The
+       * agent is holding an unresolved promise in that case, so hand it one —
+       * the engine sees the duel is already over and comes back with a
+       * terminal resolution instead of stalling on a dead player.
+       */
+      if (duel.isOver() && localAgent.isWaiting()) {
+        setControlsEnabled(false);
+        localAgent.submit(MOVES.SHIELD);
+      }
+    }
+
+    function updateHazardChip(hz) {
+      const phase = hz.getPhase();
+      const label = hz.spec.label;
+      const key = phase === 'dormant' ? `d${hz.secondsToNext()}` : phase;
+      if (key === hazardChipKey) return;
+      hazardChipKey = key;
+      hazardChip.hidden = false;
+      hazardChip.textContent =
+        phase === 'dormant'
+          ? `${label} · ${hz.secondsToNext()}s`
+          : phase === 'warning'
+            ? `${label} · NOW`
+            : `${label} · ERUPTING`;
+      hazardChip.classList.toggle('is-erupting', phase !== 'dormant');
+      hazardChip.dataset.tip = `${hz.spec.tip}. ${specialDamage(hz.spec)} lives an eruption`;
     }
 
     /**
@@ -521,6 +685,7 @@ export const DuelScreen = {
     function describe(res) {
       if (res.terminatedBy === 'item') return ['That finished it', 'is-good'];
       if (res.terminatedBy === 'ability') return ['Caught by their trick!', 'is-bad'];
+      if (res.terminatedBy === 'hazard') return ['The ground took you', 'is-bad'];
       if (res.hits.player && res.hits.enemy) return ['You both go down a life', 'is-bad'];
       if (res.hits.enemy) return ['You hit them!', 'is-good'];
       if (res.hits.player) return ['They hit you!', 'is-bad'];
@@ -537,6 +702,16 @@ export const DuelScreen = {
         if (duel.isOver()) {
           await endDuel(duel.getResult());
           return;
+        }
+
+        // Between rounds is where the enemy can spend its special: raising a
+        // volcano is two seconds of camera, and there is nowhere inside a
+        // round to put them that does not interrupt a draw.
+        const cast = duel.maybeCastSpecial();
+        if (cast) {
+          setControlsEnabled(false);
+          await announceSpecial(cast);
+          if (finished) return;
         }
 
         setControlsEnabled(true);
@@ -597,6 +772,9 @@ export const DuelScreen = {
 
     async function endDuel(result) {
       finished = true;
+      // The mountain stops caring the moment the fight is over. It is still
+      // drawn — it is part of the road now — but it does not tick.
+      clockRunning = false;
       setControlsEnabled(false);
       const won = result.winner === 'player';
       play(won ? 'win' : 'lose');
@@ -707,7 +885,24 @@ export const DuelScreen = {
      * are disabled rather than removed, so the screen the player is about to
      * use is already there when the bars pull off.
      */
-    setRenderer(scene);
+    /**
+     * The duel is installed as the renderer WRAPPED, not bare.
+     *
+     * A world special runs on a clock, and a clock needs a heartbeat. The
+     * canvas frame loop is the only one this screen has — and it is the right
+     * one, because it is already the thing that stops when the tab does. The
+     * wrapper is the whole of it: draw the scene, then give the engine the
+     * same `dt` the scene just moved on.
+     */
+    setRenderer({
+      update(dt, t) {
+        scene.update(dt, t);
+        onFrame(dt);
+      },
+      render(ctx, view, t) {
+        scene.render(ctx, view, t);
+      },
+    });
     scene.setAura(enemy.aura || 0);
 
     let intro = null;
@@ -727,6 +922,9 @@ export const DuelScreen = {
         screen.classList.remove('is-cinematic');
       }
       if (finished) return;
+      // The hazard clock starts with the fight, not with the screen: a
+      // cut-scene is not time the volcano gets to count.
+      clockRunning = true;
       loop();
     })();
 
@@ -740,24 +938,12 @@ export const DuelScreen = {
   },
 };
 
-/** Plain-language explanations for the enemy ability icons. */
-const ABILITY_TIPS = {
-  bulletSteal: 'They can take one of your bullets',
-  poison: 'Poison costs you a life three rounds later',
-  dynamite: 'Dynamite ignores your shield',
-  mindControl: 'They can scramble your chosen move',
-};
-
 /**
- * Effect → the icon that stands for it. Adding an effect to the game means
- * adding a line here and a sprite in src/art/sprites-items.js; there is no
- * text path any more, on purpose.
+ * The two effects that are not abilities: the things the PLAYER is carrying.
+ * Everything else — every themed trick, every world special — names its own
+ * icon in src/game/world-abilities.js, so adding one never touches this file.
  */
 const EFFECT_ICONS = {
-  bulletSteal: 'bulletSteal',
-  poison: 'poison',
-  dynamite: 'dynamite',
-  mindControl: 'mindControl',
   vest: 'vest',
   immune: 'diadem',
 };
@@ -776,9 +962,10 @@ function flashEffect(row, effect) {
  * `data-tip` and `aria-label`, so hovering explains it and a screen reader
  * reads it out — the icon replaces the *printed* label, not the information.
  */
-function effectBadge(effect, { label, tone = '', count } = {}) {
-  const name = label || ABILITY_LABELS[effect] || effect;
-  const tip = ABILITY_TIPS[effect] ? `${name} — ${ABILITY_TIPS[effect]}` : name;
+function effectBadge(effect, { label, tone = '', count, iconName } = {}) {
+  const ability = getAbility(effect);
+  const name = label || ability.label || effect;
+  const tip = ability.tip ? `${name} — ${ability.tip}` : name;
   return el('span.effect-badge', {
     class: tone,
     dataset: { effect },
@@ -786,7 +973,7 @@ function effectBadge(effect, { label, tone = '', count } = {}) {
     role: 'img',
     'aria-label': tip,
   }, [
-    icon(EFFECT_ICONS[effect] || 'skull', 1.15),
+    icon(iconName || EFFECT_ICONS[effect] || ability.icon || 'skull', 1.15),
     count != null ? el('span.effect-count', { text: String(count) }) : null,
   ]);
 }

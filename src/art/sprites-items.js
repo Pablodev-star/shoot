@@ -9,7 +9,9 @@
  * Icon list: bandage, poison, dynamite, potion, vest, diadem (anti-effect),
  * map, bullet, life (red diamond), coin, carrot, apple, horse token, skull
  * (enemy marker), bed (inn), shop tag, hunger, and the two duel abilities that
- * are not also items — bullet steal and mind control.
+ * are not also items — bullet steal and mind control. The worlds' own themed
+ * abilities are drawn in src/art/sprites-abilities.js and merged in here, so
+ * there is one lookup and one cache for every icon in the game.
  *
  * EVERY EFFECT IN THE GAME HAS A PICTURE
  * ---------------------------------------------------------------------------
@@ -21,11 +23,12 @@
 
 import { PALETTE, RARITY_COLORS } from './palette.js';
 import { bake, makeCanvas } from './pixel.js';
+import { ABILITY_ICONS, ABILITY_KEY } from './sprites-abilities.js';
 
 export const ICON_SIZE = 16;
 export const FRAME_SIZE = 20;
 
-const KEY = {
+const BASE_KEY = {
   '.': null,
   k: PALETTE.ink,
   K: PALETTE.inkSoft,
@@ -64,7 +67,17 @@ const KEY = {
   C: PALETTE.skinDark,
 };
 
-const ICONS = {
+/**
+ * The key every icon in the game is drawn against: this file's, plus the biome
+ * ramps the ability icons need (src/art/sprites-abilities.js). They are merged
+ * rather than kept apart because both sets are baked by `getItemSprites` into
+ * one cache — `icon('emberBite')` has to work exactly the way `icon('coin')`
+ * does — and because a character has to mean one colour across the whole game
+ * or it means nothing.
+ */
+const KEY = { ...BASE_KEY, ...ABILITY_KEY };
+
+const BASE_ICONS = {
   bandage: [
     '................',
     '................',
@@ -427,6 +440,9 @@ const ICONS = {
     '................',
   ],
 };
+
+/** Items, interface bits, and every ability the worlds can throw at you. */
+const ICONS = { ...BASE_ICONS, ...ABILITY_ICONS };
 
 /** Draw a rarity frame: a 20x20 beveled plate with a 2px rarity border. */
 function makeRarityFrame(color) {
