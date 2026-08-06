@@ -141,7 +141,12 @@ export function createDuel(config) {
     charge: 0,
     spent: false,
   }));
-  /** Set by the player's mind control: the enemy's move for this round only. */
+  /**
+   * Set by the player's mind control, and cleared by the next round that
+   * resolves — see the note in `playRound`. It survives the gap between rounds
+   * on purpose: the plate is live in that gap, and a charge spent there has to
+   * buy something.
+   */
   let forcedEnemyMove = null;
 
   /** What agents are allowed to see. Both sides get the same shape. */
@@ -492,7 +497,6 @@ export function createDuel(config) {
     const ability = rollEnemyAbility();
     abilityHitPlayer = false;
 
-    forcedEnemyMove = null;
     const [rawPlayerMove, chosenEnemyMove] = await Promise.all([
       sides.player.agent.chooseMove(publicView('player')),
       sides.enemy.agent.chooseMove(publicView('enemy')),
@@ -504,8 +508,20 @@ export function createDuel(config) {
      * it being chosen, only stop it being carried out. It overrides the choice
      * after the fact, which is both the only place it can go and exactly what
      * the ability says it does: their hand goes to the wrong thing.
+     *
+     * IT IS CLEARED WHEN IT IS SPENT, NOT WHEN A ROUND OPENS
+     * -----------------------------------------------------------------------
+     * The first version reset this at the top of `playRound`, which quietly
+     * threw the ability away for anybody who pressed it a beat early. An
+     * ability is a free action and the plate is live during the animation
+     * between rounds, so a player who charged mind control and hit Q while the
+     * last round was still playing out spent the charge and got nothing —
+     * silently, with no way to tell it had happened. Clearing it on use means
+     * it always lands: on this round if it was set while the engine was
+     * waiting, on the next one if it was set in the gap.
      */
     const enemyMove = forcedEnemyMove || chosenEnemyMove;
+    forcedEnemyMove = null;
 
     // An item thrown from the inventory — or a rock out of an erupting
     // mountain — can end the duel while the engine is still waiting for a
