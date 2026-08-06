@@ -56,11 +56,24 @@
  * If it ever wants to be gentler, `damage` and `strikes` below are the two
  * numbers to move; nothing else in the game reads them.
  *
- * WHAT THE PLAYER GETS OUT OF THIS, LATER
+ * AND THE PLAYER CAN BUY BOTH
  * ---------------------------------------------------------------------------
- * Nothing yet, on purpose. The catalogue is written so that a player-side
- * ability is a shop entry and an `owner` field away: everything here is data
- * about an effect, and none of it assumes the enemy is the one using it.
+ * Every ability in here is sold, in the world it belongs to, as a piece of
+ * equipment you keep for the rest of the run (src/game/items.js builds the shop
+ * entries from this file). What the player buys is not a copy to throw — it is
+ * a thing that CHARGES: one point a round, and when it is full you spend it.
+ *
+ * The enemy's version and the player's version are the same effect and are
+ * tuned differently on purpose, because the two sides are not symmetrical:
+ *
+ *   the enemy  rolls its abilities at random and cannot choose a moment, so
+ *              they are cheap, frequent and individually small
+ *   the player picks the moment exactly, so the same effect has to be rationed
+ *              by a charge bar — and the moment is most of its value
+ *
+ * The player-side numbers are `PLAYER_BASIC` and `PLAYER_SPECIAL` at the
+ * bottom of this file, along with the reasoning and the figures they were
+ * balanced against. They are the only place player power is written down.
  */
 
 import { PALETTE } from '../art/palette.js';
@@ -523,4 +536,184 @@ export function getSpecial(id) {
 /** Every special's total cost per eruption, for tooltips and the fight card. */
 export function specialDamage(spec) {
   return spec ? spec.strikes * spec.damage : 0;
+}
+
+// ---------------------------------------------------------------------------
+// The player's half
+// ---------------------------------------------------------------------------
+
+/**
+ * WHAT AN ABILITY IS WORTH, AND WHAT IT COSTS
+ * ---------------------------------------------------------------------------
+ * The numbers below were set against the four figures that actually constrain
+ * them, measured off src/game/worlds.js and src/game/progression.js:
+ *
+ *   world | avg enemy lives | boss lives | gold a world pays | rare / legendary
+ *      1  |      1.2        |     3      |       287         |   130 /   260
+ *      3  |      1.7        |     4      |     1,010         |   355 /   710
+ *      5  |      2.4        |     6      |     2,628         | 1,005 / 2,010
+ *      6  |      3.2        |    5+7     |     1,715         | 1,800 / 3,600
+ *
+ * Three rules came out of that, and every number here follows them.
+ *
+ * 1. AN ABILITY IS A THIRD OF A WORLD'S WAGES. A basic is a rare and a special
+ *    is a legendary, so the existing price curve already puts one at roughly a
+ *    third of what a world pays out and the other at most of it. Nothing new
+ *    was invented for pricing: the curve that sells a vest sells these.
+ *
+ * 2. IT IS RATIONED BY TIME, NOT BY STOCK. A duel runs six or seven rounds.
+ *    A basic charging in three or four means one use, occasionally two; a
+ *    special charging in five or six means once, late, and only if the fight
+ *    lasts. That is the whole balance mechanism — an ability that could be
+ *    spent every round would make the gun decorative.
+ *
+ * 3. IT IS SUPPOSED TO DECIDE BOSSES, NOT DRIFTERS. A one-life drifter dies to
+ *    anything and always did. The number actually watched while tuning is what
+ *    a full charge is worth against a BOSS: about a third of Big Jed, and about
+ *    two thirds of Old Scratch by the time you can afford the basin's kit. A
+ *    boss is still a fight you can lose with a special in your pocket, which is
+ *    the line.
+ *
+ * WHY THREE BANDS AND NOT SIX STEPS
+ * ---------------------------------------------------------------------------
+ * Abilities improve in three steps, indexed by the world the ability comes
+ * from: worlds 1-2, 3-4, 5-6. Six steps would need the player to re-buy in
+ * every world to keep pace, at a third of their income each time, which is not
+ * an upgrade path — it is a tax. Three means the kit you bought in the prairie
+ * is still worth carrying through the pass, and the basin's version is a real
+ * decision rather than an increment.
+ */
+const band = (worldId) => (worldId <= 2 ? 0 : worldId <= 4 ? 1 : 2);
+
+/**
+ * Player-side tuning for the four base effects, one row per band.
+ *
+ *   charge  rounds of the duel before it can be spent
+ *   amount  lives, or rounds taken out of a gun — read per effect below
+ *
+ * `dynamite` charges a round slower than the rest at every band, because it is
+ * the only one of the four that is damage on the spot: everything else asks the
+ * player to still win the round they set up.
+ */
+export const PLAYER_BASIC = {
+  /** Take rounds out of their gun; `take` of them end up in yours. */
+  bulletSteal: [
+    { charge: 4, amount: 1, take: 0 },
+    { charge: 3, amount: 1, take: 1 },
+    { charge: 3, amount: 2, take: 1 },
+  ],
+  /** `amount` lives, `delay` rounds later, through any shield. */
+  poison: [
+    { charge: 4, amount: 1, delay: 3 },
+    { charge: 3, amount: 1, delay: 2 },
+    { charge: 3, amount: 2, delay: 2 },
+  ],
+  /** `amount` lives now, through any shield. */
+  dynamite: [
+    { charge: 5, amount: 1 },
+    { charge: 4, amount: 1 },
+    { charge: 4, amount: 2 },
+  ],
+  /**
+   * Their hand goes to the wrong thing: whatever they meant to do this round,
+   * they reload instead — wide open to the shot you are about to take.
+   *
+   * The enemy's mind control scrambles the player at random and the player's
+   * does not, for one reason: a scramble the player cannot see is not an
+   * ability, it is a dice roll. Forcing a move you can plan around is the same
+   * effect made legible.
+   *
+   * Only worlds 4-6 have a mind-control theme, so band 0 is unreachable and is
+   * written to match band 1 rather than left undefined.
+   */
+  mindControl: [{ charge: 4 }, { charge: 4 }, { charge: 3 }],
+};
+
+/**
+ * The player's special: the same landmark the enemy raises, aimed the other way
+ * and lasting exactly one eruption.
+ *
+ * It does NOT stay. The enemy's is permanent because an enemy cannot choose a
+ * moment and has to be given one that repeats; the player picks the moment, and
+ * a permanent hazard on top of that would end fights before they started. What
+ * a full charge buys is one eruption on the rival — `strikes` rocks, a life
+ * each, over a couple of seconds.
+ *
+ *   band 0 (worlds 1-2)  6 rounds → 2 lives
+ *   band 1 (worlds 3-4)  5 rounds → 3 lives
+ *   band 2 (worlds 5-6)  5 rounds → 4 lives
+ *
+ * Four lives is two thirds of Old Scratch and it arrives at round five of a
+ * fight that averages six and a half — so it lands in about half the duels you
+ * carry it into, and in the ones where it matters.
+ */
+export const PLAYER_SPECIAL = [
+  { charge: 6, strikes: 2 },
+  { charge: 5, strikes: 3 },
+  { charge: 5, strikes: 4 },
+];
+
+/** Shop base prices. The world curve in progression.js does the rest. */
+export const ABILITY_PRICE = { basic: 130, special: 260 };
+
+/**
+ * The player's version of one themed ability: what it does, how long it takes
+ * to charge, and the sentence the shop prints under it.
+ * @param {string} id an ABILITIES key
+ */
+export function playerAbility(id) {
+  const ability = getAbility(id);
+  const tuning = ability.base ? PLAYER_BASIC[ability.base] : null;
+  if (!tuning) return null;
+  const row = tuning[band(ability.world || 1)];
+  return { ...ability, kind: 'basic', ...row, desc: describeBasic(ability.base, row) };
+}
+
+/** The player's version of one world special. */
+export function playerSpecial(id) {
+  const spec = getSpecial(id);
+  if (!spec) return null;
+  const row = PLAYER_SPECIAL[band(spec.world || 1)];
+  return {
+    ...spec,
+    kind: 'special',
+    charge: row.charge,
+    strikes: row.strikes,
+    damage: 1,
+    steal: 0,
+    poisons: false,
+    /**
+     * One eruption and it is gone. The warning is short because the player
+     * already knows it is coming — they pressed it.
+     */
+    oneShot: true,
+    warnMs: 900,
+    activeMs: 2600,
+    cycleMs: 0,
+    desc: `Calls it down on your rival: ${row.strikes} lives over one eruption. Charges in ${row.charge} rounds.`,
+  };
+}
+
+function describeBasic(base, row) {
+  const lives = (n) => `${n} ${n === 1 ? 'life' : 'lives'}`;
+  const after = ` Charges in ${row.charge} rounds.`;
+  switch (base) {
+    case 'bulletSteal':
+      return `Takes ${row.amount} ${row.amount === 1 ? 'round' : 'rounds'} out of their gun${
+        row.take ? ` and loads ${row.take} into yours` : ''
+      }.${after}`;
+    case 'poison':
+      return `${lives(row.amount)} ${row.delay} rounds later, through any shield.${after}`;
+    case 'dynamite':
+      return `${lives(row.amount)} on the spot, through any shield.${after}`;
+    case 'mindControl':
+      return `Their hand goes wrong: they reload this round instead, wide open.${after}`;
+    default:
+      return `Charges in ${row.charge} rounds.`;
+  }
+}
+
+/** Every themed ability a given world's shop can sell. */
+export function abilitiesForWorld(worldId) {
+  return Object.keys(ABILITIES).filter((id) => ABILITIES[id].world === worldId);
 }

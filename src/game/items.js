@@ -15,15 +15,37 @@
  *                 'passive'  works automatically while owned
  *                 'utility'  consumed for information (Map)
  *                 'special'  one-off unlocks (Horse)
+ *                 'ability'  equipped into a duel slot, never consumed
  *   stack       max copies held (Infinity for consumables that stack freely)
  *   shopPerk    if set, buying it permanently upgrades future shop visits
  *   desc        one-line explanation shown in shops and the inventory
  *
  * ADDING AN ITEM: append an entry here. Shops, inventory, selling and the duel
  * item bar all pick it up automatically.
+ *
+ * ABILITIES ARE ITEMS, AND THAT IS THE WHOLE INTEGRATION
+ * ---------------------------------------------------------------------------
+ * The twenty-four things a player can buy out of src/game/world-abilities.js
+ * are not a parallel system with a parallel shop, a parallel save format and a
+ * parallel grid. They are generated into this table at load (`buildAbilityItems`
+ * at the bottom), so a volcano goes in the saddlebag next to a carrot: shops
+ * stock it, the inventory draws it, selling refunds it and the save file
+ * already knows how to write it down.
+ *
+ * What makes one an ability rather than a bandage is two fields — `context:
+ * 'ability'`, which means using it EQUIPS it instead of spending it, and
+ * `ability`, which says which entry in the catalogue it stands for.
  */
 
-export const ITEMS = {
+import {
+  ABILITIES,
+  SPECIALS,
+  ABILITY_PRICE,
+  playerAbility,
+  playerSpecial,
+} from './world-abilities.js';
+
+const CATALOGUE = {
   // --- Food (hunger) -------------------------------------------------------
   carrot: {
     id: 'carrot',
@@ -180,6 +202,57 @@ export const ITEMS = {
   },
 };
 
+/**
+ * Turn the ability catalogue into shop entries.
+ *
+ * One per themed ability and one per world special, priced off the same two
+ * base numbers for every world — the exponential curve in
+ * src/game/progression.js is what makes the basin's kit cost eight times the
+ * flats', not a number written out twenty-four times here.
+ *
+ * The id carries its kind (`ab-` / `sp-`) because ids are what saves are made
+ * of: a file written today has to still say what it meant a year from now, and
+ * `ab-emberBite` says it without a lookup.
+ */
+function buildAbilityItems() {
+  const out = {};
+  for (const id of Object.keys(ABILITIES)) {
+    const player = playerAbility(id);
+    // The four unthemed base effects are the enemy's vocabulary, not stock.
+    if (!player || !player.world) continue;
+    out[`ab-${id}`] = {
+      id: `ab-${id}`,
+      name: player.label,
+      icon: player.icon,
+      rarity: 'rare',
+      basePrice: ABILITY_PRICE.basic,
+      context: 'ability',
+      ability: { kind: 'basic', ref: id },
+      stack: 1,
+      world: player.world,
+      desc: player.desc,
+    };
+  }
+  for (const id of Object.keys(SPECIALS)) {
+    const player = playerSpecial(id);
+    out[`sp-${id}`] = {
+      id: `sp-${id}`,
+      name: player.label,
+      icon: player.icon,
+      rarity: 'legendary',
+      basePrice: ABILITY_PRICE.special,
+      context: 'ability',
+      ability: { kind: 'special', ref: id },
+      stack: 1,
+      world: player.world,
+      desc: player.desc,
+    };
+  }
+  return out;
+}
+
+export const ITEMS = { ...CATALOGUE, ...buildAbilityItems() };
+
 export const ITEM_LIST = Object.values(ITEMS);
 
 /** Items shops may stock, grouped by rarity (perks and food included). */
@@ -188,6 +261,24 @@ export const SHOP_POOL = {
   rare: ['potion', 'dynamite', 'poison', 'map', 'ledger'],
   legendary: ['vest', 'diadem', 'horse', 'silverTongue'],
 };
+
+/**
+ * The ability items a given world's counter may carry, by rarity.
+ *
+ * A world sells its OWN kit and nobody else's, which is what makes the shop a
+ * reason to look at the road you are on: the basin does not stock frostbite,
+ * and the pass has never heard of a volcano. It is also the upgrade path — the
+ * only way to a stronger version of an effect is to reach the world that has
+ * one. See the band table in src/game/world-abilities.js.
+ */
+export function abilityPoolForWorld(worldId) {
+  const mine = (item) => item.ability && item.world === worldId;
+  const list = ITEM_LIST.filter(mine);
+  return {
+    rare: list.filter((i) => i.ability.kind === 'basic').map((i) => i.id),
+    legendary: list.filter((i) => i.ability.kind === 'special').map((i) => i.id),
+  };
+}
 
 export function getItem(id) {
   return ITEMS[id] || null;

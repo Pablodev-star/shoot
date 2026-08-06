@@ -20,7 +20,7 @@
 import { el, clearNode, appendAll } from '../core/dom.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { framedIconURL } from '../art/sprites-items.js';
-import { getInventory, sellItem, useItem, getState } from '../game/player.js';
+import { getInventory, sellItem, useItem, getState, isEquipped } from '../game/player.js';
 import { sellPrice } from '../game/progression.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from './toast.js';
@@ -30,6 +30,13 @@ const FILTERS = [
   { id: 'all', label: 'All', match: () => true },
   { id: 'food', label: 'Food', match: (item) => !!item.food || !!item.heal },
   { id: 'duel', label: 'Duel', match: (item) => item.context === 'duel' },
+  /**
+   * Abilities get a tab of their own rather than sitting under Gear, because
+   * they are the one thing in the bag you go looking for on purpose: by the
+   * basin a player may own five of them and can carry two, and comparing them
+   * is the entire decision.
+   */
+  { id: 'ability', label: 'Abilities', match: (item) => !!item.ability },
   { id: 'gear', label: 'Gear', match: (item) => item.context === 'passive' || item.context === 'special' },
 ];
 
@@ -73,11 +80,16 @@ export function openInventory(opts = {}) {
     if (item.context === 'passive') return 'Works on its own while you carry it';
     if (item.context === 'special') return 'Already in use';
     if (item.context === 'duel' && context !== 'duel') return 'Only in a duel';
+    // An ability is swapped between fights, not during one: the charge bar in
+    // a duel belongs to whatever you walked in carrying.
+    if (item.ability && context === 'duel') return 'Swap abilities before the fight, not in it';
+    if (item.ability && isEquipped(item.id)) return 'In hand — it charges as you fight';
     if (opts.canUse && !opts.canUse(item.id)) return 'Not usable here';
     return null;
   }
 
   function actionLabel(item) {
+    if (item.ability) return isEquipped(item.id) ? 'In hand' : 'Equip';
     if (item.food) return 'Eat';
     if (item.heal) return 'Use';
     if (item.context === 'utility') return 'Open';
@@ -156,6 +168,7 @@ export function openInventory(opts = {}) {
     if (result.effect === 'heal') {
       toast(`Restored ${result.amount} ${result.amount === 1 ? 'life' : 'lives'}`, 'good');
     }
+    if (result.effect === 'equip') toast('In hand for the next fight', 'good');
     if (context === 'duel') close();
     else renderAll();
   }

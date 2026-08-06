@@ -686,6 +686,73 @@
   100% { transform: scale(1); box-shadow: inset 0 1px 0 var(--edge-highlight); }
 }
 
+/* --- The ability bar ------------------------------------------------------
+   Two plates above the moves, and everything about them says "this is not a
+   move": half the height of a move button, its own row, and a charge readout
+   instead of a cost strip. A plate is dead until it is full, and when it fills
+   it lights once — a thing that has just become available has to say so on the
+   frame it becomes available, or the player finds out two rounds later. */
+
+.duel-abilities {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.duel-abilities[hidden] { display: none; }
+
+.ability-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border-color: var(--edge);
+  opacity: 0.6;
+}
+
+.ability-plate .ability-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.04em;
+}
+
+.ability-plate.is-ready {
+  opacity: 1;
+  border-color: var(--gold-light);
+  box-shadow: 0 0 12px rgba(255, 226, 122, 0.4);
+  animation: ability-ready 900ms var(--ease-out) 1;
+}
+
+.ability-plate.is-spent { opacity: 0.35; }
+
+@keyframes ability-ready {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 226, 122, 0.9); }
+  40% { transform: scale(1.06); box-shadow: 0 0 18px 5px rgba(255, 226, 122, 0.7); }
+  100% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 226, 122, 0.4); }
+}
+
+/* The charge, as pips. Same reasoning as the cylinder: a small number should
+   be counted at a glance, not read off a bar. */
+.charge-row { display: inline-flex; gap: 3px; align-items: center; }
+
+.charge-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1d1409;
+  border: 1px solid #5d4a30;
+}
+
+.charge-pip.is-lit {
+  background: var(--gold-light);
+  border-color: #3d2a06;
+  box-shadow: 0 0 5px rgba(232, 177, 44, 0.6);
+}
+
 /* --- The cylinder --------------------------------------------------------
    Six chambers, always drawn. A loaded chamber holds a brass round, an empty
    one is a hole. This replaces the old "no bullets" caption: an empty gun is

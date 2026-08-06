@@ -40,7 +40,17 @@ const FADE_MS = 1600;
  * @param {() => number} [random] injectable RNG, so a test can pin the strikes
  */
 export function createHazard(spec, random = Math.random) {
-  let phase = HAZARD_PHASES.DORMANT;
+  /**
+   * A ONE-SHOT HAZARD STARTS AWAKE
+   * -------------------------------------------------------------------------
+   * The enemy's landmark is permanent and opens with twenty seconds of quiet,
+   * because it was raised at a moment the player did not choose and the quiet
+   * is the warning. The player's is the same machine with `cycleMs: 0` and
+   * `oneShot`: it was raised by somebody pressing a button they had spent six
+   * rounds charging, so it goes straight to the sky changing and it does not
+   * come back. Same clock, both ends of the road.
+   */
+  let phase = spec.cycleMs > 0 ? HAZARD_PHASES.DORMANT : HAZARD_PHASES.WARNING;
   let t = 0;
   /** False until the first eruption, so the sky is clean when it is summoned. */
   let erupted = false;
@@ -110,7 +120,7 @@ export function createHazard(spec, random = Math.random) {
     if (t >= spec.activeMs) {
       phase = HAZARD_PHASES.DORMANT;
       t = 0;
-      events.push({ type: 'calm' });
+      events.push({ type: 'calm', done: !!spec.oneShot });
     }
     return events;
   }
@@ -134,6 +144,8 @@ export function createHazard(spec, random = Math.random) {
     skyLevel,
     getPhase: () => phase,
     isActive: () => phase === HAZARD_PHASES.ACTIVE,
+    /** True once a one-shot has been and gone; permanent ones never are. */
+    isSpent: () => !!spec.oneShot && erupted && phase === HAZARD_PHASES.DORMANT,
     /** Seconds until the next eruption starts. For the countdown on the card. */
     secondsToNext: () =>
       phase === HAZARD_PHASES.DORMANT ? Math.max(0, Math.ceil((spec.cycleMs - t) / 1000)) : 0,

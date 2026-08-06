@@ -85,8 +85,41 @@ hurrying for. A shield is no use under any of it (it is the ground, not a shot),
 the vest still stops a fatal one, and the diadem does not touch it: the diadem
 blocks things aimed at you, and a mountain is not aiming.
 
-Player-side specials — bought in a shop, charged over the fight, spent when you
-choose — are not built yet. The catalogue is written for them.
+### What you can do back
+
+Everything above is for sale. A world's shop is the only place to buy that
+world's kit, and what you buy is equipment, not ammunition: you keep it for the
+rest of the run and it works in every duel.
+
+Two slots — one **basic**, one **special** — swapped in the saddlebag between
+fights, never during one. Both **charge**: one point a round, and a plate above
+the move buttons lights when it is full. Spending one is a free action, like
+throwing a stick of dynamite: it does not cost you your turn. `Q` and `E`.
+
+- **A basic** charges in three to five rounds, so it lands once or twice a
+  fight. Take rounds out of their gun (and load one into yours), poison them
+  through any shield, put a life on them on the spot, or make their hand go to
+  the wrong thing entirely — they reload this round, wide open.
+- **A special** charges in five or six and fires once. It calls that world's
+  landmark down on your rival for a single eruption: two lives in the flats,
+  four by the basin.
+
+**How it is balanced.** Three numbers hold it together, and they are all in
+`src/game/world-abilities.js`:
+
+1. A basic is priced as a rare and a special as a legendary, so the existing
+   curve puts one at about a third of what a world pays out and the other at
+   most of it. Nothing new was invented for pricing.
+2. Power is rationed by **time**, not by stock. A duel runs six or seven rounds;
+   that is the whole limit.
+3. Abilities improve in three steps (worlds 1-2, 3-4, 5-6), not six. Six would
+   mean re-buying every world at a third of your income each time, which is a
+   tax rather than an upgrade path.
+
+The number actually watched while tuning is what a full charge is worth against
+a **boss** — about a third of Big Jed, about two thirds of Old Scratch by the
+time you can afford the basin's kit. A one-life drifter dies to anything and
+always did; a boss is still a fight you can lose with a volcano in your pocket.
 
 ## Story mode
 
@@ -270,11 +303,17 @@ Balance lives in data, not in code:
   each one goes off, how many strikes it lands, and what a strike costs. A
   special that hurts too much is two numbers here — `strikes` and `damage` —
   and how many enemies carry one at all is `specialChance` in `worlds.js`.
+  The player's half is at the bottom of the same file: `PLAYER_BASIC` and
+  `PLAYER_SPECIAL` are charge costs and effect sizes per band, `ABILITY_PRICE`
+  is the two base prices, and the reasoning each was set against is written
+  above them.
 - `src/game/progression.js` — every curve: exp and the level ladder (tuned
   together to hit ~1.4 levels per world), gold, prices, inn healing, hunger
   drain, walking speed, the horse discount.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
-  inventory, selling and the duel item bar pick it up.
+  inventory, selling and the duel item bar pick it up. The twenty-four ability
+  entries are generated into it from the catalogue above rather than written
+  out, so an ability is an ordinary thing in the saddlebag.
 
 ## Adding a biome
 
@@ -362,6 +401,11 @@ goes, and what it throws), a builder in `src/art/sprites-hazards.js` for the
 thing on the horizon, and `special` / `specialChance` on the world. The clock,
 the damage and the drawing are all generic — nothing in `duel-hazard.js`,
 `duel-engine.js` or `duel-scene.js` knows what a volcano is.
+
+Both halves reach the player for free. `src/game/items.js` turns the catalogue
+into shop entries at load, so a new ability is on sale in its own world's shop
+with no further work, and the player's version of it comes out of the band
+tables — there is no second place to write the numbers down.
 
 ## Adding audio
 

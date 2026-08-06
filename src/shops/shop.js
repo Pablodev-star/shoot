@@ -16,7 +16,7 @@
  */
 
 import { makeRng } from '../core/rng.js';
-import { SHOP_POOL, getItem } from '../game/items.js';
+import { SHOP_POOL, getItem, abilityPoolForWorld } from '../game/items.js';
 import { getWorld } from '../game/worlds.js';
 import { itemPrice } from '../game/progression.js';
 import { getState } from '../game/player.js';
@@ -38,12 +38,27 @@ export function generateStock(worldId, seed) {
   const slots = BASE_SLOTS + Math.floor(perks.extraSlots || 0);
   const discountChance = Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
 
+  /**
+   * The pool for THIS world: the permanent catalogue plus the abilities this
+   * stretch of road is the only place to buy (src/game/items.js). They go into
+   * the rarity tiers rather than into a section of their own — a basin shop
+   * rolling legendary should be able to come up with a volcano the same way it
+   * comes up with a diadem, and the world's own rarity table already says how
+   * often that is.
+   */
+  const abilities = abilityPoolForWorld(worldId);
+  const pool = {
+    common: SHOP_POOL.common,
+    rare: [...SHOP_POOL.rare, ...abilities.rare],
+    legendary: [...SHOP_POOL.legendary, ...abilities.legendary],
+  };
+
   const stock = [];
   const taken = new Set();
   for (let i = 0; i < slots; i++) {
     // Never put the same item on the counter twice. A visit offering "Bandage,
     // Carrot, Bandage" reads as a bug, and it wastes one of only three slots.
-    const item = pickUnused(rng, rng.weighted(world.rarity), taken);
+    const item = pickUnused(rng, rng.weighted(world.rarity), taken, pool);
 
     // Only reachable if the entire catalogue is already on the counter, which
     // needs more slots than the game can currently grant. Stop rather than
@@ -81,12 +96,13 @@ export function generateStock(worldId, seed) {
  * @param {ReturnType<import('../core/rng.js').makeRng>} rng
  * @param {string} rarity the tier rolled for this slot
  * @param {Set<string>} taken item ids already on the counter
+ * @param {Record<string, string[]>} pool this world's stock, by rarity
  * @returns {object|null} null only when every item in the catalogue is taken
  */
-function pickUnused(rng, rarity, taken) {
-  const tiers = [rarity, ...Object.keys(SHOP_POOL).filter((t) => t !== rarity)];
+function pickUnused(rng, rarity, taken, pool) {
+  const tiers = [rarity, ...Object.keys(pool).filter((t) => t !== rarity)];
   for (const tier of tiers) {
-    const available = (SHOP_POOL[tier] || [])
+    const available = (pool[tier] || [])
       .map(getItem)
       .filter((item) => item && !taken.has(item.id));
     if (available.length) return rng.pick(available);

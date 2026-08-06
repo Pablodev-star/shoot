@@ -530,6 +530,10 @@
    counting, and it is impossible to miss while the thing is going off — the
    player is meant to be spending those seconds, so they have to be able to
    read them without looking away from the fight. */
+/* `.chip` sets display, so it wins over the browser's [hidden] rule and a
+   hidden chip stays on screen as an empty pill. This puts it back. */
+.chip[hidden] { display: none; }
+
 .chip--hazard { border-color: var(--gold-dark); color: var(--gold-light); }
 .chip--hazard.is-erupting {
   border-color: var(--red-light);
