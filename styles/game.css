@@ -647,6 +647,19 @@
 .effect-badge.is-good { border-color: var(--gold-dark); }
 .effect-badge.is-blocked { border-color: var(--gold-light); }
 
+/* A world special: the one ability on the card that changes the ground rather
+   than the round. Gold while it is still in their pocket, red once it is
+   standing on the horizon — at which point it has stopped being a threat and
+   started being the weather. */
+.effect-badge.is-special {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(255, 226, 122, 0.4);
+}
+.effect-badge.is-special.is-raised {
+  border-color: var(--red-light);
+  box-shadow: 0 0 12px rgba(240, 87, 79, 0.55);
+}
+
 /* The countdown on a timed effect — poison has three rounds to run. */
 .effect-count {
   position: absolute;

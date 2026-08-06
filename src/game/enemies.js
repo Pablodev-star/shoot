@@ -21,11 +21,26 @@
  *   mindControl  scrambles the player's chosen move for one round
  *
  * All four are blocked outright by the Anti-Effect Diadem.
+ *
+ * Those are the four *effects*. What an enemy actually carries is its world's
+ * themed version of one of them — swamp rot rather than poison, an ice fall
+ * rather than dynamite — which is a name, an icon and an animation over the
+ * same rule. See src/game/world-abilities.js.
+ *
+ * THE SPECIAL
+ * ---------------------------------------------------------------------------
+ * A world also has one landmark ability, and a fraction of its riders are
+ * carrying it (`specialChance`). Every boss carries its world's. Rolling it
+ * here rather than at cast time means the duel screen can show it on the
+ * enemy's card from the first round — nothing in this game is a surprise
+ * twice — and it is the same field on a boss and on a drifter, so the engine
+ * has one path.
  */
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
+import { getAbility } from './world-abilities.js';
 
 /**
  * Everything the rest of the game needs to know about one enemy's look.
@@ -78,6 +93,8 @@ export function generateEnemy(worldId, seed) {
     bullets: 0,
     accuracy: profile.accuracy,
     abilities,
+    /** The world's landmark ability, if this one happens to be carrying it. */
+    special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
     isBoss: false,
     sprites,
   };
@@ -99,6 +116,8 @@ export function generateBoss(worldId) {
     accuracy: phase.accuracy ?? cfg.accuracy,
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: phase.abilityChanceMul || 1,
+    /** A boss always has its world's special. It is the fight's centrepiece. */
+    special: phase.special || cfg.special || null,
     isBoss: true,
     phaseIndex: 0,
     phases: cfg.phases || null,
@@ -132,6 +151,7 @@ export function nextBossPhase(boss) {
     accuracy: phase.accuracy,
     abilities: phase.abilities || boss.abilities,
     abilityChanceMul: phase.abilityChanceMul || 1,
+    special: phase.special || boss.special || null,
     phaseIndex: index,
     ...(look
       ? {
@@ -146,9 +166,16 @@ export function nextBossPhase(boss) {
   };
 }
 
-export const ABILITY_LABELS = {
-  bulletSteal: 'Bullet Steal',
-  poison: 'Poison',
-  dynamite: 'Dynamite',
-  mindControl: 'Mind Control',
-};
+/**
+ * Ability id → the name it goes by. It comes out of the catalogue rather than
+ * being listed twice: "poison" in the bayou is called swamp rot, and the one
+ * place that decides is src/game/world-abilities.js.
+ */
+export function abilityLabel(id) {
+  return getAbility(id).label;
+}
+
+/** Ability id → the sentence that explains it to somebody who hovers it. */
+export function abilityTip(id) {
+  return getAbility(id).tip;
+}

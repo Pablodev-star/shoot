@@ -13,8 +13,12 @@
  *               archetypes that ride here — see src/art/sprites-enemies.js.
  *               A world's cast is a list of looks, and each look brings its
  *               own names with it, so nobody is ever called something the
- *               sprite does not show.
+ *               sprite does not show. `abilities` names this world's THEMED
+ *               tricks and `special` its one landmark ability — both defined
+ *               in src/game/world-abilities.js — and `specialChance` is how
+ *               many of its riders are carrying that landmark.
  *   boss        the world's final fight, including the archetype it wears
+ *               and the special it always has
  *   tint        canvas colour wash that gives each world its identity
  *
  * Everything is parameterised — to rebalance the game you edit numbers here,
@@ -66,12 +70,28 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 80, 2: 18, 3: 2 },
       abilityChance: 0.05,
-      abilities: ['bulletSteal'],
+      /**
+       * The Dust Flats are the game's own theme rather than a departure from
+       * it, so only the wind-borne steal is renamed here — Big Jed's dynamite
+       * is a stick of dynamite, and there is nothing more western to make it.
+       * See src/game/world-abilities.js.
+       */
+      abilities: ['dustSnatch'],
       accuracy: 0.42,       // how often the AI reads your move correctly
       /** Who rides this stretch — see src/art/sprites-enemies.js. */
       roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
+      /** The world's special, and how many of its riders are carrying it. */
+      special: 'duststorm',
+      specialChance: 0.1,
     },
-    boss: { name: 'Big Jed', archetype: 'bossJed', lives: 3, abilities: ['dynamite'], accuracy: 0.55 },
+    boss: {
+      name: 'Big Jed',
+      archetype: 'bossJed',
+      lives: 3,
+      abilities: ['dynamite'],
+      accuracy: 0.55,
+      special: 'duststorm',
+    },
   },
   {
     id: 2,
@@ -87,16 +107,19 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 66, 2: 26, 3: 8 },
       abilityChance: 0.14,
-      abilities: ['bulletSteal', 'poison'],
+      abilities: ['lassoPull', 'hornetSting'],
       accuracy: 0.48,
       roster: ['sombrero', 'scarecrow', 'gambler', 'strawhat', 'bandana'],
+      special: 'hornetTree',
+      specialChance: 0.12,
     },
     boss: {
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
       lives: 4,
-      abilities: ['poison', 'bulletSteal'],
+      abilities: ['hornetSting', 'lassoPull'],
       accuracy: 0.6,
+      special: 'hornetTree',
     },
   },
   {
@@ -113,16 +136,19 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 50, 2: 32, 3: 14, 4: 4 },
       abilityChance: 0.24,
-      abilities: ['bulletSteal', 'poison', 'dynamite'],
+      abilities: ['coldGrip', 'frostbite', 'iceFall'],
       accuracy: 0.54,
       roster: ['goggles', 'furhood', 'bonemarshal', 'drifter'],
+      special: 'cornice',
+      specialChance: 0.14,
     },
     boss: {
       name: 'Whiteout Kate',
       archetype: 'bossWhiteout',
       lives: 4,
-      abilities: ['dynamite', 'poison'],
+      abilities: ['iceFall', 'frostbite'],
       accuracy: 0.64,
+      special: 'cornice',
     },
   },
   {
@@ -140,16 +166,19 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 36, 2: 34, 3: 22, 4: 8 },
       abilityChance: 0.34,
-      abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
+      abilities: ['mireGrasp', 'swampRot', 'gasBurst', 'willOWisp'],
       accuracy: 0.6,
       roster: ['preacher', 'wraith', 'skeleton', 'gambler'],
+      special: 'blackdamp',
+      specialChance: 0.16,
     },
     boss: {
       name: 'Colonel Sable',
       archetype: 'bossSable',
       lives: 5,
-      abilities: ['mindControl', 'dynamite'],
+      abilities: ['willOWisp', 'gasBurst'],
       accuracy: 0.68,
+      special: 'blackdamp',
     },
   },
   {
@@ -171,16 +200,20 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 24, 2: 32, 3: 28, 4: 12, 5: 4 },
       abilityChance: 0.45,
-      abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
+      abilities: ['cinderSnatch', 'emberBite', 'magmaSpout', 'hellWhisper'],
       accuracy: 0.66,
       roster: ['emberrider', 'ashwidow', 'ironkiln', 'horned', 'bonemarshal'],
+      /** The volcano. See src/game/world-abilities.js. */
+      special: 'volcano',
+      specialChance: 0.18,
     },
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
       lives: 6,
-      abilities: ['mindControl', 'poison', 'dynamite'],
+      abilities: ['hellWhisper', 'emberBite', 'magmaSpout'],
       accuracy: 0.72,
+      special: 'volcano',
     },
   },
   {
@@ -205,17 +238,21 @@ export const WORLDS = [
     enemy: {
       lives: { 2: 30, 3: 34, 4: 24, 5: 12 },
       abilityChance: 0.6,
-      abilities: ['bulletSteal', 'poison', 'dynamite', 'mindControl'],
+      abilities: ['gravityPull', 'starRot', 'meteorStrike', 'mindRift'],
       accuracy: 0.72,
       roster: ['starhelm', 'voidsheriff', 'nameless', 'ironkiln'],
+      special: 'rift',
+      specialChance: 0.22,
     },
     /** Two phases — see src/duel/duel-engine.js `phases`. */
     boss: {
       name: 'THE STRANGER',
       lives: 5,
-      abilities: ['mindControl', 'dynamite', 'poison'],
+      abilities: ['mindRift', 'meteorStrike', 'starRot'],
       accuracy: 0.78,
       archetype: 'bossStranger',
+      /** He opens the rift himself. The phase change does not close it. */
+      special: 'rift',
       /** The second line of the name card the entrance slams up. */
       cardSub: 'PAST THE LAST HORIZON',
 
@@ -253,7 +290,8 @@ export const WORLDS = [
           archetype: 'bossStranger',
           lives: 5,
           accuracy: 0.78,
-          abilities: ['poison', 'dynamite'],
+          abilities: ['starRot', 'meteorStrike'],
+          special: 'rift',
         },
         {
           name: 'The Stranger · Unmasked',
@@ -261,7 +299,8 @@ export const WORLDS = [
           archetype: 'bossStrangerUnmasked',
           lives: 7,
           accuracy: 0.88,
-          abilities: ['mindControl', 'dynamite', 'poison', 'bulletSteal'],
+          abilities: ['mindRift', 'meteorStrike', 'starRot', 'gravityPull'],
+          special: 'rift',
           /** Phase two starts with a bullet already chambered and fires faster. */
           startBullets: 2,
           abilityChanceMul: 1.6,

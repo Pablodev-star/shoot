@@ -526,6 +526,23 @@
 .chip--live { border-color: var(--green); color: #b7e9a0; }
 .chip--danger { border-color: var(--red); color: var(--red-light); }
 
+/* The world-hazard clock. It sits quiet while the thing on the horizon is
+   counting, and it is impossible to miss while the thing is going off — the
+   player is meant to be spending those seconds, so they have to be able to
+   read them without looking away from the fight. */
+.chip--hazard { border-color: var(--gold-dark); color: var(--gold-light); }
+.chip--hazard.is-erupting {
+  border-color: var(--red-light);
+  color: #fff1cf;
+  background: rgba(198, 47, 42, 0.35);
+  animation: hazard-pulse 620ms ease-in-out infinite;
+}
+
+@keyframes hazard-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 87, 79, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(240, 87, 79, 0.6); }
+}
+
 .chip.is-bumped { animation: chip-bump var(--dur-base) var(--ease-spring) both; }
 
 @keyframes chip-bump {

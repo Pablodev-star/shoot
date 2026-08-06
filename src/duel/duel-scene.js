@@ -59,6 +59,27 @@
  * So is the AURA — the purple fire and the sparks the Stranger carries. That
  * one is not a cut-scene effect at all: it burns for the whole fight, and it
  * doubles when he takes the cowl off.
+ *
+ * AND THE WORLD CAN JOIN IN
+ * ---------------------------------------------------------------------------
+ * Two things arrive here from src/game/world-abilities.js.
+ *
+ * The first is a HAZARD: the landmark a world special raises — a volcano, a
+ * twister, a rift — which is drawn in three pieces, because it is three
+ * different kinds of thing at once. Its rock goes down BEFORE the backdrop, so
+ * the ridges stand in front of it and the hour of the day falls on it like any
+ * other terrain. Its fire goes on AFTER the light, with the muzzle flashes,
+ * because it is emitting rather than lit. And its sky goes on last of all, in
+ * screen space, because when a volcano is about to go off the whole frame
+ * turns red — the camera can be six inches from a man's eye and it is still
+ * red in there.
+ *
+ * The second is the ABILITY CAST: the animation a themed trick plays over the
+ * fighter it lands on. Six motions (`castAbilityFx`) cover all eighteen of
+ * them — grit whipping across the road, hornets closing in, snow coming down,
+ * gas coming up, a burst, a spiral into somebody's head — and the ability data
+ * picks a motion and three colours. A prairie sting and an ember bite cost the
+ * same life three rounds later, and nothing about watching them is the same.
  */
 
 import { drawSprite, frameAt } from '../art/pixel.js';
@@ -71,6 +92,7 @@ import {
   GUN_TRACK,
 } from '../art/sprites-character.js';
 import { getCombatFx, FX_TIMING, FLASH_ANCHOR, SMOKE_ANCHOR, IMPACT_ANCHOR } from '../art/sprites-fx.js';
+import { getHazardArt, HAZARD_W, HAZARD_H } from '../art/sprites-hazards.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
 import { createParallax } from '../explore/parallax.js';
 import * as weather from '../explore/weather.js';
@@ -165,10 +187,23 @@ export function createDuelScene({
   const bullets = [];
   const impacts = [];
 
+  /**
+   * The world hazard, if one has been raised: the spec, its art, its box on
+   * screen and the last state the engine's clock handed over.
+   */
+  let hazard = null;
+  /** What it currently has in the air, and what it has left on the road. */
+  const debris = [];
+  const scars = [];
+  /** Themed ability particles — see `castAbilityFx`. */
+  const spell = [];
+
   let elapsed = 0;
   const cameraX = 1200; // a fixed, pleasant stretch of road
   /** Filled in by render(); the emitters need last frame's geometry. */
   let layout = null;
+  /** The walk line, in device pixels. Anything falling needs to know it. */
+  let groundLine = 0;
   /** How much bigger than the player the thing across the road is. */
   let bossScale = enemyScale;
   /**
@@ -361,6 +396,67 @@ export function createDuelScene({
     },
 
     /**
+     * Raise a world special's landmark. From here until the fight ends there
+     * is a volcano (or a twister, or a rift) standing behind the road.
+     * @param {object} spec an entry from SPECIALS in src/game/world-abilities.js
+     */
+    setHazard(spec) {
+      if (!spec) return;
+      hazard = {
+        spec,
+        art: getHazardArt(spec.art),
+        motif: spec.motif || 'rock',
+        colors: spec.debris || [PALETTE.char, PALETTE.magma, PALETTE.emberGlow],
+        /** Overwritten every frame by the screen — see `setHazardState`. */
+        state: { phase: 'dormant', sky: 0, activeK: -1 },
+        box: null,
+      };
+    },
+
+    /** The engine's clock, handed over once a frame. */
+    setHazardState(state) {
+      if (hazard && state) hazard.state = state;
+    },
+
+    /**
+     * One strike arriving on a fighter. The thing that hits is thrown from
+     * wherever that hazard throws from and lands on the target, and the
+     * impact, the shake and the mark it leaves are all hung off its landing
+     * rather than fired here — so a life is lost when the rock arrives.
+     */
+    hazardStrike(side = 'player') {
+      if (!hazard || !layout) return;
+      const L = layout[side];
+      const tx = L.originX + FIGHTER_W * L.fs * 0.5;
+      const ty = L.topY + 12 * L.fs;
+      const from = strikeOrigin(tx, ty);
+      debris.push({
+        kind: 'strike',
+        side,
+        x: from.x,
+        y: from.y,
+        sx: from.x,
+        sy: from.y,
+        tx,
+        ty,
+        t: 0,
+        life: from.ms,
+        size: Math.max(2, (lastView ? lastView.scale : 3) * 2),
+      });
+    },
+
+    /**
+     * Play a themed ability over a fighter.
+     * @param {object} cast `{ motion, colors, count, shake }` from the ability
+     * @param {'player'|'enemy'} side who it is landing on
+     */
+    castAbilityFx(cast, side = 'player') {
+      if (!cast || !layout) return;
+      spawnSpell(cast, side);
+      if (cast.shake) fx.shake = Math.max(fx.shake, cast.shake);
+    },
+
+    /**
      * Frame a point of a fighter.
      *
      * @param {object} shot
@@ -451,6 +547,8 @@ export function createDuelScene({
       if (fx.card && fx.card.t < 1) fx.card.t = Math.min(1, fx.card.t + dt / 260);
 
       stepAura(dt);
+      stepHazard(dt);
+      stepSpell(dt);
 
       step(flashes, dt, FX_TIMING.flash.reduce((a, b) => a + b, 0));
       step(impacts, dt, FX_TIMING.impact.reduce((a, b) => a + b, 0));
@@ -490,6 +588,7 @@ export function createDuelScene({
       const oy = shakeAmp ? (Math.random() - 0.5) * shakeAmp * s : 0;
 
       const gy = parallax.groundY(view);
+      groundLine = gy;
       weather.setGroundLine(gy);
 
       /**
@@ -551,6 +650,20 @@ export function createDuelScene({
       // Backdrop now, light after the fighters — see parallax.applyLighting.
       parallax.renderBackdrop(ctx, view, cameraX);
 
+      /**
+       * The landmark goes in AFTER the ridges and before the duellists.
+       *
+       * The first pass put it behind the parallax stack, which is where a
+       * mountain belongs and which buried it: five layers of ridge line came
+       * down over everything below its crater and what was left read as one
+       * more lump on a horizon full of them. It is not scenery — it is the
+       * thing that is about to take three lives off somebody — so it stands
+       * between the ridges and the road, close enough to be the biggest thing
+       * in the frame and far enough back that both fighters are in front of
+       * it. It is still terrain: the light goes over it with everything else.
+       */
+      drawHazardBody(ctx, view, gy);
+
       // --- ground shadows, so the fighters are planted rather than floating.
       // They lean away from the sun, so a duel at dusk casts two long ones. ---
       parallax.drawGroundShadow(ctx, view, playerX, FIGHTER_W * fs, gy);
@@ -583,6 +696,10 @@ export function createDuelScene({
       parallax.renderAmbient(ctx, view);
 
       drawAura(ctx, 'front');
+      // The fire in the crater and everything the mountain has in the air:
+      // emitting, so it goes on after the light, with the muzzle flashes.
+      drawHazardGlow(ctx, view);
+      drawSpell(ctx);
       drawSmoke(ctx);
       drawShells(ctx);
       drawBullets(ctx);
@@ -594,6 +711,11 @@ export function createDuelScene({
       // Rain is rain-sized however close the camera is: it is between the lens
       // and the scene, not in it.
       weather.render(ctx, view);
+
+      // The colour a hazard puts over the world while it is waking up and
+      // going off. It is deliberately outside the camera: a close-up on a face
+      // during an eruption is a close-up of a face lit red.
+      drawHazardSky(ctx, view);
 
       // --- centre banner (round call-outs) ---
       if (fx.banner) {
@@ -883,6 +1005,470 @@ export function createDuelScene({
         ctx.fillStyle = PALETTE.astralLight;
         ctx.fillRect(Math.round(p.x) - unit, Math.round(p.y), unit * 3, Math.round(p.len));
       }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // --- the world hazard -------------------------------------------------------
+
+  /**
+   * How hard each hazard throws, per phase.
+   *
+   * `idle` is what it does when it is only standing there — a thread of smoke
+   * off a volcano, grit off a twister, a bubble out of the bog. It matters
+   * more than it sounds: a landmark with nothing coming off it is a painting,
+   * and the player has to believe it is going to do something long before it
+   * does. `warn` is the same thing getting louder, and `active` is the throw.
+   *
+   * Rates are particles per millisecond.
+   */
+  const HAZARD_RATE = { dormant: 0.004, warning: 0.03, active: 0.09 };
+
+  /** Where a strike comes from, and how long it takes to arrive. */
+  function strikeOrigin(tx, ty) {
+    const s = lastView ? lastView.scale : 3;
+    const motif = hazard?.motif;
+    if (motif === 'gas') return { x: tx, y: groundLine + s * 4, ms: 260 };
+    if (motif === 'mote' || motif === 'hornet') {
+      const box = hazard.box;
+      return { x: box ? box.x + box.w / 2 : tx + 200, y: ty - s * 4, ms: 320 };
+    }
+    // Rock, snow and shards all arrive the same way: out of the sky, fast.
+    return { x: tx + (Math.random() - 0.5) * s * 20, y: -s * 12, ms: 300 };
+  }
+
+  /** One piece of whatever this hazard is made of, thrown from the landmark. */
+  function spawnDebris() {
+    const box = hazard.box;
+    if (!box) return;
+    const s = box.s;
+    const cx = box.x + box.w / 2;
+    const crest = box.y + s * 6;
+    const colors = hazard.colors;
+    const pick = colors[Math.floor(Math.random() * colors.length)];
+
+    switch (hazard.motif) {
+      case 'rock':
+        // Thrown up out of the crater and left to fall wherever it falls.
+        debris.push({
+          kind: 'rock',
+          x: cx + (Math.random() - 0.5) * s * 6,
+          y: crest,
+          vx: (Math.random() - 0.5) * 0.22 * s,
+          vy: -(0.1 + Math.random() * 0.06) * s,
+          g: 0.00017 * s,
+          size: Math.max(2, Math.round(s * (Math.random() < 0.3 ? 1.6 : 1))),
+          color: pick,
+          hot: Math.random() < 0.5,
+          t: 0,
+          life: 9000,
+        });
+        break;
+      case 'flake':
+        // A slab comes off the lip and slides down the face of the pass.
+        debris.push({
+          kind: 'rock',
+          x: box.x + box.w * (0.55 + Math.random() * 0.35),
+          y: box.y + s * (4 + Math.random() * 6),
+          vx: -(0.04 + Math.random() * 0.06) * s,
+          vy: 0.02 * s,
+          g: 0.00012 * s,
+          size: Math.max(2, Math.round(s * (0.8 + Math.random()))),
+          color: pick,
+          t: 0,
+          life: 9000,
+        });
+        break;
+      case 'mote':
+        // Grit off the column, crossing the road at head height.
+        debris.push({
+          kind: 'mote',
+          x: cx + (Math.random() - 0.5) * box.w * 0.8,
+          y: box.y + Math.random() * box.h,
+          vx: -(0.18 + Math.random() * 0.22) * s,
+          vy: (Math.random() - 0.6) * 0.03 * s,
+          g: 0,
+          size: Math.max(1, Math.round(s * 0.7)),
+          color: pick,
+          t: 0,
+          life: 1400 + Math.random() * 900,
+        });
+        break;
+      case 'hornet':
+        debris.push({
+          kind: 'hornet',
+          x: cx + (Math.random() - 0.5) * s * 10,
+          y: box.y + box.h * 0.45,
+          vx: -(0.05 + Math.random() * 0.08) * s,
+          vy: (Math.random() - 0.5) * 0.02 * s,
+          wobble: 120 + Math.random() * 200,
+          amp: s * (0.6 + Math.random()),
+          size: Math.max(1, Math.round(s * 0.8)),
+          color: pick,
+          t: 0,
+          life: 2600 + Math.random() * 1400,
+        });
+        break;
+      case 'gas':
+        // Out of the water, and up. It never comes down.
+        debris.push({
+          kind: 'gas',
+          x: box.x + Math.random() * box.w,
+          y: groundLine - Math.random() * s * 3,
+          vx: (Math.random() - 0.5) * 0.02 * s,
+          vy: -(0.02 + Math.random() * 0.03) * s,
+          g: 0,
+          size: Math.max(2, Math.round(s * (1 + Math.random()))),
+          color: pick,
+          t: 0,
+          life: 2200 + Math.random() * 1200,
+        });
+        break;
+      default:
+        // Shards, pulled out of the rift and dropped.
+        debris.push({
+          kind: 'rock',
+          x: cx + (Math.random() - 0.5) * box.w * 0.5,
+          y: box.y + box.h * (0.2 + Math.random() * 0.5),
+          vx: (Math.random() - 0.5) * 0.12 * s,
+          vy: -(0.02 + Math.random() * 0.05) * s,
+          g: 0.00014 * s,
+          size: Math.max(2, Math.round(s * 1.1)),
+          color: pick,
+          hot: true,
+          t: 0,
+          life: 9000,
+        });
+    }
+  }
+
+  /**
+   * The mark a strike leaves on the road.
+   *
+   * The volcano's is lava and it is still there at the end of the fight (`life`
+   * is Infinity, `crust` is how far it has cooled); everything else leaves
+   * something that fades. It is the one part of a hazard that accumulates, and
+   * it is the reason a long duel in the basin ends on a road that has visibly
+   * been under a mountain for two minutes.
+   */
+  function addScar(x) {
+    const s = lastView ? lastView.scale : 3;
+    scars.push({
+      x,
+      w: s * (4 + Math.random() * 5),
+      t: 0,
+      lava: !!hazard.spec.lava,
+      color: hazard.colors[hazard.colors.length - 1],
+    });
+    if (scars.length > 26) scars.shift();
+  }
+
+  function stepHazard(dt) {
+    if (!hazard) return;
+    const phase = hazard.state.phase || 'dormant';
+    const rate = HAZARD_RATE[phase] || 0;
+    if (hazard.box && rate) {
+      let n = rate * dt;
+      while (n > 0) {
+        if (n >= 1 || Math.random() < n) spawnDebris();
+        n -= 1;
+      }
+    }
+
+    for (let i = debris.length - 1; i >= 0; i--) {
+      const p = debris[i];
+      p.t += dt;
+
+      if (p.kind === 'strike') {
+        // A strike is not thrown, it is AIMED: it travels a straight line to
+        // the fighter it was scheduled for and everything happens where it
+        // lands, so a life is never lost before the thing that took it arrives.
+        const k = Math.min(1, p.t / p.life);
+        p.x = p.sx + (p.tx - p.sx) * k;
+        p.y = p.sy + (p.ty - p.sy) * k;
+        if (k >= 1) {
+          impact(p.side);
+          fx.shake = Math.max(fx.shake, 340);
+          if (hazard.spec.lava || hazard.motif === 'rock') addScar(p.tx);
+          debris.splice(i, 1);
+        }
+        continue;
+      }
+
+      if (p.kind === 'hornet') {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt + Math.sin(p.t / p.wobble) * 0.03 * p.amp;
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.g) p.vy += p.g * dt;
+      }
+
+      // Anything solid that reaches the road stops there and marks it.
+      if (p.kind === 'rock' && groundLine && p.y >= groundLine) {
+        addScar(p.x);
+        debris.splice(i, 1);
+        continue;
+      }
+      if (p.t >= p.life || p.x < -80 || p.y > groundLine + 200) debris.splice(i, 1);
+    }
+
+    for (let i = scars.length - 1; i >= 0; i--) {
+      scars[i].t += dt;
+      // Lava crusts over and stays; everything else is gone in a few seconds.
+      if (!scars[i].lava && scars[i].t > 5200) scars.splice(i, 1);
+    }
+  }
+
+  function drawHazardBody(ctx, view, gy) {
+    if (!hazard) return;
+    /**
+     * Twice the scene's pixel, and no bigger than the sky it has to fit in.
+     * A landmark drawn at the same scale as the props on the roadside is a
+     * prop; this one is meant to be the biggest thing on screen after the two
+     * men, and on a short window the clamp is what stops its crater going up
+     * behind the fighter cards.
+     */
+    const s = Math.max(view.scale, Math.min(view.scale * 2, Math.floor((gy - view.h * 0.1) / HAZARD_H)));
+    const w = HAZARD_W * s;
+    const h = HAZARD_H * s;
+    // Between the two of them, which is the only part of the road that is not
+    // already somebody's — and it is where the eye goes when neither of them
+    // is moving.
+    const x = Math.round(view.w * 0.5 - w / 2);
+    // Its foot sits a little under the walk line, so it reads as standing
+    // further down the road rather than balanced on the same crust the
+    // duellists are on.
+    const y = Math.round(gy - h + s * 3);
+    hazard.box = { x, y, w, h, s };
+
+    const art = hazard.art;
+    // A twister has no still frame: its body IS the animation.
+    const body = art.frames
+      ? art.frames[Math.floor(elapsed / 110) % art.frames.length]
+      : art.body;
+    drawSprite(ctx, body, x, y, s);
+  }
+
+  function drawHazardGlow(ctx, view) {
+    if (!hazard || !hazard.box) return;
+    const { x, y, s } = hazard.box;
+    const level = hazard.state.sky || 0;
+
+    const glow = hazard.art.glow;
+    if (glow && glow.length) {
+      // It is never entirely dark: a mountain with fire in it has fire in it
+      // between eruptions too, and that quarter-strength ember is the promise
+      // the whole hazard is trading on.
+      ctx.globalAlpha = 0.3 + 0.7 * level;
+      drawSprite(ctx, glow[Math.floor(elapsed / 150) % glow.length], x, y, s);
+      ctx.globalAlpha = 1;
+    }
+
+    // What it has left on the road, under what it currently has in the air.
+    for (const scar of scars) {
+      const k = scar.lava ? Math.max(0.35, 1 - scar.t / 24000) : 1 - scar.t / 5200;
+      if (k <= 0) continue;
+      ctx.globalAlpha = 0.85 * k;
+      ctx.fillStyle = scar.lava ? PALETTE.magmaDeep : scar.color;
+      ctx.fillRect(Math.round(scar.x - scar.w / 2), Math.round(groundLine - s), Math.round(scar.w), s * 2);
+      if (scar.lava) {
+        ctx.globalAlpha = k * (0.55 + Math.sin(elapsed / 420 + scar.x) * 0.25);
+        ctx.fillStyle = PALETTE.magma;
+        ctx.fillRect(Math.round(scar.x - scar.w / 4), Math.round(groundLine - s), Math.round(scar.w / 2), s);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    for (const p of debris) {
+      const size = p.size || s;
+      if (p.kind === 'strike') {
+        // The incoming one is drawn bigger and with a tail, because it is the
+        // only piece on screen that is going to cost anybody anything.
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = hazard.colors[0];
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = hazard.colors[hazard.colors.length - 1];
+        ctx.fillRect(Math.round(p.x - size / 2), Math.round(p.y - size), size * 2, size * 2);
+        continue;
+      }
+      const fade = p.kind === 'gas' || p.kind === 'mote' ? 1 - p.t / p.life : 1;
+      ctx.globalAlpha = Math.max(0, Math.min(1, fade));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
+      if (p.hot) {
+        ctx.globalAlpha = Math.max(0, fade * 0.6);
+        ctx.fillStyle = PALETTE.emberGlow;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(1, size - 1), Math.max(1, size - 1));
+      }
+      if (p.kind === 'hornet') {
+        // Two pixels of wing, which is all a hornet at this size can have.
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = PALETTE.bone;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y - 1), size, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** The colour the whole frame goes while a hazard is up. */
+  function drawHazardSky(ctx, view) {
+    if (!hazard) return;
+    const level = hazard.state.sky || 0;
+    if (level <= 0.01) return;
+    const sky = hazard.spec.sky || { color: PALETTE.red, alpha: 0.4 };
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = sky.alpha * level;
+    ctx.fillStyle = sky.color;
+    ctx.fillRect(-64, -64, view.w + 128, view.h + 128);
+    ctx.restore();
+    // A pulse of the same colour on top of it while it is actually throwing,
+    // so the eruption reads as light coming off something rather than as a
+    // filter somebody left on.
+    if (hazard.state.activeK >= 0) {
+      ctx.globalAlpha = 0.12 * (0.5 + Math.sin(elapsed / 180) * 0.5);
+      ctx.fillStyle = sky.color;
+      ctx.fillRect(0, 0, view.w, view.h);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // --- themed ability casts ---------------------------------------------------
+
+  /**
+   * Six motions, eighteen abilities.
+   *
+   * Each one is spawned around the fighter it is landing on, in that fighter's
+   * own geometry, so the same cast reads correctly on a man and on something
+   * two and a half times his size. The colours come from the ability.
+   */
+  function spawnSpell(cast, side) {
+    const L = layout[side];
+    const other = layout[side === 'player' ? 'enemy' : 'player'];
+    const cx = L.originX + FIGHTER_W * L.fs * 0.5;
+    const cy = L.topY + 12 * L.fs;
+    const head = L.topY + 4 * L.fs;
+    const s = lastView ? lastView.scale : 3;
+    const count = cast.count || 26;
+    const colors = cast.colors || [PALETTE.white];
+
+    for (let i = 0; i < count; i++) {
+      const color = colors[i % colors.length];
+      const size = Math.max(1, Math.round(s * (Math.random() < 0.25 ? 1.6 : 0.9)));
+      const base = { color, size, t: -i * 12, life: 620 + Math.random() * 320, motion: cast.motion };
+      const angle = (i / count) * Math.PI * 2;
+
+      switch (cast.motion) {
+        case 'streak': {
+          // Off the caster, across the road, into the target.
+          const fromX = other.originX + FIGHTER_W * other.fs * 0.5;
+          const fromY = other.topY + (8 + Math.random() * 8) * other.fs;
+          spell.push({
+            ...base,
+            x: fromX,
+            y: fromY,
+            vx: (cx - fromX) / 420,
+            vy: (cy - fromY) / 420 + (Math.random() - 0.5) * 0.05,
+            life: 520,
+          });
+          break;
+        }
+        case 'swarm': {
+          const r = L.fs * (8 + Math.random() * 10);
+          spell.push({
+            ...base,
+            x: cx + Math.cos(angle) * r,
+            y: cy + Math.sin(angle) * r * 0.8,
+            tx: cx,
+            ty: cy,
+            wobble: 90 + Math.random() * 160,
+            amp: s * 2,
+            life: 900 + Math.random() * 300,
+          });
+          break;
+        }
+        case 'fall':
+          spell.push({
+            ...base,
+            x: cx + (Math.random() - 0.5) * FIGHTER_W * L.fs * 1.6,
+            y: L.topY - L.fs * (6 + Math.random() * 24),
+            vx: (Math.random() - 0.5) * 0.02,
+            vy: 0.35 + Math.random() * 0.3,
+            g: 0.0006,
+            life: 700,
+          });
+          break;
+        case 'rise':
+          spell.push({
+            ...base,
+            x: cx + (Math.random() - 0.5) * FIGHTER_W * L.fs * 1.3,
+            y: groundLine - Math.random() * L.fs,
+            vx: (Math.random() - 0.5) * 0.03,
+            vy: -(0.12 + Math.random() * 0.18),
+            g: 0.00004,
+            life: 780 + Math.random() * 300,
+          });
+          break;
+        case 'spiral':
+          spell.push({
+            ...base,
+            x: cx,
+            y: head,
+            tx: cx,
+            ty: head,
+            angle,
+            r: L.fs * (7 + Math.random() * 4),
+            spin: 0.006 + Math.random() * 0.004,
+            life: 820,
+          });
+          break;
+        default:
+          // burst
+          spell.push({
+            ...base,
+            x: cx,
+            y: cy,
+            vx: Math.cos(angle) * (0.1 + Math.random() * 0.28),
+            vy: Math.sin(angle) * (0.1 + Math.random() * 0.28) - 0.05,
+            g: 0.0003,
+            life: 560,
+          });
+      }
+    }
+  }
+
+  function stepSpell(dt) {
+    for (let i = spell.length - 1; i >= 0; i--) {
+      const p = spell[i];
+      p.t += dt;
+      if (p.t < 0) continue;
+      if (p.motion === 'swarm') {
+        // Closing on the target, wandering on the way in.
+        p.x += (p.tx - p.x) * Math.min(1, dt / 320) + Math.sin(p.t / p.wobble) * 0.06 * p.amp;
+        p.y += (p.ty - p.y) * Math.min(1, dt / 320) + Math.cos(p.t / p.wobble) * 0.06 * p.amp;
+      } else if (p.motion === 'spiral') {
+        p.angle += p.spin * dt;
+        p.r = Math.max(0, p.r - dt * 0.012);
+        p.x = p.tx + Math.cos(p.angle) * p.r;
+        p.y = p.ty + Math.sin(p.angle) * p.r * 0.5;
+      } else {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (p.g) p.vy += p.g * dt;
+      }
+      if (p.t >= p.life) spell.splice(i, 1);
+    }
+  }
+
+  function drawSpell(ctx) {
+    for (const p of spell) {
+      if (p.t < 0) continue;
+      const k = 1 - p.t / p.life;
+      ctx.globalAlpha = Math.max(0, Math.min(1, k * 1.6));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
     ctx.globalAlpha = 1;
   }

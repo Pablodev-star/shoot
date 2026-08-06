@@ -45,6 +45,49 @@ Poison, dynamite, bullet steal and mind control are shown as pixel icons on the
 fighter they belong to, never as printed names — an ability lights its own icon
 when it goes off, and a timed one carries its countdown.
 
+**The opponent does not look at your gun.** It has a habit model — what you have
+actually done this duel — and it plays the counter to a *sample* from it a
+minority of the time; the rest of the time it plays its own game off its own
+cylinder. It used to read your cylinder as well, which is where "every time I
+reload, they fire" came from, and it used to take the argmax of that model,
+which is how an even fifty-fifty habit came back as a certainty. Both are gone,
+the shield is capped and can never come out twice in a row, and the share of
+your shots that get eaten by one has halved. It is an easier fight than it was.
+What it stopped being is a rigged one.
+
+### What each world can do
+
+The four effects above are the whole rule set, and always were. What changed is
+that a world now says them in its own voice: the bayou does not have poison, it
+has **swamp rot**, and swamp rot comes up out of the ground green. Eighteen
+themed abilities across the six worlds, each with its own icon and its own
+animation over the fighter it lands on — grit whipping across the road, hornets
+closing in, a slab of ice coming down, an ember under your collar.
+
+And each world has **one special**, which is not an ability at all. An enemy
+carrying one can spend it once, usually early, and it does not resolve — it
+raises something behind the road that is there for the rest of the fight:
+
+| World | Special | What it does |
+| ----- | ------- | ------------ |
+| Dust Flats | **Dust Devil** | Sweeps the road every 22s. 2 lives, and it empties a chamber |
+| Wildgrass Prairie | **Hornet Tree** | The swarm comes out every 20s. 2 lives, and it leaves you poisoned |
+| Whitecrown Pass | **Hanging Cornice** | Breaks every 22s. 2 lives |
+| Blackwater Bayou | **Blackdamp** | The bog breathes out every 20s. 2 lives, and it leaves you poisoned |
+| Brimstone Basin | **Volcano** | Erupts every 20s. 3 lives, and the lava stays on the road |
+| Galaxy | **The Rift** | Empties every 18s. 3 lives, and it takes a round with it |
+
+That clock is real time. Every other rule in this game waits for you to press
+something; a volcano does not. It stands on the horizon doing nothing, the sky
+goes red, it throws, and it goes quiet and starts counting again — so the
+countdown on the chip above the fight is the one number in a duel worth
+hurrying for. A shield is no use under any of it (it is the ground, not a shot),
+the vest still stops a fatal one, and the diadem does not touch it: the diadem
+blocks things aimed at you, and a mountain is not aiming.
+
+Player-side specials — bought in a shop, charged over the fight, spent when you
+choose — are not built yet. The catalogue is written for them.
+
 ## Story mode
 
 There is no level select. You walk, and the road decides what you meet.
@@ -175,6 +218,8 @@ src/
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact
+    sprites-abilities.js  an icon for every themed ability and world special
+    sprites-hazards.js    the six landmarks a special raises, built not typed
     env-kit.js            the colour key + the shared layer generators
     biomes/               one file per landscape — desert, meadow, snow, swamp,
                           inferno, void: props, layers, ground, ambient life
@@ -188,9 +233,11 @@ src/
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens
-  duel/                  duel engine, agents, scene, screen, boss entrances
+  duel/                  duel engine, agents, scene, screen, boss entrances,
+                         and the real-time clock a world special runs on
   game/                  items, worlds, progression maths, player state,
-                         enemies, save slots, run controller, interstitials
+                         enemies, world abilities, save slots, run controller,
+                         interstitials
 ```
 
 `docs/ui-audit.md` records what was wrong with the previous interface and why
@@ -218,6 +265,11 @@ Balance lives in data, not in code:
   everything on it.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
+- `src/game/world-abilities.js` — every themed ability (name, icon, colour and
+  motion over one of the four base effects) and the six specials: how often
+  each one goes off, how many strikes it lands, and what a strike costs. A
+  special that hurts too much is two numbers here — `strikes` and `damage` —
+  and how many enemies carry one at all is `specialChance` in `worlds.js`.
 - `src/game/progression.js` — every curve: exp and the level ladder (tuned
   together to hit ~1.4 levels per world), gold, prices, inn healing, hunger
   drain, walking speed, the horse discount.
@@ -289,6 +341,27 @@ Enemies are composed, not drawn from scratch. One entry in `ARCHETYPES` in
 
 It is animated the moment it exists: the walk, the four-frame draw, the recoil
 and the hit stagger all come from the rig in `src/art/sprites-character.js`.
+
+## Adding a world ability
+
+An ability is a **theme over one of four rules**. The rules are fixed —
+`bulletSteal`, `poison`, `dynamite`, `mindControl` — and the engine only ever
+switches on those, so a new one is data:
+
+1. Add an entry to `ABILITIES` in `src/game/world-abilities.js`: its `base`,
+   the name it goes by, the sentence that explains it, and an `fx` — one of six
+   motions (`streak`, `swarm`, `fall`, `rise`, `burst`, `spiral`) and three
+   colours.
+2. Draw its 16 x 16 icon in `src/art/sprites-abilities.js`, using the shared
+   key. New colours need a home in `palette.js` first.
+3. Put its id in a world's `enemy.abilities` in `src/game/worlds.js`.
+
+A **special** is the same shape with a landmark on the end of it: an entry in
+`SPECIALS` (cycle, warning, active window, strikes, damage, the colour the sky
+goes, and what it throws), a builder in `src/art/sprites-hazards.js` for the
+thing on the horizon, and `special` / `specialChance` on the world. The clock,
+the damage and the drawing are all generic — nothing in `duel-hazard.js`,
+`duel-engine.js` or `duel-scene.js` knows what a volcano is.
 
 ## Adding audio
 

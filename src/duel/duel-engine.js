@@ -27,7 +27,27 @@
  * `modifiers` comes from weather and the time of day:
  *   misfireChance          both sides may misfire (wet powder in the rain)
  *   enemyAccuracyPenalty   the AI reads you less reliably (sandstorm, night)
+ *
+ * ABILITIES ARE IDS, AND AN ID IS A THEME OVER ONE OF FOUR RULES
+ * ---------------------------------------------------------------------------
+ * An enemy carries ability *ids* — `swampRot`, `iceFall`, `cinderSnatch` — and
+ * this file resolves each one to the base effect it is a version of before it
+ * does anything with it (`baseEffectOf`). There are still exactly four rules
+ * here and there always were; what changed is that the bayou's poison is
+ * called swamp rot, comes up out of the ground green, and is the same rule.
+ * See src/game/world-abilities.js.
+ *
+ * AND THERE IS ONE THING IN HERE THAT DOES NOT WAIT FOR A ROUND
+ * ---------------------------------------------------------------------------
+ * A world SPECIAL — the volcano, the twister, the rift — is cast once by an
+ * enemy that has one, and from then on it runs on a real clock instead of on
+ * turns: see `tick` and src/duel/duel-hazard.js. It is the only thing in this
+ * engine that can take a life while both duellists are standing still, which
+ * is exactly what it is for.
  */
+
+import { baseEffectOf, getSpecial, SPECIAL_TIMING } from '../game/world-abilities.js';
+import { createHazard } from './duel-hazard.js';
 
 export const MOVES = { RELOAD: 'reload', SHIELD: 'shield', SHOOT: 'shoot' };
 
@@ -85,6 +105,16 @@ export function createDuel(config) {
   let ended = null;
   /** Set when an enemy ability damaged the player during the current round. */
   let abilityHitPlayer = false;
+  /** Why the duel stopped, when it stopped somewhere other than a shot. */
+  let terminationCause = null;
+
+  /**
+   * The world special this enemy is carrying, and the landmark it turns into
+   * once it is spent. `hazard` is null for the whole of most duels.
+   */
+  let special = getSpecial(config.enemy.special);
+  let specialUsed = false;
+  let hazard = null;
 
   /** What agents are allowed to see. Both sides get the same shape. */
   function publicView(selfId) {
@@ -128,13 +158,20 @@ export function createDuel(config) {
     return enemy.abilities[Math.floor(random() * enemy.abilities.length)];
   }
 
+  /**
+   * Resolve one ability against the player.
+   *
+   * `ability` is the id the enemy carries and `base` is the rule it stands
+   * for — the log carries the id, because the screen has been showing that
+   * icon since round one and it is the one that has to light up.
+   */
   function applyEnemyAbility(ability, playerMove) {
     const player = sides.player;
     if (player.immune) {
       log('ability-blocked', { ability });
       return playerMove;
     }
-    switch (ability) {
+    switch (baseEffectOf(ability)) {
       case 'bulletSteal': {
         if (player.bullets > 0) {
           player.bullets -= 1;
@@ -163,6 +200,69 @@ export function createDuel(config) {
       }
       default:
         return playerMove;
+    }
+  }
+
+  // --- the world special ----------------------------------------------------
+
+  /**
+   * Ask whether the enemy spends its special now.
+   *
+   * The SCREEN calls this between rounds rather than the engine calling it
+   * inside one, and that is deliberate: raising a volcano is an event the
+   * player is owed a look at, and there is nowhere inside `playRound` to put
+   * two seconds of camera without either interrupting a draw or arriving after
+   * the round it changed. The decision is still the engine's — the roll, the
+   * timing policy and the once-per-duel rule all live here.
+   *
+   * @returns {object|null} the spec that was cast, for the screen to announce
+   */
+  function maybeCastSpecial() {
+    if (over || hazard || specialUsed || !special) return null;
+    const chance = round < SPECIAL_TIMING.earlyRounds
+      ? SPECIAL_TIMING.earlyChance
+      : SPECIAL_TIMING.lateChance;
+    if (random() >= chance) return null;
+    specialUsed = true;
+    hazard = createHazard(special, random);
+    log('special', { special: special.id, spec: special });
+    return special;
+  }
+
+  /** One strike out of an eruption: it is not a shot, so no shield stops it. */
+  function applyHazardStrike(ev) {
+    const player = sides.player;
+    const hit = damage('player', ev.damage, { ignoreShield: true, source: 'hazard' });
+    if (ev.steal && player.bullets > 0) {
+      player.bullets = Math.max(0, player.bullets - ev.steal);
+    }
+    /**
+     * The diadem is not in this. It blocks things aimed AT you — a hex, a
+     * whisper, a hand in your belt — and what is falling out of the sky was
+     * not aimed at anybody. The vest still works, because the vest is a
+     * physical object and `damage` honours it for free.
+     */
+    if (ev.poisons && player.poison === 0) player.poison = POISON_DELAY;
+    log('hazard-strike', {
+      special: hazard.id,
+      damage: ev.damage,
+      hit,
+      steal: ev.steal || 0,
+      lives: player.lives,
+    });
+    if (checkEnd()) terminationCause = 'hazard';
+  }
+
+  /**
+   * Advance the real-time half of the duel. The screen calls this once per
+   * frame with the frame's own `dt`; without a hazard it costs one comparison.
+   */
+  function tick(dt) {
+    if (over || !hazard) return;
+    for (const ev of hazard.tick(dt)) {
+      if (ev.type === 'strike') applyHazardStrike(ev);
+      else log(`hazard-${ev.type}`, { special: hazard.id });
+      if (over) return;
     }
   }
 
@@ -249,11 +349,12 @@ export function createDuel(config) {
       sides.enemy.agent.chooseMove(publicView('enemy')),
     ]);
 
-    // An item thrown from the inventory can end the duel while the engine is
-    // still waiting for a move. Hand back a well-formed terminal resolution so
-    // the screen can close the fight instead of stalling.
+    // An item thrown from the inventory — or a rock out of an erupting
+    // mountain — can end the duel while the engine is still waiting for a
+    // move. Hand back a well-formed terminal resolution so the screen can
+    // close the fight instead of stalling.
     if (over) {
-      const resolution = makeResolution({ terminatedBy: 'item' });
+      const resolution = makeResolution({ terminatedBy: terminationCause || 'item' });
       log('round', resolution);
       return resolution;
     }
@@ -343,8 +444,13 @@ export function createDuel(config) {
       poison: 0,
       agent: agent || sides.enemy.agent,
     });
+    // A phase that never spent its special can still spend it. One that is
+    // already up stays up: the point of a landmark is that it does not care
+    // whose fight it is any more.
+    special = getSpecial(next.special) || special;
     over = false;
     ended = null;
+    terminationCause = null;
     log('phase', { name: next.name, lives: next.lives });
   }
 
@@ -352,10 +458,16 @@ export function createDuel(config) {
     playRound,
     useItemEffect,
     setEnemy,
+    maybeCastSpecial,
+    tick,
     getSides: () => sides,
     getRound: () => round,
     isOver: () => over,
     getResult: () => ended,
+    /** The live hazard, or null. The scene reads its state to draw it. */
+    getHazard: () => hazard,
+    /** The special this enemy is carrying, spent or not — the card shows it. */
+    getSpecialSpec: () => special,
     MOVES,
   };
 }
