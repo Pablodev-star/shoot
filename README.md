@@ -285,6 +285,8 @@ src/
   art/                   every sprite, drawn from character maps at load time
     palette.js            the one palette the whole game uses
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
+    logo.js               the title wordmark: hand-drawn display letterforms,
+                          chiselled and extruded, on a shot-up plank
     sprites-character.js  the fighter rig: player, rider, horse, the draw and
                           the revolver that comes out of it (Block 2a)
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
