@@ -409,6 +409,8 @@ export function createCastFx(world) {
       trailAt: 0,
       /** Set by `detonate`; until then a fuse just burns. */
       outcome: null,
+      /** A beat on the ground before an outcome that arrived early spends it. */
+      grace: 0,
     });
   }
 
@@ -438,6 +440,18 @@ export function createCastFx(world) {
     if (p.fuse) {
       p.phase = 'fuse';
       p.phaseT = 0;
+      /**
+       * The round can resolve while the stick is still in the air.
+       *
+       * The engine plays a whole round out before the screen animates any of
+       * it, so the blast is reported at almost exactly the moment the throw
+       * ends — and a dropped frame, a backgrounded tab or a rounding of the
+       * timer either way decides which of the two happens first. If the answer
+       * got here first it is waiting in `outcome`, and the stick gets a beat on
+       * the ground to be seen landing and then goes off with it. Dropping it
+       * instead is what would leave a live stick burning into the next round.
+       */
+      if (p.outcome) p.grace = 140;
       return;
     }
     p.phase = p.hold > 0 ? 'hold' : 'fade';
@@ -530,7 +544,10 @@ export function createCastFx(world) {
             p.y - p.scale * 4,
           );
         }
-        if (p.phaseT > FUSE_LIMIT) blow(p, true);
+        // It goes off when it has been told how it went, and on its own if it
+        // never is — a fight that ended around it, a screen that was left.
+        if (p.outcome && p.phaseT >= (p.grace || 0)) blow(p, p.outcome.stopped);
+        else if (p.phaseT > FUSE_LIMIT) blow(p, true);
       } else if (p.phase === 'hold') {
         if (p.spec.float) p.y -= p.spec.float * dt;
         if (p.phaseT >= p.hold) {
@@ -641,8 +658,14 @@ export function createCastFx(world) {
     detonate(side, { stopped = false } = {}) {
       let found = false;
       for (const p of props) {
-        if (p.side === side && p.phase === 'fuse') {
-          blow(p, stopped);
+        // Anything of this fighter's that is fused counts, INCLUDING one still
+        // in the air: the answer is recorded on the prop and `arrive` spends
+        // it. Matching only the ones already on the ground is a race the round
+        // wins about half the time, and the loser is a stick that never learns
+        // what happened to it.
+        if (p.side === side && p.fuse && (p.phase === 'travel' || p.phase === 'fuse')) {
+          p.outcome = { stopped };
+          if (p.phase === 'fuse') blow(p, stopped);
           found = true;
         }
       }
