@@ -114,22 +114,30 @@ const BASE_ICONS = {
     '....kkkkkkkk....',
     '................',
   ],
+  /**
+   * A bundle, not a slab.
+   *
+   * The old icon was one wide brick of red with stripes across it, which at
+   * sixteen pixels reads as a book. Three sticks bound together with a band and
+   * one lit fuse is what the duel now throws (src/art/sprites-casts.js), and it
+   * is the shape anybody recognises before they have read the name.
+   */
   dynamite: [
     '................',
     '..........kOk...',
-    '.........kOOk...',
+    '.........kOWk...',
     '.........kOk....',
-    '........kOk.....',
-    '.......kOk......',
-    '..kkkkkkkk......',
-    '.kRrrRrrRrrk....',
-    '.kRrrRrrRrrk....',
-    '.kMMMMMMMMMk....',
-    '.kRrrRrrRrrk....',
-    '.kRrrRrrRrrk....',
-    '.kMMMMMMMMMk....',
-    '.kRrrRrrRrrk....',
-    '.kkkkkkkkkkk....',
+    '........kyk.....',
+    '.......kyk......',
+    '..kkkkkkk.......',
+    '..krRrkRrk......',
+    '.kkkkkkkkkk.....',
+    '.kMMMMMMMMk.....',
+    '.kkkkkkkkkk.....',
+    '..krRrkRrk......',
+    '..krRrkRrk......',
+    '..krRrkRrk......',
+    '..kkkkkkk.......',
     '................',
   ],
   potion: [

@@ -80,22 +80,29 @@ export const ABILITY_KEY = {
  */
 export const ABILITY_ICONS = {
   // --- 1 · Dust Flats -------------------------------------------------------
-  /** Dust Snatch — a round held in the middle of a spinning curl of grit. */
+  /**
+   * Dust Snatch — the gust, and the round it has just hooked out of the gun.
+   *
+   * It used to be a bullet inside a ring of grit, which is a picture of a round
+   * that is perfectly safe where it is. The ability TAKES it: the curl is on
+   * the left with its hook open and the brass is already outside it, which is
+   * also what the cast now does on the road (see `fx` in world-abilities.js).
+   */
   dustSnatch: [
     '................',
     '....zzzz........',
-    '...zEEEEz.......',
-    '..zEeeeeEz......',
-    '..zE....eEz.....',
-    '.zEe..oo..ez....',
-    '.zE..kOOk..Ez...',
-    '.ze..kOOk..ez...',
-    '.zE..kOOk..Ez...',
-    '.zEe.kyyk.eEz...',
-    '..zE.kkkk.Ez....',
-    '..zEeeeeEz......',
-    '...zEEEEz.......',
+    '..zzEEEEz.......',
+    '.zEEz...zz......',
+    'zEEz......z.....',
+    'zEz........z.k..',
+    'zE..........kSk.',
+    'zEz.........kOk.',
+    'zEEz........kOk.',
+    '.zEEz.......kyk.',
+    '..zzEEEEz...kkk.',
     '....zzzz........',
+    '........zz......',
+    '.........z......',
     '................',
     '................',
   ],
@@ -199,23 +206,30 @@ export const ABILITY_ICONS = {
     '................',
     '................',
   ],
-  /** Ice Fall — a slab coming down, with the air lines it left above it. */
+  /**
+   * Deep Freeze — a man sealed inside the block, not a slab falling near one.
+   *
+   * The old icon was weather: ice coming down, with speed lines over it. What
+   * the ability actually does is stop somebody dead for two rounds, and the
+   * animation now grows a shell up over the fighter — so the badge shows the
+   * same thing the road does, a silhouette behind glass.
+   */
   iceFall: [
     '................',
-    '..k..k....k..k..',
-    '..k..k....k..k..',
-    '..k..k....k..k..',
-    '................',
-    '.......kk.......',
-    '......k11k......',
-    '.....k1113k.....',
-    '....k111133k....',
-    '...k11133333k...',
-    '..k1113333338k..',
-    '.k111333333888k.',
-    'k11333333888885k',
-    'kkkkkkkkkkkkkkkk',
-    '................',
+    '....kkkkkkkk....',
+    '...k66666666k...',
+    '..k6677777766k..',
+    '..k67TTTTTT76k..',
+    '..k677TccT776k..',
+    '..k677rrrr776k..',
+    '..k677rwwr776k..',
+    '..k677TTTT776k..',
+    '..k677TT.TT76k..',
+    '..k677TT.TT76k..',
+    '..k6788888876k..',
+    '..k6788888886k..',
+    '...k88888888k...',
+    '....kkkkkkkk....',
     '................',
   ],
 
@@ -376,42 +390,56 @@ export const ABILITY_ICONS = {
   ],
 
   // --- 6 · Galaxy -----------------------------------------------------------
-  /** Gravity Pull — a round going somewhere it did not choose. */
+  /**
+   * Gravity Pull — the hole, and the cylinder going into it.
+   *
+   * A well with a lit rim rather than the rounded rectangle it used to be, and
+   * the brass is drawn ON ITS WAY IN, strung out along the pull. The old icon
+   * had the bullet sitting quietly beside the shape, which is a picture of two
+   * objects rather than of one taking the other.
+   */
   gravityPull: [
     '................',
-    '................',
-    '....kkkk........',
-    '...k::::k.......',
-    '..k:;;;;:k......',
-    '..k:;&&;:k..kk..',
-    '..k:;&&;:k.kOOk.',
-    '..k:;;;;:k.kOOk.',
-    '...k::::k..kOOk.',
-    '....kkkk...kyyk.',
-    '..=........kkkk.',
-    '....=..=........',
-    '.......=..=.....',
-    '..........=..=..',
-    '................',
-    '................',
+    '.....kk==kk.....',
+    '...kk=::::=kk...',
+    '..k=::&&&&::=k..',
+    '..k=:&&;;&&:=k..',
+    '.k=::&;;;;&::=k.',
+    '.k=::&;;;;&::=k.',
+    '..k=:&&;;&&:=k..',
+    '..k=::&&&&::=k..',
+    '...kk=::::=kk...',
+    '.....kk==kk.....',
+    '............kk..',
+    '....=......kOOk.',
+    '.......=...kOOk.',
+    '..........=kyyk.',
+    '...........kkk..',
   ],
-  /** Star Rot — a star with something growing through it. */
+  /**
+   * Void Mirror — the plane, and the round coming back off it.
+   *
+   * The badge used to be a star, from a version of this ability that was called
+   * Star Rot and did something else. What it does now is send the next shot
+   * back at whoever fired it, so the icon is the mirror with a round leaving it
+   * the way it came — the one picture that explains the rule without a tooltip.
+   */
   starRot: [
     '................',
-    '.......k........',
-    '......k=k.......',
-    '......k=k.......',
-    '..k...k=k...k...',
-    '...k=k=U=k=k....',
-    '....k=UuU=k.....',
-    '.kk==UuuuU==kk..',
-    '....k=UuU=k.....',
-    '...k=k=U=k=k....',
-    '..k...k=k...k...',
-    '......k=k.......',
-    '......k=k.......',
-    '.......k........',
+    '...kkkkkkkkk....',
+    '..k=========k...',
+    '..k=:::::::=k...',
+    '..k=:W:::::=k...',
+    '..k=::W::::=k...',
+    '..k=:::W:::=k...',
+    '..k=::::W::=k...',
+    '..k=:::::::=k...',
+    '..k=========k...',
+    '...kkkkkkkkk....',
     '................',
+    '.kk.............',
+    'kOOk...=........',
+    '.kk.......=.....',
     '................',
   ],
   /** Meteor Strike — a rock arriving, with its own fire behind it. */
@@ -454,24 +482,32 @@ export const ABILITY_ICONS = {
   ],
 
   // --- the six specials -----------------------------------------------------
-  /** Dust Devil — the twister, seen from the road. */
+  /**
+   * Dust Devil — a twister, leaning.
+   *
+   * The old one was a stack of horizontal bars, which is a diagram of a
+   * twister rather than a twister: every band was centred on the same axis and
+   * the whole thing read as a pile of plates. This one LEANS, the bands are
+   * offset as they climb, and it stands in its own skirt of grit — the same
+   * silhouette the landmark on the road has.
+   */
   duststorm: [
     '................',
-    '..kzzzzzzzzzk...',
-    '...kEEEEEEEk....',
-    '....kzzzzzk.....',
-    '...kEEEEEEEk....',
-    '....kzzzzzk.....',
-    '.....kEEEk......',
-    '....kzzzzzk.....',
-    '.....kEEEk......',
-    '......kzk.......',
-    '.....kEEEk......',
-    '......kzk.......',
-    '......kEk.......',
+    '..kzzzzzzzzzzk..',
+    '..kEEEEEEEEEEk..',
+    '...kzzzzzzzzk...',
+    '....kEEEEEEk....',
+    '....kzzzzzzk....',
+    '.....kEEEEk.....',
     '.....kzzzk......',
-    '..kkkkkkkkkkk...',
-    '................',
+    '......kEEk......',
+    '......kzk.......',
+    '.....kEEk.......',
+    '.....kzk........',
+    '....kEEk........',
+    '...kzzzk........',
+    '..kEzzzEk.......',
+    '..kkkkkkk.......',
   ],
   /** Hornet Tree — a dead cottonwood with the nest still in it. */
   hornetTree: [

@@ -121,20 +121,40 @@ export const EFFECTS = {
 export const EFFECT_LIST = Object.keys(EFFECTS);
 
 /**
- * How a themed ability crosses the screen. `motion` picks one of six particle
- * behaviours drawn by src/duel/duel-scene.js:
+ * HOW AN ABILITY LOOKS WHEN IT HAPPENS
+ * ---------------------------------------------------------------------------
+ * `fx` is the whole performance, played by src/duel/duel-cast.js over the
+ * fighter the ability landed on. It has two halves and they do different jobs.
  *
- *   streak  flies across the road from the caster to the target
- *   swarm   converges on the target from all sides, wandering
- *   fall    comes down on the target out of the sky
- *   rise    comes up out of the ground under the target
- *   burst   blows outward from the target
- *   spiral  winds into the target's head
+ * `props` are the OBJECTS: a stick of dynamite, a gourd of poison, a rope, a
+ * rock out of nothing. They are thrown by somebody, they cross the road, and
+ * they ARRIVE — which is the half the first version of this file did not have.
+ * A stick of dynamite is not a burst of orange; it is a thing that lands at
+ * your boots and sits there. Each prop names its art (src/art/sprites-casts.js)
+ * and one of seven paths:
  *
- * `hold` is the other half, and the new one: the colour a fighter is TINTED
- * for as long as the status lasts. A freeze that is only an animation is a
- * freeze the player has forgotten about by the time it costs them a turn — the
- * ice stays on the sprite until it thaws.
+ *   throw   out of the caster's hand in an arc, landing on the target
+ *   fly     straight across the road, fast
+ *   drop    down out of the sky onto them
+ *   rise    up out of the ground under them
+ *   hold    simply there, on them, for a while
+ *   return  off the target and back to the caster — something being taken
+ *   toss    off the target and onto the road — something being lost
+ *
+ * `motion` is the other half, and it is the old one: the particles, which are
+ * the dust the object kicks up rather than the event itself. Seven behaviours —
+ * streak, swarm, fall, rise, burst, spiral, sweep — and three colours.
+ *
+ * Two flags matter beyond that. `self` says the ability is cast BY the fighter
+ * it lands on (a whisper, a mirror), so anything thrown comes off his own hand.
+ * `fuse` on a prop says it STICKS where it lands and burns until the engine
+ * says what happened to it — which is the dynamite, and the reason a cast can
+ * outlive the round that threw it.
+ *
+ * `hold`, on the ability rather than on a prop, is the colour a fighter is
+ * TINTED for as long as the status lasts. A freeze that is only an animation is
+ * a freeze the player has forgotten about by the time it costs them a turn —
+ * the ice stays on the sprite until it thaws.
  */
 const fx = (motion, colors, extra = {}) => ({ motion, colors, count: 26, ...extra });
 
@@ -158,7 +178,34 @@ export const ABILITIES = {
     tip: 'A gust off the flats takes a round out of the gun',
     icon: 'dustSnatch',
     banner: 'DUST SNATCH!',
-    fx: fx('streak', [PALETTE.sandLight, PALETTE.sand, PALETTE.sandDark], { count: 34 }),
+    /** A curl of grit goes for the gun, and the round it hooks out is gone. */
+    fx: fx('streak', [PALETTE.sandLight, PALETTE.sand, PALETTE.sandDark], {
+      count: 30,
+      props: [
+        {
+          art: 'gust',
+          path: 'fly',
+          to: 'gun',
+          ms: 300,
+          spin: 70,
+          scale: 1.3,
+          faceTravel: true,
+          trail: [PALETTE.sandLight],
+          burst: { colors: [PALETTE.sandLight, PALETTE.sand], count: 14, speed: 0.2 },
+        },
+        {
+          art: 'round',
+          path: 'toss',
+          to: 'gun',
+          ms: 520,
+          delay: 300,
+          arc: 7,
+          scale: 1.1,
+          spin: 0,
+          trail: [PALETTE.sandLight],
+        },
+      ],
+    }),
   },
   /** Grit in the eyes. The gun still works; the aim does not. */
   sandBlind: {
@@ -170,7 +217,32 @@ export const ABILITIES = {
     tip: 'Their next shot goes wide',
     icon: 'sandBlind',
     banner: 'BLINDED!',
-    fx: fx('swarm', [PALETTE.sand, PALETTE.sandLight, PALETTE.sandDeep], { count: 30 }),
+    /** A fistful of the flats, and it stays in their eyes after it lands. */
+    fx: fx('swarm', [PALETTE.sand, PALETTE.sandLight, PALETTE.sandDeep], {
+      count: 30,
+      props: [
+        {
+          art: 'gust',
+          path: 'fly',
+          to: 'face',
+          ms: 240,
+          spin: 55,
+          scale: 0.7,
+          faceTravel: true,
+          burst: { colors: [PALETTE.sandLight, PALETTE.sandDark], count: 14, speed: 0.2 },
+        },
+        {
+          art: 'grit',
+          path: 'hold',
+          to: 'face',
+          delay: 240,
+          hold: 700,
+          grow: true,
+          scale: 0.55,
+          alpha: 0.9,
+        },
+      ],
+    }),
   },
 
   // --- 2 · Wildgrass Prairie ------------------------------------------------
@@ -184,7 +256,27 @@ export const ABILITIES = {
     tip: 'A rope on the gun arm — they cannot shoot for two rounds',
     icon: 'lassoPull',
     banner: 'ROPED!',
-    fx: fx('streak', [PALETTE.boneDark, PALETTE.bone, PALETTE.woodDark], { count: 24 }),
+    /**
+     * The loop leaves the hand with the rope still attached to it — `tether`
+     * draws the line back to the caster for as long as the loop is out there,
+     * which is the difference between a lasso and a hoop somebody threw.
+     */
+    fx: fx('streak', [PALETTE.boneDark, PALETTE.bone, PALETTE.woodDark], {
+      count: 20,
+      props: [
+        {
+          art: 'lasso',
+          path: 'fly',
+          to: 'gun',
+          ms: 320,
+          scale: 0.85,
+          hold: 520,
+          grow: true,
+          tether: PALETTE.boneDark,
+          burst: { colors: [PALETTE.bone, PALETTE.boneDark], count: 10, speed: 0.14 },
+        },
+      ],
+    }),
   },
   /** Nobody keeps a shield up with their hands full of hornets. */
   hornetSwarm: {
@@ -196,7 +288,34 @@ export const ABILITIES = {
     tip: 'Their shield stops nothing for two rounds',
     icon: 'hornetSting',
     banner: 'SWARMED!',
-    fx: fx('swarm', [PALETTE.gold, PALETTE.ink, PALETTE.goldLight], { count: 34 }),
+    /** The nest is lobbed at their feet, and then it opens. */
+    fx: fx('swarm', [PALETTE.gold, PALETTE.ink, PALETTE.goldLight], {
+      count: 34,
+      props: [
+        {
+          art: 'nest',
+          path: 'throw',
+          to: 'front',
+          ms: 430,
+          arc: 10,
+          scale: 0.8,
+          hold: 200,
+          grow: true,
+          shake: 140,
+          burst: { colors: [PALETTE.gold, PALETTE.goldLight, PALETTE.ink], count: 18, speed: 0.26 },
+        },
+        {
+          art: 'swarm',
+          path: 'hold',
+          to: 'chest',
+          delay: 470,
+          hold: 720,
+          grow: true,
+          scale: 0.8,
+          alpha: 0.85,
+        },
+      ],
+    }),
   },
 
   // --- 3 · Whitecrown Pass --------------------------------------------------
@@ -210,7 +329,25 @@ export const ABILITIES = {
     tip: 'Their next two shots go wide',
     icon: 'frostbite',
     banner: 'WHITEOUT!',
-    fx: fx('swarm', [PALETTE.snowLight, PALETTE.iceLight, PALETTE.snowShade], { count: 40 }),
+    /**
+     * The only ability nobody throws: it is weather. `sweep` runs the whole
+     * pass across the fighter at speed and leaves the snow in front of them.
+     */
+    fx: fx('sweep', [PALETTE.snowLight, PALETTE.iceLight, PALETTE.snowShade], {
+      count: 44,
+      props: [
+        {
+          art: 'flurry',
+          path: 'hold',
+          to: 'chest',
+          delay: 160,
+          hold: 820,
+          grow: true,
+          scale: 1.05,
+          alpha: 0.85,
+        },
+      ],
+    }),
   },
   /** The cylinder freezes shut and everything in it is lost. */
   coldGrip: {
@@ -222,7 +359,32 @@ export const ABILITIES = {
     tip: 'Their cylinder freezes solid — every round in it is gone',
     icon: 'coldGrip',
     banner: 'FROZEN SHUT!',
-    fx: fx('streak', [PALETTE.iceLight, PALETTE.ice, PALETTE.snowMid], { count: 28 }),
+    /** A shard into the cylinder, and the gun is inside a block of ice. */
+    fx: fx('streak', [PALETTE.iceLight, PALETTE.ice, PALETTE.snowMid], {
+      count: 26,
+      props: [
+        {
+          art: 'shard',
+          path: 'fly',
+          to: 'gun',
+          ms: 260,
+          scale: 0.8,
+          faceTravel: true,
+          trail: [PALETTE.iceLight],
+        },
+        {
+          art: 'ice',
+          path: 'hold',
+          to: 'gun',
+          delay: 250,
+          hold: 620,
+          grow: true,
+          scale: 0.4,
+          alpha: 0.8,
+          burst: { colors: [PALETTE.iceLight, PALETTE.ice, PALETTE.snowLight], count: 16, speed: 0.2 },
+        },
+      ],
+    }),
   },
   /**
    * THE ONE THAT HANDS OVER TURNS
@@ -244,7 +406,42 @@ export const ABILITIES = {
     icon: 'iceFall',
     banner: 'FROZEN!',
     hold: { color: PALETTE.iceLight, alpha: 0.55 },
-    fx: fx('fall', [PALETTE.iceLight, PALETTE.snowLight, PALETTE.ice], { count: 44, shake: 300 }),
+    /**
+     * The shard comes down first and the block grows up around them out of the
+     * road. The ice on the sprite (`hold`, above) is what keeps it true after
+     * the animation is over; this is the moment it becomes true.
+     */
+    fx: fx('fall', [PALETTE.iceLight, PALETTE.snowLight, PALETTE.ice], {
+      count: 44,
+      shake: 300,
+      props: [
+        {
+          art: 'shard',
+          path: 'drop',
+          to: 'head',
+          ms: 280,
+          scale: 1,
+          trail: [PALETTE.iceLight, PALETTE.snowLight],
+        },
+        {
+          art: 'ice',
+          path: 'hold',
+          to: 'feet',
+          delay: 280,
+          hold: 1200,
+          grow: true,
+          scale: 1,
+          alpha: 0.72,
+          shake: 260,
+          burst: {
+            colors: [PALETTE.iceLight, PALETTE.snowLight, PALETTE.ice],
+            count: 22,
+            speed: 0.26,
+            up: true,
+          },
+        },
+      ],
+    }),
   },
 
   // --- 4 · Blackwater Bayou -------------------------------------------------
@@ -270,7 +467,41 @@ export const ABILITIES = {
     icon: 'poison',
     banner: 'POISONED!',
     hold: { color: PALETTE.poison, alpha: 0.4 },
-    fx: fx('rise', [PALETTE.poison, PALETTE.poisonDark, PALETTE.greenLight], { count: 34 }),
+    /**
+     * A gourd, thrown to be broken. It tumbles end over end, smashes on the
+     * road at their boots, and what comes up out of it hangs around them —
+     * which is the only honest picture of something that bites every round.
+     */
+    fx: fx('rise', [PALETTE.poison, PALETTE.poisonDark, PALETTE.greenLight], {
+      count: 32,
+      props: [
+        {
+          art: 'gourd',
+          path: 'throw',
+          to: 'front',
+          ms: 460,
+          arc: 11,
+          spin: 110,
+          scale: 0.8,
+          burst: {
+            colors: [PALETTE.poison, PALETTE.poisonDark, PALETTE.greenLight],
+            count: 20,
+            speed: 0.26,
+          },
+        },
+        {
+          art: 'miasma',
+          path: 'hold',
+          to: 'belt',
+          delay: 480,
+          hold: 960,
+          grow: true,
+          scale: 0.9,
+          alpha: 0.72,
+          float: 0.008,
+        },
+      ],
+    }),
   },
   /** Something under the water takes a life, and it does not waste it. */
   mireGrasp: {
@@ -282,7 +513,38 @@ export const ABILITIES = {
     tip: 'Takes a life off them and gives it to you',
     icon: 'mireGrasp',
     banner: 'DRAGGED UNDER!',
-    fx: fx('rise', [PALETTE.bogLight, PALETTE.bogDark, PALETTE.algae], { count: 30 }),
+    /** A hand out of the road, and the life it takes goes the other way. */
+    fx: fx('rise', [PALETTE.bogLight, PALETTE.bogDark, PALETTE.algae], {
+      count: 30,
+      props: [
+        {
+          art: 'grasp',
+          path: 'rise',
+          to: 'feet',
+          ms: 380,
+          scale: 1,
+          hold: 460,
+          grow: true,
+          shake: 160,
+          burst: {
+            colors: [PALETTE.bogLight, PALETTE.bog, PALETTE.algae],
+            count: 16,
+            speed: 0.2,
+            up: true,
+          },
+        },
+        {
+          art: 'life',
+          path: 'return',
+          to: 'chest',
+          to2: 'chest',
+          ms: 420,
+          delay: 440,
+          scale: 0.8,
+          trail: [PALETTE.redLight],
+        },
+      ],
+    }),
   },
   /** The wisp leads a hand somewhere else — and comes back with the wrong gun. */
   willOWisp: {
@@ -293,7 +555,38 @@ export const ABILITIES = {
     tip: 'Trades cylinders with them, whatever is in each',
     icon: 'willOWisp',
     banner: 'SWAPPED!',
-    fx: fx('spiral', [PALETTE.algae, PALETTE.bogLight, PALETTE.white], { count: 30 }),
+    /**
+     * TWO wisps, crossing in the middle of the road: one off each fighter,
+     * arriving at the other. It is the only ability where something goes both
+     * ways, because it is the only one that trades rather than takes.
+     */
+    fx: fx('spiral', [PALETTE.algae, PALETTE.bogLight, PALETTE.white], {
+      count: 26,
+      props: [
+        {
+          art: 'wisp',
+          path: 'fly',
+          from: 'chest',
+          to: 'chest',
+          ms: 460,
+          spin: 120,
+          scale: 1.1,
+          trail: [PALETTE.algae],
+          burst: { colors: [PALETTE.white, PALETTE.algae], count: 14, speed: 0.2 },
+        },
+        {
+          art: 'wisp',
+          path: 'return',
+          to: 'chest',
+          to2: 'chest',
+          ms: 460,
+          spin: 120,
+          scale: 1.1,
+          trail: [PALETTE.bogLight],
+          burst: { colors: [PALETTE.white, PALETTE.bogLight], count: 14, speed: 0.2 },
+        },
+      ],
+    }),
   },
   /** Marked by the fever: everything that lands on them lands harder. */
   swampFever: {
@@ -306,7 +599,23 @@ export const ABILITIES = {
     icon: 'swampRot',
     banner: 'FEVERED!',
     hold: { color: PALETTE.algae, alpha: 0.35 },
-    fx: fx('swarm', [PALETTE.algae, PALETTE.bog, PALETTE.lichen], { count: 32 }),
+    /** The fever is a brand: it is put on them, and it stays where it is put. */
+    fx: fx('swarm', [PALETTE.algae, PALETTE.bog, PALETTE.lichen], {
+      count: 32,
+      props: [
+        {
+          art: 'brand',
+          path: 'fly',
+          to: 'chest',
+          ms: 300,
+          scale: 0.75,
+          hold: 760,
+          grow: true,
+          alpha: 0.9,
+          burst: { colors: [PALETTE.algae, PALETTE.lichen], count: 12, speed: 0.16 },
+        },
+      ],
+    }),
   },
 
   // --- 5 · Brimstone Basin --------------------------------------------------
@@ -330,7 +639,36 @@ export const ABILITIES = {
     tip: 'Three lives at once — but a raised shield stops it dead',
     icon: 'dynamite',
     banner: 'DYNAMITE!',
-    fx: fx('burst', [PALETTE.goldLight, PALETTE.red, PALETTE.grey], { count: 46, shake: 420 }),
+    /**
+     * THE ONE THAT IS THROWN AND THEN WAITS.
+     *
+     * No particles at all on the cast — the stick IS the cast. It comes out of
+     * the hand, turns over in the air, lands at their boots and burns there,
+     * and the explosion does not happen until the engine has resolved the blast
+     * against what they actually did with the round (`fuse`, and
+     * `detonateCharge` in src/duel/duel-scene.js). That is the rule the ability
+     * has always had — the biggest hit in the game and the one you get a whole
+     * round to be ready for — and until now it was the one rule the animation
+     * did not say out loud.
+     */
+    fx: fx(null, [PALETTE.goldLight, PALETTE.red, PALETTE.grey], {
+      props: [
+        {
+          art: 'dynamite',
+          path: 'throw',
+          to: 'front',
+          ms: 520,
+          arc: 14,
+          spin: 90,
+          /** It lands flat: frame 1 is the stick on its side. */
+          rest: 1,
+          scale: 0.95,
+          fuse: true,
+          trail: [PALETTE.goldLight, PALETTE.white],
+          burst: { colors: [PALETTE.sandLight, PALETTE.sand], count: 10, speed: 0.14 },
+        },
+      ],
+    }),
   },
   /** The ground opens under their boots. No shield is over that. */
   magmaSpout: {
@@ -342,7 +680,30 @@ export const ABILITIES = {
     tip: 'Two lives from underneath. A shield is no use over it',
     icon: 'magmaSpout',
     banner: 'MAGMA SPOUT!',
-    fx: fx('rise', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], { count: 40, shake: 320 }),
+    /** The crust goes first, and what is under the basin comes up through it. */
+    fx: fx('rise', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], {
+      count: 36,
+      shake: 200,
+      props: [
+        { art: 'fissure', path: 'hold', to: 'feet', hold: 280, grow: true, scale: 0.9 },
+        {
+          art: 'spout',
+          path: 'hold',
+          to: 'feet',
+          delay: 240,
+          hold: 560,
+          grow: true,
+          scale: 0.9,
+          shake: 320,
+          burst: {
+            colors: [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep],
+            count: 24,
+            speed: 0.32,
+            up: true,
+          },
+        },
+      ],
+    }),
   },
   /** Their rounds come out glowing, and one of them is yours now. */
   cinderSnatch: {
@@ -355,7 +716,35 @@ export const ABILITIES = {
     tip: 'Takes two rounds out of their gun and loads one into yours',
     icon: 'cinderSnatch',
     banner: 'CINDER SNATCH!',
-    fx: fx('streak', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], { count: 30 }),
+    /** Two rounds out of their cylinder, and one of them arrives in yours. */
+    fx: fx('streak', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], {
+      count: 28,
+      props: [
+        {
+          art: 'gust',
+          path: 'fly',
+          to: 'gun',
+          ms: 280,
+          spin: 55,
+          scale: 1.2,
+          faceTravel: true,
+          trail: [PALETTE.magma, PALETTE.emberGlow],
+          burst: { colors: [PALETTE.emberGlow, PALETTE.magma], count: 14, speed: 0.22 },
+        },
+        {
+          art: 'round',
+          path: 'return',
+          to: 'gun',
+          to2: 'gun',
+          ms: 460,
+          delay: 300,
+          count: 2,
+          stagger: 130,
+          scale: 1.1,
+          trail: [PALETTE.emberGlow],
+        },
+      ],
+    }),
   },
   /** Something tells you where to put the next two, and it is right. */
   hellWhisper: {
@@ -374,7 +763,26 @@ export const ABILITIES = {
     icon: 'hellWhisper',
     banner: 'WHISPERED TO!',
     hold: { color: PALETTE.magma, alpha: 0.3, self: true },
-    fx: fx('spiral', [PALETTE.magma, PALETTE.charDark, PALETTE.sulfurLight], { count: 28 }),
+    /**
+     * `self`, because nothing crosses the road: the thing doing the whispering
+     * turns up at the caster's own shoulder and leans in.
+     */
+    fx: fx('spiral', [PALETTE.magma, PALETTE.charDark, PALETTE.sulfurLight], {
+      count: 28,
+      self: true,
+      props: [
+        {
+          art: 'shade',
+          path: 'hold',
+          to: 'head',
+          hold: 900,
+          grow: true,
+          scale: 0.8,
+          float: 0.004,
+          alpha: 0.95,
+        },
+      ],
+    }),
   },
 
   // --- 6 · Galaxy -----------------------------------------------------------
@@ -388,7 +796,35 @@ export const ABILITIES = {
     tip: 'Empties their gun and two of the rounds end up in yours',
     icon: 'gravityPull',
     banner: 'PULLED!',
-    fx: fx('streak', [PALETTE.astralLight, PALETTE.astral, PALETTE.purple], { count: 34 }),
+    /** A hole opens on their chest, the cylinder empties into it, and two of
+     * the rounds come out the other side in your hand. */
+    fx: fx('swarm', [PALETTE.astralLight, PALETTE.astral, PALETTE.purple], {
+      count: 34,
+      props: [
+        {
+          art: 'well',
+          path: 'fly',
+          to: 'chest',
+          ms: 300,
+          spin: 90,
+          scale: 0.9,
+          hold: 700,
+          burst: { colors: [PALETTE.astralLight, PALETTE.purple], count: 18, speed: 0.24 },
+        },
+        {
+          art: 'round',
+          path: 'return',
+          to: 'chest',
+          to2: 'gun',
+          ms: 460,
+          delay: 430,
+          count: 2,
+          stagger: 150,
+          scale: 1.1,
+          trail: [PALETTE.astralLight],
+        },
+      ],
+    }),
   },
   /** The next thing fired at you arrives at the man who fired it. */
   voidMirror: {
@@ -401,7 +837,25 @@ export const ABILITIES = {
     icon: 'starRot',
     banner: 'MIRRORED!',
     hold: { color: PALETTE.astralLight, alpha: 0.35, self: true },
-    fx: fx('burst', [PALETTE.astralLight, PALETTE.astral, PALETTE.white], { count: 30 }),
+    /**
+     * Also `self`: the mirror assembles out of loose shards in front of the
+     * caster and locks, which is the whole promise of the ability drawn once.
+     */
+    fx: fx('burst', [PALETTE.astralLight, PALETTE.astral, PALETTE.white], {
+      count: 26,
+      self: true,
+      props: [
+        {
+          art: 'mirror',
+          path: 'hold',
+          to: 'gun',
+          hold: 900,
+          grow: true,
+          scale: 0.9,
+          alpha: 0.92,
+        },
+      ],
+    }),
   },
   /** A rock out of nothing at all. Three lives, and no shield is over it. */
   meteorStrike: {
@@ -413,7 +867,28 @@ export const ABILITIES = {
     tip: 'Three lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
     banner: 'METEOR!',
-    fx: fx('fall', [PALETTE.astralLight, PALETTE.purple, PALETTE.white], { count: 44, shake: 420 }),
+    /** One rock, out of the top of the frame, straight through them. */
+    fx: fx('fall', [PALETTE.astralLight, PALETTE.purple, PALETTE.white], {
+      count: 40,
+      props: [
+        {
+          art: 'meteor',
+          path: 'drop',
+          to: 'chest',
+          ms: 440,
+          spin: 70,
+          scale: 1.1,
+          shake: 420,
+          sfx: 'thunder',
+          trail: [PALETTE.astralLight, PALETTE.purple, PALETTE.white],
+          burst: {
+            colors: [PALETTE.white, PALETTE.astralLight, PALETTE.purple],
+            count: 34,
+            speed: 0.42,
+          },
+        },
+      ],
+    }),
   },
   /** The space between a thought and a hand comes apart for two rounds. */
   mindRift: {
@@ -426,7 +901,22 @@ export const ABILITIES = {
     icon: 'mindRift',
     banner: 'RIFTED!',
     hold: { color: PALETTE.purple, alpha: 0.5 },
-    fx: fx('spiral', [PALETTE.purple, PALETTE.astralLight, PALETTE.cosmic], { count: 36, shake: 300 }),
+    /** The tear opens over their head, and everything winds into it. */
+    fx: fx('spiral', [PALETTE.purple, PALETTE.astralLight, PALETTE.cosmic], {
+      count: 36,
+      shake: 300,
+      props: [
+        {
+          art: 'tear',
+          path: 'hold',
+          to: 'head',
+          hold: 980,
+          grow: true,
+          scale: 0.9,
+          burst: { colors: [PALETTE.purple, PALETTE.astralLight], count: 18, speed: 0.2 },
+        },
+      ],
+    }),
   },
 };
 
@@ -558,7 +1048,13 @@ export const SPECIALS = {
     icon: 'volcano',
     tip: 'Raises a volcano behind the road. It erupts every 20 seconds for the rest of the duel',
     banner: 'VOLCANO!',
-    warnBanner: 'THE SKY IS RED',
+    /**
+     * The others name the thing that is about to move — the nest, the snow,
+     * the water. This one used to name the weather instead, and "THE SKY IS
+     * RED" was both the odd one out and a line about a colour the player can
+     * already see: the whole frame goes red two seconds before it says so.
+     */
+    warnBanner: 'THE MOUNTAIN IS WAKING',
     art: 'volcano',
     motif: 'rock',
     debris: [PALETTE.char, PALETTE.magma, PALETTE.emberGlow],

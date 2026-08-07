@@ -75,11 +75,12 @@
  * red in there.
  *
  * The second is the ABILITY CAST: the animation a themed trick plays over the
- * fighter it lands on. Six motions (`castAbilityFx`) cover all eighteen of
- * them — grit whipping across the road, hornets closing in, snow coming down,
- * gas coming up, a burst, a spiral into somebody's head — and the ability data
- * picks a motion and three colours. A prairie sting and an ember bite cost the
- * same life three rounds later, and nothing about watching them is the same.
+ * fighter it lands on. That used to be six motions and three colours, and it
+ * lives in src/duel/duel-cast.js now because it grew a second half — the
+ * OBJECTS. A stick of dynamite is thrown, tumbles, lands at somebody's boots
+ * and burns there until the round resolves; a rope crosses the road with the
+ * hand still on the end of it; a rock comes down out of nothing. The scene owns
+ * the geometry and hands it over; the cast module owns the performance.
  */
 
 import { drawSprite, frameAt, tinted } from '../art/pixel.js';
@@ -94,6 +95,7 @@ import {
 import { getCombatFx, FX_TIMING, FLASH_ANCHOR, SMOKE_ANCHOR, IMPACT_ANCHOR } from '../art/sprites-fx.js';
 import { getHazardArt, HAZARD_W, HAZARD_H } from '../art/sprites-hazards.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
+import { createCastFx } from './duel-cast.js';
 import { createParallax } from '../explore/parallax.js';
 import * as weather from '../explore/weather.js';
 import { PALETTE } from '../art/palette.js';
@@ -196,8 +198,20 @@ export function createDuelScene({
   /** What they currently have in the air, and what they left on the road. */
   const debris = [];
   const scars = [];
-  /** Themed ability particles — see `castAbilityFx`. */
-  const spell = [];
+
+  /**
+   * Everything a themed ability throws: the objects and the particles both.
+   * It reads the scene rather than owning any of it — see src/duel/duel-cast.js
+   * for why a cast is a performance with props in it rather than a colour.
+   */
+  const casts = createCastFx({
+    layoutOf: (side) => (layout ? layout[side] : null),
+    groundY: () => groundLine,
+    unit: () => (lastView ? lastView.scale : 3),
+    shake: (ms) => {
+      fx.shake = Math.max(fx.shake, ms);
+    },
+  });
 
   /**
    * A COLOUR A FIGHTER IS WEARING, FOR AS LONG AS IT LASTS
@@ -503,13 +517,30 @@ export function createDuelScene({
 
     /**
      * Play a themed ability over a fighter.
-     * @param {object} cast `{ motion, colors, count, shake }` from the ability
+     *
+     * The whole performance: whatever the ability throws (a stick, a rope, a
+     * rock out of the sky), the particles that go with it, and the shake.
+     *
+     * @param {object} cast the ability's `fx` block, from world-abilities.js
      * @param {'player'|'enemy'} side who it is landing on
      */
     castAbilityFx(cast, side = 'player') {
       if (!cast || !layout) return;
-      spawnSpell(cast, side);
-      if (cast.shake) fx.shake = Math.max(fx.shake, cast.shake);
+      casts.play(cast, side);
+    },
+
+    /**
+     * Tell a burning fuse how the round went.
+     *
+     * Only the dynamite uses this, and it is the reason a cast can outlive the
+     * round that threw it: the stick lands when it is cast and goes off when
+     * the engine has resolved it against what the victim actually did.
+     *
+     * @param {'player'|'enemy'} side the fighter it is lying at
+     * @param {{stopped?: boolean}} outcome
+     */
+    detonateCharge(side, outcome) {
+      return casts.detonate(side, outcome || {});
     },
 
     /**
@@ -604,7 +635,7 @@ export function createDuelScene({
 
       stepAura(dt);
       stepHazard(dt);
-      stepSpell(dt);
+      casts.update(dt);
 
       step(flashes, dt, FX_TIMING.flash.reduce((a, b) => a + b, 0));
       step(impacts, dt, FX_TIMING.impact.reduce((a, b) => a + b, 0));
@@ -755,7 +786,10 @@ export function createDuelScene({
       // The fire in the crater and everything the mountain has in the air:
       // emitting, so it goes on after the light, with the muzzle flashes.
       drawHazardGlow(ctx, view);
-      drawSpell(ctx);
+      // Everything an ability threw, and the dust it kicked up. It is emitting
+      // and it is the thing the player is meant to be watching, so it goes on
+      // after the hour of the day with the muzzle flashes.
+      casts.draw(ctx);
       drawSmoke(ctx);
       drawShells(ctx);
       drawBullets(ctx);
@@ -1412,144 +1446,6 @@ export function createDuelScene({
       ctx.globalAlpha = 1;
     }
   }
-  // --- themed ability casts ---------------------------------------------------
-
-  /**
-   * Six motions, eighteen abilities.
-   *
-   * Each one is spawned around the fighter it is landing on, in that fighter's
-   * own geometry, so the same cast reads correctly on a man and on something
-   * two and a half times his size. The colours come from the ability.
-   */
-  function spawnSpell(cast, side) {
-    const L = layout[side];
-    const other = layout[side === 'player' ? 'enemy' : 'player'];
-    const cx = L.originX + FIGHTER_W * L.fs * 0.5;
-    const cy = L.topY + 12 * L.fs;
-    const head = L.topY + 4 * L.fs;
-    const s = lastView ? lastView.scale : 3;
-    const count = cast.count || 26;
-    const colors = cast.colors || [PALETTE.white];
-
-    for (let i = 0; i < count; i++) {
-      const color = colors[i % colors.length];
-      const size = Math.max(1, Math.round(s * (Math.random() < 0.25 ? 1.6 : 0.9)));
-      const base = { color, size, t: -i * 12, life: 620 + Math.random() * 320, motion: cast.motion };
-      const angle = (i / count) * Math.PI * 2;
-
-      switch (cast.motion) {
-        case 'streak': {
-          // Off the caster, across the road, into the target.
-          const fromX = other.originX + FIGHTER_W * other.fs * 0.5;
-          const fromY = other.topY + (8 + Math.random() * 8) * other.fs;
-          spell.push({
-            ...base,
-            x: fromX,
-            y: fromY,
-            vx: (cx - fromX) / 420,
-            vy: (cy - fromY) / 420 + (Math.random() - 0.5) * 0.05,
-            life: 520,
-          });
-          break;
-        }
-        case 'swarm': {
-          const r = L.fs * (8 + Math.random() * 10);
-          spell.push({
-            ...base,
-            x: cx + Math.cos(angle) * r,
-            y: cy + Math.sin(angle) * r * 0.8,
-            tx: cx,
-            ty: cy,
-            wobble: 90 + Math.random() * 160,
-            amp: s * 2,
-            life: 900 + Math.random() * 300,
-          });
-          break;
-        }
-        case 'fall':
-          spell.push({
-            ...base,
-            x: cx + (Math.random() - 0.5) * FIGHTER_W * L.fs * 1.6,
-            y: L.topY - L.fs * (6 + Math.random() * 24),
-            vx: (Math.random() - 0.5) * 0.02,
-            vy: 0.35 + Math.random() * 0.3,
-            g: 0.0006,
-            life: 700,
-          });
-          break;
-        case 'rise':
-          spell.push({
-            ...base,
-            x: cx + (Math.random() - 0.5) * FIGHTER_W * L.fs * 1.3,
-            y: groundLine - Math.random() * L.fs,
-            vx: (Math.random() - 0.5) * 0.03,
-            vy: -(0.12 + Math.random() * 0.18),
-            g: 0.00004,
-            life: 780 + Math.random() * 300,
-          });
-          break;
-        case 'spiral':
-          spell.push({
-            ...base,
-            x: cx,
-            y: head,
-            tx: cx,
-            ty: head,
-            angle,
-            r: L.fs * (7 + Math.random() * 4),
-            spin: 0.006 + Math.random() * 0.004,
-            life: 820,
-          });
-          break;
-        default:
-          // burst
-          spell.push({
-            ...base,
-            x: cx,
-            y: cy,
-            vx: Math.cos(angle) * (0.1 + Math.random() * 0.28),
-            vy: Math.sin(angle) * (0.1 + Math.random() * 0.28) - 0.05,
-            g: 0.0003,
-            life: 560,
-          });
-      }
-    }
-  }
-
-  function stepSpell(dt) {
-    for (let i = spell.length - 1; i >= 0; i--) {
-      const p = spell[i];
-      p.t += dt;
-      if (p.t < 0) continue;
-      if (p.motion === 'swarm') {
-        // Closing on the target, wandering on the way in.
-        p.x += (p.tx - p.x) * Math.min(1, dt / 320) + Math.sin(p.t / p.wobble) * 0.06 * p.amp;
-        p.y += (p.ty - p.y) * Math.min(1, dt / 320) + Math.cos(p.t / p.wobble) * 0.06 * p.amp;
-      } else if (p.motion === 'spiral') {
-        p.angle += p.spin * dt;
-        p.r = Math.max(0, p.r - dt * 0.012);
-        p.x = p.tx + Math.cos(p.angle) * p.r;
-        p.y = p.ty + Math.sin(p.angle) * p.r * 0.5;
-      } else {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        if (p.g) p.vy += p.g * dt;
-      }
-      if (p.t >= p.life) spell.splice(i, 1);
-    }
-  }
-
-  function drawSpell(ctx) {
-    for (const p of spell) {
-      if (p.t < 0) continue;
-      const k = 1 - p.t / p.life;
-      ctx.globalAlpha = Math.max(0, Math.min(1, k * 1.6));
-      ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
-    }
-    ctx.globalAlpha = 1;
-  }
-
   // --- the cut-scene's furniture ----------------------------------------------
 
   function drawCinematics(ctx, view) {

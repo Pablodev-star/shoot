@@ -570,10 +570,14 @@ export const DuelScreen = {
       if (spec.kind === 'special') {
         announcePlayerSpecial(spec);
       } else {
-        scene.castAbilityFx(spec.fx, 'enemy');
+        // A self-buff plays over the fighter that cast it, which for a player
+        // cast is the player. Everything else lands on the rival.
+        scene.castAbilityFx(spec.fx, spec.fx?.self ? 'player' : 'enemy');
         scene.fx.banner = spec.banner || spec.label.toUpperCase();
         scene.fx.bannerTimer = 900;
-        play(spec.effect === 'blast' || spec.effect === 'pierce' ? 'hit' : 'shield');
+        // Nothing has hit anybody yet when a blast is cast — the stick is still
+        // in the air. Its noise belongs to the detonation, a round later.
+        if (spec.effect !== 'blast') play(spec.effect === 'pierce' ? 'hit' : 'shield');
         flashEffect(enemyStatus, spec.id);
         enemyCard.classList.remove('is-hit');
         void enemyCard.offsetWidth;
@@ -689,19 +693,42 @@ export const DuelScreen = {
           scene.fx.banner = ability.banner;
           scene.fx.bannerTimer = 900;
         }
-        play(ability.effect === 'blast' || ability.effect === 'pierce' ? 'hit' : 'shield');
+        // …except a blast, which has not hit anything yet: the stick is in the
+        // air and its noise is the explosion, which happens a round later.
+        if (ability.effect !== 'blast') play(ability.effect === 'pierce' ? 'hit' : 'shield');
       }
-      // The dynamite, landing or not. It is the only ability whose outcome is
-      // not decided when it is cast, so it is the only one that reports back.
+      /**
+       * THE STICK GOING OFF.
+       *
+       * The dynamite is the only ability whose outcome is not decided when it
+       * is cast — a shield raised in the round it was thrown eats it — so it is
+       * the only one that reports back. What is on screen at this point is a
+       * stick lying at somebody's boots with the fuse burning (see `fuse` in
+       * src/game/world-abilities.js); this is where it is told how it went.
+       *
+       * The delay is the draw. The engine resolves the whole round before the
+       * screen animates any of it, so detonating on the spot would blow the
+       * stick up while both of them still had their guns in leather — it goes
+       * off on the beat the shot does. The scene owns the fireball, the shake
+       * and the noise; if there is no fuse burning (a duel loaded mid-blast,
+       * a cast that never got drawn) nothing happens and nothing breaks.
+       */
       if (event.type === 'blast') {
-        scene.fx.shake = event.stopped ? 200 : 520;
-        play(event.stopped ? 'shield' : 'hit');
-        toast(
-          event.stopped
-            ? (event.side === 'player' ? 'Your shield ate the blast' : 'They got a shield up in time')
-            : (event.side === 'player' ? 'The blast went straight through' : 'The blast lands'),
-          event.side === 'player' ? (event.stopped ? 'good' : 'bad') : (event.stopped ? 'bad' : 'good'),
-        );
+        const stopped = !!event.stopped;
+        const side = event.side;
+        setTimeout(() => {
+          if (finished) return;
+          if (!scene.detonateCharge(side, { stopped })) {
+            scene.fx.shake = stopped ? 200 : 520;
+            play(stopped ? 'shield' : 'hit');
+          }
+          toast(
+            stopped
+              ? (side === 'player' ? 'Your shield ate the blast' : 'They got a shield up in time')
+              : (side === 'player' ? 'The blast went straight through' : 'The blast lands'),
+            side === 'player' ? (stopped ? 'good' : 'bad') : (stopped ? 'bad' : 'good'),
+          );
+        }, DRAW_MS);
       }
       if (event.type === 'reflect') toast('Mirrored — it went back at them', 'good');
       if (event.type === 'hazard-warn') handleHazardWarn(event);
