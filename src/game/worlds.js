@@ -71,12 +71,12 @@ export const WORLDS = [
       lives: { 1: 80, 2: 18, 3: 2 },
       abilityChance: 0.05,
       /**
-       * The Dust Flats are the game's own theme rather than a departure from
-       * it, so only the wind-borne steal is renamed here — Big Jed's dynamite
-       * is a stick of dynamite, and there is nothing more western to make it.
-       * See src/game/world-abilities.js.
+       * Two tricks and both of them are weather: a gust that takes a round off
+       * your belt and a handful of grit in your eyes. Big Jed's dynamite went
+       * to Brimstone Basin along with the rest of the dynamite in the game —
+       * see the note on it in src/game/world-abilities.js.
        */
-      abilities: ['dustSnatch'],
+      abilities: ['dustSnatch', 'sandBlind'],
       accuracy: 0.42,       // how often the AI reads your move correctly
       /** Who rides this stretch — see src/art/sprites-enemies.js. */
       roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
@@ -88,7 +88,7 @@ export const WORLDS = [
       name: 'Big Jed',
       archetype: 'bossJed',
       lives: 3,
-      abilities: ['dynamite'],
+      abilities: ['dustSnatch', 'sandBlind'],
       accuracy: 0.55,
       special: 'duststorm',
     },
@@ -107,7 +107,7 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 66, 2: 26, 3: 8 },
       abilityChance: 0.14,
-      abilities: ['lassoPull', 'hornetSting'],
+      abilities: ['lassoPull', 'hornetSwarm'],
       accuracy: 0.48,
       roster: ['sombrero', 'scarecrow', 'gambler', 'strawhat', 'bandana'],
       special: 'hornetTree',
@@ -117,7 +117,7 @@ export const WORLDS = [
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
       lives: 4,
-      abilities: ['hornetSting', 'lassoPull'],
+      abilities: ['hornetSwarm', 'lassoPull'],
       accuracy: 0.6,
       special: 'hornetTree',
     },
@@ -136,7 +136,7 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 50, 2: 32, 3: 14, 4: 4 },
       abilityChance: 0.24,
-      abilities: ['coldGrip', 'frostbite', 'iceFall'],
+      abilities: ['coldGrip', 'whiteout', 'deepFreeze'],
       accuracy: 0.54,
       roster: ['goggles', 'furhood', 'bonemarshal', 'drifter'],
       special: 'cornice',
@@ -146,7 +146,7 @@ export const WORLDS = [
       name: 'Whiteout Kate',
       archetype: 'bossWhiteout',
       lives: 4,
-      abilities: ['iceFall', 'frostbite'],
+      abilities: ['deepFreeze', 'whiteout'],
       accuracy: 0.64,
       special: 'cornice',
     },
@@ -166,7 +166,7 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 36, 2: 34, 3: 22, 4: 8 },
       abilityChance: 0.34,
-      abilities: ['mireGrasp', 'swampRot', 'gasBurst', 'willOWisp'],
+      abilities: ['poison', 'mireGrasp', 'willOWisp', 'swampFever'],
       accuracy: 0.6,
       roster: ['preacher', 'wraith', 'skeleton', 'gambler'],
       special: 'blackdamp',
@@ -176,7 +176,7 @@ export const WORLDS = [
       name: 'Colonel Sable',
       archetype: 'bossSable',
       lives: 5,
-      abilities: ['willOWisp', 'gasBurst'],
+      abilities: ['willOWisp', 'swampFever', 'poison'],
       accuracy: 0.68,
       special: 'blackdamp',
     },
@@ -200,7 +200,7 @@ export const WORLDS = [
     enemy: {
       lives: { 1: 24, 2: 32, 3: 28, 4: 12, 5: 4 },
       abilityChance: 0.45,
-      abilities: ['cinderSnatch', 'emberBite', 'magmaSpout', 'hellWhisper'],
+      abilities: ['dynamite', 'magmaSpout', 'cinderSnatch', 'hellWhisper'],
       accuracy: 0.66,
       roster: ['emberrider', 'ashwidow', 'ironkiln', 'horned', 'bonemarshal'],
       /** The volcano. See src/game/world-abilities.js. */
@@ -211,7 +211,7 @@ export const WORLDS = [
       name: 'Old Scratch',
       archetype: 'bossScratch',
       lives: 6,
-      abilities: ['hellWhisper', 'emberBite', 'magmaSpout'],
+      abilities: ['magmaSpout', 'hellWhisper', 'dynamite'],
       accuracy: 0.72,
       special: 'volcano',
     },
@@ -238,7 +238,7 @@ export const WORLDS = [
     enemy: {
       lives: { 2: 30, 3: 34, 4: 24, 5: 12 },
       abilityChance: 0.6,
-      abilities: ['gravityPull', 'starRot', 'meteorStrike', 'mindRift'],
+      abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
       accuracy: 0.72,
       roster: ['starhelm', 'voidsheriff', 'nameless', 'ironkiln'],
       special: 'rift',
@@ -248,7 +248,7 @@ export const WORLDS = [
     boss: {
       name: 'THE STRANGER',
       lives: 5,
-      abilities: ['mindRift', 'meteorStrike', 'starRot'],
+      abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
       accuracy: 0.78,
       archetype: 'bossStranger',
       /** He opens the rift himself. The phase change does not close it. */
@@ -290,7 +290,7 @@ export const WORLDS = [
           archetype: 'bossStranger',
           lives: 5,
           accuracy: 0.78,
-          abilities: ['starRot', 'meteorStrike'],
+          abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
         },
         {
@@ -299,7 +299,7 @@ export const WORLDS = [
           archetype: 'bossStrangerUnmasked',
           lives: 7,
           accuracy: 0.88,
-          abilities: ['mindRift', 'meteorStrike', 'starRot', 'gravityPull'],
+          abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',
           /** Phase two starts with a bullet already chambered and fires faster. */
           startBullets: 2,

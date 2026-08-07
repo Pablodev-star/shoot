@@ -82,7 +82,7 @@
  * same life three rounds later, and nothing about watching them is the same.
  */
 
-import { drawSprite, frameAt } from '../art/pixel.js';
+import { drawSprite, frameAt, tinted } from '../art/pixel.js';
 import { getView } from '../core/scene.js';
 import {
   getCharacterSprites,
@@ -198,6 +198,38 @@ export function createDuelScene({
   const scars = [];
   /** Themed ability particles — see `castAbilityFx`. */
   const spell = [];
+
+  /**
+   * A COLOUR A FIGHTER IS WEARING, FOR AS LONG AS IT LASTS
+   * ---------------------------------------------------------------------------
+   * The half of an ability that is not a burst of particles. A freeze that is
+   * only an animation is a freeze the player has forgotten about by the time it
+   * costs them a turn, so the ice STAYS on the sprite until it thaws — and so
+   * does the green on somebody carrying poison and the fever-red on somebody
+   * marked. It is the only thing on the road that says "this is still true".
+   *
+   * `{ color, alpha }` per side, or null. Set by the screen from whatever the
+   * engine says is on that fighter; see `hold` in src/game/world-abilities.js.
+   */
+  const statusTint = { player: null, enemy: null };
+
+  /**
+   * Tinted copies, cached. `tinted()` allocates a canvas, and a fighter is
+   * redrawn sixty times a second — the cache is keyed by the frame and the
+   * colour, so a whole duel spent frozen costs four canvases.
+   */
+  const tintCache = new Map();
+  let tintSeq = 0;
+  function tintedFrame(sprite, color) {
+    if (!sprite.__tintId) sprite.__tintId = ++tintSeq;
+    const key = `${sprite.__tintId}|${color}`;
+    let out = tintCache.get(key);
+    if (!out) {
+      out = tinted(sprite, color, 1);
+      tintCache.set(key, out);
+    }
+    return out;
+  }
 
   let elapsed = 0;
   const cameraX = 1200; // a fixed, pleasant stretch of road
@@ -389,6 +421,16 @@ export function createDuelScene({
     setHudBox(box) {
       hudBottom = Number.isFinite(box?.bottom) ? box.bottom : null;
       hudLeft = Number.isFinite(box?.left) ? box.left : null;
+    },
+
+    /**
+     * What colour a fighter is wearing right now, and for how long they keep
+     * wearing it. Pass null to take it off.
+     * @param {'player'|'enemy'} side
+     * @param {{color: string, alpha: number}|null} tint
+     */
+    setStatusTint(side, tint) {
+      statusTint[side] = tint || null;
     },
 
     /** How much fire the enemy is carrying. See `stepAura`. */
@@ -1674,7 +1716,19 @@ export function createDuelScene({
     const set = sprites[side];
     const frames = poseFrames(set, actor.pose);
     const frame = frames[poseFrame(actor, frames.length)];
-    drawSprite(ctx, frame, originX, topY + (FIGHTER_H - frame.height) * fs, fs, flip);
+    const y = topY + (FIGHTER_H - frame.height) * fs;
+    drawSprite(ctx, frame, originX, y, fs, flip);
+
+    // Whatever they are wearing, laid over their own silhouette so it takes
+    // the shape of the man rather than boxing him in. It breathes, because a
+    // flat wash reads as a rendering mistake and a slow pulse reads as an
+    // effect that is still running.
+    const tint = statusTint[side];
+    if (tint) {
+      ctx.globalAlpha = tint.alpha * (0.75 + Math.sin(elapsed / 260) * 0.25);
+      drawSprite(ctx, tintedFrame(frame, tint.color), originX, y, fs, flip);
+      ctx.globalAlpha = 1;
+    }
 
     const track = gunAt(actor);
     if (!track) return;

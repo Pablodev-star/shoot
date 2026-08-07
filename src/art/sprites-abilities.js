@@ -100,6 +100,26 @@ export const ABILITY_ICONS = {
     '................',
   ],
 
+  /** Sand in the Eyes — an eye with a handful of the flats going into it. */
+  sandBlind: [
+    '................',
+    '..z.............',
+    '...zz...........',
+    '.z..Ez..........',
+    '...zzE.z........',
+    '..zEz.zz........',
+    '....kkkkkkkk....',
+    '..kkzzEEEzzkkk..',
+    '.kzEEkkkkkEEzk..',
+    '.kzEkbBBBbkEzk..',
+    '.kzEkbkkkbkEzk..',
+    '.kzEEkkkkkEEzk..',
+    '..kkzzEEEzzkkk..',
+    '....kkkkkkkk....',
+    '................',
+    '................',
+  ],
+
   // --- 2 · Wildgrass Prairie ------------------------------------------------
   /** Lasso Pull — a rope loop closing on a round, with the line running off. */
   lassoPull: [

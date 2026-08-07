@@ -41,9 +41,9 @@ does anyone fire: a muzzle flash off the barrel, a tracer crossing the road,
 the case out of the cylinder, and powder smoke left hanging. A life is lost
 when the round arrives, not when the gun appears.
 
-Poison, dynamite, bullet steal and mind control are shown as pixel icons on the
-fighter they belong to, never as printed names — an ability lights its own icon
-when it goes off, and a timed one carries its countdown.
+Everything an ability does is shown as a pixel icon on the fighter it is
+working on, never as printed names, and every one of them carries the number of
+rounds it has left to run.
 
 **The opponent does not look at your gun.** It has a habit model — what you have
 actually done this duel — and it plays the counter to a *sample* from it a
@@ -52,19 +52,61 @@ cylinder. It used to read your cylinder as well, which is where "every time I
 reload, they fire" came from, and it used to take the argmax of that model,
 which is how an even fifty-fifty habit came back as a certainty. Both are gone,
 the shield is capped and can never come out twice in a row, and the share of
-your shots that get eaten by one has halved. It is an easier fight than it was.
-What it stopped being is a rigged one.
+your shots that get eaten by one has halved.
+
+### Abilities
+
+There are **fourteen mechanics**, and each one does something the others cannot.
+Ten of them never touch the life bar at all:
+
+| | |
+| --- | --- |
+| **steal / empty / swap** | rounds out of their cylinder, all of them, or a straight trade |
+| **blast** | damage now — **and a raised shield stops it dead** |
+| **pierce** | damage now, straight through a shield |
+| **venom** | one life *every* round, for three |
+| **drain** | a life off them and onto you |
+| **freeze** | they do nothing at all for two rounds. The turns are yours |
+| **jam** | they cannot shoot |
+| **panic** | their shield stops nothing |
+| **blind** | their next shots go wide |
+| **mark** | every shot that lands on them costs one extra |
+| **doubleTap** | your next shots cost them one extra |
+| **reflect** | the next shot that would hit you goes back at them |
+
+Nineteen abilities across the six worlds are built from those, two to four per
+world, and the numbers rise as the road does: Dust Snatch takes one round out of
+a gun, Gravity Pull takes the whole cylinder and keeps two.
+
+**Poison and Dynamite are world abilities now, not shop staples.** They used to
+be throwables any shop in the game would sell. Poison belongs to the Blackwater
+Bayou and dynamite to Brimstone Basin — sold in that world's shop and nowhere
+else, carried by that world's riders and nobody else's — and both were rewritten
+to be worth the trip:
+
+- **Poison** — one life a round for three rounds. Nothing stops it.
+- **Dynamite** — three lives at a stroke, the biggest single hit in the game,
+  and the only ability of the fourteen a **shield** will stop. It is the hardest
+  thing to be hit by and the easiest to be ready for.
+
+Both cost more charge than anything else, and the enemies holding them reach for
+them about a third as often as their other tricks — a signature, not a tax.
+
+**Using one costs a turn.** This is the rule that makes the rest survivable:
+
+- an **enemy** that casts is doing that *instead of* drawing — no shot, no
+  shield, no round loaded, and open all round;
+- a **player** who casts knocks the enemy's hand to its belt: it reloads that
+  round, whatever it had picked;
+- the **player** is never restricted — cast and still shoot, shield, reload, or
+  cast the other slot.
+
+An ability is not extra damage bolted onto a turn. It is a turn taken away from
+somebody, which is why the strong ones want five or six rounds of charge.
 
 ### What each world can do
 
-The four effects above are the whole rule set, and always were. What changed is
-that a world now says them in its own voice: the bayou does not have poison, it
-has **swamp rot**, and swamp rot comes up out of the ground green. Eighteen
-themed abilities across the six worlds, each with its own icon and its own
-animation over the fighter it lands on — grit whipping across the road, hornets
-closing in, a slab of ice coming down, an ember under your collar.
-
-And each world has **one special**, which is not an ability at all. An enemy
+Each world also has **one special**, which is not an ability at all. An enemy
 carrying one can spend it once, usually early, and it does not resolve — it
 raises something behind the road that is there for the rest of the fight:
 
@@ -87,39 +129,36 @@ blocks things aimed at you, and a mountain is not aiming.
 
 ### What you can do back
 
-Everything above is for sale. A world's shop is the only place to buy that
-world's kit, and what you buy is equipment, not ammunition: you keep it for the
-rest of the run and it works in every duel.
+Everything above is for sale, in the world it belongs to and nowhere else, and
+what you buy is equipment rather than ammunition: you keep it for the rest of
+the run and it works in every duel.
 
 Two slots — one **basic**, one **special** — swapped in the saddlebag between
 fights, never during one. Both **charge**: one point a round, and a plate above
-the move buttons lights when it is full. Spending one is a free action, like
-throwing a stick of dynamite: it does not cost you your turn. `Q` and `E`.
+the move buttons lights when it is full. `Q` and `E`.
 
-- **A basic** charges in three to five rounds, so it lands once or twice a
-  fight. Take rounds out of their gun (and load one into yours), poison them
-  through any shield, put a life on them on the spot, or make their hand go to
-  the wrong thing entirely — they reload this round, wide open.
-- **A special** charges in five or six and fires once. It calls that world's
-  landmark down on your rival for a single eruption: two lives in the flats,
-  four by the basin.
+Anything still working on a fighter is drawn **on the fighter**: ice holds on a
+frozen man until he thaws, poison keeps him green, a mark keeps him red. The
+badge on the card carries the exact count; the colour on the road says it at a
+glance.
 
-**How it is balanced.** Three numbers hold it together, and they are all in
+**How it is balanced.** Four rules, all of them in
 `src/game/world-abilities.js`:
 
 1. A basic is priced as a rare and a special as a legendary, so the existing
    curve puts one at about a third of what a world pays out and the other at
    most of it. Nothing new was invented for pricing.
-2. Power is rationed by **time**, not by stock. A duel runs six or seven rounds;
-   that is the whole limit.
-3. Abilities improve in three steps (worlds 1-2, 3-4, 5-6), not six. Six would
-   mean re-buying every world at a third of your income each time, which is a
-   tax rather than an upgrade path.
+2. Power is rationed by **time**. A duel runs six or seven rounds; a three-round
+   charge is two uses, a six-round charge is one.
+3. **The cost is the size of what it takes away** — turns, not damage. Anything
+   that hands its caster free turns costs five. Poison and dynamite cost six.
+4. It is meant to decide **bosses**, not drifters. A full charge is worth about
+   a third of Big Jed and two thirds of Old Scratch by the time the basin's kit
+   is affordable.
 
-The number actually watched while tuning is what a full charge is worth against
-a **boss** — about a third of Big Jed, about two thirds of Old Scratch by the
-time you can afford the basin's kit. A one-life drifter dies to anything and
-always did; a boss is still a fight you can lose with a volcano in your pocket.
+Measured over six hundred simulated duels a world, one equipped ability is worth
+roughly thirteen to twenty points of win rate — a real purchase, and not a
+different game.
 
 ## Story mode
 
@@ -298,15 +337,13 @@ Balance lives in data, not in code:
   everything on it.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
-- `src/game/world-abilities.js` — every themed ability (name, icon, colour and
-  motion over one of the four base effects) and the six specials: how often
-  each one goes off, how many strikes it lands, and what a strike costs. A
-  special that hurts too much is two numbers here — `strikes` and `damage` —
-  and how many enemies carry one at all is `specialChance` in `worlds.js`.
-  The player's half is at the bottom of the same file: `PLAYER_BASIC` and
-  `PLAYER_SPECIAL` are charge costs and effect sizes per band, `ABILITY_PRICE`
-  is the two base prices, and the reasoning each was set against is written
-  above them.
+- `src/game/world-abilities.js` — the fourteen mechanics, the nineteen
+  abilities built from them (numbers, charge cost, and the `weight` that says
+  how often an enemy reaches for it) and the six specials. An ability that
+  hurts too much is one number on the ability; a special is `strikes` and
+  `damage`; how many enemies carry a special at all is `specialChance` in
+  `worlds.js`. Player and enemy fire the same numbers — the asymmetry is the
+  turn rule, not the tuning.
 - `src/game/progression.js` — every curve: exp and the level ladder (tuned
   together to hit ~1.4 levels per world), gold, prices, inn healing, hunger
   drain, walking speed, the horse discount.
@@ -383,14 +420,16 @@ and the hit stagger all come from the rig in `src/art/sprites-character.js`.
 
 ## Adding a world ability
 
-An ability is a **theme over one of four rules**. The rules are fixed —
-`bulletSteal`, `poison`, `dynamite`, `mindControl` — and the engine only ever
-switches on those, so a new one is data:
+An ability is a **mechanic with a coat of paint on it**, and the mechanics are
+the fourteen in `EFFECTS`. The engine switches on those and nothing else, so a
+new ability that reuses one is pure data:
 
-1. Add an entry to `ABILITIES` in `src/game/world-abilities.js`: its `base`,
-   the name it goes by, the sentence that explains it, and an `fx` — one of six
-   motions (`streak`, `swarm`, `fall`, `rise`, `burst`, `spiral`) and three
-   colours.
+1. Add an entry to `ABILITIES` in `src/game/world-abilities.js`: its `effect`
+   (one of the fourteen), its numbers (`amount` / `turns` / `take`), its
+   `charge`, the sentence that explains it, an `fx` — one of six motions
+   (`streak`, `swarm`, `fall`, `rise`, `burst`, `spiral`) and three colours —
+   and, if it leaves something running, a `hold` colour for the sprite to wear
+   while it does.
 2. Draw its 16 x 16 icon in `src/art/sprites-abilities.js`, using the shared
    key. New colours need a home in `palette.js` first.
 3. Put its id in a world's `enemy.abilities` in `src/game/worlds.js`.
