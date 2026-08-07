@@ -232,6 +232,11 @@
 
    One frame, not three. The goods sit directly on the board — the old version
    put bordered cards inside a bordered grid inside a bordered panel.
+
+   Both venues are BUILT rather than boxed: the shop is a stall (awning, sign
+   on ropes, posts, counter) and the inn hangs its sign off a wrought bracket
+   and lays each bed out in a room of its own. Neither adds a word to the
+   screen; both use the five materials in `base.css` and nothing else.
    ========================================================================== */
 
 .venue-screen { --screen-max: 860px; gap: var(--sp-3); }
@@ -243,15 +248,168 @@
   width: 100%;
 }
 
+/* Flex rather than grid, for one reason: a shop with a Trader's Ledger stocks
+   four items, and an auto-fit grid strands the fourth alone against the left
+   edge of an otherwise empty row. Wrapped rows centre themselves here. */
 .shop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--sp-3);
   width: 100%;
 }
 
+.shop-grid > .shop-card { flex: 1 1 176px; max-width: 268px; }
+
 @media (max-width: 520px) {
-  .shop-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-2); }
+  .shop-grid { gap: var(--sp-2); }
+  .shop-grid > .shop-card { flex-basis: 138px; }
+}
+
+/* --- The stall -------------------------------------------------------------
+
+   A canvas awning on two posts with a counter under it. The whole thing is one
+   column so the goods can never drift out of the frame that is holding them.
+   --------------------------------------------------------------------------- */
+
+.stall-screen { --screen-max: 900px; }
+
+.stall {
+  --stall-post: clamp(12px, 1.8vw, 20px);
+  --stall-stripe: clamp(20px, 3vw, 30px);
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.55));
+}
+
+/* The canvas: two stripes, and the light falling off the curve of it. */
+.stall-awning {
+  position: relative;
+  height: clamp(22px, 3.4vw, 34px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.34)),
+    repeating-linear-gradient(
+      90deg,
+      var(--red-dark) 0 var(--stall-stripe),
+      var(--bone-dark) var(--stall-stripe) calc(var(--stall-stripe) * 2)
+    );
+  border: var(--border) solid var(--edge-strong);
+  border-bottom: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* The valance, scalloped out of the same cloth by a repeating mask. */
+.stall-awning::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 100%;
+  height: clamp(11px, 1.5vw, 15px);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5)),
+    repeating-linear-gradient(
+      90deg,
+      var(--red-dark) 0 var(--stall-stripe),
+      var(--bone-dark) var(--stall-stripe) calc(var(--stall-stripe) * 2)
+    );
+  -webkit-mask-image: radial-gradient(circle at 50% 0, #000 68%, transparent 69%);
+  mask-image: radial-gradient(circle at 50% 0, #000 68%, transparent 69%);
+  -webkit-mask-size: var(--stall-stripe) 100%;
+  mask-size: var(--stall-stripe) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+}
+
+/* The sign, hanging off the awning on two ropes. */
+.stall-sign {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  margin-top: clamp(22px, 3vw, 30px);
+  padding: var(--sp-2) clamp(18px, 3vw, 34px);
+  background: var(--plank);
+  border: var(--border-thick) solid var(--edge-strong);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--sand-light);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75);
+  transform: rotate(-0.6deg);
+}
+
+.stall-sign::before,
+.stall-sign::after {
+  content: '';
+  position: absolute;
+  top: clamp(-30px, -3vw, -22px);
+  width: 4px;
+  height: clamp(22px, 3vw, 30px);
+  background: var(--rope);
+}
+.stall-sign::before { left: 16%; }
+.stall-sign::after { right: 16%; }
+
+/* The two brass eyes the ropes are tied through. */
+.stall-sign-text { position: relative; display: inline-block; }
+.stall-sign-text::before,
+.stall-sign-text::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rivet);
+}
+.stall-sign-text::before { left: calc(-1 * clamp(12px, 2vw, 22px)); }
+.stall-sign-text::after { right: calc(-1 * clamp(12px, 2vw, 22px)); }
+
+/* Where the goods are actually laid out, between the posts. */
+.stall-shelf {
+  position: relative;
+  margin-top: calc(-1 * clamp(14px, 2vw, 20px));
+  padding: clamp(26px, 3.4vw, 38px) calc(var(--stall-post) + var(--sp-3)) var(--sp-4);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0.45)),
+    var(--plank);
+  border-left: var(--border) solid var(--edge-strong);
+  border-right: var(--border) solid var(--edge-strong);
+}
+
+/* The posts holding the awning up. */
+.stall-shelf::before,
+.stall-shelf::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--stall-post);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px),
+    linear-gradient(90deg, var(--wood-light), var(--wood) 40%, var(--wood-deep));
+  border-inline: 2px solid var(--edge-strong);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.stall-shelf::before { left: 0; }
+.stall-shelf::after { right: 0; }
+
+/* The counter: a thick plank with its end grain showing and a shadow under. */
+.stall-counter {
+  height: clamp(16px, 2.4vw, 24px);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 78px, rgba(0, 0, 0, 0.5) 78px 80px),
+    linear-gradient(180deg, var(--wood-light) 0 3px, var(--wood) 3px 45%, var(--wood-dark) 100%);
+  border: var(--border) solid var(--edge-strong);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: inset 0 2px 0 rgba(242, 227, 198, 0.22), 0 6px 0 rgba(0, 0, 0, 0.42);
 }
 
 .shop-card {
@@ -290,6 +448,19 @@
 .shop-card.is-sold { filter: grayscale(0.85) brightness(0.55); }
 .shop-card.is-sold:hover { transform: none; }
 .shop-card.is-poor .shop-price { color: var(--red-light); }
+
+/* On the stall, the goods are standing on a counter — so they cast onto it.
+   Without this the cards float a centimetre above the plank they are on. */
+.stall-shelf .shop-card::after {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -14px;
+  height: 12px;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0, rgba(0, 0, 0, 0.55), transparent 72%);
+}
 
 .shop-icon { flex: 0 0 auto; }
 
@@ -340,9 +511,12 @@
 .shop-card .card-foot .btn,
 .bed-card .card-foot .btn { width: 100%; justify-self: stretch; }
 
-/* The discount tag hangs off the card on a string. */
+/* The discount tag hangs off the card on a string. It is nailed to the corner
+   of the card, over everything on it — including the inn's bed scene, which is
+   full-bleed and would otherwise paint straight over the top of it. */
 .discount-flag {
   position: absolute;
+  z-index: 3;
   top: -10px;
   right: -8px;
   padding: 3px 9px;
@@ -374,12 +548,90 @@
   80% { transform: translateX(3px); }
 }
 
-/* --- Inn beds ------------------------------------------------------------- */
+/* --- The inn --------------------------------------------------------------
+
+   A sign on a wrought bracket, a plaque saying what state you are in, and two
+   rooms you can look into. Each bed is drawn (src/art/sprites-venue.js) and
+   stands on the floorboards of its own room, so the choice is made by looking
+   rather than by comparing two prices under two copies of one icon.
+   --------------------------------------------------------------------------- */
+
+/* The hanging sign, shared shape with the stall's but swinging off a bracket
+   bolted to the wall rather than tied under an awning. */
+.hanging-sign {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  margin: clamp(20px, 3vw, 28px) auto 0;
+  padding: var(--sp-2) clamp(22px, 4vw, 44px);
+  background: var(--plank);
+  border: var(--border-thick) solid var(--edge-strong);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--sand-light);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.75);
+  transform-origin: 50% -22px;
+  animation: sign-sway 7s var(--ease-in-out) infinite;
+}
+
+/* The bracket: a horizontal iron arm above the board, and two hangers. */
+.hanging-sign::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: calc(-1 * clamp(20px, 3vw, 28px));
+  height: 4px;
+  background: linear-gradient(180deg, var(--steel-dark), var(--iron-deep));
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.hanging-sign-text { position: relative; display: inline-block; }
+.hanging-sign-text::before,
+.hanging-sign-text::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * clamp(18px, 3vw, 26px));
+  width: 3px;
+  height: clamp(18px, 3vw, 26px);
+  background: linear-gradient(180deg, var(--steel-dark), var(--iron-mid));
+}
+.hanging-sign-text::before { left: calc(-1 * clamp(14px, 2.4vw, 26px)); }
+.hanging-sign-text::after { right: calc(-1 * clamp(14px, 2.4vw, 26px)); }
+
+@keyframes sign-sway {
+  0%, 100% { transform: rotate(-0.8deg); }
+  50% { transform: rotate(0.8deg); }
+}
+
+/* What state you turned up in, on one plaque instead of loose in the panel. */
+.inn-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  align-self: center;
+  padding: var(--sp-2) var(--sp-5);
+  background: var(--surface-sunken);
+  border: var(--border) solid var(--edge);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
 
 .bed-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--sp-3);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--sp-4);
   width: 100%;
 }
 
@@ -389,7 +641,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  padding: 0 var(--sp-3) var(--sp-3);
   text-align: center;
   background: var(--surface-raised);
   border: var(--border) solid var(--edge);
@@ -397,15 +649,72 @@
   border-top-color: var(--grey);
   border-radius: var(--radius-lg);
   box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-1);
-  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) linear;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) linear,
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
-.bed-card:hover { transform: translateY(-4px); }
+.bed-card:hover {
+  transform: translateY(-4px);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), var(--lift-3);
+}
 .bed-card.is-used { filter: grayscale(0.8) brightness(0.6); }
 .bed-card.is-used:hover { transform: none; }
-.bed-card.is-premium { border-top-color: var(--gold-light); }
+.bed-card.is-premium {
+  border-top-color: var(--gold-light);
+  box-shadow: inset 0 1px 0 var(--edge-highlight), 0 0 22px rgba(232, 177, 44, 0.14), var(--lift-1);
+}
+
+/* The room the bed is standing in: a papered wall, a skirting board and the
+   floor it has its legs on. The bed art is the only thing in it. */
+.bed-scene {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: calc(100% + var(--sp-3) * 2);
+  margin: 0 calc(-1 * var(--sp-3));
+  padding-bottom: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 108%, rgba(255, 198, 110, 0.2), transparent 62%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg, #3a2412 0%, #4a3018 62%, #2c1a0b 100%);
+  border-bottom: var(--border) solid var(--edge-strong);
+}
+
+/* The floorboards, and the dark line the wall meets them on. */
+.bed-scene::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 16px;
+  background:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, var(--wood-deep), var(--wood-dark));
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+.bed-art {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45));
+}
+
+.bed-card.is-premium .bed-scene {
+  background:
+    radial-gradient(ellipse at 50% 106%, rgba(255, 210, 120, 0.3), transparent 66%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg, #4a2f18 0%, #5a3a1e 62%, #33200e 100%);
+}
 
 .bed-name {
+  margin-top: var(--sp-1);
   font-family: var(--font-display);
   font-size: var(--text-md);
   letter-spacing: var(--tracking-tight);

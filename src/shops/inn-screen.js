@@ -6,6 +6,16 @@
  * game, so it can be compared against the lives you are missing without doing
  * arithmetic.
  *
+ * THE TWO BEDS ARE TWO BEDS
+ * ---------------------------------------------------------------------------
+ * Both offers used to show the same 16 x 16 `bed` icon at 3x, so the screen
+ * asked you to choose between two identical pictures and read the difference
+ * out of the price. Each offer now stands in a little room of its own with its
+ * own bed drawn in it (`src/art/sprites-venue.js`): a plank cot with a straw
+ * sack and an army blanket, or a panelled frame with brass on the posts, two
+ * pillows and a quilt. The prices agree with the pictures rather than being
+ * the only thing that distinguishes them.
+ *
  * The old version buried this: a bare row of diamonds floated at the top of a
  * panel with no label, the offers were wide rows with the price stranded on the
  * far right, and the whole thing sat inside a panel inside a panel.
@@ -14,7 +24,7 @@
 import { el, clearNode } from '../core/dom.js';
 import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
-import { iconURL } from '../art/sprites-items.js';
+import { bedURL, venueSize } from '../art/sprites-venue.js';
 import { getState, spendGold, canAfford, heal, fullHeal } from '../game/player.js';
 import { generateOffers, innSeed } from './inn.js';
 import { DISCOUNT_RATE } from './shop.js';
@@ -45,6 +55,11 @@ export const InnScreen = {
     const lives = livesRow(player.lives, player.maxLives, { large: true });
     const livesNote = el('span.muted', { text: livesText() });
     const bedGrid = el('div.bed-grid.stagger');
+
+    // 40 x 24 source pixels at 5x — an exact multiple, which is the only way
+    // pixel art stays pixel art in an <img>.
+    const BED_SCALE = 5;
+    const bedPx = venueSize('bedStraw');
 
     const unsub = on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => {
       updateLivesRow(lives, l, maxLives);
@@ -98,7 +113,16 @@ export const InnScreen = {
               ? el('span.discount-flag', { text: `-${Math.round(DISCOUNT_RATE * 100)}%` })
               : null,
 
-            el('img.pixel', { src: iconURL('bed', 3), width: '48', height: '48', alt: '' }),
+            // The room, with its bed standing on the floor of it.
+            el('div.bed-scene', {}, [
+              el('img.pixel.bed-art', {
+                src: bedURL(offer.id, BED_SCALE),
+                width: String(bedPx.w * BED_SCALE),
+                height: String(bedPx.h * BED_SCALE),
+                alt: '',
+              }),
+            ]),
+
             el('div.bed-name', { text: offer.name }),
             el('p.shop-desc', { text: offer.desc }),
 
@@ -135,12 +159,12 @@ export const InnScreen = {
 
     renderBeds();
 
-    const screen = el('div.screen.venue-screen', {}, [
+    const screen = el('div.screen.venue-screen.inn-screen', {}, [
       band,
       el('div.screen-body', {}, [
-        el('h1.screen-title', { text: 'Inn' }),
+        el('h1.hanging-sign', {}, [el('span.hanging-sign-text', { text: 'Inn' })]),
         el('div.panel.panel--braced.venue-board', {}, [
-          el('div.row.row--center', {}, [lives, livesNote]),
+          el('div.inn-state', {}, [lives, livesNote]),
           bedGrid,
         ]),
       ]),

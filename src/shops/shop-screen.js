@@ -6,6 +6,16 @@
  * state), is it a bargain (the tag hanging off the corner). Anything you cannot
  * buy says why on the button itself.
  *
+ * THE SHOP IS A STALL
+ * ---------------------------------------------------------------------------
+ * The goods used to sit in a rectangle in the middle of the screen, which is
+ * what a list looks like. They now sit in a built thing: a striped canvas
+ * awning with a scalloped valance, the store's sign hanging off it on two
+ * ropes, two posts holding the whole lot up, and a plank counter under the
+ * goods with the room's own crates and barrels stacked behind it
+ * (`interior-scene.js`). Nothing was added to the *information* on the screen —
+ * the stall is the frame the same three cards were always in, drawn.
+ *
  * Removed in the rebuild: the subtitle ("the shopkeeper lays out 3 things worth
  * having" — a sentence that carried no information), the COMMON chip on every
  * card, and the panel that wrapped the grid of cards inside another frame.
@@ -122,11 +132,17 @@ export const ShopScreen = {
 
     renderStock();
 
-    const screen = el('div.screen.venue-screen', {}, [
+    const screen = el('div.screen.venue-screen.stall-screen', {}, [
       band,
       el('div.screen-body', {}, [
-        el('h1.screen-title', { text: 'General Store' }),
-        el('div.panel.panel--braced.venue-board', {}, [grid]),
+        el('div.stall', {}, [
+          el('div.stall-awning'),
+          el('h1.stall-sign', {}, [
+            el('span.stall-sign-text', { text: 'General Store' }),
+          ]),
+          el('div.stall-shelf', {}, [grid]),
+          el('div.stall-counter'),
+        ]),
       ]),
       el('div.screen-footer', {}, [
         el('button.btn.btn--ghost', {
