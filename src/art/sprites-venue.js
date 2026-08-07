@@ -437,6 +437,35 @@ const DEFS = {
   candle: CANDLE,
 };
 
+/**
+ * The hole in the middle of the hearth, in source pixels, found by looking for
+ * the `K` region rather than written down beside it.
+ *
+ * The scene draws a live fire into this rectangle, and a fire that overruns it
+ * paints over the masonry the sprite already drew. Measuring the art means the
+ * two cannot drift: edit a row of HEARTH above and the fire follows.
+ *
+ * @returns {{x: number, y: number, w: number, h: number}}
+ */
+function findOpening(rows, ch = 'K') {
+  let x0 = Infinity;
+  let x1 = -1;
+  let y0 = Infinity;
+  let y1 = -1;
+  rows.forEach((row, y) => {
+    const first = row.indexOf(ch);
+    if (first < 0) return;
+    x0 = Math.min(x0, first);
+    x1 = Math.max(x1, row.lastIndexOf(ch));
+    y0 = Math.min(y0, y);
+    y1 = Math.max(y1, y);
+  });
+  if (x1 < 0) return { x: 0, y: 0, w: 0, h: 0 };
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+export const HEARTH_OPENING = findOpening(HEARTH);
+
 /** Which bed art an inn offer gets. Unknown ids fall back to the cheap one. */
 const BED_FOR_OFFER = {
   basic: 'bedStraw',

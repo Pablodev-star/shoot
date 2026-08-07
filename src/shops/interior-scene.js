@@ -29,7 +29,7 @@
 
 import { PALETTE } from '../art/palette.js';
 import { drawSprite } from '../art/pixel.js';
-import { venueSprite } from '../art/sprites-venue.js';
+import { HEARTH_OPENING, venueSprite } from '../art/sprites-venue.js';
 import { makeRng } from '../core/rng.js';
 
 /** Where the wall stops and the floor starts, as a fraction of frame height. */
@@ -446,13 +446,24 @@ function drawInnRoom(ctx, view, s, fs, floorY, flicker, flames, sparks, t) {
     const hy = base;
     drawSprite(ctx, hearth, hx, hy - hearth.height * fs, fs);
 
-    // The fire lives in the opening the sprite leaves black. Its tongues are
-    // drawn at the wall scale rather than the furniture scale, so a fire in a
-    // big hearth is made of many small flames instead of four fat ones.
-    const fx = hx + 6 * fs;
-    const fy = hy - 3 * fs;
-    const fw = 20 * fs;
-    const fh = 12 * fs;
+    // The fire lives in the opening the sprite leaves black — HEARTH_OPENING
+    // is that hole, measured off the art. Its tongues are drawn at the wall
+    // scale rather than the furniture scale, so a fire in a big hearth is made
+    // of many small flames instead of four fat ones.
+    //
+    // The clip is not belt-and-braces: a flame is a rectangle whose height and
+    // width both vary, and one that grows past the lintel or the jamb paints
+    // over masonry the sprite already drew. Cutting the fire to the hole means
+    // the flames can be as tall as they like and the stone still wins.
+    const fx = hx + HEARTH_OPENING.x * fs;
+    const fy = hy - (hearth.height - (HEARTH_OPENING.y + HEARTH_OPENING.h)) * fs;
+    const fw = HEARTH_OPENING.w * fs;
+    const fh = HEARTH_OPENING.h * fs;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(fx, fy - fh, fw, fh);
+    ctx.clip();
 
     ctx.fillStyle = PALETTE.magmaDeep;
     ctx.fillRect(fx, fy - 2 * s, fw, 2 * s);
@@ -460,7 +471,7 @@ function drawInnRoom(ctx, view, s, fs, floorY, flicker, flames, sparks, t) {
       const rise = f.life;
       const h = Math.max(s, snap(fh * f.height * (1 - rise * 0.5), s));
       const x = snap(fx + f.x * fw, s);
-      const w = Math.max(s, snap(4 * s * (1 - rise * 0.5), s));
+      const w = Math.max(s, snap(3 * s * (1 - rise * 0.5), s));
       ctx.fillStyle = PALETTE.magmaDeep;
       ctx.fillRect(x - w, fy - h, w * 2, h);
       ctx.fillStyle = PALETTE.magma;
@@ -469,13 +480,16 @@ function drawInnRoom(ctx, view, s, fs, floorY, flicker, flames, sparks, t) {
       ctx.fillRect(x - Math.round(w / 2 / s) * s, fy - h + 4 * s, Math.max(s, w), Math.max(s, h - 5 * s));
     }
 
-    // Sparks going up the chimney.
+    // Sparks going up out of the fire. They rise through the top of the
+    // opening rather than over it — above that line is a chimney breast, and
+    // you cannot see sparks through a chimney breast.
     ctx.fillStyle = PALETTE.emberGlow;
     for (const spark of sparks) {
       ctx.globalAlpha = 0.35 + spark.y * 0.5;
-      ctx.fillRect(snap(fx + spark.x * fw, s), snap(fy - fh - (1 - spark.y) * 8 * s, s), s, s);
+      ctx.fillRect(snap(fx + spark.x * fw, s), snap(fy - (1 - spark.y) * fh, s), s, s);
     }
     ctx.globalAlpha = 1;
+    ctx.restore();
 
     // The fire's own light, thrown on the floor in front of it.
     ctx.globalCompositeOperation = 'lighter';
