@@ -28,14 +28,17 @@
  *   misfireChance          both sides may misfire (wet powder in the rain)
  *   enemyAccuracyPenalty   the AI reads you less reliably (sandstorm, night)
  *
- * ABILITIES ARE IDS, AND AN ID IS A THEME OVER ONE OF FOUR RULES
+ * ABILITIES ARE IDS, AND AN ID NAMES ONE OF FOURTEEN MECHANICS
  * ---------------------------------------------------------------------------
- * An enemy carries ability *ids* — `swampRot`, `iceFall`, `cinderSnatch` — and
- * this file resolves each one to the base effect it is a version of before it
- * does anything with it (`baseEffectOf`). There are still exactly four rules
- * here and there always were; what changed is that the bayou's poison is
- * called swamp rot, comes up out of the ground green, and is the same rule.
- * See src/game/world-abilities.js.
+ * Both sides carry ability *ids* — `deepFreeze`, `poison`, `voidMirror` — and
+ * `applyAbility` resolves each one to its `effect` and does that. Ten of the
+ * fourteen never touch a life bar: they leave a counter on a fighter (ice, a
+ * jammed gun, a shield that has stopped working) and the round resolution
+ * reads it. See `blankStatus`, and src/game/world-abilities.js for the table.
+ *
+ * Casting is not free. An enemy that casts spends its whole turn on it, and a
+ * player who casts knocks the enemy's hand to its belt — see the note on
+ * `playerCastPending`, which is the rule the charge costs are paying for.
  *
  * AND THERE IS ONE THING IN HERE THAT DOES NOT WAIT FOR A ROUND
  * ---------------------------------------------------------------------------
@@ -157,9 +160,6 @@ export function createDuel(config) {
   /**
    * THE TURN RULE
    * -------------------------------------------------------------------------
-   * Whoever cast an ability that is still waiting to be paid for. Set when
-   * either side spends one, read once by the round that resolves, then cleared.
-   *
    *   the ENEMY cast   → that IS its turn. No shot, no shield, no round loaded,
    *                      and it stands there open while it does it.
    *   the PLAYER cast  → the enemy's hand goes to its belt instead: it reloads
@@ -167,12 +167,20 @@ export function createDuel(config) {
    *   the player       → is never restricted. Cast and still shoot, shield,
    *                      reload, or cast the other slot.
    *
-   * It survives the gap between rounds on purpose. An ability is a free action
-   * and its plate is live during the animation, so a charge spent a beat early
-   * has to buy something — it lands on the next round that resolves rather than
-   * being thrown away.
+   * THE TWO ARE TRACKED SEPARATELY, AND THE ENEMY'S WINS
+   * -------------------------------------------------------------------------
+   * They used to share one field, which had a quiet bug in it: a round in
+   * which BOTH of them cast would have the player's write land last, the
+   * enemy would be handed a reload instead of the turn it had actually spent,
+   * and it would come out of its own cast a bullet richer. An enemy that cast
+   * is casting, whatever the player also did.
+   *
+   * `playerCastPending` survives the gap between rounds on purpose. An ability
+   * is a free action and its plate is live during the animation, so a charge
+   * spent a beat early has to buy something — it lands on the next round that
+   * resolves rather than being thrown away.
    */
-  let abilityCastBy = null;
+  let playerCastPending = false;
 
   /** What agents are allowed to see. Both sides get the same shape. */
   function publicView(selfId) {
@@ -500,7 +508,7 @@ export function createDuel(config) {
     }
 
     applyAbility(spec.id, 'player', 'enemy');
-    abilityCastBy = 'player';
+    playerCastPending = true;
     log('player-ability', { ability: spec.id, spec, side: 'enemy' });
     checkEnd();
     return { ok: true, spec };
@@ -589,7 +597,6 @@ export function createDuel(config) {
     round += 1;
 
     const ability = rollEnemyAbility();
-    if (ability) abilityCastBy = 'enemy';
     abilityHitPlayer = false;
 
     const [rawPlayerMove, chosenEnemyMove] = await Promise.all([
@@ -597,17 +604,35 @@ export function createDuel(config) {
       sides.enemy.agent.chooseMove(publicView('enemy')),
     ]);
 
-    // The enemy's ability lands before either of them draws, so a freeze or a
-    // stolen cylinder is already in force when the round resolves.
-    if (ability) applyAbility(ability, 'enemy', 'player');
-
-    // An erupting mountain can end the duel while the engine is still waiting
-    // for a move. Hand back a well-formed terminal resolution so the screen can
-    // close the fight instead of stalling.
+    /**
+     * THE FIGHT CAN BE OVER BEFORE THIS ROUND STARTS
+     * -----------------------------------------------------------------------
+     * A charged ability or an erupting mountain can finish somebody while the
+     * engine is still waiting for a move — so the FIRST thing after the await
+     * is to ask whether there is still a duel, before the enemy's rolled
+     * ability gets to go off.
+     *
+     * It has to be in that order. The other way round, a player who spent
+     * Meteor Strike on the enemy's last life could still be killed by an
+     * ability the corpse had rolled at the top of the round: `ended` already
+     * said `player`, so the run carried on with a winner on zero lives.
+     */
     if (over || checkEnd()) {
       const resolution = makeResolution({
+        terminatedBy: terminationCause || 'item',
+        hits: { player: abilityHitPlayer, enemy: false },
+      });
+      log('round', resolution);
+      return resolution;
+    }
+
+    // Now the enemy's, which lands before either of them draws — so a freeze or
+    // a stolen cylinder is already in force when the round resolves.
+    if (ability) applyAbility(ability, 'enemy', 'player');
+    if (checkEnd()) {
+      const resolution = makeResolution({
         ability,
-        terminatedBy: terminationCause || (ability ? 'ability' : 'item'),
+        terminatedBy: 'ability',
         hits: { player: abilityHitPlayer, enemy: false },
       });
       log('round', resolution);
@@ -615,19 +640,19 @@ export function createDuel(config) {
     }
 
     /**
-     * THE TURN RULE, APPLIED
-     * -----------------------------------------------------------------------
-     * See `abilityCastBy`. An enemy that cast is doing that instead of drawing;
-     * an enemy whose rival cast has its hand knocked to its belt. Either way it
-     * is open all round, which is what the player is buying.
+     * THE TURN RULE, APPLIED. See the note on `playerCastPending`.
+     *
+     * The enemy's own cast takes precedence over the reload its rival's cast
+     * would have forced: it is already busy.
      */
-    const caster = abilityCastBy;
-    abilityCastBy = null;
-    const enemyMove = caster === 'enemy'
+    const playerCast = playerCastPending;
+    playerCastPending = false;
+    const enemyMove = ability
       ? MOVES.ABILITY
-      : caster === 'player'
+      : playerCast
         ? MOVES.RELOAD
         : chosenEnemyMove;
+    const caster = ability ? 'enemy' : playerCast ? 'player' : null;
 
     const p = normalise(sides.player, rawPlayerMove);
     const e = normalise(sides.enemy, enemyMove);
@@ -788,7 +813,9 @@ export function createDuel(config) {
       accuracy: next.accuracy,
       abilities: next.abilities || [],
       abilityChanceMul: next.abilityChanceMul || 1,
-      poison: 0,
+      // A new phase is a new fighter: it does not inherit the ice, the mark or
+      // the mirror the last one was wearing when it went down.
+      status: blankStatus(),
       agent: agent || sides.enemy.agent,
     });
     // A phase that never spent its special can still spend it. One that is

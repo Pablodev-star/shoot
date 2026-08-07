@@ -246,7 +246,7 @@ export const DuelScreen = {
       ['jam', 'lassoPull', 'Jammed — cannot shoot', 'is-bad'],
       ['panic', 'hornetSting', 'Panicked — their shield stops nothing', 'is-bad'],
       ['blind', 'sandBlind', 'Blinded — shots go wide', 'is-bad'],
-      ['mark', 'swampRot', 'Marked — everything that lands costs one more', 'is-bad'],
+      ['mark', 'swampRot', 'Marked — every shot that lands costs one more', 'is-bad'],
       ['doubleTap', 'hellWhisper', 'Loaded — shots cost them one more', 'is-good'],
       ['reflect', 'starRot', 'Mirrored — the next shot goes back', 'is-good'],
     ];
@@ -669,7 +669,17 @@ export const DuelScreen = {
       // motion and three colours (src/game/world-abilities.js) and the scene
       // plays it over the fighter it landed on, so a hornet sting and an ember
       // bite are told apart by watching rather than by reading the tooltip.
-      if (event.type === 'ability') {
+      /**
+       * ONLY THE ENEMY'S CASTS ARE ANNOUNCED FROM HERE
+       * ---------------------------------------------------------------------
+       * `applyAbility` in the engine is shared by both sides, so it logs this
+       * for the player's casts too — and `castAbility` below has already
+       * played the particles, the banner and the cue for those. Without the
+       * gate a player cast fired everything twice, flashed the OPPONENT's
+       * badge whenever both of them happened to carry the same ability, and
+       * animated a self-buff over the wrong fighter.
+       */
+      if (event.type === 'ability' && event.side === 'enemy') {
         flashEffect(enemyAbilities, event.ability);
         const ability = getAbility(event.ability);
         // It plays over whoever it LANDED on, which is not always the rival:

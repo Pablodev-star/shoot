@@ -101,6 +101,18 @@ export const EFFECTS = {
   jam: { label: 'Control', blocks: false },
   panic: { label: 'Control', blocks: false },
   blind: { label: 'Control', blocks: false },
+  /**
+   * Gunfire only, and the description says so.
+   *
+   * The obvious reading of a mark is "everything that lands costs one more",
+   * and that is what it used to claim — but it is only consulted where bullets
+   * arrive (`landShot`), so a blast, a spout, a poison tick and a rock off the
+   * mountain all ignored it. Two ways out of that: widen the rule into the
+   * common damage path, or narrow the promise. The promise was narrowed,
+   * because widening it would have put the mark on every venom tick as well —
+   * three extra lives out of a four-round charge, on top of what it already
+   * does to the shooting.
+   */
   mark: { label: 'Curse', blocks: false },
   doubleTap: { label: 'Buff', blocks: false },
   reflect: { label: 'Guard', blocks: false },
@@ -290,7 +302,7 @@ export const ABILITIES = {
     turns: 3,
     charge: 4,
     label: 'Swamp Fever',
-    tip: 'For three rounds, everything that hits them costs one extra life',
+    tip: 'For three rounds, every shot that hits them costs one extra life',
     icon: 'swampRot',
     banner: 'FEVERED!',
     hold: { color: PALETTE.algae, alpha: 0.35 },
@@ -733,7 +745,7 @@ export function describeAbility(a) {
     case 'blind':
       return `Their next ${a.turns === 1 ? 'shot goes' : `${a.turns} shots go`} wide.${after}`;
     case 'mark':
-      return `For ${rounds(a.turns)}, everything that hits them costs one extra life.${after}`;
+      return `For ${rounds(a.turns)}, every shot that hits them costs one extra life.${after}`;
     case 'doubleTap':
       return `Your next ${a.turns === 1 ? 'shot costs' : `${a.turns} shots cost`} them an extra life.${after}`;
     case 'reflect':

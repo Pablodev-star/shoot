@@ -70,7 +70,7 @@ Ten of them never touch the life bar at all:
 | **jam** | they cannot shoot |
 | **panic** | their shield stops nothing |
 | **blind** | their next shots go wide |
-| **mark** | everything that lands on them costs one extra |
+| **mark** | every shot that lands on them costs one extra |
 | **doubleTap** | your next shots cost them one extra |
 | **reflect** | the next shot that would hit you goes back at them |
 
