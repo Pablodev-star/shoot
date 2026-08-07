@@ -12,6 +12,7 @@
 
 import { EVENTS, emit } from '../core/events.js';
 import { getItem, ITEMS, SELL_RATIO } from './items.js';
+import { playerAbility, playerSpecial } from './world-abilities.js';
 import {
   STARTING_LIVES,
   LIVES_PER_LEVEL,
@@ -43,6 +44,16 @@ function blankState() {
     inventory: [{ id: 'carrot', qty: 2 }],
     /** Permanent upgrades applied to every future shop visit. */
     shopPerks: { extraSlots: 0, discountBonus: 0 },
+    /**
+     * The two duel abilities currently in hand, as item ids.
+     *
+     * Two slots and not a list, because the charge bar is the balance: a
+     * player carrying four abilities would be spending one nearly every round
+     * and the gun would be decoration. Owning several is fine and expected —
+     * you swap them in the saddlebag between fights, and the one that suits a
+     * boss is not the one that suits a road full of drifters.
+     */
+    equipped: { basic: null, special: null },
 
     stats: { duelsWon: 0, duelsLost: 0, goldEarned: 0, itemsBought: 0, distance: 0 },
   };
@@ -72,6 +83,9 @@ export function restore(data) {
   state = { ...blankState(), ...(data || {}) };
   state.shopPerks = { ...blankState().shopPerks, ...(data?.shopPerks || {}) };
   state.stats = { ...blankState().stats, ...(data?.stats || {}) };
+  // A save written before abilities existed has no slots; it gets empty ones
+  // rather than `undefined`, which every reader would then have to guard.
+  state.equipped = { ...blankState().equipped, ...(data?.equipped || {}) };
   emitAll();
   return state;
 }
@@ -273,6 +287,12 @@ export function sellItem(id) {
     }
   }
   if (item.unlock === 'horse' && countOf('horse') === 0) state.hasHorse = false;
+  // Selling the thing in your hand takes it out of your hand.
+  if (item.ability && countOf(id) === 0) {
+    for (const slot of ['basic', 'special']) {
+      if (state.equipped[slot] === id) state.equipped[slot] = null;
+    }
+  }
   play('coin');
   return value;
 }
@@ -292,6 +312,16 @@ export function useItem(id, opts = {}) {
   }
   if (item.context === 'passive') return { ok: false, reason: 'Works on its own.' };
   if (item.context === 'special') return { ok: false, reason: 'Already in use.' };
+
+  // Using an ability does not spend it — it puts it in your hand for every
+  // duel from here on. It is the one "use" in the bag that gives something
+  // back instead of taking it away.
+  if (item.context === 'ability') {
+    const result = equipAbility(id);
+    if (!result.ok) return { ok: false, reason: result.reason };
+    play('click');
+    return { ok: true, effect: 'equip', slot: result.slot };
+  }
 
   if (item.food) {
     if (state.hunger >= HUNGER_MAX) return { ok: false, reason: 'Not hungry.' };
@@ -328,6 +358,68 @@ export function useItem(id, opts = {}) {
   }
 
   return { ok: false, reason: 'Nothing happens.' };
+}
+
+// ---------------------------------------------------------------------------
+// Duel abilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Put an ability in its slot, taking whatever was there out.
+ *
+ * Equipping is free and instant: the item is not consumed, there is nothing to
+ * confirm, and the previous occupant goes back to being an ordinary thing in
+ * the bag. A slot is a *choice*, and a choice you have to pay to change is a
+ * choice most players will simply never make.
+ *
+ * @returns {{ok: boolean, slot?: string, reason?: string}}
+ */
+export function equipAbility(id) {
+  const item = getItem(id);
+  if (!item || !item.ability) return { ok: false, reason: 'That is not an ability.' };
+  if (countOf(id) <= 0) return { ok: false, reason: 'You do not have that.' };
+  const slot = item.ability.kind === 'special' ? 'special' : 'basic';
+  if (state.equipped[slot] === id) return { ok: false, reason: 'Already in hand.' };
+  state.equipped[slot] = id;
+  emit(EVENTS.INVENTORY_CHANGED, { inventory: state.inventory, equipped: id });
+  return { ok: true, slot };
+}
+
+/** Take an ability out of its slot without selling it. */
+export function unequipAbility(slot) {
+  if (!state.equipped[slot]) return false;
+  state.equipped[slot] = null;
+  emit(EVENTS.INVENTORY_CHANGED, { inventory: state.inventory });
+  return true;
+}
+
+export function isEquipped(id) {
+  return state.equipped.basic === id || state.equipped.special === id;
+}
+
+/**
+ * The two abilities the next duel starts with, resolved all the way down to
+ * their numbers. Anything equipped but no longer owned is dropped on the way
+ * out, which is what keeps a sold ability from fighting on without you.
+ *
+ * @returns {Array<object>} 0, 1 or 2 specs, each with `item`, `kind`, `charge`
+ */
+export function getEquippedAbilities() {
+  const out = [];
+  for (const slot of ['basic', 'special']) {
+    const id = state.equipped[slot];
+    if (!id) continue;
+    const item = getItem(id);
+    if (!item || countOf(id) <= 0) {
+      state.equipped[slot] = null;
+      continue;
+    }
+    const spec = item.ability.kind === 'special'
+      ? playerSpecial(item.ability.ref)
+      : playerAbility(item.ability.ref);
+    if (spec) out.push({ ...spec, itemId: id, slot });
+  }
+  return out;
 }
 
 /** True while a Bulletproof Vest is available to absorb a fatal shot. */

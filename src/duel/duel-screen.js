@@ -29,7 +29,15 @@
 import { el, clearNode, wait } from '../core/dom.js';
 import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
-import { getState, setLives, hasVest, consumeVest, isImmuneToEffects, countOf } from '../game/player.js';
+import {
+  getState,
+  setLives,
+  hasVest,
+  consumeVest,
+  isImmuneToEffects,
+  countOf,
+  getEquippedAbilities,
+} from '../game/player.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
 import { getAbility, getSpecial, specialDamage } from '../game/world-abilities.js';
@@ -128,6 +136,12 @@ export const DuelScreen = {
         bullets: 0,
         hasVest: hasVest(),
         immune: isImmuneToEffects(),
+        /**
+         * Whatever is in the two ability slots, resolved down to its numbers.
+         * Empty for a player who has not bought any, which is most of world 1
+         * and every run that spends its gold on bandages instead.
+         */
+        abilities: getEquippedAbilities(),
       },
       enemy,
       playerAgent: localAgent,
@@ -141,6 +155,8 @@ export const DuelScreen = {
     let finished = false;
     /** True once the fight proper has started — see `onFrame`. */
     let clockRunning = false;
+    /** True while the player's one-shot landmark is still on the road. */
+    let playerHazardUp = false;
 
     // --- fighter cards -----------------------------------------------------
     const playerLives = livesRow(player.lives, player.maxLives, { large: true });
@@ -337,6 +353,62 @@ export const DuelScreen = {
       }),
     ]);
 
+    /**
+     * THE ABILITY BAR
+     * -----------------------------------------------------------------------
+     * Up to two plates above the moves: what you are carrying, how close it is
+     * to being worth pressing, and nothing else. They are deliberately NOT a
+     * fourth and fifth move button — they sit on their own row, they are half
+     * the height, and pressing one does not end your turn. An ability is
+     * something you do *as well as* reloading, shielding or shooting, and the
+     * layout has to say so before the tooltip does.
+     *
+     * The charge is drawn as pips rather than a bar for the same reason the
+     * cylinder is drawn as chambers: the number is small, and a player should
+     * be able to count "one more round" without reading a percentage.
+     */
+    const abilityBar = el('div.duel-abilities');
+    const abilityPlates = new Map();
+
+    function buildAbilityBar() {
+      clearNode(abilityBar);
+      abilityPlates.clear();
+      const slots = duel.getAbilityState();
+      abilityBar.hidden = slots.length === 0;
+      slots.forEach((slot, index) => {
+        const pips = el('span.charge-row');
+        const key = index === 0 ? 'Q' : 'E';
+        const plate = el('button.btn.ability-plate', {
+          onclick: () => castAbility(slot.itemId),
+          'data-tip': `${slot.spec.label} — ${slot.spec.desc}`,
+          'aria-label': `${slot.spec.label}. ${slot.spec.desc}`,
+        }, [
+          icon(slot.spec.icon, 1.2),
+          el('span.ability-name', {}, [slot.spec.label, el('span.kbd', { text: key })]),
+          pips,
+        ]);
+        plate.pips = pips;
+        abilityPlates.set(slot.itemId, plate);
+        abilityBar.append(plate);
+      });
+      syncAbilityBar();
+    }
+
+    function syncAbilityBar() {
+      for (const slot of duel.getAbilityState()) {
+        const plate = abilityPlates.get(slot.itemId);
+        if (!plate) continue;
+        clearNode(plate.pips);
+        for (let i = 0; i < slot.cost; i++) {
+          plate.pips.append(el('span.charge-pip', { class: i < slot.charge ? 'is-lit' : '' }));
+        }
+        plate.classList.toggle('is-ready', slot.ready);
+        plate.classList.toggle('is-spent', slot.spent);
+        plate.disabled = !slot.ready || finished;
+        if (slot.spent) plate.dataset.tip = `${slot.spec.label} — spent for this duel`;
+      }
+    }
+
     const itemButton = el('button.btn.btn--sm.btn--ghost', {
       onclick: () => openBag(),
       'data-tip': 'Use dynamite, poison or a bandage',
@@ -357,6 +429,7 @@ export const DuelScreen = {
       // their own: a duel on a short screen was pushing them off the bottom.
       el('div.duel-bottom', {}, [
         el('div.duel-extras', {}, [helpButton, callout, itemButton]),
+        abilityBar,
         controls,
       ]),
     ]);
@@ -364,6 +437,7 @@ export const DuelScreen = {
     root.append(screen);
     attachButtonSounds(screen);
     renderAbilities();
+    buildAbilityBar();
     syncBars();
 
     /**
@@ -394,6 +468,7 @@ export const DuelScreen = {
       // Shoot swaps its cost strip for "Empty" when the cylinder is out, so a
       // disabled button still says why it is disabled.
       buttons[MOVES.SHOOT].renderCost();
+      syncAbilityBar();
     }
 
     function setControlsEnabled(enabled) {
@@ -423,8 +498,85 @@ export const DuelScreen = {
       localAgent.submit(move);
     }
 
+    /**
+     * Spend a charged ability.
+     *
+     * It is a free action: the controls stay live and the round the player was
+     * in the middle of choosing is still theirs to choose. Everything after the
+     * engine call is presentation — the same themed animation the enemy's
+     * version plays, aimed the other way for once.
+     */
+    /** Q and E map to the first and second plate, whatever is in them. */
+    function castFromKey(index) {
+      const slot = duel.getAbilityState()[index];
+      if (slot && !finished) castAbility(slot.itemId);
+    }
+
+    function castAbility(itemId) {
+      const result = duel.useAbility(itemId);
+      if (!result.ok) {
+        play('error');
+        if (result.reason) toast(result.reason, 'bad');
+        return;
+      }
+      const spec = result.spec;
+      if (spec.kind === 'special') {
+        announcePlayerSpecial(spec);
+      } else {
+        scene.castAbilityFx(spec.fx, 'enemy');
+        scene.fx.banner = spec.banner || spec.label.toUpperCase();
+        scene.fx.bannerTimer = 900;
+        play(spec.base === 'dynamite' ? 'hit' : 'shield');
+        flashEffect(enemyStatus, spec.id);
+        enemyCard.classList.remove('is-hit');
+        void enemyCard.offsetWidth;
+        enemyCard.classList.add('is-hit');
+      }
+      syncBars();
+      syncAbilityBar();
+    }
+
+    /**
+     * The player calls one down.
+     *
+     * Shorter than the enemy's entrance, and on purpose: the enemy's is a
+     * surprise that has to be established, and this one is a thing the player
+     * spent five rounds waiting to press. They do not need it explained to
+     * them — they need it to land.
+     */
+    function announcePlayerSpecial(spec) {
+      scene.setHazard(spec, 'player');
+      scene.fx.banner = spec.banner || spec.label.toUpperCase();
+      scene.fx.bannerTimer = 1500;
+      scene.fx.shake = 700;
+      scene.fx.rays = 0.7;
+      playerHazardUp = true;
+      play(spec.sfx || 'toll');
+      setCallout(`You call down the ${spec.label.toLowerCase()}`, 'is-good');
+    }
+
+    /**
+     * CLOSING THE BAG IS PART OF ENDING THE FIGHT
+     * -----------------------------------------------------------------------
+     * The saddlebag is a free action and the duel can end while it is open —
+     * a thrown stick of dynamite finishes the enemy, or a rock out of an
+     * erupting mountain finishes you. The inventory spends the item BEFORE it
+     * calls back here (see `doUse` in src/ui/inventory-panel.js), so anything
+     * used in the seconds between the last life going and the overview coming
+     * up is gone for nothing. It gets shut the moment the fight is decided,
+     * and the callback refuses anything already in flight.
+     */
+    let bag = null;
+
+    function closeBag() {
+      bag?.close();
+      bag = null;
+    }
+
     function openBag() {
-      openInventory({
+      if (finished || duel.isOver()) return;
+      bag = openInventory({
+        onClose: () => { bag = null; },
         context: 'duel',
         canUse: (id) => ['dynamite', 'poison', 'bandage', 'potion', 'carrot', 'apple'].includes(id),
         useOpts: () => ({
@@ -432,6 +584,7 @@ export const DuelScreen = {
           maxLives: duel.getSides().player.maxLives,
         }),
         onUse: (id, result) => {
+          if (finished || duel.isOver()) return;
           if (result.effect === 'dynamite' || result.effect === 'poison') {
             duel.useItemEffect(result.effect);
             scene.fx.banner = result.effect === 'dynamite' ? 'DYNAMITE!' : 'POISONED!';
@@ -452,6 +605,9 @@ export const DuelScreen = {
       if (e.key === '2') submit(MOVES.SHIELD, true);
       if (e.key === '3') submit(MOVES.SHOOT, true);
       if ((e.key === 'i' || e.key === 'I') && !itemButton.disabled) openBag();
+      // Q and E, because 1-3 are the moves and an ability is not one.
+      if (e.key === 'q' || e.key === 'Q') castFromKey(0);
+      if (e.key === 'e' || e.key === 'E') castFromKey(1);
     };
     window.addEventListener('keydown', onKey);
 
@@ -481,8 +637,8 @@ export const DuelScreen = {
           scene.fx.bannerTimer = 900;
         }
       }
-      if (event.type === 'hazard-warn') handleHazardWarn();
-      if (event.type === 'hazard-erupt') handleHazardErupt();
+      if (event.type === 'hazard-warn') handleHazardWarn(event);
+      if (event.type === 'hazard-erupt') handleHazardErupt(event);
       if (event.type === 'hazard-strike') handleHazardStrike(event);
       if (event.type === 'ability-blocked') {
         flashEffect(enemyStatus, 'immune');
@@ -535,22 +691,32 @@ export const DuelScreen = {
       await wait(900);
     }
 
-    /** The sky turning. Nothing has been thrown yet — that is the point. */
-    function handleHazardWarn() {
-      const spec = duel.getHazard()?.spec;
-      if (!spec) return;
-      scene.fx.banner = spec.warnBanner || 'IT IS WAKING';
-      scene.fx.bannerTimer = 1400;
-      scene.fx.shake = Math.max(scene.fx.shake, 260);
-      play(spec.sfx || 'rumble');
+    /** The hazard an event belongs to, whichever side raised it. */
+    function hazardOf(event) {
+      return duel.getHazards().find((h) => h.owner === (event.owner || 'enemy')) || null;
     }
 
-    function handleHazardErupt() {
-      const spec = duel.getHazard()?.spec;
-      if (!spec) return;
+    /** The sky turning. Nothing has been thrown yet — that is the point. */
+    function handleHazardWarn(event) {
+      const entry = hazardOf(event);
+      if (!entry) return;
+      // Only the enemy's gets the warning card. The player's was pressed by
+      // the player a second ago; telling them it is coming is telling them
+      // something they did.
+      if (entry.owner === 'enemy') {
+        scene.fx.banner = entry.spec.warnBanner || 'IT IS WAKING';
+        scene.fx.bannerTimer = 1400;
+      }
+      scene.fx.shake = Math.max(scene.fx.shake, 260);
+      play(entry.spec.sfx || 'rumble');
+    }
+
+    function handleHazardErupt(event) {
+      const entry = hazardOf(event);
+      if (!entry) return;
       scene.fx.shake = 700;
       scene.fx.rays = 0.5;
-      play(spec.sfx || 'rumble');
+      play(entry.spec.sfx || 'rumble');
     }
 
     /**
@@ -559,12 +725,17 @@ export const DuelScreen = {
      * where it lands rather than off this call.
      */
     function handleHazardStrike(event) {
-      scene.hazardStrike('player');
-      playerCard.classList.remove('is-hit');
-      void playerCard.offsetWidth;
-      playerCard.classList.add('is-hit');
+      const owner = event.owner || 'enemy';
+      const side = event.side || 'player';
+      scene.hazardStrike(side, owner);
+      const card = side === 'player' ? playerCard : enemyCard;
+      card.classList.remove('is-hit');
+      void card.offsetWidth;
+      card.classList.add('is-hit');
       play('hit');
-      if (event.steal) toast('The blast knocked a round out of your gun', 'bad');
+      if (event.steal && side === 'player') {
+        toast('The blast knocked a round out of your gun', 'bad');
+      }
       syncBars();
     }
 
@@ -579,10 +750,16 @@ export const DuelScreen = {
     function onFrame(dt) {
       if (finished || !clockRunning) return;
       duel.tick(dt);
-      const hz = duel.getHazard();
-      if (hz) {
-        scene.setHazardState(hz.getState());
-        updateHazardChip(hz);
+      for (const entry of duel.getHazards()) {
+        scene.setHazardState(entry.owner, entry.clock.getState());
+        if (entry.owner === 'enemy') updateHazardChip(entry.clock);
+      }
+      // The player's is one eruption and gone; the engine drops it from its
+      // list the moment it goes quiet, and the scene has to let go too or the
+      // landmark stands there for the rest of the fight doing nothing.
+      if (playerHazardUp && !duel.getHazards().some((h) => h.owner === 'player')) {
+        playerHazardUp = false;
+        scene.clearHazard('player');
       }
       /**
        * A rock can kill you while the engine is still waiting for a move. The
@@ -590,9 +767,12 @@ export const DuelScreen = {
        * the engine sees the duel is already over and comes back with a
        * terminal resolution instead of stalling on a dead player.
        */
-      if (duel.isOver() && localAgent.isWaiting()) {
-        setControlsEnabled(false);
-        localAgent.submit(MOVES.SHIELD);
+      if (duel.isOver()) {
+        closeBag();
+        if (localAgent.isWaiting()) {
+          setControlsEnabled(false);
+          localAgent.submit(MOVES.SHIELD);
+        }
       }
     }
 
@@ -775,7 +955,9 @@ export const DuelScreen = {
       // The mountain stops caring the moment the fight is over. It is still
       // drawn — it is part of the road now — but it does not tick.
       clockRunning = false;
+      closeBag();
       setControlsEnabled(false);
+      syncAbilityBar();
       const won = result.winner === 'player';
       play(won ? 'win' : 'lose');
       scene.fx.banner = won ? 'YOU WIN' : 'YOU LOSE';
@@ -930,6 +1112,7 @@ export const DuelScreen = {
 
     return () => {
       finished = true;
+      closeBag();
       intro?.skip();
       localAgent.cancel();
       window.removeEventListener('keydown', onKey);
