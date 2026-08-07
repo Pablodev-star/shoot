@@ -13,10 +13,14 @@
   gap: clamp(10px, 2.2vh, 24px);
 }
 
+/* The wordmark is baked at a fixed source size in src/art/logo.js; this is the
+   only place its on-screen size is decided. Keep it at or above the canvas's
+   natural width — `image-rendering: pixelated` upscales cleanly but downscaling
+   drops whole pixel rows, and the mark's bevel is one pixel thick. */
 .logo-wrap {
   display: grid;
   place-items: center;
-  width: min(520px, 84vw);
+  width: min(560px, 86vw);
   max-width: none;
   animation: logo-drop 900ms var(--ease-spring) both;
 }
