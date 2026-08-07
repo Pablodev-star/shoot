@@ -66,3 +66,26 @@ with baked 16x16 pixel-art icons from the game palette.
 Everything was a brown vertical gradient with a 3px border and a rounded
 corner. No wood, no iron, no rope, no paper, no hardware — the shapes could
 have belonged to any genre.
+
+## 6. The two venues were nowhere in particular
+
+Fixed after the rebuild, and worth writing down because it is the same class of
+problem as §2: things the player had to *read* that could have been *shown*.
+
+| Where | What was wrong |
+| --- | --- |
+| Both backdrops | `createInteriorScene('shop')` and `createInteriorScene('inn')` drew the **same picture** — a horizontal plank wall, one lantern, floating dust — with one colour swapped. Two different places, one room. |
+| Inn beds | Both offers drew the same 16 x 16 `bed` icon at 3x. The screen asked you to choose between two identical pictures, so the only difference between "Basic Bed" and "Premium Bed" was the price under them. |
+| Shop | Three cards in a rectangle. Nothing on the screen said *shop* except the heading, which said it in words. |
+| Both walls | Wall boards and floor boards ran the same way, so the two surfaces read as one flat thing folded over rather than as a corner you are standing in. |
+
+What replaced them: two rooms with nothing in common but the boards
+(`src/shops/interior-scene.js`), a stall — awning, valance, sign on ropes,
+posts, counter — around the shop's goods, and two beds drawn once each in
+`src/art/sprites-venue.js`. The wall's grain now runs vertically against the
+floor's horizontal, furniture standing on the floor is drawn at twice the scale
+of what is fixed to the wall behind it, and every prop is laid out from an edge
+of the frame, because the HTML sits in a column down the middle and covers
+almost everything between the two walls on a phone.
+
+No text was added to either screen.

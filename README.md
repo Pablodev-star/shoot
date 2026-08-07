@@ -205,8 +205,18 @@ There is no level select. You walk, and the road decides what you meet.
   one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
+  A shop is a **stall**, not a list: a striped canvas awning with a scalloped
+  valance, the store's sign hanging off it on two ropes, two posts, and a plank
+  counter with the goods standing on it — inside a trading post whose shelves,
+  barrels, sacks and overhead rail of pans and hats are drawn behind them.
 - **Inns** sell a basic bed (heals more in later worlds) or a premium bed (heals
-  everything).
+  everything), and **the two beds are two beds**. Both offers used to show the
+  same 16 x 16 icon at 3x, so the choice was made by reading two prices under
+  one picture. Each now stands in a little room of its own: a plank cot with a
+  sacking mattress, the straw coming out of it and an army blanket over the
+  foot, or a panelled frame with brass on the posts, two pillows, a quilt and a
+  rug. The room they are in is drawn too — a stone hearth with a live fire in
+  it, a window with the night behind it, a rug, a chair pulled up to the heat.
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
 - **The trail map** is a drawn map of the road you are on, not a list: the
@@ -299,6 +309,9 @@ src/
                           inferno, void: props, layers, ground, ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-portraits.js  32 x 32 faces, for speech and for the cut-scene (2e)
+    sprites-venue.js      what a shop and an inn are made of: the two beds,
+                          and the crates, barrels, jars, hearth and window the
+                          rooms behind them are furnished with
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
     map-art.js            the trail map: ground, markers, road, compass
