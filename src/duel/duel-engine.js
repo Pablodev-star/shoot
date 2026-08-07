@@ -46,15 +46,27 @@
  * is exactly what it is for.
  */
 
-import { baseEffectOf, getSpecial, SPECIAL_TIMING } from '../game/world-abilities.js';
+import { getAbility, getSpecial, pickWeighted, SPECIAL_TIMING } from '../game/world-abilities.js';
 import { createHazard } from './duel-hazard.js';
 
-export const MOVES = { RELOAD: 'reload', SHIELD: 'shield', SHOOT: 'shoot' };
+/**
+ * The three a duellist chooses, and two an ability can put them in.
+ *
+ * No agent ever RETURNS `ability` or `frozen` — they are what a round hands
+ * back when somebody spent their turn casting or spent it standing still with
+ * ice on them. They are here so the screen has one vocabulary for what a
+ * fighter did, however it came about.
+ */
+export const MOVES = {
+  RELOAD: 'reload',
+  SHIELD: 'shield',
+  SHOOT: 'shoot',
+  ABILITY: 'ability',
+  FROZEN: 'frozen',
+};
 
 /** Bullets a duellist can hold at once. */
 export const MAX_BULLETS = 6;
-/** Rounds before poison deals its damage. */
-export const POISON_DELAY = 3;
 
 /**
  * @param {object} config
@@ -80,9 +92,8 @@ export function createDuel(config) {
       bullets: config.player.bullets || 0,
       hasVest: !!config.player.hasVest,
       immune: !!config.player.immune,
-      poison: 0,
-      /** Lives the pending poison will take when it bites. See `tickPoison`. */
-      poisonAmount: 1,
+      /** Every counter an ability can leave on them. See `blankStatus`. */
+      status: null,
       pendingItem: null,
       agent: config.playerAgent,
     },
@@ -94,14 +105,16 @@ export function createDuel(config) {
       bullets: config.enemy.bullets || 0,
       hasVest: false,
       immune: false,
-      poison: 0,
-      poisonAmount: 1,
+      status: null,
       abilities: config.enemy.abilities || [],
       abilityChanceMul: config.enemy.abilityChanceMul || 1,
       accuracy: config.enemy.accuracy ?? 0.5,
       agent: config.enemyAgent,
     },
   };
+
+  sides.player.status = blankStatus();
+  sides.enemy.status = blankStatus();
 
   let round = 0;
   let over = false;
@@ -142,12 +155,24 @@ export function createDuel(config) {
     spent: false,
   }));
   /**
-   * Set by the player's mind control, and cleared by the next round that
-   * resolves — see the note in `playRound`. It survives the gap between rounds
-   * on purpose: the plate is live in that gap, and a charge spent there has to
-   * buy something.
+   * THE TURN RULE
+   * -------------------------------------------------------------------------
+   * Whoever cast an ability that is still waiting to be paid for. Set when
+   * either side spends one, read once by the round that resolves, then cleared.
+   *
+   *   the ENEMY cast   → that IS its turn. No shot, no shield, no round loaded,
+   *                      and it stands there open while it does it.
+   *   the PLAYER cast  → the enemy's hand goes to its belt instead: it reloads
+   *                      this round, whatever it had picked.
+   *   the player       → is never restricted. Cast and still shoot, shield,
+   *                      reload, or cast the other slot.
+   *
+   * It survives the gap between rounds on purpose. An ability is a free action
+   * and its plate is live during the animation, so a charge spent a beat early
+   * has to buy something — it lands on the next round that resolves rather than
+   * being thrown away.
    */
-  let forcedEnemyMove = null;
+  let abilityCastBy = null;
 
   /** What agents are allowed to see. Both sides get the same shape. */
   function publicView(selfId) {
@@ -155,8 +180,8 @@ export function createDuel(config) {
     const foe = sides[selfId === 'player' ? 'enemy' : 'player'];
     return {
       round,
-      self: { lives: self.lives, bullets: self.bullets, poison: self.poison },
-      foe: { lives: foe.lives, bullets: foe.bullets, poison: foe.poison },
+      self: { lives: self.lives, bullets: self.bullets, status: { ...self.status } },
+      foe: { lives: foe.lives, bullets: foe.bullets, status: { ...foe.status } },
       modifiers,
     };
   }
@@ -181,61 +206,180 @@ export function createDuel(config) {
 
   /**
    * The enemy's ability roll for this round, resolved before moves are locked
-   * in so mind control can actually scramble the player's choice.
+   * in — casting is now the enemy's whole turn, so the round has to know.
+   *
+   * `pickWeighted` is what keeps poison and dynamite rare in the hands that
+   * have them: both carry a weight of about a third, so a bayou rider with
+   * four tricks plays poison one time in ten rather than one in four.
    */
   function rollEnemyAbility() {
     const enemy = sides.enemy;
     if (!enemy.abilities || enemy.abilities.length === 0) return null;
     const chance = 0.18 * enemy.abilityChanceMul;
     if (random() >= chance) return null;
-    return enemy.abilities[Math.floor(random() * enemy.abilities.length)];
+    return pickWeighted(enemy.abilities, random());
+  }
+
+
+  /**
+   * WHAT AN ABILITY LEAVES ON A FIGHTER
+   * ---------------------------------------------------------------------------
+   * Ten of the fourteen mechanics do not take a life; they take a *turn*, or a
+   * cylinder, or the use of a shield. All of that is counters on a side, ticked
+   * down at the end of every round, and the round resolution below reads them.
+   * Nothing here is special-cased per ability: an ability writes a number into
+   * one of these and the rules do the rest, which is why adding the fifteenth
+   * will not touch `playRound`.
+   */
+  function blankStatus() {
+    return {
+      /** Rounds of doing nothing at all. The turns belong to the other side. */
+      frozen: 0,
+      /** Rounds unable to shoot. Reloading and shielding still work. */
+      jam: 0,
+      /** Rounds in which a raised shield stops nothing. */
+      panic: 0,
+      /** Shots that will go wide. */
+      blind: 0,
+      /** Rounds taking one extra life off everything that lands. */
+      mark: 0,
+      /** Shots that will cost the other side one extra life. */
+      doubleTap: 0,
+      /** Incoming shots that go back at whoever fired them. */
+      reflect: 0,
+      /** Rounds of one life each, through anything. */
+      venom: 0,
+    };
   }
 
   /**
-   * Resolve one ability against the player.
-   *
-   * `ability` is the id the enemy carries and `base` is the rule it stands
-   * for — the log carries the id, because the screen has been showing that
-   * icon since round one and it is the one that has to light up.
+   * Effects that land on the CASTER rather than the rival. The diadem does not
+   * touch these, and neither does anything else that asks "is the victim
+   * immune" — there is no victim.
    */
-  function applyEnemyAbility(ability, playerMove) {
-    const player = sides.player;
-    if (player.immune) {
-      log('ability-blocked', { ability });
-      return playerMove;
+  const SELF_EFFECTS = new Set(['doubleTap', 'reflect']);
+
+  /**
+   * Blast is queued rather than applied.
+   *
+   * It is the one effect a shield stops, and at the moment an ability is cast
+   * nobody has committed to a move yet — so it waits for the shot phase and is
+   * resolved there against what the victim actually did. That is the whole
+   * design of the dynamite: the hardest thing in the game to be hit by, and the
+   * easiest to be ready for.
+   */
+  let pendingBlasts = [];
+
+  /**
+   * Resolve one ability. The same function for both sides — `from` cast it,
+   * `to` is wearing it — because there is no rule in here that knows or cares
+   * which of them is the player.
+   *
+   * @returns {boolean} false when it was blocked outright
+   */
+  function applyAbility(id, from, to) {
+    const a = getAbility(id);
+    if (!a.effect) return false;
+    const caster = sides[from];
+    const victim = sides[to];
+    const onSelf = SELF_EFFECTS.has(a.effect);
+
+    if (!onSelf && victim.immune) {
+      log('ability-blocked', { ability: id, side: to });
+      return false;
     }
-    switch (baseEffectOf(ability)) {
-      case 'bulletSteal': {
-        if (player.bullets > 0) {
-          player.bullets -= 1;
-          sides.enemy.bullets = Math.min(MAX_BULLETS, sides.enemy.bullets + 1);
-          log('ability', { ability, side: 'enemy' });
+
+    switch (a.effect) {
+      case 'steal': {
+        const taken = Math.min(victim.bullets, a.amount || 1);
+        victim.bullets -= taken;
+        if (a.take) {
+          caster.bullets = Math.min(MAX_BULLETS, caster.bullets + Math.min(taken, a.take));
         }
-        return playerMove;
+        break;
       }
-      case 'poison': {
-        if (player.poison === 0) {
-          player.poison = POISON_DELAY;
-          player.poisonAmount = 1;
-          log('ability', { ability, side: 'enemy' });
+      case 'empty': {
+        const taken = victim.bullets;
+        victim.bullets = 0;
+        if (a.take) {
+          caster.bullets = Math.min(MAX_BULLETS, caster.bullets + Math.min(taken, a.take));
         }
-        return playerMove;
+        break;
       }
-      case 'dynamite': {
-        abilityHitPlayer = damage('player', 1, { ignoreShield: true, source: 'dynamite' });
-        log('ability', { ability, side: 'enemy' });
-        return playerMove;
+      case 'swap': {
+        const mine = caster.bullets;
+        caster.bullets = victim.bullets;
+        victim.bullets = mine;
+        break;
       }
-      case 'mindControl': {
-        const options = [MOVES.RELOAD, MOVES.SHIELD, MOVES.SHOOT];
-        const scrambled = options[Math.floor(random() * options.length)];
-        log('ability', { ability, side: 'enemy', from: playerMove, to: scrambled });
-        return scrambled;
+      case 'blast':
+        // Waits for the shot phase — see `pendingBlasts` above.
+        pendingBlasts.push({ from, to, amount: a.amount || 1, ability: id });
+        break;
+      case 'pierce':
+        damage(to, a.amount || 1, { ignoreShield: true, source: 'ability' });
+        break;
+      case 'venom':
+        victim.status.venom = Math.max(victim.status.venom, a.turns || 3);
+        break;
+      case 'drain': {
+        const hit = damage(to, a.amount || 1, { ignoreShield: true, source: 'ability' });
+        // Only what actually came off them goes on: a vest that ate the blow
+        // leaves nothing to take.
+        if (hit) caster.lives = Math.min(caster.maxLives, caster.lives + (a.amount || 1));
+        break;
       }
+      case 'freeze':
+        victim.status.frozen = Math.max(victim.status.frozen, a.turns || 1);
+        break;
+      case 'jam':
+        victim.status.jam = Math.max(victim.status.jam, a.turns || 1);
+        break;
+      case 'panic':
+        victim.status.panic = Math.max(victim.status.panic, a.turns || 1);
+        break;
+      case 'blind':
+        victim.status.blind = Math.max(victim.status.blind, a.turns || 1);
+        break;
+      case 'mark':
+        victim.status.mark = Math.max(victim.status.mark, a.turns || 1);
+        break;
+      case 'doubleTap':
+        caster.status.doubleTap = Math.max(caster.status.doubleTap, a.turns || 1);
+        break;
+      case 'reflect':
+        caster.status.reflect = Math.max(caster.status.reflect, a.turns || 1);
+        break;
       default:
-        return playerMove;
+        return false;
+    }
+
+    log('ability', { ability: id, effect: a.effect, side: from, target: onSelf ? from : to });
+    return true;
+  }
+
+  /**
+   * End of round: everything measured in ROUNDS comes down by one.
+   *
+   * Three of the counters are deliberately not here. `frozen` is spent by the
+   * round it costs (see `normalise`), and `blind`, `doubleTap` and `reflect`
+   * are counted in SHOTS rather than rounds — a blind that expired while the
+   * player was reloading would be no blind at all.
+   */
+  function tickStatus(sideId) {
+    const st = sides[sideId].status;
+    for (const key of ['jam', 'panic', 'mark']) {
+      if (st[key] > 0) st[key] -= 1;
+    }
+    // Venom bites every round it is on, then counts down — so three rounds of
+    // it is three lives, which is what it says on the tin.
+    if (st.venom > 0) {
+      st.venom -= 1;
+      damage(sideId, 1, { ignoreShield: true, source: 'venom' });
     }
   }
+
+
 
   // --- the world special ----------------------------------------------------
 
@@ -290,10 +434,7 @@ export function createDuel(config) {
      * not aimed at anybody. The vest still works, because the vest is a
      * physical object and `damage` honours it for free.
      */
-    if (ev.poisons && victim.poison === 0) {
-      victim.poison = POISON_DELAY;
-      victim.poisonAmount = 1;
-    }
+    if (ev.poisons) victim.status.venom = Math.max(victim.status.venom, 2);
     log('hazard-strike', {
       special: entry.spec.id,
       owner: entry.owner,
@@ -358,43 +499,13 @@ export function createDuel(config) {
       return { ok: true, spec };
     }
 
-    applyPlayerBasic(spec);
+    applyAbility(spec.id, 'player', 'enemy');
+    abilityCastBy = 'player';
     log('player-ability', { ability: spec.id, spec, side: 'enemy' });
     checkEnd();
     return { ok: true, spec };
   }
 
-  /** The four base effects, aimed at the enemy for once. */
-  function applyPlayerBasic(spec) {
-    const enemy = sides.enemy;
-    switch (spec.base) {
-      case 'bulletSteal': {
-        const taken = Math.min(enemy.bullets, spec.amount || 1);
-        enemy.bullets -= taken;
-        if (spec.take) {
-          sides.player.bullets = Math.min(MAX_BULLETS, sides.player.bullets + Math.min(taken, spec.take));
-        }
-        break;
-      }
-      case 'poison':
-        if (enemy.poison === 0) {
-          enemy.poison = spec.delay || POISON_DELAY;
-          enemy.poisonAmount = spec.amount || 1;
-        }
-        break;
-      case 'dynamite':
-        damage('enemy', spec.amount || 1, { ignoreShield: true, source: 'ability' });
-        break;
-      case 'mindControl':
-        // Their hand goes to the wrong thing. Set for this round only; see the
-        // note in src/game/world-abilities.js on why it is a forced move and
-        // not the scramble the enemy's version uses.
-        forcedEnemyMove = MOVES.RELOAD;
-        break;
-      default:
-        break;
-    }
-  }
 
   /** Charge state for the screen's meters. */
   function getAbilityState() {
@@ -408,45 +519,28 @@ export function createDuel(config) {
     }));
   }
 
-  /** Player items used mid-duel are queued and resolved at the top of a round. */
-  function useItemEffect(effect) {
-    if (over) return;
-    if (effect === 'dynamite') {
-      damage('enemy', 1, { ignoreShield: true, source: 'dynamite' });
-      log('item', { effect, side: 'player' });
-    } else if (effect === 'poison') {
-      if (sides.enemy.poison === 0) {
-        sides.enemy.poison = POISON_DELAY;
-        sides.enemy.poisonAmount = 1;
-      }
-      log('item', { effect, side: 'player' });
-    }
-    checkEnd();
-  }
-
   /**
-   * Poison ticks down a round at a time and bites once, for whatever the thing
-   * that applied it was worth — `poisonAmount`, which is 1 for everything the
-   * enemy and the saddlebag can do and 2 for the basin's and the Galaxy's
-   * player-side rot. The countdown is the same either way, so the badge on the
-   * fighter card needs no new state to read.
+   * What a fighter actually does, once the ice and the rope have had their say.
+   *
+   * The freeze is spent HERE rather than in `tickStatus`, because it is counted
+   * in turns taken away and this is the only place that knows a turn was taken
+   * away. Everything else measured in rounds ticks at the end of one.
    */
-  function tickPoison(sideId) {
-    const side = sides[sideId];
-    if (side.poison <= 0) return;
-    side.poison -= 1;
-    if (side.poison === 0) {
-      damage(sideId, side.poisonAmount || 1, { ignoreShield: true, source: 'poison' });
-      side.poisonAmount = 1;
-    }
-  }
-
   function normalise(side, move) {
+    if (side.status.frozen > 0) {
+      side.status.frozen -= 1;
+      log('frozen', { side: side.id, left: side.status.frozen });
+      return { move: MOVES.FROZEN, dry: false, jammed: false };
+    }
+    if (move === MOVES.SHOOT && side.status.jam > 0) {
+      log('jammed', { side: side.id });
+      return { move: MOVES.SHOOT, dry: true, jammed: true };
+    }
     if (move === MOVES.SHOOT && side.bullets <= 0) {
       log('dryfire', { side: side.id });
-      return { move: MOVES.SHOOT, dry: true };
+      return { move: MOVES.SHOOT, dry: true, jammed: false };
     }
-    return { move, dry: false };
+    return { move, dry: false, jammed: false };
   }
 
   function checkEnd() {
@@ -495,6 +589,7 @@ export function createDuel(config) {
     round += 1;
 
     const ability = rollEnemyAbility();
+    if (ability) abilityCastBy = 'enemy';
     abilityHitPlayer = false;
 
     const [rawPlayerMove, chosenEnemyMove] = await Promise.all([
@@ -502,51 +597,39 @@ export function createDuel(config) {
       sides.enemy.agent.chooseMove(publicView('enemy')),
     ]);
 
-    /**
-     * The enemy picks its move the instant the round opens, long before the
-     * player has pressed anything — so the player's mind control cannot stop
-     * it being chosen, only stop it being carried out. It overrides the choice
-     * after the fact, which is both the only place it can go and exactly what
-     * the ability says it does: their hand goes to the wrong thing.
-     *
-     * IT IS CLEARED WHEN IT IS SPENT, NOT WHEN A ROUND OPENS
-     * -----------------------------------------------------------------------
-     * The first version reset this at the top of `playRound`, which quietly
-     * threw the ability away for anybody who pressed it a beat early. An
-     * ability is a free action and the plate is live during the animation
-     * between rounds, so a player who charged mind control and hit Q while the
-     * last round was still playing out spent the charge and got nothing —
-     * silently, with no way to tell it had happened. Clearing it on use means
-     * it always lands: on this round if it was set while the engine was
-     * waiting, on the next one if it was set in the gap.
-     */
-    const enemyMove = forcedEnemyMove || chosenEnemyMove;
-    forcedEnemyMove = null;
+    // The enemy's ability lands before either of them draws, so a freeze or a
+    // stolen cylinder is already in force when the round resolves.
+    if (ability) applyAbility(ability, 'enemy', 'player');
 
-    // An item thrown from the inventory — or a rock out of an erupting
-    // mountain — can end the duel while the engine is still waiting for a
-    // move. Hand back a well-formed terminal resolution so the screen can
+    // An erupting mountain can end the duel while the engine is still waiting
+    // for a move. Hand back a well-formed terminal resolution so the screen can
     // close the fight instead of stalling.
-    if (over) {
-      const resolution = makeResolution({ terminatedBy: terminationCause || 'item' });
-      log('round', resolution);
-      return resolution;
-    }
-
-    let playerMove = rawPlayerMove;
-    if (ability) playerMove = applyEnemyAbility(ability, playerMove);
-    if (checkEnd()) {
+    if (over || checkEnd()) {
       const resolution = makeResolution({
         ability,
-        playerMove,
-        terminatedBy: 'ability',
+        terminatedBy: terminationCause || (ability ? 'ability' : 'item'),
         hits: { player: abilityHitPlayer, enemy: false },
       });
       log('round', resolution);
       return resolution;
     }
 
-    const p = normalise(sides.player, playerMove);
+    /**
+     * THE TURN RULE, APPLIED
+     * -----------------------------------------------------------------------
+     * See `abilityCastBy`. An enemy that cast is doing that instead of drawing;
+     * an enemy whose rival cast has its hand knocked to its belt. Either way it
+     * is open all round, which is what the player is buying.
+     */
+    const caster = abilityCastBy;
+    abilityCastBy = null;
+    const enemyMove = caster === 'enemy'
+      ? MOVES.ABILITY
+      : caster === 'player'
+        ? MOVES.RELOAD
+        : chosenEnemyMove;
+
+    const p = normalise(sides.player, rawPlayerMove);
     const e = normalise(sides.enemy, enemyMove);
 
     // --- resolve bullets ---------------------------------------------------
@@ -562,19 +645,59 @@ export function createDuel(config) {
     if (playerMisfired) log('misfire', { side: 'player' });
     if (enemyMisfired) log('misfire', { side: 'enemy' });
 
-    // --- resolve shots -----------------------------------------------------
+    /**
+     * A shot leaves the barrel and then has to survive three questions:
+     * was the shooter blinded, is the target behind a shield that still works,
+     * and is the target wearing a mirror. `spendBlind` is called for every shot
+     * that is actually fired, so being blind costs you shots rather than rounds.
+     */
+    const spendBlind = (sideId) => {
+      const st = sides[sideId].status;
+      if (st.blind <= 0) return false;
+      st.blind -= 1;
+      log('blinded', { side: sideId });
+      return true;
+    };
+
     const playerFires = p.move === MOVES.SHOOT && !p.dry && !playerMisfired;
     const enemyFires = e.move === MOVES.SHOOT && !e.dry && !enemyMisfired;
-    const playerProtected = p.move === MOVES.SHIELD;
-    const enemyProtected = e.move === MOVES.SHIELD;
+    const playerWide = playerFires && spendBlind('player');
+    const enemyWide = enemyFires && spendBlind('enemy');
+
+    // A shield that has been panicked is a shield that is not there.
+    const shielded = (sideId, move) =>
+      move === MOVES.SHIELD && sides[sideId].status.panic <= 0;
+    const playerProtected = shielded('player', p.move);
+    const enemyProtected = shielded('enemy', e.move);
 
     const hits = { player: false, enemy: false };
-    if (playerFires) hits.enemy = damage('enemy', 1, { protectedNow: enemyProtected });
-    if (enemyFires) hits.player = damage('player', 1, { protectedNow: playerProtected });
+    const bounced = { player: false, enemy: false };
+    if (playerFires && !playerWide) {
+      const shot = landShot('player', 'enemy', enemyProtected);
+      hits.enemy = shot.hit;
+      if (shot.bounced) { hits.player = hits.player || shot.bouncedHit; bounced.player = true; }
+    }
+    if (enemyFires && !enemyWide) {
+      const shot = landShot('enemy', 'player', playerProtected);
+      hits.player = hits.player || shot.hit;
+      if (shot.bounced) { hits.enemy = hits.enemy || shot.bouncedHit; bounced.enemy = true; }
+    }
 
-    // --- poison ticks ------------------------------------------------------
-    tickPoison('player');
-    tickPoison('enemy');
+    // --- the dynamite, resolved against what they actually did --------------
+    for (const blast of pendingBlasts) {
+      const guarded = blast.to === 'player' ? playerProtected : enemyProtected;
+      const stopped = !damage(blast.to, blast.amount, {
+        protectedNow: guarded,
+        source: 'blast',
+      });
+      log('blast', { ability: blast.ability, side: blast.to, stopped, guarded });
+      if (!stopped) hits[blast.to] = true;
+    }
+    pendingBlasts = [];
+
+    // --- venom, and every counter an ability left behind --------------------
+    tickStatus('player');
+    tickStatus('enemy');
 
     // A round has been fought, so everything in the player's hands is a round
     // closer to being worth using.
@@ -587,21 +710,65 @@ export function createDuel(config) {
     const resolution = {
       round,
       ability,
+      abilityBy: caster,
       playerMove: p.move,
       enemyMove: e.move,
       playerDry: p.dry,
       enemyDry: e.dry,
+      playerJammed: p.jammed,
+      enemyJammed: e.jammed,
+      playerFrozen: p.move === MOVES.FROZEN,
+      enemyFrozen: e.move === MOVES.FROZEN,
+      playerWide,
+      enemyWide,
       playerMisfired,
       enemyMisfired,
-      playerFires,
-      enemyFires,
+      playerFires: playerFires && !playerWide,
+      enemyFires: enemyFires && !enemyWide,
       hits,
+      bounced,
+      status: { player: { ...sides.player.status }, enemy: { ...sides.enemy.status } },
       lives: { player: sides.player.lives, enemy: sides.enemy.lives },
       bullets: { player: sides.player.bullets, enemy: sides.enemy.bullets },
       ended,
     };
     log('round', resolution);
     return resolution;
+  }
+
+  /**
+   * One shot arriving.
+   *
+   * Everything that modifies a bullet meets here: the mirror that sends it
+   * back, the mark that makes it cost more, and the whisper that made it
+   * heavier on the way out. It is one function because the alternative is the
+   * same four conditions written twice, once per side, which is how the two
+   * halves of a duel quietly stop agreeing.
+   */
+  function landShot(fromId, toId, targetProtected) {
+    const shooter = sides[fromId];
+    const target = sides[toId];
+
+    // The mirror first: a reflected round never reaches the man it was aimed
+    // at, so nothing else about him — his shield, his mark — is consulted.
+    if (target.status.reflect > 0) {
+      target.status.reflect -= 1;
+      log('reflect', { side: toId, back: fromId });
+      const back = 1 + (shooter.status.mark > 0 ? 1 : 0);
+      const bouncedHit = damage(fromId, back, { ignoreShield: true, source: 'reflect' });
+      return { hit: false, bounced: true, bouncedHit };
+    }
+
+    let amount = 1;
+    if (shooter.status.doubleTap > 0) {
+      shooter.status.doubleTap -= 1;
+      amount += 1;
+      log('doubleTap', { side: fromId });
+    }
+    if (target.status.mark > 0) amount += 1;
+
+    const hit = damage(toId, amount, { protectedNow: targetProtected, source: 'shot' });
+    return { hit, bounced: false, bouncedHit: false, amount };
   }
 
   /**
@@ -636,7 +803,6 @@ export function createDuel(config) {
 
   return {
     playRound,
-    useItemEffect,
     setEnemy,
     maybeCastSpecial,
     useAbility,

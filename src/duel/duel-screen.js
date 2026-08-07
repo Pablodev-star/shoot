@@ -65,6 +65,7 @@ import { MAX_BULLETS } from './duel-engine.js';
 import { getSettings } from '../core/settings.js';
 import { toast } from '../ui/toast.js';
 import { openHowToPlay } from '../ui/help.js';
+import { PALETTE } from '../art/palette.js';
 
 /**
  * How long the screen waits on each beat of a round, in milliseconds.
@@ -232,18 +233,32 @@ export const DuelScreen = {
 
     /**
      * Live status on a fighter: what is currently working on them, as opposed
-     * to what they are capable of. Poison is the one the engine tracks, and it
-     * counts down, so the badge carries the number of rounds left.
+     * to what they can do. Every one of the eight counters the engine keeps has
+     * a badge here with the number still to run, because a rule the player
+     * cannot see the clock for is a rule they can only learn by losing to it —
+     * "frozen, 1 left" is the difference between a wasted turn and a planned
+     * one. The colour on the fighter out on the road says the same thing at a
+     * glance; this says it exactly.
      */
+    const STATUS_BADGES = [
+      ['frozen', 'iceFall', 'Frozen — they do nothing at all', 'is-bad'],
+      ['venom', 'poison', 'Poisoned — a life every round', 'is-active'],
+      ['jam', 'lassoPull', 'Jammed — cannot shoot', 'is-bad'],
+      ['panic', 'hornetSting', 'Panicked — their shield stops nothing', 'is-bad'],
+      ['blind', 'sandBlind', 'Blinded — shots go wide', 'is-bad'],
+      ['mark', 'swampRot', 'Marked — everything that lands costs one more', 'is-bad'],
+      ['doubleTap', 'hellWhisper', 'Loaded — shots cost them one more', 'is-good'],
+      ['reflect', 'starRot', 'Mirrored — the next shot goes back', 'is-good'],
+    ];
+
     function renderStatus(row, side) {
       clearNode(row);
-      if (side.poison > 0) {
+      const st = side.status || {};
+      for (const [key, iconName, label, tone] of STATUS_BADGES) {
+        const left = st[key] || 0;
+        if (left <= 0) continue;
         row.append(
-          effectBadge('poison', {
-            label: `Poisoned — ${side.poison} round${side.poison === 1 ? '' : 's'} left`,
-            tone: 'is-active',
-            count: side.poison,
-          }),
+          effectBadge(key, { label: `${label} — ${left} left`, iconName, tone, count: left }),
         );
       }
       if (side.hasVest) {
@@ -251,6 +266,31 @@ export const DuelScreen = {
       }
       if (side.immune) {
         row.append(effectBadge('immune', { label: 'Diadem — effects cannot touch you', tone: 'is-good' }));
+      }
+    }
+
+    /**
+     * The colour a fighter wears on the road while something is on them.
+     *
+     * One tint at a time and the worst one wins: a man who is frozen AND
+     * poisoned is drawn as frozen, because that is the one costing him his
+     * turn. Anything with no colour of its own leaves the sprite alone.
+     */
+    const STATUS_TINTS = [
+      ['frozen', { color: PALETTE.iceLight, alpha: 0.55 }],
+      ['venom', { color: PALETTE.poison, alpha: 0.4 }],
+      ['mark', { color: PALETTE.redLight, alpha: 0.32 }],
+      ['panic', { color: PALETTE.gold, alpha: 0.28 }],
+      ['doubleTap', { color: PALETTE.magma, alpha: 0.3 }],
+      ['reflect', { color: PALETTE.astralLight, alpha: 0.35 }],
+    ];
+
+    function syncStatusTints() {
+      const s = duel.getSides();
+      for (const id of ['player', 'enemy']) {
+        const st = s[id].status || {};
+        const found = STATUS_TINTS.find(([key]) => (st[key] || 0) > 0);
+        scene.setStatusTint(id, found ? found[1] : null);
       }
     }
 
@@ -346,7 +386,9 @@ export const DuelScreen = {
         key: '3',
         cls: 'duel-btn--shoot',
         cost: () => {
-          const dry = duel.getSides().player.bullets <= 0;
+          const player = duel.getSides().player;
+          if ((player.status?.jam || 0) > 0) return [el('span', { text: 'Jammed' })];
+          const dry = player.bullets <= 0;
           return dry ? [el('span', { text: 'Empty' })] : [el('span', { text: '−' }), pip(true)];
         },
         tip: 'Spend one round. Hits a rival who reloaded or shot.',
@@ -411,7 +453,7 @@ export const DuelScreen = {
 
     const itemButton = el('button.btn.btn--sm.btn--ghost', {
       onclick: () => openBag(),
-      'data-tip': 'Use dynamite, poison or a bandage',
+      'data-tip': 'Eat something, or patch yourself up',
     }, [icon('shopTag', 1.1), 'Saddlebag', el('span.kbd', { text: 'I' })]);
 
     const helpButton = iconButton('question', {
@@ -463,6 +505,7 @@ export const DuelScreen = {
       updateCylinder(enemyCylinder, sides.enemy.bullets);
       renderStatus(playerStatus, sides.player);
       renderStatus(enemyStatus, sides.enemy);
+      syncStatusTints();
       roundPill.textContent = `Round ${Math.max(1, duel.getRound() + (localAgent.isWaiting() ? 1 : 0))}`;
 
       // Shoot swaps its cost strip for "Empty" when the cylinder is out, so a
@@ -472,16 +515,20 @@ export const DuelScreen = {
     }
 
     function setControlsEnabled(enabled) {
-      const bullets = duel.getSides().player.bullets;
+      const player = duel.getSides().player;
+      const jammed = (player.status?.jam || 0) > 0;
       for (const [move, btn] of Object.entries(buttons)) {
-        btn.disabled = !enabled || (move === MOVES.SHOOT && bullets <= 0);
+        // A jammed gun is disabled rather than allowed to waste the turn: the
+        // player can see the badge counting down and the button agreeing with
+        // it, which is the whole point of showing the status at all.
+        btn.disabled = !enabled || (move === MOVES.SHOOT && (player.bullets <= 0 || jammed));
       }
       itemButton.disabled = !enabled || !hasDuelItems();
       controls.classList.toggle('is-waiting', !enabled);
     }
 
     function hasDuelItems() {
-      return ['dynamite', 'poison', 'bandage', 'potion'].some((id) => countOf(id) > 0);
+      return ['bandage', 'potion', 'carrot', 'apple'].some((id) => countOf(id) > 0);
     }
 
     function setCallout(text, tone = '') {
@@ -526,7 +573,7 @@ export const DuelScreen = {
         scene.castAbilityFx(spec.fx, 'enemy');
         scene.fx.banner = spec.banner || spec.label.toUpperCase();
         scene.fx.bannerTimer = 900;
-        play(spec.base === 'dynamite' ? 'hit' : 'shield');
+        play(spec.effect === 'blast' || spec.effect === 'pierce' ? 'hit' : 'shield');
         flashEffect(enemyStatus, spec.id);
         enemyCard.classList.remove('is-hit');
         void enemyCard.offsetWidth;
@@ -578,19 +625,13 @@ export const DuelScreen = {
       bag = openInventory({
         onClose: () => { bag = null; },
         context: 'duel',
-        canUse: (id) => ['dynamite', 'poison', 'bandage', 'potion', 'carrot', 'apple'].includes(id),
+        canUse: (id) => ['bandage', 'potion', 'carrot', 'apple'].includes(id),
         useOpts: () => ({
           lives: duel.getSides().player.lives,
           maxLives: duel.getSides().player.maxLives,
         }),
         onUse: (id, result) => {
           if (finished || duel.isOver()) return;
-          if (result.effect === 'dynamite' || result.effect === 'poison') {
-            duel.useItemEffect(result.effect);
-            scene.fx.banner = result.effect === 'dynamite' ? 'DYNAMITE!' : 'POISONED!';
-            scene.fx.bannerTimer = 900;
-            syncBars();
-          }
           if (result.effect === 'heal') {
             const sides = duel.getSides();
             sides.player.lives = Math.min(sides.player.maxLives, sides.player.lives + result.amount);
@@ -631,12 +672,28 @@ export const DuelScreen = {
       if (event.type === 'ability') {
         flashEffect(enemyAbilities, event.ability);
         const ability = getAbility(event.ability);
-        scene.castAbilityFx(ability.fx, 'player');
+        // It plays over whoever it LANDED on, which is not always the rival:
+        // a mirror and a loaded whisper settle on the fighter that cast them.
+        scene.castAbilityFx(ability.fx, event.target || 'player');
         if (ability.banner) {
           scene.fx.banner = ability.banner;
           scene.fx.bannerTimer = 900;
         }
+        play(ability.effect === 'blast' || ability.effect === 'pierce' ? 'hit' : 'shield');
       }
+      // The dynamite, landing or not. It is the only ability whose outcome is
+      // not decided when it is cast, so it is the only one that reports back.
+      if (event.type === 'blast') {
+        scene.fx.shake = event.stopped ? 200 : 520;
+        play(event.stopped ? 'shield' : 'hit');
+        toast(
+          event.stopped
+            ? (event.side === 'player' ? 'Your shield ate the blast' : 'They got a shield up in time')
+            : (event.side === 'player' ? 'The blast went straight through' : 'The blast lands'),
+          event.side === 'player' ? (event.stopped ? 'good' : 'bad') : (event.stopped ? 'bad' : 'good'),
+        );
+      }
+      if (event.type === 'reflect') toast('Mirrored — it went back at them', 'good');
       if (event.type === 'hazard-warn') handleHazardWarn(event);
       if (event.type === 'hazard-erupt') handleHazardErupt(event);
       if (event.type === 'hazard-strike') handleHazardStrike(event);
@@ -805,6 +862,8 @@ export const DuelScreen = {
      */
     async function animate(res) {
       const draws = (move) => move === MOVES.SHOOT || move === MOVES.RELOAD;
+      // A frozen fighter and one that spent its turn casting both just stand
+      // there — the ice on the sprite and the particles say which is which.
       const poseFor = (move) =>
         move === MOVES.SHIELD ? 'shield' : draws(move) ? 'aim' : 'idle';
 
@@ -858,17 +917,38 @@ export const DuelScreen = {
       if (move === MOVES.SHOOT) return 'Shoot';
       if (move === MOVES.SHIELD) return 'Shield';
       if (move === MOVES.RELOAD) return 'Reload';
+      if (move === MOVES.ABILITY) return 'Ability';
+      if (move === MOVES.FROZEN) return 'Frozen';
       return '—';
     }
 
-    /** @returns {[string, string]} message and tone class */
+    /**
+     * One line for what just happened, most specific first.
+     *
+     * The order matters more than it used to: a round can now end with nobody
+     * having fired because one of them was standing under two feet of ice, and
+     * "Nothing doing" is the wrong thing to print at somebody who just lost a
+     * turn to it.
+     *
+     * @returns {[string, string]} message and tone class
+     */
     function describe(res) {
       if (res.terminatedBy === 'item') return ['That finished it', 'is-good'];
       if (res.terminatedBy === 'ability') return ['Caught by their trick!', 'is-bad'];
       if (res.terminatedBy === 'hazard') return ['The ground took you', 'is-bad'];
       if (res.hits.player && res.hits.enemy) return ['You both go down a life', 'is-bad'];
+      if (res.bounced?.enemy) return ['Your mirror sent it back!', 'is-good'];
+      if (res.bounced?.player) return ['Their mirror sent it back at you', 'is-bad'];
       if (res.hits.enemy) return ['You hit them!', 'is-good'];
       if (res.hits.player) return ['They hit you!', 'is-bad'];
+      if (res.playerFrozen) return ['You are frozen solid', 'is-bad'];
+      if (res.enemyFrozen) return ['They cannot move', 'is-good'];
+      if (res.playerJammed) return ['Your gun will not fire', 'is-bad'];
+      if (res.enemyJammed) return ['Their gun will not fire', 'is-good'];
+      if (res.playerWide) return ['You could not see — wide', 'is-bad'];
+      if (res.enemyWide) return ['They shot wide', 'is-good'];
+      if (res.abilityBy === 'enemy') return ['They spent their turn on that', 'is-good'];
+      if (res.abilityBy === 'player') return ['They scrambled for their belt', 'is-good'];
       if (res.playerDry) return ['Your gun is empty', 'is-bad'];
       if (res.playerMove === MOVES.SHOOT && res.enemyMove === MOVES.SHIELD) return ['Blocked — bullet wasted', ''];
       if (res.enemyMove === MOVES.SHOOT && res.playerMove === MOVES.SHIELD) return ['You blocked it', 'is-good'];
@@ -1029,14 +1109,20 @@ export const DuelScreen = {
 
     function labelFor(move, dry) {
       if (!move) return '—';
+      if (move === MOVES.FROZEN) return 'Frozen';
+      if (move === MOVES.ABILITY) return 'Ability';
       if (move === MOVES.SHOOT) return dry ? 'Shoot (empty)' : 'Shoot';
       return move === MOVES.SHIELD ? 'Shield' : 'Reload';
     }
 
     function outcomeFor(r) {
       if (r.hits.player && r.hits.enemy) return 'Trade';
+      if (r.bounced?.enemy || r.bounced?.player) return 'Mirrored';
       if (r.hits.enemy) return 'You hit';
       if (r.hits.player) return 'You were hit';
+      if (r.playerFrozen || r.enemyFrozen) return 'Frozen';
+      if (r.playerJammed || r.enemyJammed) return 'Jammed';
+      if (r.playerWide || r.enemyWide) return 'Wide';
       if (r.playerMisfired || r.enemyMisfired) return 'Misfire';
       return '—';
     }

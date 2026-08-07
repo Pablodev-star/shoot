@@ -4,85 +4,109 @@
  * Every trick anybody can pull in a duel, and the one landmark each world can
  * put on the road behind it.
  *
- * WHY A DUEL ABILITY IS NOW A PLACE AS WELL AS A RULE
+ * AN ABILITY IS A MECHANIC, NOT A COAT OF PAINT
  * ---------------------------------------------------------------------------
- * The game had four abilities — bullet steal, poison, dynamite, mind control —
- * and every enemy in every world drew from the same four. That is one rule set
- * wearing six skins: a drifter in the Dust Flats and a horned thing in
- * Brimstone Basin poisoned you with the same green icon and the same nothing on
- * screen, so the worlds were only ever different to look at while you were
- * walking, and identical the moment anybody drew.
+ * The first version of this file had four effects — steal a round, poison,
+ * dynamite, scramble a move — and eighteen names over the top of them. Every
+ * world had a poison called something else, in a different colour, costing the
+ * same life at the same moment. That is a reskin, and a reskin is exactly as
+ * interesting as its tooltip: once a player has read "swamp rot: a life three
+ * rounds later" they have read every ability in the game and there is nothing
+ * left to learn on the road.
  *
- * So an ability is split in two here:
+ * So there are FOURTEEN mechanics now, and each one does something the others
+ * cannot:
  *
- *   BASE     what it does to the duel. Still exactly four things, still
- *            resolved by src/duel/duel-engine.js, still balanced by the
- *            per-world numbers in src/game/worlds.js.
- *   THEME    what it *is*: its name, its icon, the colour and the motion of
- *            the thing that crosses the screen when it goes off, and the word
- *            the fight shouts.
+ *   steal    takes rounds out of their cylinder; `take` of them into yours
+ *   empty    takes ALL of them
+ *   swap     trades cylinders — yours for theirs, whatever is in each
+ *   blast    damage now, and A SHIELD STOPS IT (the dynamite)
+ *   pierce   damage now, straight through a shield
+ *   venom    1 damage EVERY round for `turns` rounds (the poison)
+ *   drain    a life off them and onto you
+ *   freeze   they lose their next `turns` turns entirely — they stand there
+ *   jam      they cannot shoot for `turns` rounds
+ *   panic    their shield does not protect for `turns` rounds
+ *   blind    their next `turns` shots miss
+ *   mark     everything that hits them costs one extra for `turns` rounds
+ *   doubleTap your next `turns` shots cost them one extra
+ *   reflect  the next shot that hits you goes back at whoever fired it
  *
- * The bayou does not have poison, it has swamp rot, and swamp rot comes up out
- * of the ground as green gas. Brimstone Basin does not have poison either, it
- * has an ember that went in under your collar and is still burning. They cost
- * the same life three rounds later, and nothing about the fight is the same.
+ * Four of those are damage and ten are not, which is the point: an ability is
+ * usually a thing done to the *shape of the fight* rather than to the life bar,
+ * and two of them (freeze, mind you) hand the other side turns to use as they
+ * like. See src/duel/duel-engine.js — every one is a counter on a side, and the
+ * round resolution reads them.
  *
- * Adding a themed ability is one entry in ABILITIES, one icon in
- * src/art/sprites-abilities.js, and its id in that world's list in
- * src/game/worlds.js. No engine change: the engine reads `base`.
- *
- * THE SPECIAL IS NOT A BIGGER ABILITY. IT IS THE MAP CHANGING.
+ * THERE ARE NO BANDS ANY MORE
  * ---------------------------------------------------------------------------
- * Each world also has ONE special, and it works nothing like the four above.
- * An enemy carrying it can spend it once, at any point in the duel — usually
- * early, because it is worth more the longer it is out — and it does not
- * resolve and finish. It raises something behind the road, and that thing is
- * there for the rest of the fight, on a clock of its own:
+ * The old file tuned each effect three times, once per pair of worlds, because
+ * the same effect turned up in five of them. Each ability belongs to exactly
+ * one world now, so its numbers are written once, on the ability, and the
+ * "it gets better as you go" curve is simply that the later worlds' entries are
+ * stronger. One place to read a number, one place to change it.
  *
- *   dormant  ~20 seconds. It is drawn, it is quiet, and you fight normally.
- *   warning  the sky goes the colour of what is about to happen.
- *   active   it throws. Rocks, hornets, snow, gas — a handful of strikes
- *            spread across the window, each one taking a life.
- *   dormant  and round it goes, for as long as the duel lasts.
- *
- * That clock is REAL TIME, not rounds, which is the whole point of it: the
- * duel is a game of unhurried decisions and a volcano does not wait for you to
- * pick one. See src/duel/duel-hazard.js for the clock and
- * src/duel/duel-scene.js for what it looks like.
- *
- * A special is deliberately expensive to be hit by — three lives is most of a
- * young run — so it is rolled per enemy from `specialChance` in
- * src/game/worlds.js rather than carried by everybody, and every boss has one.
- * If it ever wants to be gentler, `damage` and `strikes` below are the two
- * numbers to move; nothing else in the game reads them.
- *
- * AND THE PLAYER CAN BUY BOTH
+ * USING ONE COSTS THE ENEMY ITS TURN
  * ---------------------------------------------------------------------------
- * Every ability in here is sold, in the world it belongs to, as a piece of
- * equipment you keep for the rest of the run (src/game/items.js builds the shop
- * entries from this file). What the player buys is not a copy to throw — it is
- * a thing that CHARGES: one point a round, and when it is full you spend it.
+ * The rule that makes all of this survivable, and it is symmetrical in the
+ * engine even though it is asymmetrical to play (see `playRound`):
  *
- * The enemy's version and the player's version are the same effect and are
- * tuned differently on purpose, because the two sides are not symmetrical:
+ *   · an enemy that casts is DOING that instead of drawing — no shot, no
+ *     shield, and it is open all round
+ *   · a player who casts forces the enemy to reload that round
+ *   · the player is never restricted: cast and still shoot, shield, reload,
+ *     or cast the other slot
  *
- *   the enemy  rolls its abilities at random and cannot choose a moment, so
- *              they are cheap, frequent and individually small
- *   the player picks the moment exactly, so the same effect has to be rationed
- *              by a charge bar — and the moment is most of its value
+ * That is why the strong ones cost five or six rounds of charge. An ability is
+ * not extra damage bolted onto a turn — it is a turn taken away from somebody.
  *
- * The player-side numbers are `PLAYER_BASIC` and `PLAYER_SPECIAL` at the
- * bottom of this file, along with the reasoning and the figures they were
- * balanced against. They are the only place player power is written down.
+ * POISON AND DYNAMITE ARE WORLD ABILITIES, NOT SHOP STAPLES
+ * ---------------------------------------------------------------------------
+ * They used to be throwables anybody could buy anywhere, which made two of the
+ * six worlds' signatures into general stock. Poison belongs to the Blackwater
+ * Bayou and dynamite to Brimstone Basin: they are sold in that world's shop and
+ * nowhere else, they are carried by that world's riders and nobody else's, and
+ * both were rewritten to be worth the trip — poison bites every round for three
+ * rounds instead of once, dynamite takes three lives at a stroke instead of
+ * one. Both cost more charge than anything else in the game, and the enemies
+ * that have them reach for them rarely (`weight`), because a trick that lands
+ * every other round at that size is not a signature, it is a tax.
+ *
+ * THE PLAYER BUYS ALL OF IT
+ * ---------------------------------------------------------------------------
+ * Every entry here is sold, in the world it belongs to, as equipment kept for
+ * the rest of the run (src/game/items.js builds the shop entries from this
+ * file). What the player buys is not a copy to throw — it is a thing that
+ * CHARGES: one point a round, and when it is full you spend it.
  */
 
 import { PALETTE } from '../art/palette.js';
 
 /**
- * The four things an ability can actually DO. The engine switches on these and
- * on nothing else; every id below names one of them in `base`.
+ * The mechanics, and what each one reads off its ability.
+ *
+ * `blocks` is the one thing the duel screen needs from this table that the
+ * engine does not: whether a shield is any use against it, which is the first
+ * question a player asks about anything pointed at them.
  */
-export const BASE_EFFECTS = ['bulletSteal', 'poison', 'dynamite', 'mindControl'];
+export const EFFECTS = {
+  steal: { label: 'Theft', blocks: false },
+  empty: { label: 'Theft', blocks: false },
+  swap: { label: 'Trade', blocks: false },
+  blast: { label: 'Damage', blocks: true },
+  pierce: { label: 'Damage', blocks: false },
+  venom: { label: 'Damage over time', blocks: false },
+  drain: { label: 'Damage', blocks: false },
+  freeze: { label: 'Control', blocks: false },
+  jam: { label: 'Control', blocks: false },
+  panic: { label: 'Control', blocks: false },
+  blind: { label: 'Control', blocks: false },
+  mark: { label: 'Curse', blocks: false },
+  doubleTap: { label: 'Buff', blocks: false },
+  reflect: { label: 'Guard', blocks: false },
+};
+
+export const EFFECT_LIST = Object.keys(EFFECTS);
 
 /**
  * How a themed ability crosses the screen. `motion` picks one of six particle
@@ -94,228 +118,303 @@ export const BASE_EFFECTS = ['bulletSteal', 'poison', 'dynamite', 'mindControl']
  *   rise    comes up out of the ground under the target
  *   burst   blows outward from the target
  *   spiral  winds into the target's head
+ *
+ * `hold` is the other half, and the new one: the colour a fighter is TINTED
+ * for as long as the status lasts. A freeze that is only an animation is a
+ * freeze the player has forgotten about by the time it costs them a turn — the
+ * ice stays on the sprite until it thaws.
  */
 const fx = (motion, colors, extra = {}) => ({ motion, colors, count: 26, ...extra });
 
 /**
- * Every ability in the game, themed and otherwise.
+ * Every ability in the game.
  *
- * The first four are the originals. They are still here because the player's
- * own dynamite and poison come out of the saddlebag under those names, and
- * because a themed id is only ever a *label* on one of them — anything that
- * cannot find a theme falls back to the base and still works.
+ * Fields, beyond the obvious: `effect` is the mechanic, `amount`/`turns`/`take`
+ * are its numbers, `charge` is how many rounds the player waits to spend it,
+ * and `weight` is how often an enemy holding it reaches for it (1 is normal).
  */
 export const ABILITIES = {
-  // --- the four base effects, unthemed -------------------------------------
-  bulletSteal: {
-    base: 'bulletSteal',
-    label: 'Bullet Steal',
-    tip: 'They can take one of your bullets',
-    icon: 'bulletSteal',
-    banner: 'ROUND TAKEN!',
-    fx: fx('streak', [PALETTE.goldLight, PALETTE.gold, PALETTE.goldDark]),
-  },
-  poison: {
-    base: 'poison',
-    label: 'Poison',
-    tip: 'Poison costs you a life three rounds later',
-    icon: 'poison',
-    banner: 'POISONED!',
-    fx: fx('rise', [PALETTE.poison, PALETTE.poisonDark, PALETTE.greenLight]),
-  },
-  dynamite: {
-    base: 'dynamite',
-    label: 'Dynamite',
-    tip: 'Dynamite ignores your shield',
-    icon: 'dynamite',
-    banner: 'DYNAMITE!',
-    fx: fx('burst', [PALETTE.goldLight, PALETTE.red, PALETTE.grey], { shake: 320 }),
-  },
-  mindControl: {
-    base: 'mindControl',
-    label: 'Mind Control',
-    tip: 'They can scramble your chosen move',
-    icon: 'mindControl',
-    banner: 'MIND CONTROL!',
-    fx: fx('spiral', [PALETTE.purple, PALETTE.purpleDark, PALETTE.white]),
-  },
-
   // --- 1 · Dust Flats -------------------------------------------------------
   /** The wind does the stealing out here, and it takes it off your belt. */
   dustSnatch: {
-    base: 'bulletSteal',
+    effect: 'steal',
     world: 1,
+    amount: 1,
+    take: 0,
+    charge: 3,
     label: 'Dust Snatch',
-    tip: 'A gust off the flats takes a round from your belt',
+    tip: 'A gust off the flats takes a round out of the gun',
     icon: 'dustSnatch',
     banner: 'DUST SNATCH!',
     fx: fx('streak', [PALETTE.sandLight, PALETTE.sand, PALETTE.sandDark], { count: 34 }),
   },
+  /** Grit in the eyes. The gun still works; the aim does not. */
+  sandBlind: {
+    effect: 'blind',
+    world: 1,
+    turns: 1,
+    charge: 3,
+    label: 'Sand in the Eyes',
+    tip: 'Their next shot goes wide',
+    icon: 'sandBlind',
+    banner: 'BLINDED!',
+    fx: fx('swarm', [PALETTE.sand, PALETTE.sandLight, PALETTE.sandDeep], { count: 30 }),
+  },
 
   // --- 2 · Wildgrass Prairie ------------------------------------------------
+  /** A rope on the gun arm. They can reload and they can duck; they cannot fire. */
   lassoPull: {
-    base: 'bulletSteal',
+    effect: 'jam',
     world: 2,
-    label: 'Lasso Pull',
-    tip: 'A rope out of the grass whips a round out of your hand',
+    turns: 2,
+    charge: 4,
+    label: 'Lasso',
+    tip: 'A rope on the gun arm — they cannot shoot for two rounds',
     icon: 'lassoPull',
     banner: 'ROPED!',
-    fx: fx('streak', [PALETTE.boneDark, PALETTE.bone, PALETTE.woodDark], { count: 22 }),
+    fx: fx('streak', [PALETTE.boneDark, PALETTE.bone, PALETTE.woodDark], { count: 24 }),
   },
-  hornetSting: {
-    base: 'poison',
+  /** Nobody keeps a shield up with their hands full of hornets. */
+  hornetSwarm: {
+    effect: 'panic',
     world: 2,
-    label: 'Hornet Sting',
-    tip: 'Prairie hornets — the sting costs you a life three rounds later',
+    turns: 2,
+    charge: 4,
+    label: 'Hornet Swarm',
+    tip: 'Their shield stops nothing for two rounds',
     icon: 'hornetSting',
-    banner: 'STUNG!',
-    fx: fx('swarm', [PALETTE.gold, PALETTE.ink, PALETTE.goldLight], { count: 30 }),
+    banner: 'SWARMED!',
+    fx: fx('swarm', [PALETTE.gold, PALETTE.ink, PALETTE.goldLight], { count: 34 }),
   },
 
   // --- 3 · Whitecrown Pass --------------------------------------------------
-  coldGrip: {
-    base: 'bulletSteal',
+  /** Snow across the whole pass. Two shots into it and neither one arrives. */
+  whiteout: {
+    effect: 'blind',
     world: 3,
-    label: 'Cold Grip',
-    tip: 'Your cylinder freezes and gives a round up',
-    icon: 'coldGrip',
-    banner: 'FROZEN SOLID!',
-    fx: fx('streak', [PALETTE.iceLight, PALETTE.ice, PALETTE.snowMid]),
-  },
-  frostbite: {
-    base: 'poison',
-    world: 3,
-    label: 'Frostbite',
-    tip: 'The cold gets into you — a life three rounds later',
+    turns: 2,
+    charge: 3,
+    label: 'Whiteout',
+    tip: 'Their next two shots go wide',
     icon: 'frostbite',
-    banner: 'FROSTBITE!',
-    fx: fx('swarm', [PALETTE.snowLight, PALETTE.iceLight, PALETTE.snowShade], { count: 34 }),
+    banner: 'WHITEOUT!',
+    fx: fx('swarm', [PALETTE.snowLight, PALETTE.iceLight, PALETTE.snowShade], { count: 40 }),
   },
-  iceFall: {
-    base: 'dynamite',
+  /** The cylinder freezes shut and everything in it is lost. */
+  coldGrip: {
+    effect: 'empty',
     world: 3,
-    label: 'Ice Fall',
-    tip: 'A slab comes off the crag. A shield is no use under it',
+    take: 0,
+    charge: 5,
+    label: 'Cold Grip',
+    tip: 'Their cylinder freezes solid — every round in it is gone',
+    icon: 'coldGrip',
+    banner: 'FROZEN SHUT!',
+    fx: fx('streak', [PALETTE.iceLight, PALETTE.ice, PALETTE.snowMid], { count: 28 }),
+  },
+  /**
+   * THE ONE THAT HANDS OVER TURNS
+   * -------------------------------------------------------------------------
+   * Two rounds in which the other side does nothing at all: no shot, no
+   * shield, no reload. Whoever cast it has two turns to do as they like with
+   * an opponent standing still in front of them, which is the most any single
+   * thing in this game does — hence five rounds of charge, and hence the ice
+   * that stays on the sprite until it lets go, so nobody is ever surprised by
+   * their own turn being skipped.
+   */
+  deepFreeze: {
+    effect: 'freeze',
+    world: 3,
+    turns: 2,
+    charge: 5,
+    label: 'Deep Freeze',
+    tip: 'They are frozen solid: two rounds in which they do nothing at all',
     icon: 'iceFall',
-    banner: 'ICE FALL!',
-    fx: fx('fall', [PALETTE.snowLight, PALETTE.snowMid, PALETTE.iceLight], { shake: 340 }),
+    banner: 'FROZEN!',
+    hold: { color: PALETTE.iceLight, alpha: 0.55 },
+    fx: fx('fall', [PALETTE.iceLight, PALETTE.snowLight, PALETTE.ice], { count: 44, shake: 300 }),
   },
 
   // --- 4 · Blackwater Bayou -------------------------------------------------
-  mireGrasp: {
-    base: 'bulletSteal',
+  /**
+   * POISON.
+   *
+   * It used to be a stick you could buy in any shop in the game for one life
+   * three rounds later. It is the bayou's now, it is sold nowhere else, and it
+   * bites EVERY round for three of them — so it is worth three lives if the
+   * fight lasts and one if it does not, which is the most interesting thing a
+   * damage effect can be. Six rounds of charge, the joint-longest in the game,
+   * and the riders down here reach for it about a third as often as anything
+   * else.
+   */
+  poison: {
+    effect: 'venom',
     world: 4,
+    turns: 3,
+    charge: 6,
+    weight: 0.35,
+    label: 'Poison',
+    tip: 'One life a round for three rounds. No shield stops it',
+    icon: 'poison',
+    banner: 'POISONED!',
+    hold: { color: PALETTE.poison, alpha: 0.4 },
+    fx: fx('rise', [PALETTE.poison, PALETTE.poisonDark, PALETTE.greenLight], { count: 34 }),
+  },
+  /** Something under the water takes a life, and it does not waste it. */
+  mireGrasp: {
+    effect: 'drain',
+    world: 4,
+    amount: 1,
+    charge: 5,
     label: 'Mire Grasp',
-    tip: 'Something under the water takes a round off you',
+    tip: 'Takes a life off them and gives it to you',
     icon: 'mireGrasp',
     banner: 'DRAGGED UNDER!',
-    fx: fx('rise', [PALETTE.bogLight, PALETTE.bogDark, PALETTE.algae]),
+    fx: fx('rise', [PALETTE.bogLight, PALETTE.bogDark, PALETTE.algae], { count: 30 }),
   },
-  swampRot: {
-    base: 'poison',
-    world: 4,
-    label: 'Swamp Rot',
-    tip: 'Black water in the lungs — a life three rounds later',
-    icon: 'swampRot',
-    banner: 'ROTTING!',
-    fx: fx('rise', [PALETTE.algae, PALETTE.bog, PALETTE.lichen], { count: 32 }),
-  },
-  gasBurst: {
-    base: 'dynamite',
-    world: 4,
-    label: 'Gas Burst',
-    tip: 'A pocket of marsh gas goes up. A shield is no use over it',
-    icon: 'gasBurst',
-    banner: 'GAS BURST!',
-    fx: fx('burst', [PALETTE.algae, PALETTE.lichen, PALETTE.bogLight], { shake: 320 }),
-  },
+  /** The wisp leads a hand somewhere else — and comes back with the wrong gun. */
   willOWisp: {
-    base: 'mindControl',
+    effect: 'swap',
     world: 4,
+    charge: 4,
     label: "Will-o'-Wisp",
-    tip: 'A light on the water leads your hand somewhere else',
+    tip: 'Trades cylinders with them, whatever is in each',
     icon: 'willOWisp',
-    banner: 'LED ASTRAY!',
-    fx: fx('spiral', [PALETTE.algae, PALETTE.bogLight, PALETTE.white]),
+    banner: 'SWAPPED!',
+    fx: fx('spiral', [PALETTE.algae, PALETTE.bogLight, PALETTE.white], { count: 30 }),
+  },
+  /** Marked by the fever: everything that lands on them lands harder. */
+  swampFever: {
+    effect: 'mark',
+    world: 4,
+    turns: 3,
+    charge: 4,
+    label: 'Swamp Fever',
+    tip: 'For three rounds, everything that hits them costs one extra life',
+    icon: 'swampRot',
+    banner: 'FEVERED!',
+    hold: { color: PALETTE.algae, alpha: 0.35 },
+    fx: fx('swarm', [PALETTE.algae, PALETTE.bog, PALETTE.lichen], { count: 32 }),
   },
 
   // --- 5 · Brimstone Basin --------------------------------------------------
-  cinderSnatch: {
-    base: 'bulletSteal',
+  /**
+   * DYNAMITE.
+   *
+   * Also no longer general stock. Three lives at a stroke — far and away the
+   * biggest single hit in the game — and the only ability of the fourteen that
+   * A SHIELD STOPS. That is the whole design: it is the hardest thing to be
+   * hit by and the easiest thing to be ready for, so throwing it is a read
+   * rather than a purchase. Six rounds of charge, and the basin's riders throw
+   * it about a third as often as anything else they carry.
+   */
+  dynamite: {
+    effect: 'blast',
     world: 5,
-    label: 'Cinder Snatch',
-    tip: 'A round is pulled out of your gun and it is glowing',
-    icon: 'cinderSnatch',
-    banner: 'CINDER SNATCH!',
-    fx: fx('streak', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep]),
+    amount: 3,
+    charge: 6,
+    weight: 0.35,
+    label: 'Dynamite',
+    tip: 'Three lives at once — but a raised shield stops it dead',
+    icon: 'dynamite',
+    banner: 'DYNAMITE!',
+    fx: fx('burst', [PALETTE.goldLight, PALETTE.red, PALETTE.grey], { count: 46, shake: 420 }),
   },
-  emberBite: {
-    base: 'poison',
-    world: 5,
-    label: 'Ember Bite',
-    tip: 'An ember under your collar — a life three rounds later',
-    icon: 'emberBite',
-    banner: 'BURNING!',
-    fx: fx('rise', [PALETTE.magma, PALETTE.emberGlow, PALETTE.magmaDeep], { count: 32 }),
-  },
+  /** The ground opens under their boots. No shield is over that. */
   magmaSpout: {
-    base: 'dynamite',
+    effect: 'pierce',
     world: 5,
+    amount: 2,
+    charge: 5,
     label: 'Magma Spout',
-    tip: 'The ground opens under your boots. A shield is no use over it',
+    tip: 'Two lives from underneath. A shield is no use over it',
     icon: 'magmaSpout',
     banner: 'MAGMA SPOUT!',
-    fx: fx('rise', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], {
-      count: 40,
-      shake: 360,
-    }),
+    fx: fx('rise', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], { count: 40, shake: 320 }),
   },
-  hellWhisper: {
-    base: 'mindControl',
+  /** Their rounds come out glowing, and one of them is yours now. */
+  cinderSnatch: {
+    effect: 'steal',
     world: 5,
+    amount: 2,
+    take: 1,
+    charge: 3,
+    label: 'Cinder Snatch',
+    tip: 'Takes two rounds out of their gun and loads one into yours',
+    icon: 'cinderSnatch',
+    banner: 'CINDER SNATCH!',
+    fx: fx('streak', [PALETTE.emberGlow, PALETTE.magma, PALETTE.magmaDeep], { count: 30 }),
+  },
+  /** Something tells you where to put the next two, and it is right. */
+  hellWhisper: {
+    effect: 'doubleTap',
+    world: 5,
+    turns: 2,
+    /**
+     * Five rather than four. Two shots at double is two extra lives on a road
+     * where the average rider has two and a half of them, and at four rounds
+     * it landed in nearly every duel — measured, it was worth twenty points of
+     * win rate on its own, which is more than the volcano.
+     */
+    charge: 5,
     label: 'Hell Whisper',
-    tip: 'Something says your name and your hand answers it',
+    tip: 'Your next two shots cost them an extra life each',
     icon: 'hellWhisper',
     banner: 'WHISPERED TO!',
-    fx: fx('spiral', [PALETTE.magma, PALETTE.charDark, PALETTE.sulfurLight]),
+    hold: { color: PALETTE.magma, alpha: 0.3, self: true },
+    fx: fx('spiral', [PALETTE.magma, PALETTE.charDark, PALETTE.sulfurLight], { count: 28 }),
   },
 
   // --- 6 · Galaxy -----------------------------------------------------------
+  /** Everything in the cylinder leaves it, and two of them arrive in yours. */
   gravityPull: {
-    base: 'bulletSteal',
+    effect: 'empty',
     world: 6,
+    take: 2,
+    charge: 5,
     label: 'Gravity Pull',
-    tip: 'A round leaves your cylinder and does not fall',
+    tip: 'Empties their gun and two of the rounds end up in yours',
     icon: 'gravityPull',
     banner: 'PULLED!',
-    fx: fx('streak', [PALETTE.astralLight, PALETTE.astral, PALETTE.purple]),
+    fx: fx('streak', [PALETTE.astralLight, PALETTE.astral, PALETTE.purple], { count: 34 }),
   },
-  starRot: {
-    base: 'poison',
+  /** The next thing fired at you arrives at the man who fired it. */
+  voidMirror: {
+    effect: 'reflect',
     world: 6,
-    label: 'Star Rot',
-    tip: 'Something out here is inside you — a life three rounds later',
+    turns: 1,
+    charge: 4,
+    label: 'Void Mirror',
+    tip: 'The next shot that would hit you goes back at them instead',
     icon: 'starRot',
-    banner: 'STAR ROT!',
-    fx: fx('swarm', [PALETTE.astral, PALETTE.purple, PALETTE.astralLight], { count: 30 }),
+    banner: 'MIRRORED!',
+    hold: { color: PALETTE.astralLight, alpha: 0.35, self: true },
+    fx: fx('burst', [PALETTE.astralLight, PALETTE.astral, PALETTE.white], { count: 30 }),
   },
+  /** A rock out of nothing at all. Three lives, and no shield is over it. */
   meteorStrike: {
-    base: 'dynamite',
+    effect: 'pierce',
     world: 6,
+    amount: 3,
+    charge: 5,
     label: 'Meteor Strike',
-    tip: 'A rock arrives out of nothing. A shield is no use under it',
+    tip: 'Three lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
     banner: 'METEOR!',
-    fx: fx('fall', [PALETTE.astralLight, PALETTE.purple, PALETTE.white], { shake: 380 }),
+    fx: fx('fall', [PALETTE.astralLight, PALETTE.purple, PALETTE.white], { count: 44, shake: 420 }),
   },
+  /** The space between a thought and a hand comes apart for two rounds. */
   mindRift: {
-    base: 'mindControl',
+    effect: 'freeze',
     world: 6,
+    turns: 2,
+    charge: 5,
     label: 'Mind Rift',
-    tip: 'The space between your thought and your hand comes apart',
+    tip: 'Two rounds in which they can do nothing at all',
     icon: 'mindRift',
     banner: 'RIFTED!',
-    fx: fx('spiral', [PALETTE.purple, PALETTE.astralLight, PALETTE.cosmic]),
+    hold: { color: PALETTE.purple, alpha: 0.5 },
+    fx: fx('spiral', [PALETTE.purple, PALETTE.astralLight, PALETTE.cosmic], { count: 36, shake: 300 }),
   },
 };
 
@@ -505,27 +604,25 @@ export const SPECIAL_TIMING = {
 };
 
 /**
- * Look an ability up by id. Never null: an id with no entry is treated as a
- * base effect of its own name, which is what keeps a half-finished theme from
- * taking the duel down with it.
+ * Look an ability up by id. Never null: an unknown id comes back inert rather
+ * than undefined, which is what keeps a half-finished theme from taking the
+ * duel down with it.
  */
 export function getAbility(id) {
   const entry = ABILITIES[id];
   if (entry) return { id, ...entry };
-  return {
-    id,
-    base: BASE_EFFECTS.includes(id) ? id : null,
-    label: id,
-    tip: '',
-    icon: id,
-    banner: null,
-    fx: null,
-  };
+  return { id, effect: null, label: id, tip: '', icon: id, banner: null, fx: null };
 }
 
 /** What an ability id actually does to the duel. */
-export function baseEffectOf(id) {
-  return getAbility(id).base;
+export function effectOf(id) {
+  return getAbility(id).effect;
+}
+
+/** True when a raised shield is any use against this ability. Only blast is. */
+export function isBlockable(id) {
+  const effect = effectOf(id);
+  return !!(effect && EFFECTS[effect]?.blocks);
 }
 
 /** Look a special up by id. Null when there is none. */
@@ -545,8 +642,9 @@ export function specialDamage(spec) {
 /**
  * WHAT AN ABILITY IS WORTH, AND WHAT IT COSTS
  * ---------------------------------------------------------------------------
- * The numbers below were set against the four figures that actually constrain
- * them, measured off src/game/worlds.js and src/game/progression.js:
+ * The numbers on each entry above were set against the four figures that
+ * actually constrain them, measured off src/game/worlds.js and
+ * src/game/progression.js:
  *
  *   world | avg enemy lives | boss lives | gold a world pays | rare / legendary
  *      1  |      1.2        |     3      |       287         |   130 /   260
@@ -554,80 +652,96 @@ export function specialDamage(spec) {
  *      5  |      2.4        |     6      |     2,628         | 1,005 / 2,010
  *      6  |      3.2        |    5+7     |     1,715         | 1,800 / 3,600
  *
- * Three rules came out of that, and every number here follows them.
+ * Four rules came out of that, and every number follows them.
  *
  * 1. AN ABILITY IS A THIRD OF A WORLD'S WAGES. A basic is a rare and a special
  *    is a legendary, so the existing price curve already puts one at roughly a
  *    third of what a world pays out and the other at most of it. Nothing new
  *    was invented for pricing: the curve that sells a vest sells these.
  *
- * 2. IT IS RATIONED BY TIME, NOT BY STOCK. A duel runs six or seven rounds.
- *    A basic charging in three or four means one use, occasionally two; a
- *    special charging in five or six means once, late, and only if the fight
- *    lasts. That is the whole balance mechanism — an ability that could be
- *    spent every round would make the gun decorative.
+ * 2. IT IS RATIONED BY TIME, NOT BY STOCK. A duel runs six or seven rounds, so
+ *    a three-round charge is two uses, a four is one or two, and a six is one —
+ *    late, and only if the fight lasts. That is the whole balance mechanism.
  *
- * 3. IT IS SUPPOSED TO DECIDE BOSSES, NOT DRIFTERS. A one-life drifter dies to
- *    anything and always did. The number actually watched while tuning is what
- *    a full charge is worth against a BOSS: about a third of Big Jed, and about
- *    two thirds of Old Scratch by the time you can afford the basin's kit. A
- *    boss is still a fight you can lose with a special in your pocket, which is
- *    the line.
+ * 3. THE COST IS THE SIZE OF WHAT IT TAKES AWAY. Not damage — turns. Anything
+ *    that hands its caster free turns (freeze, and the empty that leaves a gun
+ *    with nothing in it) costs five. Poison and dynamite cost six, the longest
+ *    in the game, because three lives is most of any enemy in the first four
+ *    worlds. The cheap ones at three are the ones that only bend a round:
+ *    a stolen bullet, a shot sent wide.
  *
- * WHY THREE BANDS AND NOT SIX STEPS
+ * 4. IT IS SUPPOSED TO DECIDE BOSSES, NOT DRIFTERS. A one-life drifter dies to
+ *    anything and always did. The figure watched while tuning is what a full
+ *    charge is worth against a BOSS: about a third of Big Jed, about two thirds
+ *    of Old Scratch by the time the basin's kit is affordable. A boss is still
+ *    a fight you can lose with a volcano in your pocket.
+ *
+ * WHY THE NUMBERS ARE ON THE ABILITY AND NOT IN A BAND TABLE
  * ---------------------------------------------------------------------------
- * Abilities improve in three steps, indexed by the world the ability comes
- * from: worlds 1-2, 3-4, 5-6. Six steps would need the player to re-buy in
- * every world to keep pace, at a third of their income each time, which is not
- * an upgrade path — it is a tax. Three means the kit you bought in the prairie
- * is still worth carrying through the pass, and the basin's version is a real
- * decision rather than an increment.
+ * They used to be tuned three times over, once per pair of worlds, because the
+ * same four effects turned up in all six. Each ability is its own mechanic now
+ * and belongs to exactly one world, so "it gets better as you go" is simply
+ * that the later entries are stronger — Dust Snatch takes one round, Gravity
+ * Pull takes the whole cylinder. One number, in one place, on the thing it
+ * describes.
  */
-const band = (worldId) => (worldId <= 2 ? 0 : worldId <= 4 ? 1 : 2);
+
+/** Shop base prices. The world curve in progression.js does the rest. */
+export const ABILITY_PRICE = { basic: 130, special: 260 };
 
 /**
- * Player-side tuning for the four base effects, one row per band.
+ * The player's version of one ability: exactly the entry above, plus the
+ * sentence the shop prints under it. Player and enemy fire the same numbers —
+ * the asymmetry is in the turn rule (see the header), not in the tuning.
  *
- *   charge  rounds of the duel before it can be spent
- *   amount  lives, or rounds taken out of a gun — read per effect below
- *
- * `dynamite` charges a round slower than the rest at every band, because it is
- * the only one of the four that is damage on the spot: everything else asks the
- * player to still win the round they set up.
+ * @param {string} id an ABILITIES key
  */
-export const PLAYER_BASIC = {
-  /** Take rounds out of their gun; `take` of them end up in yours. */
-  bulletSteal: [
-    { charge: 4, amount: 1, take: 0 },
-    { charge: 3, amount: 1, take: 1 },
-    { charge: 3, amount: 2, take: 1 },
-  ],
-  /** `amount` lives, `delay` rounds later, through any shield. */
-  poison: [
-    { charge: 4, amount: 1, delay: 3 },
-    { charge: 3, amount: 1, delay: 2 },
-    { charge: 3, amount: 2, delay: 2 },
-  ],
-  /** `amount` lives now, through any shield. */
-  dynamite: [
-    { charge: 5, amount: 1 },
-    { charge: 4, amount: 1 },
-    { charge: 4, amount: 2 },
-  ],
-  /**
-   * Their hand goes to the wrong thing: whatever they meant to do this round,
-   * they reload instead — wide open to the shot you are about to take.
-   *
-   * The enemy's mind control scrambles the player at random and the player's
-   * does not, for one reason: a scramble the player cannot see is not an
-   * ability, it is a dice roll. Forcing a move you can plan around is the same
-   * effect made legible.
-   *
-   * Only worlds 4-6 have a mind-control theme, so band 0 is unreachable and is
-   * written to match band 1 rather than left undefined.
-   */
-  mindControl: [{ charge: 4 }, { charge: 4 }, { charge: 3 }],
-};
+export function playerAbility(id) {
+  const ability = getAbility(id);
+  if (!ability.effect || !ability.world) return null;
+  return { ...ability, kind: 'basic', desc: describeAbility(ability) };
+}
+
+/** The one-line description, written from the numbers so it can never drift. */
+export function describeAbility(a) {
+  const lives = (n) => `${n} ${n === 1 ? 'life' : 'lives'}`;
+  const rounds = (n) => `${n} ${n === 1 ? 'round' : 'rounds'}`;
+  const after = ` Charges in ${a.charge} rounds.`;
+  switch (a.effect) {
+    case 'steal':
+      return `Takes ${rounds(a.amount)} out of their gun${
+        a.take ? ` and loads ${a.take} into yours` : ''
+      }.${after}`;
+    case 'empty':
+      return `Empties their cylinder${a.take ? `, and ${a.take} of them end up in yours` : ''}.${after}`;
+    case 'swap':
+      return `Trades cylinders with them, whatever is in each.${after}`;
+    case 'blast':
+      return `${lives(a.amount)} at once — but a raised shield stops it dead.${after}`;
+    case 'pierce':
+      return `${lives(a.amount)}, straight through any shield.${after}`;
+    case 'venom':
+      return `One life a round for ${rounds(a.turns)}. No shield stops it.${after}`;
+    case 'drain':
+      return `Takes ${lives(a.amount)} off them and gives it to you.${after}`;
+    case 'freeze':
+      return `They do nothing at all for ${rounds(a.turns)} — the turns are yours.${after}`;
+    case 'jam':
+      return `They cannot shoot for ${rounds(a.turns)}.${after}`;
+    case 'panic':
+      return `Their shield stops nothing for ${rounds(a.turns)}.${after}`;
+    case 'blind':
+      return `Their next ${a.turns === 1 ? 'shot goes' : `${a.turns} shots go`} wide.${after}`;
+    case 'mark':
+      return `For ${rounds(a.turns)}, everything that hits them costs one extra life.${after}`;
+    case 'doubleTap':
+      return `Your next ${a.turns === 1 ? 'shot costs' : `${a.turns} shots cost`} them an extra life.${after}`;
+    case 'reflect':
+      return `The next shot that would hit you goes back at them instead.${after}`;
+    default:
+      return `Charges in ${a.charge} rounds.`;
+  }
+}
 
 /**
  * The player's special: the same landmark the enemy raises, aimed the other way
@@ -639,9 +753,9 @@ export const PLAYER_BASIC = {
  * a full charge buys is one eruption on the rival — `strikes` rocks, a life
  * each, over a couple of seconds.
  *
- *   band 0 (worlds 1-2)  6 rounds → 2 lives
- *   band 1 (worlds 3-4)  5 rounds → 3 lives
- *   band 2 (worlds 5-6)  5 rounds → 4 lives
+ *   worlds 1-2  6 rounds → 2 lives
+ *   worlds 3-4  5 rounds → 3 lives
+ *   worlds 5-6  5 rounds → 4 lives
  *
  * Four lives is two thirds of Old Scratch and it arrives at round five of a
  * fight that averages six and a half — so it lands in about half the duels you
@@ -653,27 +767,13 @@ export const PLAYER_SPECIAL = [
   { charge: 5, strikes: 4 },
 ];
 
-/** Shop base prices. The world curve in progression.js does the rest. */
-export const ABILITY_PRICE = { basic: 130, special: 260 };
-
-/**
- * The player's version of one themed ability: what it does, how long it takes
- * to charge, and the sentence the shop prints under it.
- * @param {string} id an ABILITIES key
- */
-export function playerAbility(id) {
-  const ability = getAbility(id);
-  const tuning = ability.base ? PLAYER_BASIC[ability.base] : null;
-  if (!tuning) return null;
-  const row = tuning[band(ability.world || 1)];
-  return { ...ability, kind: 'basic', ...row, desc: describeBasic(ability.base, row) };
-}
+const specialBand = (worldId) => (worldId <= 2 ? 0 : worldId <= 4 ? 1 : 2);
 
 /** The player's version of one world special. */
 export function playerSpecial(id) {
   const spec = getSpecial(id);
   if (!spec) return null;
-  const row = PLAYER_SPECIAL[band(spec.world || 1)];
+  const row = PLAYER_SPECIAL[specialBand(spec.world || 1)];
   return {
     ...spec,
     kind: 'special',
@@ -694,26 +794,27 @@ export function playerSpecial(id) {
   };
 }
 
-function describeBasic(base, row) {
-  const lives = (n) => `${n} ${n === 1 ? 'life' : 'lives'}`;
-  const after = ` Charges in ${row.charge} rounds.`;
-  switch (base) {
-    case 'bulletSteal':
-      return `Takes ${row.amount} ${row.amount === 1 ? 'round' : 'rounds'} out of their gun${
-        row.take ? ` and loads ${row.take} into yours` : ''
-      }.${after}`;
-    case 'poison':
-      return `${lives(row.amount)} ${row.delay} rounds later, through any shield.${after}`;
-    case 'dynamite':
-      return `${lives(row.amount)} on the spot, through any shield.${after}`;
-    case 'mindControl':
-      return `Their hand goes wrong: they reload this round instead, wide open.${after}`;
-    default:
-      return `Charges in ${row.charge} rounds.`;
-  }
-}
-
 /** Every themed ability a given world's shop can sell. */
 export function abilitiesForWorld(worldId) {
   return Object.keys(ABILITIES).filter((id) => ABILITIES[id].world === worldId);
+}
+
+/**
+ * How often an enemy holding a mixed hand reaches for each of them.
+ *
+ * Uniform until poison and dynamite arrived at three lives apiece. Those two
+ * carry `weight: 0.35`, so a bayou rider with poison and three other tricks
+ * plays poison about one time in ten rather than one in four — which is what
+ * makes it the thing you remember about the bayou instead of the thing you
+ * dread every round.
+ */
+export function pickWeighted(ids, roll) {
+  const weights = ids.map((id) => getAbility(id).weight ?? 1);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let t = roll * total;
+  for (let i = 0; i < ids.length; i++) {
+    t -= weights[i];
+    if (t <= 0) return ids[i];
+  }
+  return ids[ids.length - 1];
 }

@@ -94,29 +94,19 @@ const CATALOGUE = {
     desc: 'Restores 3 lives in one gulp.',
   },
 
-  // --- Duel items ----------------------------------------------------------
-  dynamite: {
-    id: 'dynamite',
-    name: 'Dynamite',
-    icon: 'dynamite',
-    rarity: 'rare',
-    basePrice: 120,
-    context: 'duel',
-    duelEffect: 'dynamite',
-    stack: 10,
-    desc: 'Throw it: 1 damage that ignores shields.',
-  },
-  poison: {
-    id: 'poison',
-    name: 'Poison',
-    icon: 'poison',
-    rarity: 'rare',
-    basePrice: 110,
-    context: 'duel',
-    duelEffect: 'poison',
-    stack: 10,
-    desc: 'Poisons your rival: 1 damage after 3 rounds.',
-  },
+  /**
+   * THERE ARE NO DUEL THROWABLES ANY MORE
+   * -------------------------------------------------------------------------
+   * Dynamite and Poison used to live here, as ten-stack items any shop in the
+   * game would sell. Both are world ABILITIES now — dynamite belongs to
+   * Brimstone Basin and poison to the Blackwater Bayou, they are sold in those
+   * worlds' shops and nowhere else, and they were rewritten to be worth the
+   * trip (three lives at once, and a life a round for three rounds). See
+   * src/game/world-abilities.js.
+   *
+   * What is left in the bag for a duel is what was always the honest part of
+   * it: something to eat and something to patch yourself up with.
+   */
 
   // --- Passives ------------------------------------------------------------
   vest: {
@@ -258,7 +248,7 @@ export const ITEM_LIST = Object.values(ITEMS);
 /** Items shops may stock, grouped by rarity (perks and food included). */
 export const SHOP_POOL = {
   common: ['carrot', 'apple', 'bandage'],
-  rare: ['potion', 'dynamite', 'poison', 'map', 'ledger'],
+  rare: ['potion', 'map', 'ledger'],
   legendary: ['vest', 'diadem', 'horse', 'silverTongue'],
 };
 
