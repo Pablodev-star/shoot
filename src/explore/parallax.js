@@ -65,6 +65,7 @@ import {
   SKY_BODY_SIZE,
   SKY_GLOW_SIZE,
 } from '../art/sprites-environment.js';
+import { PLAYER_SIZE } from '../art/sprites-character.js';
 import { makeRng } from '../core/rng.js';
 import { getSky } from './daynight.js';
 import { getWeatherState } from './weather.js';
@@ -90,6 +91,22 @@ const MARGIN = 48;
 
 /** Colour step the sky ramp is quantised to before dithering. */
 const QUANTUM = 10;
+
+/**
+ * Where the traveller stands, as a fraction of the frame's width.
+ *
+ * The road's one fixed point. He never moves off it — the world moves past him
+ * — so anything that has to line up with him is placed against this rather
+ * than against the left edge of the screen. The explore screen draws him here
+ * and `drawStructures` puts the shop doors here; see the note there for why
+ * that stopped the player walking straight past every shop in the game.
+ */
+const HERO_ANCHOR = 0.26;
+
+/** The traveller's left edge in device pixels, for the frame given. */
+export function heroX(view) {
+  return Math.round(view.w * HERO_ANCHOR);
+}
 
 /**
  * 4x4 ordered (Bayer) dither thresholds, normalised. A 2x2 checker only has
@@ -460,12 +477,28 @@ export function createParallax(options = {}) {
 
   // --- structures (shops / inns placed by the encounter generator) ----------
 
+  /**
+   * THE DOOR STANDS WHERE THE TRAVELLER DOES
+   * -------------------------------------------------------------------------
+   * A stop is *reached* the moment the walk engine's distance counter passes
+   * the event's world position — and that position used to be drawn at screen
+   * x = 0, the left edge of the frame, while the traveller walks a quarter of
+   * the way in. So the shop slid past him, off the side of the screen, and
+   * only then did the game cut to the counter: you entered a building you had
+   * visibly already left behind.
+   *
+   * Placing the building's middle — which is where both false fronts put their
+   * doorway — on the traveller's middle fixes it at the source, and it fixes
+   * it for the walk back out too: leaving the shop puts him in the doorway of
+   * the building he just came out of.
+   */
   function drawStructures(ctx, view, cameraX, gy) {
     const s = view.scale;
+    const doorX = heroX(view) + (PLAYER_SIZE.w * s) / 2;
     for (const st of structures) {
       const sprite = env.buildings[st.kind];
       if (!sprite) continue;
-      const sx = (st.worldX - cameraX) * s;
+      const sx = (st.worldX - cameraX) * s + doorX - (sprite.width * s) / 2;
       if (sx < -sprite.width * s * 1.2 || sx > view.w + sprite.width * s) continue;
       const sy = gy + 4 * s - sprite.height * s;
       drawSprite(ctx, sprite, sx, sy, s);

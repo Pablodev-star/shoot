@@ -151,9 +151,28 @@ export function createWalkEngine() {
     emit(EVENTS.WALK_RESUMED, {});
   }
 
+  /** Still over the horizon further ahead than this. */
+  const AHEAD_WINDOW = 700;
   /**
-   * World positions of the buildings that belong to upcoming shop/inn events,
-   * so the parallax renderer can show them approaching on the horizon.
+   * Long off the back of the frame further behind than this. Deliberately
+   * generous: the renderer culls on screen position, which is the honest test,
+   * and this only decides what is worth handing it.
+   */
+  const BEHIND_WINDOW = 900;
+
+  /**
+   * World positions of the buildings that belong to the shop/inn events near
+   * the traveller, so the parallax renderer can draw them.
+   *
+   * A BUILDING YOU HAVE USED IS STILL A BUILDING
+   * -------------------------------------------------------------------------
+   * Resolved stops used to be dropped from this list the moment the encounter
+   * fired, which meant the shop vanished off the road while the player was
+   * inside it: they walked out of a door into empty desert, with the place they
+   * had just been standing in gone. A shop is not a pickup. It stays where it
+   * was built, and the player walks away from it — so the window runs behind
+   * the traveller as well as in front, and only the distance either side of him
+   * decides what is worth drawing.
    */
   function visibleStructures() {
     if (!segment) return [];
@@ -161,9 +180,9 @@ export function createWalkEngine() {
     const out = [];
     for (const event of segment.events) {
       if (event.type !== 'shop' && event.type !== 'inn') continue;
-      if (event.resolved) continue;
       const worldX = effectiveDistance(event, mounted, HORSE_TIME_MUL);
-      if (worldX - travelled > 700) continue; // still over the horizon
+      const gap = worldX - travelled;
+      if (gap > AHEAD_WINDOW || gap < -BEHIND_WINDOW) continue;
       out.push({ worldX, kind: event.type });
     }
     return out;

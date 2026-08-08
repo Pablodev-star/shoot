@@ -135,54 +135,80 @@ export function goldChip(gold, tip = 'Gold') {
 }
 
 /**
- * Labelled meter: a title row with a value, plus a bar.
+ * A vital gauge: an icon, a notched track, and the number inside the track.
  *
- * `setFlag` is how a meter says it is being drained faster than normal — a
- * badge next to the label, and a state class on the bar so the bar itself can
- * show the reason (see the sand-blasted hunger meter in styles/ui.css). A rate
+ * It replaced a stacked meter — a label row with the value on the far right,
+ * and a bar underneath it — which was as tall as the whole rest of the travel
+ * band and, given a full-width row to sit in, drew a metre-long hunger bar.
+ * Everything is on one line here, so the band stays one line, and the number
+ * rides inside the track instead of at the other end of the strip from it.
+ *
+ * The notches are the point. A smooth bar at 40% is a percentage; ten ration
+ * marks with four of them left is a supply, and the player can read it without
+ * reading the number at all.
+ *
+ * `setRate` is how a gauge says it is emptying faster than normal — a badge
+ * with the multiplier on it, and a state class on the track so the track can
+ * show the reason (see the scoured hunger gauge in styles/ui.css). A rate
  * change the player cannot see is a difficulty change they can only discover
  * by losing to it.
  *
  * @returns {{
  *   node: HTMLElement,
- *   bar: HTMLElement,
+ *   track: HTMLElement,
  *   set(ratio: number, text?: string): void,
- *   setFlag(flag: {text: string, tip?: string, state?: string} | null): void,
+ *   setRate(rate: {text: string, tip?: string, state?: string} | null): void,
  * }}
  */
-export function meter({ label, iconName, ratio = 1, value = '', variant = '' }) {
-  const fill = el('div.fill', { style: { width: `${clamp01(ratio) * 100}%` } });
-  const bar = el('div.bar', { class: variant }, [fill]);
-  const valueNode = el('span.meter-value', { text: value });
-  const flagNode = el('span.meter-flag', { hidden: true });
-  const node = el('div.meter', {}, [
-    el('div.meter-head', {}, [
-      el('span.row.row--tight', {}, [iconName ? icon(iconName, 0.9) : null, label, flagNode]),
-      valueNode,
-    ]),
-    bar,
+export function gauge({ label, iconName, ratio = 1, value = '', tip = '' } = {}) {
+  const fill = el('div.gauge-fill', { style: { width: `${clamp01(ratio) * 100}%` } });
+  const valueNode = el('span.gauge-value', { text: value });
+  const track = el('div.gauge-track', {}, [fill, el('span.gauge-notches'), valueNode]);
+  const rateNode = el('span.gauge-rate', { hidden: true });
+  const node = el('div.gauge', {
+    role: 'meter',
+    'aria-label': label,
+    'aria-valuemin': '0',
+    'aria-valuemax': '100',
+    'aria-valuenow': String(Math.round(clamp01(ratio) * 100)),
+    'data-tip': tip || label,
+  }, [
+    iconName ? icon(iconName, 0.9, 'gauge-icon') : null,
+    label ? el('span.gauge-label', { text: label }) : null,
+    track,
+    rateNode,
   ]);
-  let flagState = null;
+
+  let rateState = null;
+  applyLevel(track, clamp01(ratio));
+
   return {
     node,
-    bar,
+    track,
     set(nextRatio, nextValue) {
       const r = clamp01(nextRatio);
       fill.style.width = `${r * 100}%`;
-      bar.classList.toggle('is-warn', r <= 0.45 && r > 0.2);
-      bar.classList.toggle('is-low', r <= 0.2);
+      applyLevel(track, r);
+      node.setAttribute('aria-valuenow', String(Math.round(r * 100)));
       if (nextValue != null) valueNode.textContent = nextValue;
     },
-    setFlag(flag) {
-      if (flagState) bar.classList.remove(flagState);
-      flagState = flag?.state || null;
-      flagNode.hidden = !flag;
-      flagNode.textContent = flag?.text || '';
-      if (flag?.tip) flagNode.dataset.tip = flag.tip;
-      else delete flagNode.dataset.tip;
-      if (flagState) bar.classList.add(flagState);
+    setRate(rate) {
+      if (rateState) track.classList.remove(rateState);
+      rateState = rate?.state || null;
+      rateNode.hidden = !rate;
+      rateNode.textContent = rate?.text || '';
+      if (rate?.tip) rateNode.dataset.tip = rate.tip;
+      else delete rateNode.dataset.tip;
+      if (rateState) track.classList.add(rateState);
     },
   };
+}
+
+/** Three thresholds, one class each: getting low, nearly gone, gone. */
+function applyLevel(track, r) {
+  track.classList.toggle('is-warn', r <= 0.45 && r > 0.2);
+  track.classList.toggle('is-low', r <= 0.2 && r > 0);
+  track.classList.toggle('is-empty', r <= 0);
 }
 
 /**

@@ -7,9 +7,24 @@
  * It used to be two: a status bar and, on the road, a second full-width panel
  * underneath it holding the hunger meter and a row of weather chips. Together
  * they took a fifth of the screen before the game had drawn anything. The
- * hunger meter now lives here — it is a survival stat like lives and gold, and
+ * hunger gauge now lives here — it is a survival stat like lives and gold, and
  * it belongs with them — and the weather chips are gone, because the sky
  * already shows the weather.
+ *
+ * FOUR GROUPS, NOT NINE THINGS IN A ROW
+ * ---------------------------------------------------------------------------
+ * The band used to be a flat list of children with hairline rules dropped
+ * between some of them and an invisible spacer holding the right-hand end
+ * apart. At a middling width that list wrapped wherever it happened to run out
+ * of room, the rules ended up leading nothing, and the hunger meter — the only
+ * elastic item — was thrown onto a line of its own where it drew a bar the
+ * width of the screen.
+ *
+ * It is four groups now — where you are, how you are doing, what you have, and
+ * what you can press — and each one wraps as a unit. The band measures itself
+ * rather than the window (see the container queries in styles/game.css), so the
+ * same strip laid over a phone and inside a 420px shop column collapses the
+ * same way and at the same point.
  *
  * It subscribes to the event bus itself, so screens just mount it and forget.
  */
@@ -20,11 +35,11 @@ import { getState, expProgress } from '../game/player.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { HUNGER_MAX } from '../game/progression.js';
 import { drainMultiplier } from '../explore/hunger.js';
-import { livesRow, updateLivesRow, meter, goldChip, uiIcon } from './widgets.js';
+import { livesRow, updateLivesRow, gauge, goldChip, uiIcon } from './widgets.js';
 
 /**
  * @param {object} opts
- * @param {boolean} [opts.hunger] include the hunger meter (the road does; a
+ * @param {boolean} [opts.hunger] include the hunger gauge (the road does; a
  *   shop counter does not — you cannot starve while browsing)
  * @param {HTMLElement[]} [opts.actions] trailing buttons
  * @returns {HTMLElement} with a `dispose()` method to drop its subscriptions
@@ -35,38 +50,53 @@ export function trailBand(opts = {}) {
 
   const lives = livesRow(player.lives, player.maxLives);
   const gold = goldChip(player.gold);
-  const levelChip = el('span.chip', {}, [el('span', { text: `Lv ${player.level}` })]);
   const worldLabel = el('span.world', { text: world.name });
 
+  /**
+   * The level chip carries its own progress along its bottom edge. The number
+   * alone only ever moves once every several fights, so between those moments
+   * it said nothing about how close the next one was — and the exp total was
+   * already being computed here for the tooltip nobody hovers on a phone.
+   */
+  const levelValue = el('span', { text: `Lv ${player.level}` });
+  const levelChip = el('span.chip.chip--level', {}, [levelValue]);
+  const syncLevel = (level) => {
+    const p = expProgress();
+    levelValue.textContent = `Lv ${level}`;
+    levelChip.style.setProperty('--exp', `${Math.round(p.ratio * 100)}%`);
+    levelChip.dataset.tip = `${p.exp} / ${p.next} exp to level ${level + 1}`;
+  };
+
   const hunger = opts.hunger
-    ? meter({
+    ? gauge({
         label: 'Hunger',
         iconName: 'hunger',
         ratio: player.hunger / HUNGER_MAX,
         value: `${Math.round(player.hunger)}%`,
+        tip: 'Eat before it runs out — starving costs you a life at a time',
       })
     : null;
 
-  const node = el('div.trailband', {}, [
-    el('div.trailband-place', {}, [uiIcon('signpost', 1), worldLabel]),
-    el('span.rule'),
-    lives,
-    hunger ? el('span.rule') : null,
-    hunger ? hunger.node : null,
-    el('span.grow'),
-    levelChip,
-    gold,
-    ...(opts.actions?.length ? [el('div.trailband-actions', {}, opts.actions)] : []),
+  /**
+   * The wrapper is not decoration: a container query can only style things
+   * *inside* the element it measures, never that element itself, and the band
+   * has to change its own layout at the narrow end. So the wrapper is what
+   * gets measured and the strip inside it is what reshapes.
+   */
+  const node = el('div.trailband-wrap', {}, [
+    el('div.trailband', {}, [
+      el('div.trailband-place', {}, [uiIcon('signpost', 1), worldLabel]),
+      lives,
+      hunger ? hunger.node : null,
+      el('div.trailband-stats', {}, [levelChip, gold]),
+      opts.actions?.length ? el('div.trailband-actions', {}, opts.actions) : null,
+    ]),
   ]);
 
   const unsubs = [
     on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => updateLivesRow(lives, l, maxLives)),
     on(EVENTS.GOLD_CHANGED, ({ gold: g }) => gold.setValue(g)),
-    on(EVENTS.EXP_CHANGED, ({ level }) => {
-      const p = expProgress();
-      levelChip.firstChild.textContent = `Lv ${level}`;
-      levelChip.dataset.tip = `${p.exp} / ${p.next} exp to level ${level + 1}`;
-    }),
+    on(EVENTS.EXP_CHANGED, ({ level }) => syncLevel(level)),
     on(EVENTS.WORLD_CHANGED, ({ world: id }) => {
       worldLabel.textContent = getWorld(id).name;
       worldLabel.dataset.tip = `World ${id} of ${FINAL_WORLD}`;
@@ -75,39 +105,46 @@ export function trailBand(opts = {}) {
 
   if (hunger) {
     /**
-     * Harsh weather eats your rations faster — a sandstorm half again as fast,
-     * snow and ashfall not far behind. The meter says so rather than leaving
-     * the player to notice that the bar is emptying while the sky happens to
-     * be orange: a badge on the label carrying the actual multiplier, and a
-     * bar that looks scoured — see `.bar.is-harsh`.
+     * Two things eat your rations faster than walking does: the horse, which
+     * covers more ground per hour, and harsh weather — a sandstorm half again
+     * as fast, snow and ashfall not far behind. The gauge says so rather than
+     * leaving the player to notice that the bar is emptying while the sky
+     * happens to be orange: a badge carrying the actual combined multiplier,
+     * and a track that looks scoured whenever the sky is the reason.
      *
-     * It reads the number out of the sky rather than deciding for itself which
-     * weathers count, so a new one is visible here the day it is added.
+     * It reads the number out of the hunger system rather than deciding for
+     * itself what counts, so a new drain is visible here the day it is added.
      */
-    const syncWeatherFlag = () => {
-      const { weather, weatherLabel } = drainMultiplier();
-      hunger.setFlag(
-        weatherLabel
-          ? {
-              text: `×${weather}`,
-              tip: `${weatherLabel} is burning your rations faster`,
-              state: 'is-harsh',
-            }
-          : null,
-      );
+    const syncDrain = () => {
+      const { total, horse, weatherLabel } = drainMultiplier();
+      const causes = [horse && 'the horse', weatherLabel && `the ${weatherLabel.toLowerCase()}`]
+        .filter(Boolean);
+      // No badge without something to name in it: a multiplier the player
+      // cannot attribute is worse than no multiplier.
+      if (total <= 1.001 || !causes.length) {
+        hunger.setRate(null);
+        return;
+      }
+      const subject = causes.join(' and ');
+      hunger.setRate({
+        text: `×${Math.round(total * 10) / 10}`,
+        tip: `${subject[0].toUpperCase()}${subject.slice(1)} ${causes.length > 1 ? 'are' : 'is'} burning your rations faster`,
+        // Only the sky scours the track. The horse is a rate, not a texture.
+        state: weatherLabel ? 'is-harsh' : null,
+      });
     };
-    syncWeatherFlag();
+    syncDrain();
 
     unsubs.push(
       on(EVENTS.HUNGER_CHANGED, ({ hunger: h }) =>
         hunger.set(h / HUNGER_MAX, `${Math.round(h)}%`),
       ),
-      on(EVENTS.WEATHER_CHANGED, syncWeatherFlag),
+      on(EVENTS.WEATHER_CHANGED, syncDrain),
+      on(EVENTS.HORSE_ACQUIRED, syncDrain),
     );
   }
 
-  const p = expProgress();
-  levelChip.dataset.tip = `${p.exp} / ${p.next} exp to level ${player.level + 1}`;
+  syncLevel(player.level);
   worldLabel.dataset.tip = `World ${player.world} of ${FINAL_WORLD}`;
 
   node.dispose = () => unsubs.forEach((fn) => fn());
