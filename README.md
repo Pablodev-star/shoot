@@ -192,12 +192,18 @@ There is no level select. You walk, and the road decides what you meet.
   couple of fights between any two of them. So a stretch can offer a shop, three
   duels and another shop with no bed anywhere in between, or two inns and a
   single store. Nothing is ever adjacent to anything of its own kind, and no
-  building is ever stumbled into: they are always approached.
+  building is ever stumbled into: they are always approached — and you stop at
+  the door. The building is drawn so its doorway lands on the traveller at the
+  moment the stop is reached, and it is still standing there behind you when
+  you walk on.
 - **Hunger** drains while you travel. At zero you lose a life every 12 seconds,
-  so food is a real purchase, not a nicety. Harsh weather burns it faster — a
-  sandstorm half again as fast, snow and ashfall close behind — and the meter
-  says so: the multiplier sits next to the label and the bar looks scoured, so
-  the change is never something you find out by dying.
+  so food is a real purchase, not a nicety. The gauge is notched into ten
+  rations, so how much is left is something you see rather than read. Two
+  things burn them faster — the horse, and harsh weather, a sandstorm half
+  again as fast with snow and ashfall close behind — and the gauge says so: the
+  combined multiplier rides beside the track, and the track looks scoured
+  whenever the sky is the reason, so the change is never something you find out
+  by dying.
 - **A horse** roughly halves travel time.
 - **Day and night** run on a continuous clock, and the **weather** turns —
   overcast, rain, sandstorm, fog, snow, ashfall, and a meteor shower out past
