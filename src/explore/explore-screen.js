@@ -36,7 +36,7 @@ import {
   PLAYER_SIZE,
   HORSE_SIZE,
 } from '../art/sprites-character.js';
-import { createParallax } from './parallax.js';
+import { createParallax, heroX as heroAnchorX } from './parallax.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { getEngine, quitToMenu } from '../game/run.js';
@@ -221,7 +221,11 @@ export const ExploreScreen = {
         // so he stands in the hour of the day instead of in front of it.
         parallax.renderBackdrop(ctx, view, cameraX);
         const walking = !engine.isPaused();
-        const heroX = Math.round(view.w * 0.26);
+        // The one place on the road that never moves. It comes from the
+        // parallax because the buildings are placed against it — see
+        // `drawStructures` — and two files disagreeing about where the
+        // traveller stands is what put the shop doors off to his left.
+        const heroX = heroAnchorX(view);
 
         // The traveller's shadow, thrown by whatever is up in the sky. A horse
         // is twice as wide as a man and throws twice the shadow.

@@ -9,12 +9,40 @@
    One bar, not two. Where you are, how you are doing, and how hungry you are,
    in a single strip at the top of every screen inside a run — so the player
    builds one mental map of the interface instead of three.
+
+   IT MEASURES ITSELF, NOT THE WINDOW
+   --------------------------------------------------------------------------
+   The breakpoints below are container queries, because the band is not always
+   as wide as the window: it sits inside the road's 1000px column, inside the
+   shop's narrower one, and edge to edge on a phone. Keyed to the viewport, a
+   1024px tablet got the roomy layout inside a 420px column and the strip
+   overflowed; keyed to itself, every place it is mounted collapses at the
+   width where it actually runs out of room.
+
+   `.trailband-wrap` is the thing being measured, and the strip inside it is
+   the thing that reshapes — a query can style a container's contents but not
+   the container, and the band changes its own display at the narrow end.
+
+   FOUR GROUPS THAT WRAP AS UNITS
+   --------------------------------------------------------------------------
+   Place, condition (lives + hunger), holdings (level + gold), actions. The old
+   band was a flat list with hairline rules between some items and a spacer
+   propping up the right-hand end, so a wrap could leave a rule dangling at the
+   end of a line and the gold chip stranded under the signpost.
    ========================================================================== */
+
+.trailband-wrap {
+  container-type: inline-size;
+  container-name: band;
+  width: 100%;
+}
 
 .trailband {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  flex-wrap: wrap;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-2);
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
   background: var(--surface-glass);
@@ -25,10 +53,12 @@
 }
 
 .trailband-place {
+  order: 1;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
+  flex: 0 1 auto;
 }
 
 .trailband-place .world {
@@ -41,38 +71,85 @@
   text-overflow: ellipsis;
 }
 
-.trailband .rule {
-  width: 2px;
-  align-self: stretch;
-  margin: 2px 0;
-  background: rgba(0, 0, 0, 0.45);
-  box-shadow: 1px 0 0 var(--edge-highlight);
-  border-radius: 1px;
+/* The diamonds never shrink and never wrap into a second rank — a life row
+   that reflows mid-run reads as one having been added. */
+.trailband .lives { order: 2; flex: 0 0 auto; flex-wrap: nowrap; }
+
+/* The hunger gauge is the only elastic thing in the band, so it takes the
+   slack — capped, so it never becomes a metre-wide hunger bar on a desktop. */
+.trailband .gauge {
+  order: 3;
+  flex: 1 1 190px;
+  max-width: 320px;
 }
 
-/* The hunger meter lives in the band, sized to itself. It carries a rate
-   badge in bad weather, so it gets the width for one. */
-.trailband .meter { max-width: 214px; flex: 0 1 214px; }
-
-.trailband-actions { display: flex; align-items: center; gap: var(--sp-2); }
-
-@media (max-width: 900px) {
-  .trailband .meter { flex: 0 1 130px; }
+/* Holdings sit against the right-hand end. The auto margin is what does it:
+   with no spacer element, a wrap cannot leave one behind. */
+.trailband-stats {
+  order: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
 }
 
-@media (max-width: 700px) {
-  .trailband { gap: var(--sp-2); padding: var(--sp-2); flex-wrap: wrap; }
-  .trailband .rule { display: none; }
-  .trailband .meter { flex: 1 1 100%; max-width: none; order: 5; }
+.trailband-actions {
+  order: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
-@media (max-width: 520px) {
-  .trailband { gap: 6px; }
-  .trailband .lives { flex-wrap: nowrap; gap: 3px; }
-  .trailband .life { width: 11px; height: 11px; border-width: 1px; }
-  .trailband-place { max-width: 96px; }
+/* Sharing the line and running short of it: the word goes, and the fork icon
+   and the notches carry the gauge on their own. It comes back in the middle
+   band below, where the gauge has a line to itself and the room to be spelled
+   out; it goes again on a phone, where that line is short as well. */
+@container band (min-width: 621px) and (max-width: 820px) {
+  .trailband .gauge-label { display: none; }
+}
+
+/* No longer room for a gauge worth reading beside everything else, so the band
+   becomes two rows — and stops leaving the wrap to the browser.
+
+   Left to flex, this width produced three ragged lines: the gold chip stranded
+   beside the signpost, the two buttons alone on a line of their own, and the
+   gauge under both. Two named rows put the readouts down the left and the
+   things you press down the right, which is also the hand that reaches them.
+
+   Only a band that has a gauge needs the second row. The shop counter's band
+   has no hunger on it and stays a single flex line; browsers without `:has`
+   land on the same fallback, which is the layout above and still legible. */
+@container band (max-width: 620px) {
+  .trailband:has(.gauge) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'place lives stats'
+      'gauge gauge actions';
+    align-items: center;
+  }
+
+  .trailband:has(.gauge) .trailband-place { grid-area: place; }
+  .trailband:has(.gauge) .lives { grid-area: lives; justify-self: end; }
+  .trailband:has(.gauge) .gauge { grid-area: gauge; max-width: none; }
+  .trailband:has(.gauge) .trailband-stats { grid-area: stats; justify-self: end; }
+  .trailband:has(.gauge) .trailband-actions { grid-area: actions; justify-self: end; }
+
+  /* Flex fallback for a band with no gauge in it, or no `:has` to detect one. */
+  .trailband .gauge { order: 9; flex: 1 1 100%; max-width: none; }
+}
+
+/* Phone. Everything tightens; nothing is dropped. Every figure in the band is
+   one the player can lose the run by not seeing. */
+@container band (max-width: 440px) {
+  .trailband { column-gap: var(--sp-2); padding: var(--sp-2); }
+  .trailband .gauge-label { display: none; }
   .trailband-place .world { font-size: var(--text-xs); }
+  .trailband .lives { gap: 3px; }
+  .trailband .life { width: 11px; height: 11px; border-width: 1px; }
   .trailband .chip { padding: 4px 8px; }
+  .trailband-stats { gap: 6px; }
+  .trailband-actions { gap: 6px; }
 }
 
 /* ==========================================================================
