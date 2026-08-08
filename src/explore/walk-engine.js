@@ -94,6 +94,16 @@ export function createWalkEngine() {
     const event = nextEvent();
     if (event && distanceToNext() <= 0) {
       event.resolved = true;
+      /**
+       * Where the traveller actually stopped, nailed down before anything can
+       * move it. `effectiveDistance` is a function of the mount state, so a
+       * shop walked into on foot and left on a horse bought at its counter
+       * would be recomputed with the shortened gap — and the building would
+       * jump a quarter of its approach backwards, out from under the player
+       * who is standing in its doorway. A stop that has happened has a
+       * settled position; only the road ahead is still being measured.
+       */
+      event.placedAt = effectiveDistance(event, getState().hasHorse, HORSE_TIME_MUL);
       pause();
       /**
        * THE ENCOUNTER CARRIES ITS OWN WORLD, AND THE TICK ENDS HERE
@@ -180,7 +190,12 @@ export function createWalkEngine() {
     const out = [];
     for (const event of segment.events) {
       if (event.type !== 'shop' && event.type !== 'inn') continue;
-      const worldX = effectiveDistance(event, mounted, HORSE_TIME_MUL);
+      // A stop that has been reached keeps the position it was reached at; the
+      // ones still ahead are measured live, because the horse really does pull
+      // them closer and the trigger uses the same figure. A stop resolved in
+      // an earlier session has no `placedAt` — it was replayed from a flag in
+      // the save — and there the live figure is the best guess there is.
+      const worldX = event.placedAt ?? effectiveDistance(event, mounted, HORSE_TIME_MUL);
       const gap = worldX - travelled;
       if (gap > AHEAD_WINDOW || gap < -BEHIND_WINDOW) continue;
       out.push({ worldX, kind: event.type });
