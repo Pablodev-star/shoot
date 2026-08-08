@@ -61,7 +61,15 @@ export function getView() {
 
 function frame(now) {
   if (!running) return;
-  const dt = Math.min(64, now - last); // clamp so alt-tab does not fast-forward
+  /**
+   * Clamped at both ends. The top end is so alt-tabbing away for a minute does
+   * not fast-forward the game when you come back; the bottom end is because the
+   * timestamp a frame is handed is the moment the frame STARTED, which can be
+   * earlier than the `performance.now()` that `start()` wrote — so the very
+   * first dt of a session could come out negative and run every animation clock
+   * in the game backwards past zero.
+   */
+  const dt = Math.min(64, Math.max(0, now - last));
   last = now;
   elapsed += dt;
 

@@ -45,6 +45,15 @@ Everything an ability does is shown as a pixel icon on the fighter it is
 working on, never as printed names, and every one of them carries the number of
 rounds it has left to run.
 
+**An ability is a thing that arrives.** Every one of the eighteen throws
+something you can watch cross the road: a gourd of poison that tumbles and
+smashes at their boots, a rope that leaves the hand with the line still on it, a
+nest, a rock out of the top of the frame, a mirror assembling itself out of
+loose shards. The **dynamite** is the one the whole system was built around — it
+is thrown, it lands, and it lies there with the fuse burning until the round
+resolves, because that is exactly what the rule always said: the biggest hit in
+the game, and the one you get a whole round to raise a shield against.
+
 **The opponent does not look at your gun.** It has a habit model — what you have
 actually done this duel — and it plays the counter to a *sample* from it a
 minority of the time; the rest of the time it plays its own game off its own
@@ -303,6 +312,9 @@ src/
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact
     sprites-abilities.js  an icon for every themed ability and world special
+    sprites-casts.js      what an ability actually throws: the stick of
+                          dynamite, the gourd, the rope, the rock — typed for
+                          the hard things, built for fire, ice and smoke
     sprites-hazards.js    the six landmarks a special raises, built not typed
     env-kit.js            the colour key + the shared layer generators
     biomes/               one file per landscape — desert, meadow, snow, swamp,
@@ -321,7 +333,8 @@ src/
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop and inn logic + screens
   duel/                  duel engine, agents, scene, screen, boss entrances,
-                         and the real-time clock a world special runs on
+                         the performance an ability plays when it is cast, and
+                         the real-time clock a world special runs on
   game/                  items, worlds, progression maths, player state,
                          enemies, world abilities, save slots, run controller,
                          interstitials
@@ -441,12 +454,16 @@ new ability that reuses one is pure data:
 
 1. Add an entry to `ABILITIES` in `src/game/world-abilities.js`: its `effect`
    (one of the fourteen), its numbers (`amount` / `turns` / `take`), its
-   `charge`, the sentence that explains it, an `fx` — one of six motions
-   (`streak`, `swarm`, `fall`, `rise`, `burst`, `spiral`) and three colours —
-   and, if it leaves something running, a `hold` colour for the sprite to wear
+   `charge`, the sentence that explains it, and an `fx` — the performance it
+   plays when it lands. That is `props` (the objects it throws: an art id from
+   `src/art/sprites-casts.js` and one of seven paths — `throw`, `fly`, `drop`,
+   `rise`, `hold`, `return`, `toss`) plus a particle `motion` (`streak`,
+   `swarm`, `fall`, `rise`, `burst`, `spiral`, `sweep`) and three colours. If it
+   leaves something running, give it a `hold` colour for the sprite to wear
    while it does.
 2. Draw its 16 x 16 icon in `src/art/sprites-abilities.js`, using the shared
-   key. New colours need a home in `palette.js` first.
+   key, and any object it throws in `src/art/sprites-casts.js`. New colours need
+   a home in `palette.js` first.
 3. Put its id in a world's `enemy.abilities` in `src/game/worlds.js`.
 
 A **special** is the same shape with a landmark on the end of it: an entry in
