@@ -18,6 +18,9 @@
  *                 'ability'  equipped into a duel slot, never consumed
  *   stack       max copies held (Infinity for consumables that stack freely)
  *   shopPerk    if set, buying it permanently upgrades future shop visits
+ *   boon        if set, using it leaves something on the player for the next
+ *               few DUELS rather than for right now — see `grantBoon` in
+ *               src/game/player.js
  *   desc        one-line explanation shown in shops and the inventory
  *
  * ADDING AN ITEM: append an entry here. Shops, inventory, selling and the duel
@@ -68,6 +71,59 @@ const CATALOGUE = {
     food: 40,
     stack: 99,
     desc: 'Restores 40% hunger.',
+  },
+  /**
+   * THE ROAD STOPS SELLING LUNCH, AND THAT IS THE PROBLEM THESE TWO SOLVE
+   * -------------------------------------------------------------------------
+   * Food used to be common and only common. That is fine in the Dust Flats,
+   * where a shop rolls common four times in five — and it quietly stops being
+   * fine by the basin, where common is thirty per cent of the table and the
+   * Galaxy's is eighteen (see `rarity` in src/game/worlds.js). By the last two
+   * worlds the counter is stocked with abilities and legendaries, a carrot is
+   * not on it, and a player who walked in with an empty gauge starves on a road
+   * that has nothing to sell them.
+   *
+   * So there is food in the rare tier and food in the legendary tier, and both
+   * are the same idea rather than "a bigger apple": they fill the gauge to the
+   * TOP. That is what a meal is worth when the next shop is eleven duels away
+   * — you stop counting percentages and you are simply not hungry any more.
+   *
+   * `food: 100` is the whole gauge; `addHunger` clamps at HUNGER_MAX, so this
+   * is a fill rather than a number that has to be kept in step with one.
+   */
+  stew: {
+    id: 'stew',
+    name: 'Trail Stew',
+    icon: 'stew',
+    rarity: 'rare',
+    basePrice: 45,
+    context: 'anytime',
+    food: 100,
+    stack: 10,
+    desc: 'A full pot. Fills the hunger gauge to the top, whatever was left in it.',
+  },
+  /**
+   * The legendary meal, and the only item in the game that reaches forward
+   * into the fights you have not had yet.
+   *
+   * Everything else in the bag is spent on the moment it is spent in: a
+   * bandage is this life, a stick of dynamite is this round. The feast fills
+   * the gauge like the stew and then puts two rounds in your cylinder at the
+   * START of each of the next three duels — which is a whole turn you do not
+   * have to spend reloading in the open, three times over. See `boon` in
+   * src/game/player.js; the duel screen reads it when it builds the fight.
+   */
+  feast: {
+    id: 'feast',
+    name: "Traveller's Feast",
+    icon: 'feast',
+    rarity: 'legendary',
+    basePrice: 110,
+    context: 'anytime',
+    food: 100,
+    boon: { id: 'wellFed', label: 'Well fed', duels: 3, bullets: 2 },
+    stack: 3,
+    desc: 'Fills the gauge, and you ride out of it well fed: the next three duels start with two rounds already loaded.',
   },
 
   // --- Healing -------------------------------------------------------------
@@ -154,6 +210,33 @@ const CATALOGUE = {
     desc: 'Opens the trail map: every duel, shop, inn and boss on the road ahead. Never runs out.',
   },
 
+  /**
+   * THE CANTEEN IS THE MAP'S IDEA APPLIED TO HUNGER
+   * -------------------------------------------------------------------------
+   * Bought once, kept forever, and it changes a rate rather than handing over
+   * a quantity. Every other answer to hunger is a thing you consume — and the
+   * later a world is, the more of them a crossing costs and the less reliably
+   * a shop has any. This is the answer you buy instead of the answer you carry:
+   * a third off the drain, permanently, for the rest of the run.
+   *
+   * It sits in the rare tier and costs about a world's wages in the Dust
+   * Flats, which is the point of it — an early run that commits to it walks
+   * the whole game hungry a third less often, and one that spends the same
+   * gold on a vest does not. The travel band shows the multiplier it produces
+   * the same way it shows the horse's, so what you bought is on screen.
+   */
+  canteen: {
+    id: 'canteen',
+    name: 'Canteen',
+    icon: 'canteen',
+    rarity: 'rare',
+    basePrice: 220,
+    context: 'passive',
+    passive: 'canteen',
+    stack: 1,
+    desc: 'Water for the road. Hunger drains a third slower, for the rest of the run.',
+  },
+
   // --- Special -------------------------------------------------------------
   horse: {
     id: 'horse',
@@ -165,6 +248,32 @@ const CATALOGUE = {
     unlock: 'horse',
     stack: 1,
     desc: 'Ride instead of walk. Cuts travel time roughly in half.',
+  },
+
+  /**
+   * THE DUSK TOTEM — THE ONE ITEM THAT SPENDS ITSELF ON THE END OF THE RUN
+   * -------------------------------------------------------------------------
+   * A vest stops one fatal shot inside one duel. This stops the run ending,
+   * wherever the run was about to end: the last life to a rider's bullet, to a
+   * rock off an erupting mountain, or to an empty gauge on a road with nothing
+   * left to eat on it. It breaks, you come back on half your maximum lives with
+   * the gauge full, and it is gone.
+   *
+   * It is also the only item in the game with a SCENE — see src/ui/totem.js.
+   * Everything else that saves you does it in a toast; this one takes the
+   * screen, because the thing it just bought you is the only thing in the game
+   * that cannot be bought twice in a run.
+   */
+  duskTotem: {
+    id: 'duskTotem',
+    name: 'Dusk Totem',
+    icon: 'duskTotem',
+    rarity: 'legendary',
+    basePrice: 700,
+    context: 'passive',
+    passive: 'revive',
+    stack: 1,
+    desc: 'When the last life goes, it breaks instead of you: back on half your lives, and back on the road. One use.',
   },
 
   // --- Shop perks (stackable upgrades to future shop visits) ---------------
@@ -248,8 +357,8 @@ export const ITEM_LIST = Object.values(ITEMS);
 /** Items shops may stock, grouped by rarity (perks and food included). */
 export const SHOP_POOL = {
   common: ['carrot', 'apple', 'bandage'],
-  rare: ['potion', 'map', 'ledger'],
-  legendary: ['vest', 'diadem', 'horse', 'silverTongue'],
+  rare: ['potion', 'map', 'ledger', 'stew', 'canteen'],
+  legendary: ['vest', 'diadem', 'horse', 'silverTongue', 'feast', 'duskTotem'],
 };
 
 /**

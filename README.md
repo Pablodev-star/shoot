@@ -204,6 +204,19 @@ There is no level select. You walk, and the road decides what you meet.
   combined multiplier rides beside the track, and the track looks scoured
   whenever the sky is the reason, so the change is never something you find out
   by dying.
+- **Food that keeps up with the road.** A carrot and an apple are fine in the
+  Dust Flats, where four shop rolls in five come up common — and useless by the
+  Galaxy, where common is eighteen per cent of the table and the counter is
+  stocked with abilities. So there is food in the rare tier and food in the
+  legendary tier, and both **fill the gauge to the top** rather than handing
+  over a percentage: **Trail Stew** is the meal, and the **Traveller's Feast**
+  is the meal that reaches into the fights after it — the next three duels start
+  with two rounds already in the cylinder, counted down on a chip in the travel
+  band.
+- **The Canteen** is the answer to hunger you buy instead of the answer you
+  carry. Bought once and kept, like the map: a third off the drain for the rest
+  of the run. It is the only multiplier in the game that pulls the other way,
+  and the gauge's badge goes cool instead of hot to say so.
 - **A horse** roughly halves travel time.
 - **Day and night** run on a continuous clock, and the **weather** turns —
   overcast, rain, sandstorm, fog, snow, ashfall, and a meteor shower out past
@@ -239,6 +252,17 @@ There is no level select. You walk, and the road decides what you meet.
   duel, shop, inn and boss marked on it, with your own position as a blue
   circle. Drag it, zoom it, and open it as often as you like — it is bought
   once and kept, not spent per look. It still shows no numbers.
+- **The Dusk Totem is the only thing in the game that refuses a game over**, and
+  it is the only item with a scene. When the last life goes — to a rider's
+  bullet, to a rock off an erupting mountain, to an empty gauge on a road with
+  nothing left to eat on it — the screen goes black instantly, with no fade,
+  and stays black for three full seconds. Then the carving rises out of the dark
+  and floats there with its ember coming up behind it, and one word appears at
+  the bottom: **TAP**. The first tap grows it and splits it. The second opens
+  the split into a fissure with light pouring out. The third breaks it into
+  twenty-eight shards that carry their own share of the cracks across the frame,
+  and you are standing up on half your lives with the gauge full. One use, and
+  the fight you were losing is still going on underneath.
 - **Every enemy is somebody.** Twenty-seven hand-drawn archetypes — the
   Sombrero Outlaw, the Bone Marshal, the Reed Wraith, the Ash Widow, the Iron
   Kiln, the Star Reaver — each with its own head, torso, palette and set of
@@ -384,7 +408,11 @@ Balance lives in data, not in code:
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up. The twenty-four ability
   entries are generated into it from the catalogue above rather than written
-  out, so an ability is an ordinary thing in the saddlebag.
+  out, so an ability is an ordinary thing in the saddlebag. Three fields there
+  are worth knowing: `food` is hunger restored (`100` fills the gauge), `boon`
+  leaves something on the player for the next few *duels* rather than for right
+  now, and `stack: 1` plus `context: 'passive'` is how a bought-once-and-kept
+  item like the Canteen or the Dusk Totem is written.
 
 ## Adding a biome
 

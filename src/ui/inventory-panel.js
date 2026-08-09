@@ -93,6 +93,10 @@ export function openInventory(opts = {}) {
     if (item.food) return 'Eat';
     if (item.heal) return 'Use';
     if (item.context === 'utility') return 'Open';
+    // A vest, a diadem, a canteen, a totem: the button is dead for all of them
+    // (the pane says why underneath) and "Throw" was a verb the player is being
+    // offered for something they are wearing.
+    if (item.context === 'passive' || item.context === 'special') return 'Carried';
     return 'Throw';
   }
 

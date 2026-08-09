@@ -37,6 +37,14 @@ export const EVENTS = {
   LEVEL_UP: 'player:levelup',
   INVENTORY_CHANGED: 'inventory:changed',
   HORSE_ACQUIRED: 'player:horse',
+  /** A meal's after-effect was granted, spent down a duel, or ran out. */
+  BOON_CHANGED: 'player:boon',
+  /**
+   * The last life went and a Dusk Totem was in the bag, so this is fired
+   * INSTEAD of GAME_OVER. Whoever owns the screen at the time is expected to
+   * play the break (src/ui/totem.js) and then call `breakTotem`.
+   */
+  TOTEM_TRIGGERED: 'player:totem',
 
   // Duel
   DUEL_STARTED: 'duel:started',

@@ -808,6 +808,20 @@
   to { background-position: 0 0; }
 }
 
+/* The other direction. A multiplier under 1 is the canteen, and it is the only
+   good news the gauge ever carries — so it is cool where the harsh badge is
+   hot, and it sits still instead of throbbing. A rate that is helping you does
+   not need to be shouted at you every second and a half. */
+.gauge-track.is-eased + .gauge-rate {
+  color: #06222b;
+  /* The ice ramp out of src/art/palette.js — the interface has no token for it
+     because nothing in the chrome has ever been cold before. */
+  background: linear-gradient(180deg, #c2ecf7, #7ac8e2);
+  border-color: #3f82a6;
+  box-shadow: 0 0 8px rgba(122, 200, 226, 0.45);
+  animation: none;
+}
+
 /* ==========================================================================
    Stats
    ========================================================================== */
@@ -1331,4 +1345,84 @@ input[type='range']::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   .speech.is-in { animation: none; }
   .speech-next.is-ready { animation: none; }
+}
+
+/* ==========================================================================
+   The Dusk Totem breaking — the scene that plays instead of a game over
+   ========================================================================== */
+
+/* Black, and black IMMEDIATELY: there is no transition on this element and
+   there must never be one. The lights going out is the first beat of the
+   scene (see src/ui/totem.js), and a fade would turn it into a screen wipe.
+   The only thing that ever animates here is the veil lifting at the end, which
+   is set from script on the frame the totem comes apart. */
+.totem-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: #000;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.totem-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* One word, at the bottom, in the game's display face. It is hidden until the
+   totem has finished arriving — offering the tap over an empty frame would
+   turn the three seconds of dark into a loading screen. */
+.totem-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: max(env(safe-area-inset-bottom), 8%);
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--gold-light);
+  text-shadow: 0 0 12px rgba(255, 190, 82, 0.55);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 700ms var(--ease-in-out);
+  pointer-events: none;
+}
+
+.totem-prompt.is-shown {
+  opacity: 1;
+  animation: totem-breathe 1.8s var(--ease-in-out) infinite;
+}
+
+/* Struck: the word takes the hit along with the stone. */
+.totem-prompt.is-struck { animation: totem-strike 260ms var(--ease-out) 1, totem-breathe 1.8s var(--ease-in-out) infinite 260ms; }
+
+/* The last line is not an instruction any more, so it stops asking. */
+.totem-prompt.is-final {
+  animation: none;
+  opacity: 1;
+  color: var(--bone);
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.6);
+  font-size: var(--text-xl);
+}
+
+@keyframes totem-breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@keyframes totem-strike {
+  0% { transform: translateX(-50%) scale(1.35); color: #fff; }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .totem-prompt.is-shown,
+  .totem-prompt.is-struck { animation: none; opacity: 1; }
 }

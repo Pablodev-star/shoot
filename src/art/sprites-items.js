@@ -7,11 +7,12 @@
  * inset, giving the icon a 2px border of rarity color.
  *
  * Icon list: bandage, poison, dynamite, potion, vest, diadem (anti-effect),
- * map, bullet, life (red diamond), coin, carrot, apple, horse token, skull
- * (enemy marker), bed (inn), shop tag, hunger, and the two duel abilities that
- * are not also items — bullet steal and mind control. The worlds' own themed
- * abilities are drawn in src/art/sprites-abilities.js and merged in here, so
- * there is one lookup and one cache for every icon in the game.
+ * map, bullet, life (red diamond), coin, carrot, apple, stew, feast, canteen,
+ * dusk totem, horse token, skull (enemy marker), bed (inn), shop tag, hunger,
+ * and the two duel abilities that are not also items — bullet steal and mind
+ * control. The worlds' own themed abilities are drawn in
+ * src/art/sprites-abilities.js and merged in here, so there is one lookup and
+ * one cache for every icon in the game.
  *
  * EVERY EFFECT IN THE GAME HAS A PICTURE
  * ---------------------------------------------------------------------------
@@ -425,6 +426,113 @@ const BASE_ICONS = {
     '....kcCCCcck....',
     '.....kkkkkk.....',
     '................',
+    '................',
+    '................',
+  ],
+  /**
+   * Trail Stew — the rare meal, and the first food in the game that is COOKED.
+   *
+   * A carrot is a carrot and an apple is an apple: both are drawn as the thing
+   * itself, because that is all they are. This one is drawn as a serving —
+   * a tin bowl, chunks in the broth, and steam coming off it — because what it
+   * sells is not an ingredient, it is a stop by a fire that fills the gauge to
+   * the top.
+   */
+  stew: [
+    '................',
+    '.........W......',
+    '.....W...W......',
+    '.....W..W.......',
+    '....W...........',
+    '................',
+    '.kkkkkkkkkkkkkk.',
+    'kssssssssssssssk',
+    'ksTtEtGtTtotTtsk',
+    'ksTtTtTtTtTtTtsk',
+    '.kSTtTtTtTtTtSk.',
+    '..kSSTtTtTtSSk..',
+    '...kSSSSSSSSk...',
+    '....kkkkkkkk....',
+    '................',
+    '................',
+  ],
+  /**
+   * Traveller's Feast — a roast on a gold platter, with the bone still in it.
+   *
+   * The legendary meal has to look like an occasion rather than a bigger lunch,
+   * so it is the only food in the catalogue served on something. The platter is
+   * the legendary frame's own gold, which is what ties the picture to the tier
+   * before the card says a word about rarity.
+   */
+  feast: [
+    '................',
+    '................',
+    '.......kkkk.....',
+    '......kEEttk....',
+    '.....kEEttttk...',
+    '..kWkEttttttk...',
+    '.kWWkttttttTk...',
+    '..kWkkTTTTTTk...',
+    '....kkkkkkkkk...',
+    '..kOOOOOOOOOOk..',
+    '.kOOOOOOOOOOOOk.',
+    '.kyyyyyyyyyyyyk.',
+    '..kkyyyyyyyykk..',
+    '....kkkkkkkk....',
+    '................',
+    '................',
+  ],
+  /**
+   * The Canteen — tin, a brass cap, and the strap it hangs off the saddle by.
+   *
+   * Drawn from the front rather than in profile: a canteen seen edge-on is a
+   * disc with a lump on top, and at sixteen pixels that is a pocket watch. The
+   * two strap tabs are what say it is carried.
+   */
+  canteen: [
+    '................',
+    '......kkkk......',
+    '.....kOOOOk.....',
+    '.....kyyyyk.....',
+    '...kkkkkkkkkk...',
+    '..kWWssssssssk..',
+    '.kWWsssssssssSk.',
+    'tkWssssssssssSkt',
+    '.kSSSSSSSSSSSSk.',
+    '.ksssssssssSSSk.',
+    '.kSsssssssSSSSk.',
+    '..kSSssssSSSSk..',
+    '...kkkkkkkkkk...',
+    '................',
+    '................',
+    '................',
+  ],
+  /**
+   * The Dusk Totem — void stone, a gold band, and something awake behind the
+   * eyes.
+   *
+   * The icon is the top of the idol rather than the whole pole, for the reason
+   * every icon in this file is a close crop: a thirty-two pixel totem squeezed
+   * into sixteen is a smudge with a hat. The full carving — the one that comes
+   * apart when it saves you — is drawn at its own size in
+   * src/art/sprites-totem.js, and the two share a palette so the thing on the
+   * shop counter is recognisably the thing floating in the dark.
+   */
+  duskTotem: [
+    '....kok..kok....',
+    '....kOk..kOk....',
+    '..kkkkkkkkkkkk..',
+    '..k!!!!!!!!!!k..',
+    '..k?~~????~~?k..',
+    '..k?~<????<~?k..',
+    '..k??????????k..',
+    '..k???!!!!???k..',
+    '..k????!!????k..',
+    '..k?&WWWWWW&?k..',
+    '..k??????????k..',
+    '..kOOOOOOOOOOk..',
+    '..k&&&&&&&&&&k..',
+    '..kkkkkkkkkkkk..',
     '................',
     '................',
   ],

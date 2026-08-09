@@ -34,10 +34,15 @@ import {
   setLives,
   hasVest,
   consumeVest,
+  hasTotem,
+  breakTotem,
   isImmuneToEffects,
   countOf,
   getEquippedAbilities,
+  getBoon,
 } from '../game/player.js';
+import { totemReviveLives } from '../game/progression.js';
+import { playTotemRevival } from '../ui/totem.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
 import { getAbility, getSpecial, specialDamage } from '../game/world-abilities.js';
@@ -76,6 +81,17 @@ import { PALETTE } from '../art/palette.js';
  */
 const DRAW_MS = 4 * CHARACTER_TIMING.aim;
 const BULLET_MS = 260;
+
+/**
+ * What the saddlebag will hand you in the middle of a fight: something to patch
+ * yourself up with, and something to eat.
+ *
+ * The Traveller's Feast is deliberately NOT on the list even though it is food.
+ * What it is bought for is the three duels AFTER it, so spending one here would
+ * look, from inside the fight, like a legendary that did nothing — the rounds
+ * it loads are loaded when a duel starts, and this one already has.
+ */
+const DUEL_ITEMS = ['bandage', 'potion', 'carrot', 'apple', 'stew'];
 
 /** Combine weather and night into the modifier set the engine understands. */
 function buildModifiers() {
@@ -129,13 +145,25 @@ export const DuelScreen = {
     const localAgent = createLocalAgent();
     let aiAgent = createAiAgent(enemy, modifiers, { thinkMs: 120 });
 
+    /**
+     * What the last meal left on you, if anything.
+     *
+     * The only thing outside this fight that reaches into how it STARTS — a
+     * Traveller's Feast puts rounds in the cylinder before the first draw, so
+     * the opening turn does not have to be spent reloading in the open. It is
+     * read once, here, and spent by `resolveDuel` when the fight is over.
+     */
+    const boon = getBoon();
+
     const duel = createDuel({
       player: {
         name: 'You',
         lives: player.lives,
         maxLives: player.maxLives,
-        bullets: 0,
+        bullets: Math.min(MAX_BULLETS, boon?.bullets || 0),
         hasVest: hasVest(),
+        hasTotem: hasTotem(),
+        totemLives: totemReviveLives(player.maxLives),
         immune: isImmuneToEffects(),
         /**
          * Whatever is in the two ability slots, resolved down to its numbers.
@@ -153,6 +181,17 @@ export const DuelScreen = {
 
     const roundLog = [];
     let vestConsumed = false;
+    /**
+     * Set the moment the engine refuses a killing blow because of the totem,
+     * and cleared by `runTotem` once the scene has been played. It is a flag
+     * rather than an immediate call because the engine resolves a whole round
+     * before the screen animates any of it: the shot that killed you has to
+     * actually arrive before the lights go out.
+     */
+    let totemPending = false;
+    let totemPlaying = false;
+    /** The in-flight scene, so both entry points wait on one of them. */
+    let totemScene = null;
     let finished = false;
     /** True once the fight proper has started — see `onFrame`. */
     let clockRunning = false;
@@ -263,6 +302,17 @@ export const DuelScreen = {
       }
       if (side.hasVest) {
         row.append(effectBadge('vest', { label: 'Vest — stops one fatal shot', tone: 'is-good' }));
+      }
+      // It stays on the card until it is spent, and it disappears the moment
+      // it is: the badge going is how the player learns the totem was used on
+      // the round that black screen came up.
+      if (side.hasTotem) {
+        row.append(
+          effectBadge('duskTotem', {
+            label: 'Dusk Totem — when the last life goes, it breaks instead of you',
+            tone: 'is-good',
+          }),
+        );
       }
       if (side.immune) {
         row.append(effectBadge('immune', { label: 'Diadem — effects cannot touch you', tone: 'is-good' }));
@@ -528,7 +578,7 @@ export const DuelScreen = {
     }
 
     function hasDuelItems() {
-      return ['bandage', 'potion', 'carrot', 'apple'].some((id) => countOf(id) > 0);
+      return DUEL_ITEMS.some((id) => countOf(id) > 0);
     }
 
     function setCallout(text, tone = '') {
@@ -538,7 +588,7 @@ export const DuelScreen = {
     }
 
     function submit(move, fromKeyboard = false) {
-      if (!localAgent.isWaiting()) return;
+      if (!localAgent.isWaiting() || totemPlaying) return;
       if (fromKeyboard) play(MOVE_SFX[move]);
       setControlsEnabled(false);
       setCallout('Both of you draw…', 'is-waiting');
@@ -629,7 +679,7 @@ export const DuelScreen = {
       bag = openInventory({
         onClose: () => { bag = null; },
         context: 'duel',
-        canUse: (id) => ['bandage', 'potion', 'carrot', 'apple'].includes(id),
+        canUse: (id) => DUEL_ITEMS.includes(id),
         useOpts: () => ({
           lives: duel.getSides().player.lives,
           maxLives: duel.getSides().player.maxLives,
@@ -646,6 +696,10 @@ export const DuelScreen = {
     }
 
     const onKey = (e) => {
+      // Nothing about the fight is reachable while the totem is on screen —
+      // including the shortcuts, which is the half of "the controls are dead"
+      // that disabling three buttons does not cover.
+      if (totemPlaying) return;
       if (e.key === '1') submit(MOVES.RELOAD, true);
       if (e.key === '2') submit(MOVES.SHIELD, true);
       if (e.key === '3') submit(MOVES.SHOOT, true);
@@ -730,6 +784,7 @@ export const DuelScreen = {
           );
         }, DRAW_MS);
       }
+      if (event.type === 'totem' && event.side === 'player') totemPending = true;
       if (event.type === 'reflect') toast('Mirrored — it went back at them', 'good');
       if (event.type === 'hazard-warn') handleHazardWarn(event);
       if (event.type === 'hazard-erupt') handleHazardErupt(event);
@@ -834,6 +889,65 @@ export const DuelScreen = {
     }
 
     /**
+     * THE TOTEM, IN THE MIDDLE OF A FIGHT
+     * -----------------------------------------------------------------------
+     * The engine has already put the lives back (see `damage` in
+     * src/duel/duel-engine.js) — what is left to do here is the part that is
+     * worth watching, and then taking the totem out of the bag.
+     *
+     * The hazard clock is stopped for the duration and the buttons go dead:
+     * the scene takes as long as the player takes to press it three times, and
+     * a volcano counting down behind a black screen would be a rock landing on
+     * somebody who could not see it coming. The fight is exactly where it was
+     * when the black lifts, except that you are standing up in it.
+     */
+    function runTotem() {
+      // Already up: hand back the SAME promise. The scene can be started from
+      // two places — the end of the round that killed you, and the frame loop
+      // when a hazard did it mid-animation — and if the second one wins the
+      // race, the round loop has to wait on the scene that is already playing
+      // rather than deciding there is nothing to wait for and carrying on
+      // behind a black screen.
+      if (totemScene) return totemScene;
+      if (!totemPending || finished) return null;
+      totemPending = false;
+      totemPlaying = true;
+      totemScene = playTotem();
+      return totemScene;
+    }
+
+    async function playTotem() {
+      const wasRunning = clockRunning;
+      /**
+       * When the scene starts from the frame loop, the engine is still parked
+       * on an unresolved move — so whatever the controls were doing before has
+       * to be exactly what they are doing after, or the fight has no way to
+       * carry on.
+       */
+      const wasEnabled = !controls.classList.contains('is-waiting');
+      clockRunning = false;
+      closeBag();
+      setControlsEnabled(false);
+      scene.impact('player');
+      scene.setPose('player', 'hit');
+
+      await playTotemRevival();
+
+      // The item leaves the bag now rather than when the engine spent it, so a
+      // fight abandoned mid-scene cannot eat a legendary for nothing.
+      breakTotem();
+      totemPlaying = false;
+      if (finished) return;
+      scene.setPose('player', 'idle');
+      scene.fx.banner = 'YOU ARE UP';
+      scene.fx.bannerTimer = 1200;
+      setCallout('The totem is gone. You are not', 'is-good');
+      syncBars();
+      clockRunning = wasRunning;
+      if (wasEnabled) setControlsEnabled(true);
+    }
+
+    /**
      * The real-time half of the fight, driven off the canvas frame loop.
      *
      * Everything else in this screen happens because somebody pressed
@@ -844,6 +958,11 @@ export const DuelScreen = {
     function onFrame(dt) {
       if (finished || !clockRunning) return;
       duel.tick(dt);
+      // A rock off an erupting mountain can be the thing that kills you, and it
+      // lands here rather than inside a round — so the scene has to be able to
+      // start from here too. `runTotem` guards itself; the loop calling it a
+      // moment later is a no-op.
+      if (totemPending) runTotem();
       for (const entry of duel.getHazards()) {
         scene.setHazardState(entry.owner, entry.clock.getState());
         if (entry.owner === 'enemy') updateHazardChip(entry.clock);
@@ -996,6 +1115,10 @@ export const DuelScreen = {
     // --- main loop ---------------------------------------------------------
     async function loop() {
       while (!finished) {
+        // Nothing else in a round may start while the totem is on screen —
+        // including the next round's "choose your move".
+        if (totemPending || totemPlaying) await runTotem();
+        if (finished) return;
         if (duel.isOver()) {
           await endDuel(duel.getResult());
           return;
@@ -1025,6 +1148,12 @@ export const DuelScreen = {
           if (aiAgent.observe) aiAgent.observe(res.playerMove);
         }
         await animate(res);
+        // The bullet has arrived and the life it took is off the bar. THAT is
+        // the moment the lights go out — see `runTotem`. `totemPlaying` is in
+        // the condition because the frame loop may have started the scene
+        // while this round was still being animated.
+        if (totemPending || totemPlaying) await runTotem();
+        if (finished) return;
 
         if (duel.isOver()) {
           const result = duel.getResult();
@@ -1227,6 +1356,12 @@ export const DuelScreen = {
         screen.classList.remove('is-cinematic');
       }
       if (finished) return;
+      // A cylinder that starts with rounds in it is the first thing a player
+      // will notice and the last thing they will be able to explain, so the
+      // meal that put them there says so on the way in.
+      if (boon?.bullets) {
+        toast(`${boon.label} — ${boon.bullets} rounds already loaded`, 'good', 'reload');
+      }
       // The hazard clock starts with the fight, not with the screen: a
       // cut-scene is not time the volcano gets to count.
       clockRunning = true;
@@ -1252,6 +1387,7 @@ export const DuelScreen = {
 const EFFECT_ICONS = {
   vest: 'vest',
   immune: 'diadem',
+  duskTotem: 'duskTotem',
 };
 
 /** Kick the animation on one badge in a row, if that effect is showing. */

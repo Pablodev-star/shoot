@@ -20,6 +20,7 @@ import {
   itemPrice,
   sellPrice,
   HUNGER_MAX,
+  totemReviveLives,
 } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
@@ -54,6 +55,18 @@ function blankState() {
      * boss is not the one that suits a road full of drifters.
      */
     equipped: { basic: null, special: null },
+
+    /**
+     * What the last meal left on you, and how many duels of it are left.
+     *
+     * `null` almost always. A boon is the one effect in the game that outlives
+     * the screen it was granted on — see the Traveller's Feast in
+     * src/game/items.js — so it lives on the run rather than on a duel, and it
+     * is counted in FIGHTS rather than in minutes: a player who eats before a
+     * long walk should get the three duels they paid for, not three duels'
+     * worth of clock spent walking.
+     */
+    boon: null,
 
     stats: { duelsWon: 0, duelsLost: 0, goldEarned: 0, itemsBought: 0, distance: 0 },
   };
@@ -108,10 +121,26 @@ export function setLives(value) {
   return state.lives;
 }
 
+/**
+ * Take lives off, and decide whether that was the end of the run.
+ *
+ * It is not the end if there is a Dusk Totem in the bag: TOTEM_TRIGGERED goes
+ * out instead of GAME_OVER, and whoever is on screen plays the break and calls
+ * `breakTotem` when it lands. Nothing here restores anything — the life bar
+ * genuinely sits at zero for as long as the scene takes, which is what makes it
+ * a revival rather than a hit that was quietly ignored.
+ *
+ * This is the ROAD's death only. A duel keeps its own life count and hands the
+ * totem to the engine (`hasTotem` in src/duel/duel-engine.js), because a fight
+ * has to be able to carry on after you come back.
+ */
 export function loseLife(amount = 1) {
   const before = state.lives;
   setLives(state.lives - amount);
-  if (state.lives <= 0 && before > 0) emit(EVENTS.GAME_OVER, { reason: 'lives' });
+  if (state.lives <= 0 && before > 0) {
+    if (hasTotem()) emit(EVENTS.TOTEM_TRIGGERED, { reason: 'lives' });
+    else emit(EVENTS.GAME_OVER, { reason: 'lives' });
+  }
   return state.lives;
 }
 
@@ -324,11 +353,19 @@ export function useItem(id, opts = {}) {
   }
 
   if (item.food) {
-    if (state.hunger >= HUNGER_MAX) return { ok: false, reason: 'Not hungry.' };
+    /**
+     * "Not hungry" is only a refusal for food that is ONLY food. A meal that
+     * also leaves something on you for the next three fights is a thing a
+     * player eats on a full gauge on purpose — the night before a boss — and
+     * refusing it because the bar happens to be topped up would make the
+     * legendary of the tier unusable exactly when it is worth the most.
+     */
+    if (state.hunger >= HUNGER_MAX && !item.boon) return { ok: false, reason: 'Not hungry.' };
     addHunger(item.food);
+    if (item.boon) grantBoon(item.boon);
     removeItem(id, 1);
     play('eat');
-    return { ok: true, effect: 'food' };
+    return { ok: true, effect: 'food', boon: item.boon ? getBoon() : null };
   }
 
   if (item.heal) {
@@ -422,6 +459,48 @@ export function getEquippedAbilities() {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Boons — what a meal leaves on you for the fights after it
+// ---------------------------------------------------------------------------
+
+/**
+ * Put a boon on the player, replacing whatever was there.
+ *
+ * Replacing rather than stacking: two feasts in a row are three duels of the
+ * effect starting now, not six, and the item is honest about it because the
+ * shop line says "the next three duels" and the chip in the travel band counts
+ * them down in front of you.
+ */
+export function grantBoon(spec) {
+  if (!spec) return null;
+  state.boon = { ...spec, duels: spec.duels || 1 };
+  emit(EVENTS.BOON_CHANGED, { boon: state.boon });
+  return state.boon;
+}
+
+/** The live boon, or null. Anything spent down to nothing reads as null. */
+export function getBoon() {
+  const boon = state.boon;
+  if (!boon || boon.duels <= 0) return null;
+  return boon;
+}
+
+/**
+ * One duel's worth of it, spent. Called once per fight from `resolveDuel`,
+ * whichever way the fight went — a duel you lost still ate the meal.
+ */
+export function spendBoonDuel() {
+  if (!state.boon) return null;
+  state.boon.duels -= 1;
+  if (state.boon.duels <= 0) state.boon = null;
+  emit(EVENTS.BOON_CHANGED, { boon: state.boon });
+  return state.boon;
+}
+
+// ---------------------------------------------------------------------------
+// Carried gear the rest of the game asks about by name
+// ---------------------------------------------------------------------------
+
 /** True while a Bulletproof Vest is available to absorb a fatal shot. */
 export function hasVest() {
   return countOf('vest') > 0;
@@ -434,6 +513,35 @@ export function consumeVest() {
 /** True while the Anti-Effect Diadem is owned. */
 export function isImmuneToEffects() {
   return countOf('diadem') > 0;
+}
+
+/** True while a Canteen is on the saddle — hunger drains slower. */
+export function hasCanteen() {
+  return countOf('canteen') > 0;
+}
+
+/** True while a Dusk Totem is in the bag to be broken. */
+export function hasTotem() {
+  return countOf('duskTotem') > 0;
+}
+
+/**
+ * The totem comes apart: it leaves the bag, the lives come back and so does
+ * the gauge.
+ *
+ * The gauge matters as much as the lives do. The likeliest death the totem ever
+ * catches is starvation — a road with no shop on it and nothing left to eat —
+ * and coming back on half your lives with the bar still empty is coming back
+ * for twelve seconds. It gives the day back, not just the breath.
+ *
+ * @returns {boolean} false when there was no totem to break
+ */
+export function breakTotem() {
+  if (!hasTotem()) return false;
+  removeItem('duskTotem', 1);
+  setLives(totemReviveLives(state.maxLives));
+  setHunger(HUNGER_MAX);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
