@@ -147,8 +147,32 @@ export const HUNGER_DRAIN_HORSE_MUL = 1.15;
 export const HUNGER_DRAIN_SANDSTORM_MUL = 1.5;
 export const HUNGER_DRAIN_SNOW_MUL = 1.4;
 export const HUNGER_DRAIN_ASH_MUL = 1.3;
+/**
+ * The only multiplier that pulls the other way: water on the saddle.
+ *
+ * A third off, which is deliberately worth more than the horse costs (x1.15) —
+ * the two are bought together often enough that the canteen has to survive
+ * being stacked with it, and 1.15 x 0.67 is still comfortably under one.
+ */
+export const HUNGER_DRAIN_CANTEEN_MUL = 0.67;
 /** Once hunger hits zero, one life is lost every this many milliseconds. */
 export const STARVATION_INTERVAL_MS = 12000;
+
+// ---------------------------------------------------------------------------
+// The Dusk Totem
+// ---------------------------------------------------------------------------
+
+/**
+ * What you come back on.
+ *
+ * Half the bar, never fewer than two. Half rather than all of it because the
+ * totem is meant to buy a run its next shop, not to hand back the fight that
+ * was lost; two as a floor because a revival that puts you on one life in a
+ * world where every rider carries three is a cut-scene, not a rescue.
+ */
+export function totemReviveLives(maxLives) {
+  return Math.max(2, Math.ceil(maxLives / 2));
+}
 
 // ---------------------------------------------------------------------------
 // Travel

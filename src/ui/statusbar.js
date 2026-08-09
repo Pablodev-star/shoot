@@ -29,13 +29,13 @@
  * It subscribes to the event bus itself, so screens just mount it and forget.
  */
 
-import { el } from '../core/dom.js';
+import { el, clearNode } from '../core/dom.js';
 import { EVENTS, on } from '../core/events.js';
-import { getState, expProgress } from '../game/player.js';
+import { getState, expProgress, getBoon } from '../game/player.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { HUNGER_MAX } from '../game/progression.js';
 import { drainMultiplier } from '../explore/hunger.js';
-import { livesRow, updateLivesRow, gauge, goldChip, uiIcon } from './widgets.js';
+import { livesRow, updateLivesRow, gauge, goldChip, uiIcon, icon } from './widgets.js';
 
 /**
  * @param {object} opts
@@ -67,6 +67,28 @@ export function trailBand(opts = {}) {
     levelChip.dataset.tip = `${p.exp} / ${p.next} exp to level ${level + 1}`;
   };
 
+  /**
+   * What the last meal is still worth, counted in fights.
+   *
+   * A boon is the one thing a player can be carrying that has no icon in the
+   * bag — the feast that granted it was eaten — so without this the effect is
+   * invisible until a duel opens with two rounds already loaded and nobody can
+   * remember why. It is a countdown, and it is next to the gold because that is
+   * where the things you spent gold on live.
+   */
+  const boonChip = el('span.chip.chip--legendary', { hidden: true });
+  const syncBoon = () => {
+    const boon = getBoon();
+    boonChip.hidden = !boon;
+    if (!boon) return;
+    clearNode(boonChip);
+    boonChip.append(icon('feast', 1), el('span', { text: `${boon.duels}` }));
+    boonChip.dataset.tip =
+      `${boon.label} — the next ${boon.duels === 1 ? 'duel starts' : `${boon.duels} duels start`} ` +
+      `with ${boon.bullets} rounds loaded`;
+  };
+  syncBoon();
+
   const hunger = opts.hunger
     ? gauge({
         label: 'Hunger',
@@ -88,7 +110,7 @@ export function trailBand(opts = {}) {
       el('div.trailband-place', {}, [uiIcon('signpost', 1), worldLabel]),
       lives,
       hunger ? hunger.node : null,
-      el('div.trailband-stats', {}, [levelChip, gold]),
+      el('div.trailband-stats', {}, [levelChip, boonChip, gold]),
       opts.actions?.length ? el('div.trailband-actions', {}, opts.actions) : null,
     ]),
   ]);
@@ -101,6 +123,7 @@ export function trailBand(opts = {}) {
       worldLabel.textContent = getWorld(id).name;
       worldLabel.dataset.tip = `World ${id} of ${FINAL_WORLD}`;
     }),
+    on(EVENTS.BOON_CHANGED, syncBoon),
   ];
 
   if (hunger) {
@@ -116,21 +139,31 @@ export function trailBand(opts = {}) {
      * itself what counts, so a new drain is visible here the day it is added.
      */
     const syncDrain = () => {
-      const { total, horse, weatherLabel } = drainMultiplier();
-      const causes = [horse && 'the horse', weatherLabel && `the ${weatherLabel.toLowerCase()}`]
+      const { total, horse, weatherLabel, canteen } = drainMultiplier();
+      const faster = [horse && 'the horse', weatherLabel && `the ${weatherLabel.toLowerCase()}`]
         .filter(Boolean);
       // No badge without something to name in it: a multiplier the player
       // cannot attribute is worse than no multiplier.
-      if (total <= 1.001 || !causes.length) {
+      if (Math.abs(total - 1) <= 0.001 || (!faster.length && !canteen)) {
         hunger.setRate(null);
         return;
       }
-      const subject = causes.join(' and ');
+      const burning = total > 1;
+      const subject = burning ? faster.join(' and ') : 'the canteen';
+      // The other half of the sum, when there is one. A player wearing both a
+      // canteen and a sandstorm is owed the reason the number is still 1.0.
+      const aside = burning
+        ? (canteen ? ', even with the canteen' : '')
+        : (faster.length ? `, despite ${faster.join(' and ')}` : '');
       hunger.setRate({
-        text: `×${Math.round(total * 10) / 10}`,
-        tip: `${subject[0].toUpperCase()}${subject.slice(1)} ${causes.length > 1 ? 'are' : 'is'} burning your rations faster`,
-        // Only the sky scours the track. The horse is a rate, not a texture.
-        state: weatherLabel ? 'is-harsh' : null,
+        text: `×${trimNumber(total)}`,
+        tip:
+          `${subject[0].toUpperCase()}${subject.slice(1)} ` +
+          `${burning && faster.length > 1 ? 'are' : 'is'} ` +
+          `${burning ? 'burning your rations faster' : 'stretching your rations'}${aside}`,
+        // Only the sky scours the track. The horse is a rate, not a texture,
+        // and the canteen is the one badge that is not a warning at all.
+        state: burning ? (weatherLabel ? 'is-harsh' : null) : 'is-eased',
       });
     };
     syncDrain();
@@ -141,6 +174,9 @@ export function trailBand(opts = {}) {
       ),
       on(EVENTS.WEATHER_CHANGED, syncDrain),
       on(EVENTS.HORSE_ACQUIRED, syncDrain),
+      // The canteen is bought, sold and (never) eaten like anything else in
+      // the bag, so the bag is what says the rate has changed.
+      on(EVENTS.INVENTORY_CHANGED, syncDrain),
     );
   }
 
@@ -149,4 +185,9 @@ export function trailBand(opts = {}) {
 
   node.dispose = () => unsubs.forEach((fn) => fn());
   return node;
+}
+
+/** `1.15` rather than `1.1`, and `0.7` rather than `0.70`. */
+function trimNumber(n) {
+  return String(Math.round(n * 100) / 100);
 }

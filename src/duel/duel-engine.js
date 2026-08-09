@@ -73,7 +73,8 @@ export const MAX_BULLETS = 6;
 
 /**
  * @param {object} config
- * @param {object} config.player   { lives, maxLives, bullets, hasVest, immune }
+ * @param {object} config.player   { lives, maxLives, bullets, hasVest, hasTotem,
+ *                                  totemLives, immune, abilities }
  * @param {object} config.enemy    from src/game/enemies.js
  * @param {object} config.playerAgent
  * @param {object} config.enemyAgent
@@ -94,6 +95,17 @@ export function createDuel(config) {
       maxLives: config.player.maxLives,
       bullets: config.player.bullets || 0,
       hasVest: !!config.player.hasVest,
+      /**
+       * The totem, and the number of lives it hands back when it goes.
+       *
+       * The engine is told the number rather than working it out, for the same
+       * reason it is told the vest rather than reading the bag: a duel does not
+       * know what a Dusk Totem is, only that this fighter has one thing left
+       * that stops a killing blow and what the fighter is standing on
+       * afterwards. See `totemReviveLives` in src/game/progression.js.
+       */
+      hasTotem: !!config.player.hasTotem,
+      totemLives: config.player.totemLives || 0,
       immune: !!config.player.immune,
       /** Every counter an ability can leave on them. See `blankStatus`. */
       status: null,
@@ -107,6 +119,8 @@ export function createDuel(config) {
       maxLives: config.enemy.maxLives,
       bullets: config.enemy.bullets || 0,
       hasVest: false,
+      hasTotem: false,
+      totemLives: 0,
       immune: false,
       status: null,
       abilities: config.enemy.abilities || [],
@@ -205,6 +219,23 @@ export function createDuel(config) {
     if (side.hasVest && side.lives - amount <= 0) {
       side.hasVest = false;
       log('vest', { side: sideId });
+      return false;
+    }
+    /**
+     * THE TOTEM, WHICH IS NOT A SECOND VEST
+     * -----------------------------------------------------------------------
+     * A vest eats the blow: the fight carries on as though it never landed,
+     * and the lives are the lives you had. This one lets it land and then
+     * refuses the consequence — the fighter goes down and comes back up on
+     * `totemLives`, which can be MORE than they were standing on. So it is
+     * checked second (a vest is the cheaper thing to spend and spends itself
+     * first) and it does not report a hit either, because the screen has a
+     * whole scene to play before the round is allowed to look normal again.
+     */
+    if (side.hasTotem && side.lives - amount <= 0) {
+      side.hasTotem = false;
+      side.lives = Math.max(1, side.totemLives || Math.ceil(side.maxLives / 2));
+      log('totem', { side: sideId, lives: side.lives });
       return false;
     }
     side.lives = Math.max(0, side.lives - amount);

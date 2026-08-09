@@ -28,11 +28,14 @@ import {
   fullHeal,
   addGold,
   addExp,
+  breakTotem,
+  spendBoonDuel,
 } from './player.js';
 import { getWorld, FINAL_WORLD } from './worlds.js';
 import { writeSlot } from './save.js';
 import { goldForEnemy, expForEnemy } from './progression.js';
 import { toast } from '../ui/toast.js';
+import { playTotemRevival } from '../ui/totem.js';
 import { bumpStat } from '../core/settings.js';
 
 const run = {
@@ -134,6 +137,30 @@ on(EVENTS.GAME_OVER, async () => {
 });
 
 /**
+ * THE ROAD'S DEATH, REFUSED
+ * ---------------------------------------------------------------------------
+ * `loseLife` fires this instead of GAME_OVER when there is a Dusk Totem in the
+ * bag (see src/game/player.js), and the only two deaths the road has are
+ * starvation and a starvation tick that arrives while the gauge is still empty
+ * — so this is very nearly always somebody who ran out of food between shops.
+ *
+ * The walk is stopped SYNCHRONOUSLY, before the first `await`: the emit is
+ * dispatched from inside the walk loop's own frame, and a pause that waited for
+ * the scene to finish would let the next starvation tick land behind a black
+ * screen and end the run anyway. `breakTotem` gives back the lives AND the
+ * gauge, which is what makes the rescue worth anything out here.
+ */
+on(EVENTS.TOTEM_TRIGGERED, async () => {
+  if (!run.started) return;
+  run.engine?.pause();
+  await playTotemRevival();
+  breakTotem();
+  toast('The totem broke instead of you', 'gold');
+  await save();
+  run.engine?.resume();
+});
+
+/**
  * Safety net. A segment normally ends with the boss duel, which routes the
  * world transition itself — but if the walker ever runs off the end of a
  * segment (a restored save, a hand-edited slot), move on rather than walking an
@@ -170,6 +197,8 @@ export async function finishEncounter() {
  */
 export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
   const worldId = from ?? getState().world;
+  // A boon is counted in fights, and this is the end of one however it went.
+  spendBoonDuel();
   if (won) {
     const gold = goldForEnemy({ worldId, lives: enemy.maxLives, isBoss });
     const exp = expForEnemy({ worldId, lives: enemy.maxLives, isBoss });

@@ -9,11 +9,13 @@
  * STARVATION_INTERVAL_MS — progressive, never instant, so there is always time
  * to open the inventory and eat something.
  *
- * WHAT MAKES IT DRAIN FASTER
+ * WHAT MAKES IT DRAIN FASTER — AND THE ONE THING THAT MAKES IT DRAIN SLOWER
  * ---------------------------------------------------------------------------
  * Two things multiply the base rate: the horse (you cover more ground, so you
- * burn more), and harsh weather (you are fighting the sky for every step).
- * Both live in `drainMultiplier()` rather than being inlined in the update,
+ * burn more), and harsh weather (you are fighting the sky for every step). One
+ * thing divides it: the Canteen, bought once and kept, which is the only answer
+ * to hunger in the game that is not a thing you eat.
+ * All of them live in `drainMultiplier()` rather than being inlined in the update,
  * because the travel band draws that number — a hunger bar that quietly
  * empties half again as fast is a difficulty spike the player can only find
  * out about by dying of it.
@@ -29,9 +31,10 @@ import { EVENTS, emit } from '../core/events.js';
 import {
   HUNGER_DRAIN_PER_SEC,
   HUNGER_DRAIN_HORSE_MUL,
+  HUNGER_DRAIN_CANTEEN_MUL,
   STARVATION_INTERVAL_MS,
 } from '../game/progression.js';
-import { getState, setHunger, loseLife } from '../game/player.js';
+import { getState, setHunger, loseLife, hasCanteen } from '../game/player.js';
 import { getWeatherState } from './weather.js';
 import { toast } from '../ui/toast.js';
 
@@ -49,17 +52,27 @@ export function reset() {
 /**
  * Everything currently multiplying the base drain rate.
  *
- * @returns {{total: number, horse: boolean, weather: number, weatherLabel: string|null}}
+ * Two of them push it up and one pulls it down — the canteen is the only thing
+ * in the game that makes a crossing cost less than walking it does, and it is
+ * reported here beside the others rather than quietly folded into the number,
+ * so the band can name what the player is looking at.
+ *
+ * @returns {{total: number, horse: boolean, canteen: boolean, weather: number, weatherLabel: string|null}}
  */
 export function drainMultiplier() {
   const horse = !!getState().hasHorse;
+  const canteen = hasCanteen();
   const sky = getWeatherState();
   const weather = sky.hungerMul || 1;
   return {
     horse,
+    canteen,
     weather,
     weatherLabel: weather > 1 ? sky.label : null,
-    total: (horse ? HUNGER_DRAIN_HORSE_MUL : 1) * weather,
+    total:
+      (horse ? HUNGER_DRAIN_HORSE_MUL : 1) *
+      (canteen ? HUNGER_DRAIN_CANTEEN_MUL : 1) *
+      weather,
   };
 }
 
