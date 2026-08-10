@@ -1426,11 +1426,18 @@ function paintCartouche(ctx, mapW, topBand, title) {
   // the W off "WHITECROWN PASS".
   const w = measureText(text, 1) * scale + 20;
   const h = 24;
-  // Top left, in the strip between the foot of the range and the first row of
-  // encounters — the one part of every map that is always empty country, and
-  // the corner a map has put its name in for four hundred years.
+  // Nailed up over the range itself, not on the flat below it.
+  //
+  // The board is baked into the map and scales with it; a marker is 32 CSS
+  // pixels tall whatever the zoom. So a board on the open ground below the
+  // hills is clear of the trailhead pin at the zoom it was placed at and under
+  // it at the zoom the player actually reads the whole road at — the pin grows
+  // upwards relative to the sheet as the sheet shrinks. Inside the range band
+  // there is no such zoom: the nearest marker's foot is a full row of cells
+  // below the board, and the pin would have to be three times its height to
+  // reach it at the lowest zoom the panel allows.
   const left = Math.round(Math.min(mapW - w - 12, 14));
-  const top = Math.round(topBand + 14);
+  const top = Math.round(Math.max(6, topBand - h - 12));
 
   ctx.globalAlpha = 0.4;
   ctx.fillStyle = PALETTE.shadow;
