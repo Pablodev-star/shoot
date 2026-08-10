@@ -1048,8 +1048,21 @@ export const DuelScreen = {
       const label = hz.spec.label;
       const charge = hz.getState().charge ?? -1;
       const pct = charge >= 0 ? Math.min(100, Math.round(charge * 100)) : -1;
+      /**
+       * A charge special that has let go is in neither state the other five
+       * have: the window is still open but the shot has been taken. It reads
+       * FIRED for that half second, because "erupting" would be describing
+       * something about to happen that already has.
+       */
+      const spent = pct < 0 && phase === 'active' && hz.getPattern() === 'charge';
       const key =
-        phase === 'dormant' ? `d${hz.secondsToNext()}` : pct >= 0 ? `c${Math.round(pct / 4)}` : phase;
+        phase === 'dormant'
+          ? `d${hz.secondsToNext()}`
+          : pct >= 0
+            ? `c${Math.round(pct / 4)}`
+            : spent
+              ? 'fired'
+              : phase;
       if (key === hazardChipKey) return;
       hazardChipKey = key;
       hazardChip.hidden = false;
@@ -1058,9 +1071,11 @@ export const DuelScreen = {
           ? `${label} · ${hz.secondsToNext()}s`
           : pct >= 0
             ? `${label} · CHARGING ${pct}%`
-            : phase === 'warning'
-              ? `${label} · NOW`
-              : `${label} · ERUPTING`;
+            : spent
+              ? `${label} · FIRED`
+              : phase === 'warning'
+                ? `${label} · NOW`
+                : `${label} · ERUPTING`;
       hazardChip.classList.toggle('is-erupting', phase !== 'dormant');
       const cost = specialDamage(hz.spec);
       hazardChip.dataset.tip = `${hz.spec.tip}. ${

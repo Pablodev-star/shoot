@@ -94,8 +94,8 @@ const PATTERNS = {
 
   /**
    * The cornice. A slab does not come off a mountain in instalments: the whole
-   * eruption arrives inside a third of a second, early, and the rest of the
-   * window is the snow still coming down after it.
+   * eruption arrives inside half a second, early, and the rest of the window is
+   * the snow still coming down after it.
    */
   volley: (n, ms, rng) => spread(n, ms * 0.16, ms * 0.16 + 320, rms(rng, 0.4)),
 
@@ -126,16 +126,42 @@ const PATTERNS = {
   charge: (n, ms) => [{ at: ms * CHARGE_RELEASE, hits: n, mega: true }],
 };
 
-/** Evenly spaced blows between two times, each nudged by `jitter(step)`. */
+/**
+ * Evenly spaced blows between two times, each nudged by `jitter(step)`.
+ *
+ * The interval is divided by `n - 1`, not by `n`, so the LAST blow lands on
+ * `to` rather than a whole step short of it. Dividing by `n` was quietly
+ * throwing away the end of every window: the blackdamp's second tick, asked
+ * for 96% of a seven-second window, was arriving at 60% of it and leaving two
+ * silent seconds on the end of a pattern whose whole character is that it is
+ * still going when you think it has stopped.
+ *
+ * Everything is then clamped into `[from, to]` and sorted. That matters more
+ * than it looks: `to` is always inside the active window by construction, and
+ * a blow scheduled past the end of the window is not late, it is GONE — the
+ * clock drops whatever is left in the schedule when the window closes — so a
+ * clamp here is what stops a jitter roll from silently costing an eruption
+ * part of its damage.
+ */
 function spread(n, from, to, jitter) {
-  const step = (to - from) / n;
+  if (n <= 1) return [{ at: from, hits: 1 }];
+  const step = (to - from) / (n - 1);
   const out = [];
-  for (let i = 0; i < n; i++) out.push({ at: from + step * i + jitter(step), hits: 1 });
-  return out;
+  for (let i = 0; i < n; i++) {
+    const at = from + step * i + jitter(step);
+    out.push({ at: Math.min(to, Math.max(from, at)), hits: 1 });
+  }
+  return out.sort((a, b) => a.at - b.at);
 }
 
-/** A jitter function worth `k` of a step, drawn from the injected RNG. */
-const rms = (rng, k) => (step) => rng() * step * k;
+/**
+ * A jitter function worth `k` of a step, drawn from the injected RNG.
+ *
+ * Symmetric — it can pull a blow earlier as well as later — because the two
+ * blows at the ends of the run now sit exactly on `from` and `to`, and
+ * one-sided jitter on those would only ever be clamped away.
+ */
+const rms = (rng, k) => (step) => (rng() - 0.5) * step * k;
 
 /**
  * @param {object} spec an entry from SPECIALS in src/game/world-abilities.js
@@ -255,12 +281,22 @@ export function createHazard(spec, random = Math.random) {
    * It starts during the WARNING rather than at the eruption, because a rift
    * that is quiet for two seconds and then suddenly full has hidden the half of
    * the wind-up the player most needed.
+   *
+   * And it STOPS at the shot. The active window runs on for another half second
+   * after the beam lands, and clamping this at 1 through that tail left the
+   * chip reading "CHARGING 100%" over the top of an impact that had already
+   * happened — the one moment in the whole cycle when the player is certain
+   * what just occurred, being contradicted by the interface. Once it has fired
+   * there is nothing left to charge, so it goes back to -1 and the rest of the
+   * window is simply the wreckage.
    */
   function chargeLevel() {
     if (!isCharge) return -1;
     if (phase === HAZARD_PHASES.WARNING) return Math.min(1, t / spec.warnMs) * 0.3;
     if (phase !== HAZARD_PHASES.ACTIVE) return -1;
-    return Math.min(1, 0.3 + 0.7 * (t / (spec.activeMs * CHARGE_RELEASE)));
+    const k = t / (spec.activeMs * CHARGE_RELEASE);
+    if (k >= 1) return -1;
+    return 0.3 + 0.7 * k;
   }
 
   return {

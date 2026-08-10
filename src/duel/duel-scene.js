@@ -1204,14 +1204,37 @@ export function createDuelScene({
     return { x: tx + (Math.random() - 0.5) * s * 20, y: -s * 12, ms: 320 };
   }
 
-  /** Push a particle, and keep the list from growing without limit. */
+  /**
+   * Push a particle. It ONLY pushes.
+   *
+   * This used to evict on the spot when the list was full, and that was a real
+   * bug rather than an untidiness: a strike that lands calls `spawnBurst`,
+   * which adds thirty pieces, and every one of those could splice an older
+   * particle out from UNDER the reverse loop that was in the middle of
+   * retiring the strike. The `debris.splice(i, 1)` that followed then removed
+   * whatever had shifted into that index instead, leaving the landed strike in
+   * the list — where the next frame found it still past its arrival time and
+   * fired the impact, the burst and the scar again, and again, without end.
+   *
+   * Appending is safe from inside that loop (the loop reads the length once and
+   * counts down, so new pieces are never visited); removing is not. So the cap
+   * is enforced once a frame instead — see `trimDebris`.
+   */
   function addDebris(bit) {
     debris.push(bit);
-    if (debris.length > DEBRIS_CAP) {
+  }
+
+  /**
+   * Bring the list back under the cap. Called once a frame, before anything
+   * iterates it, and never from inside a loop over it.
+   */
+  function trimDebris() {
+    while (debris.length > DEBRIS_CAP) {
       // Never at the expense of something that is going to cost somebody a
       // life: the aimed pieces outrank all the scenery.
       const i = debris.findIndex((p) => p.kind !== 'strike' && p.kind !== 'beam');
-      debris.splice(i < 0 ? 0 : i, 1);
+      if (i < 0) break;
+      debris.splice(i, 1);
     }
   }
 
@@ -1555,6 +1578,10 @@ export function createDuelScene({
       }
     }
 
+    // Everything above emits; from here down the list is only walked and
+    // shortened, so the cap is applied exactly here and nowhere else.
+    trimDebris();
+
     for (let i = debris.length - 1; i >= 0; i--) {
       const p = debris[i];
       p.t += dt;
@@ -1570,11 +1597,13 @@ export function createDuelScene({
         p.y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * (p.arc || 0);
         trailPush(p);
         if (k >= 1) {
+          // Retired FIRST, so nothing it goes on to spawn can be confused with
+          // it. A piece that arrives is not a piece any more.
+          debris.splice(i, 1);
           impact(p.side);
           fx.shake = Math.max(fx.shake, 340);
           spawnBurst(p.hz, p.x, p.y, 1);
           if (p.hz.spec.lava || p.hz.motif === 'rock') addScar(p.hz, p.tx);
-          debris.splice(i, 1);
         }
         continue;
       }
@@ -1631,9 +1660,9 @@ export function createDuelScene({
 
       // Anything solid that reaches the road stops there and marks it.
       if (p.kind === 'rock' && groundLine && p.y >= groundLine) {
+        debris.splice(i, 1);
         addScar(p.hz, p.x, 0.7);
         spawnBurst(p.hz, p.x, groundLine, 0.3);
-        debris.splice(i, 1);
         continue;
       }
       if (p.kind === 'chip' && groundLine && p.y >= groundLine && p.vy > 0) {
