@@ -138,7 +138,9 @@ export const SlotsScreen = {
       ]),
       el('div.screen-body', {}, [
         grid,
-        el('p.muted.center', { text: 'Progress saves itself after every encounter.' }),
+        el('p.muted.center', {
+          text: 'Progress saves itself after every encounter, and again whenever you leave from the road. Die out there and the slot is erased.',
+        }),
       ]),
     ]);
 

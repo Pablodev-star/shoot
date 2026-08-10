@@ -32,7 +32,7 @@ import {
   spendBoonDuel,
 } from './player.js';
 import { getWorld, FINAL_WORLD } from './worlds.js';
-import { writeSlot } from './save.js';
+import { writeSlot, deleteSlot } from './save.js';
 import { goldForEnemy, expForEnemy } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { playTotemRevival } from '../ui/totem.js';
@@ -44,6 +44,16 @@ const run = {
   /** Set while a duel is in progress so its result can be attributed. */
   pendingEnemy: null,
   started: false,
+  /**
+   * True from the moment a fight is routed to until it has been resolved. The
+   * road can be left for the menu; a fight cannot. See `quitToMenu`.
+   */
+  inBattle: false,
+  /**
+   * Set once the run has died for good and its slot has been erased. Nothing
+   * writes a save after this — see `save`.
+   */
+  dead: false,
 };
 
 export function getEngine() {
@@ -60,6 +70,8 @@ export function getSlot() {
 
 export async function startNewRun(slot) {
   run.slot = slot;
+  run.dead = false;
+  run.inBattle = false;
   newRun();
   daynight.reset(0.32);
   weather.force('clear');
@@ -72,6 +84,8 @@ export async function startNewRun(slot) {
 
 export async function loadRun(slot, data) {
   run.slot = slot;
+  run.dead = false;
+  run.inBattle = false;
   restorePlayer(data.player);
 
   // A finished run has no road left to walk — every encounter of the Galaxy is
@@ -126,14 +140,18 @@ on(EVENTS.ENCOUNTER_REACHED, async (event) => {
   if (!run.started) return;
   if (event.type === 'shop') await go('shop', { encounter: event });
   else if (event.type === 'inn') await go('inn', { encounter: event });
-  else if (event.type === 'boss') await go('duel', { encounter: event, isBoss: true });
-  else await go('duel', { encounter: event });
+  else {
+    // A fight is the one place the run cannot be walked out of. The flag goes
+    // up before the screen so the road's Menu button is already refusing by
+    // the time the duel is on it.
+    run.inBattle = true;
+    await go('duel', { encounter: event, ...(event.type === 'boss' ? { isBoss: true } : {}) });
+  }
 });
 
 on(EVENTS.GAME_OVER, async () => {
   if (!run.started) return;
-  run.started = false;
-  await go('gameOver', { world: getState().world });
+  await die(getState().world);
 });
 
 /**
@@ -197,6 +215,9 @@ export async function finishEncounter() {
  */
 export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
   const worldId = from ?? getState().world;
+  // However it went, it went: the fight is behind us and the menu is open
+  // again before any of the branches below can route away from here.
+  run.inBattle = false;
   // A boon is counted in fights, and this is the end of one however it went.
   spendBoonDuel();
   if (won) {
@@ -227,14 +248,43 @@ export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
   } else {
     getState().stats.duelsLost += 1;
     bumpStat('duelsLost');
-    // Losing a duel means zero lives — the run is over. Deliberately NOT
-    // saved: the slot keeps the state from before the fight, so "Continue"
-    // puts the player back on the road with the lives they had.
-    run.started = false;
-    await go('gameOver', { world: worldId });
+    // Losing a duel means zero lives, and zero lives is the end of the run and
+    // of the slot holding it. See `die`.
+    await die(worldId);
     return;
   }
   await finishEncounter();
+}
+
+/**
+ * THE RUN IS OVER AND SO IS THE SLOT
+ * ---------------------------------------------------------------------------
+ * There are exactly two ways to die out here — losing a duel, and a starvation
+ * tick with no Dusk Totem in the bag — and both of them come through this.
+ *
+ * The slot is ERASED. It used to be kept: a loss deliberately skipped the save
+ * so the file still held the state from before the fight, and "Continue" put
+ * the player back on the road with the lives they had walked in with. That is
+ * a game with no losing condition in it. Every duel in the last four worlds is
+ * survivable by walking into it, dying, and walking into it again, and the
+ * vest, the totem and the inn — three whole systems whose only job is to buy
+ * you one more mistake — are worth nothing next to a free retry.
+ *
+ * So death is final and the file goes with it. The bargain the road offers is
+ * the other half of it, and it is why LEAVING is still safe: quit from the
+ * menu and the run is written exactly as it stands (`quitToMenu`), and it will
+ * be there tomorrow. What you cannot do is leave a fight — the Menu button is
+ * gone from the duel and `quitToMenu` refuses while `inBattle` is up — so the
+ * choice of whether to risk the slot is made on the road, before the shooting,
+ * which is where a choice belongs.
+ */
+async function die(worldId) {
+  run.started = false;
+  run.inBattle = false;
+  run.dead = true;
+  run.engine?.pause();
+  await deleteSlot(run.slot);
+  await go('gameOver', { world: worldId ?? getState().world, slot: run.slot });
 }
 
 // ---------------------------------------------------------------------------
@@ -247,6 +297,9 @@ export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
  *   a finished run so it is never resumed as a road state.
  */
 export async function save(extra = {}) {
+  // A dead run has no slot left to write to, and re-creating one from the
+  // state still sitting in memory would undo the erase.
+  if (run.dead) return;
   if (!run.started && getState().lives <= 0) return;
   const engineState = run.engine ? run.engine.serialize() : {};
   await writeSlot(run.slot, {
@@ -261,11 +314,25 @@ export async function save(extra = {}) {
   emit(EVENTS.SAVE_WRITTEN, { slot: run.slot });
 }
 
-/** Abandon the run and return to the menu (progress is already saved). */
+/**
+ * Leave the run and go back to the menu, with everything written to the slot
+ * first. This is the safe exit, and the only one — the road can be left at any
+ * step of it, but a fight cannot: with the slot now on the table (see `die`),
+ * quitting out of a duel that is going badly would be the free retry by
+ * another door. The duel screen offers no way here; this refuses anyway,
+ * because a rule worth having is worth being unable to route around.
+ *
+ * @returns {Promise<boolean>} false when the run stayed where it was
+ */
 export async function quitToMenu() {
+  if (run.inBattle) {
+    toast('You cannot walk out of a fight', 'bad');
+    return false;
+  }
   await save();
   run.started = false;
   if (run.engine) run.engine.pause();
   resetStack();
   await go('title');
+  return true;
 }

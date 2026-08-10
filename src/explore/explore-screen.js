@@ -154,12 +154,19 @@ export const ExploreScreen = {
       engine.pause();
     }
 
+    /**
+     * The safe exit, and the only one. Leaving from the road writes the run as
+     * it stands and the slot is waiting when you come back — which is worth
+     * saying out loud now that dying does the opposite and erases it
+     * (see `die` in src/game/run.js). Nobody should have to find that out from
+     * the empty card.
+     */
     async function leave() {
       engine.pause();
       const confirmed = await confirmDialog({
         title: 'Leave the road?',
-        body: 'Your run is saved at the last encounter. You can pick it up from the same slot.',
-        confirmLabel: 'Back to menu',
+        body: 'Your run is written to its slot as it stands right now, and you can pick it up from the same slot whenever you like. Only dying loses it.',
+        confirmLabel: 'Save and leave',
       });
       if (confirmed) await quitToMenu();
       else engine.resume();

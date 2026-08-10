@@ -483,31 +483,39 @@ export const ABILITY_ICONS = {
 
   // --- the six specials -----------------------------------------------------
   /**
-   * Dust Devil — a twister, leaning.
+   * Dust Devil — a twister under its wall cloud, with the light winding down
+   * the front of it.
    *
-   * The old one was a stack of horizontal bars, which is a diagram of a
-   * twister rather than a twister: every band was centred on the same axis and
-   * the whole thing read as a pile of plates. This one LEANS, the bands are
-   * offset as they climb, and it stands in its own skirt of grit — the same
-   * silhouette the landmark on the road has.
+   * Two passes ago this was a stack of horizontal bars: every band centred on
+   * the same axis, which is a diagram of a twister rather than a twister — it
+   * read as a pile of plates. The pass after that leaned the bars over, which
+   * fixed the axis and left the other half of the problem, because a lean is
+   * not a rotation either.
+   *
+   * What turns is the HIGHLIGHT. There is one lit pixel run per row and it
+   * walks across the funnel as the eye goes down — right, right, right, then
+   * back left, then right again — which is a helix seen side on, and it is the
+   * same thing the landmark's three ribbons do in
+   * src/art/sprites-hazards.js. The icon and the thing on the horizon are the
+   * same object drawn at two sizes, which is the whole job of an icon.
    */
   duststorm: [
-    '................',
-    '..kzzzzzzzzzzk..',
-    '..kEEEEEEEEEEk..',
-    '...kzzzzzzzzk...',
-    '....kEEEEEEk....',
-    '....kzzzzzzk....',
-    '.....kEEEEk.....',
-    '.....kzzzk......',
-    '......kEEk......',
-    '......kzk.......',
-    '.....kEEk.......',
-    '.....kzk........',
-    '....kEEk........',
-    '...kzzzk........',
-    '..kEzzzEk.......',
-    '..kkkkkkk.......',
+    '.kkkkkkkkkkkk...',
+    '.kEEEeeeeeezk...',
+    '.kzeeeeeezzzk...',
+    '..kzeeEeeezk....',
+    '...kzeEEeezk....',
+    '...kzeeEEezk....',
+    '....kzeeEEzk....',
+    '....kzeeEzk.....',
+    '.....kzeEzk.....',
+    '.....kzEezk.....',
+    '.....kEezk......',
+    '......kEzk......',
+    '......kzEk......',
+    '......kzek......',
+    '...kzeeEEeezk...',
+    '..z..zeezee..z..',
   ],
   /** Hornet Tree — a dead cottonwood with the nest still in it. */
   hornetTree: [
