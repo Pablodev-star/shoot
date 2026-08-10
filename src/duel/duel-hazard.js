@@ -8,8 +8,7 @@
  *   dormant   it is on the horizon and it is quiet. `cycleMs`.
  *   warning   the sky turns. `warnMs`. Nothing is thrown yet — this window
  *             exists so that being hit is never the first news of it.
- *   active    it throws. `strikes` of them, spread across `activeMs`, each one
- *             costing `damage`.
+ *   active    it goes off. What that MEANS is the pattern's business, below.
  *   dormant   and round again, until somebody wins.
  *
  * WHY IT IS A REAL CLOCK AND NOT A ROUND COUNTER
@@ -20,6 +19,36 @@
  * is twenty seconds whether you have taken your turn or not, which is the
  * entire reason a special is worth a shop slot — it does not make the enemy
  * better at duelling, it makes the duel a place you cannot stand around in.
+ *
+ * SIX SPECIALS THAT ERUPT SIX DIFFERENT WAYS
+ * ---------------------------------------------------------------------------
+ * They used to erupt one way. Every special spread `strikes` evenly across its
+ * window and took `damage` off you each time, so a volcano and a hornet tree
+ * and a tear in the sky were the same metronome in three colours — and once a
+ * player has learned to count "one, two, three" through an eruption they have
+ * learned all six.
+ *
+ * So the shape of an eruption is a PATTERN now, and every special names one:
+ *
+ *   barrage    rock thrown out over the window, one at a time  (the volcano)
+ *   volley     the whole thing at once, in one slab            (the cornice)
+ *   sweep      an even beat crossing the road, no jitter       (the twister)
+ *   swarm      a tight flurry at the front of the window       (the hornets)
+ *   lingering  slow, evenly spaced, all the way to the end     (the blackdamp)
+ *   charge     it winds up in front of you and lands ONE hit   (the rift)
+ *
+ * `charge` is the one that changes what a special IS. Nothing is thrown for
+ * the whole active window: the thing on the horizon is visibly gathering, and
+ * at the end of it a single shot arrives carrying the eruption's entire cost —
+ * four lives at once out of a rift, rather than four rocks of one. Then it goes
+ * quiet and starts counting again like anything else.
+ *
+ * THE ONE RULE EVERY PATTERN KEEPS
+ * ---------------------------------------------------------------------------
+ * An eruption is worth `strikes * damage` lives however it is spent. A pattern
+ * decides the rhythm and the size of each blow; it never decides the total. So
+ * `specialDamage` still answers the only question the shop card and the tooltip
+ * ever ask, and a pattern can be changed without re-tuning a world.
  *
  * That is also why this file has no idea what a round is. It is handed `dt` in
  * milliseconds and hands back a list of events; src/duel/duel-engine.js turns
@@ -34,6 +63,79 @@ export const HAZARD_PHASES = { DORMANT: 'dormant', WARNING: 'warning', ACTIVE: '
 
 /** How long the sky takes to let go of the colour after an eruption ends. */
 const FADE_MS = 1600;
+
+/**
+ * Where in its window a `charge` special finally lets go.
+ *
+ * Not 1: the shot has to land inside the eruption and leave the window a beat
+ * to close on the fight rather than on a life bar dropping — the same reason
+ * every other pattern stops short of the end.
+ */
+const CHARGE_RELEASE = 0.86;
+
+/**
+ * THE SIX SHAPES AN ERUPTION CAN TAKE
+ * ---------------------------------------------------------------------------
+ * Each one is handed the spec, the length of the window and an RNG, and hands
+ * back the blows that window contains: when each lands, and what it costs.
+ * Everything after this table treats the result as an opaque list, so a new
+ * pattern is a new entry here and nothing else.
+ *
+ * A blow is `{ at, damage, steal, poisons, mega }`. `mega` is not a number —
+ * it is the flag that says "draw this one as the whole eruption arriving",
+ * which is the difference between a rock and the rift firing.
+ */
+const PATTERNS = {
+  /**
+   * The volcano. Rock thrown up and out across the window, one at a time,
+   * jittered so no two eruptions have the same rhythm.
+   */
+  barrage: (n, ms, rng) => spread(n, ms * 0.2, ms * 0.86, rms(rng, 0.6)),
+
+  /**
+   * The cornice. A slab does not come off a mountain in instalments: the whole
+   * eruption arrives inside a third of a second, early, and the rest of the
+   * window is the snow still coming down after it.
+   */
+  volley: (n, ms, rng) => spread(n, ms * 0.16, ms * 0.16 + 320, rms(rng, 0.4)),
+
+  /**
+   * The twister. A wall crossing the road at a constant speed, so the beat is
+   * dead even — the one pattern with no jitter in it at all, because what makes
+   * it frightening is that you can hear exactly when the next one is due.
+   */
+  sweep: (n, ms) => spread(n, ms * 0.16, ms * 0.9, () => 0),
+
+  /** The hornets. Everything out of the nest in one flurry, then the buzzing. */
+  swarm: (n, ms, rng) => spread(n, ms * 0.14, ms * 0.56, rms(rng, 0.9)),
+
+  /**
+   * The blackdamp. Gas does not hit, it accumulates: an even, slow beat that
+   * runs all the way to the end of the window, so the last of it lands while
+   * the player is already sure it is over.
+   */
+  lingering: (n, ms, rng) => spread(n, ms * 0.24, ms * 0.96, rms(rng, 0.25)),
+
+  /**
+   * The rift, and the reason this table exists.
+   *
+   * Nothing at all for the whole window — the landmark is winding up in plain
+   * sight and the scene draws every millisecond of it — and then one blow
+   * carrying the lot.
+   */
+  charge: (n, ms) => [{ at: ms * CHARGE_RELEASE, hits: n, mega: true }],
+};
+
+/** Evenly spaced blows between two times, each nudged by `jitter(step)`. */
+function spread(n, from, to, jitter) {
+  const step = (to - from) / n;
+  const out = [];
+  for (let i = 0; i < n; i++) out.push({ at: from + step * i + jitter(step), hits: 1 });
+  return out;
+}
+
+/** A jitter function worth `k` of a step, drawn from the injected RNG. */
+const rms = (rng, k) => (step) => rng() * step * k;
 
 /**
  * @param {object} spec an entry from SPECIALS in src/game/world-abilities.js
@@ -54,33 +156,36 @@ export function createHazard(spec, random = Math.random) {
   let t = 0;
   /** False until the first eruption, so the sky is clean when it is summoned. */
   let erupted = false;
-  /** Times within the active window, in ms, at which a strike lands. */
+  /** The blows left in the window that is currently running. */
   let schedule = [];
   let eruptions = 0;
 
+  const pattern = PATTERNS[spec.pattern] ? spec.pattern : 'barrage';
+  const isCharge = pattern === 'charge';
+
   /**
-   * Where the strikes fall inside the window.
+   * Lay out the eruption that is starting.
    *
-   * Never at the very start and never at the very end: the first is a beat
-   * after the mountain goes off, so the player sees it coming out before it
-   * arrives, and the last leaves the window enough room to close on the fight
-   * rather than on a life bar dropping.
+   * The pattern says WHEN and how many blows; this says what each blow costs,
+   * and it is here rather than in the table so that the invariant — an
+   * eruption is worth `strikes * damage` however it is spent — is written once.
    */
   function scheduleStrikes() {
     const count = Math.max(1, spec.strikes);
-    const from = spec.activeMs * 0.2;
-    const to = spec.activeMs * 0.86;
-    const step = (to - from) / count;
-    schedule = [];
-    for (let i = 0; i < count; i++) {
-      schedule.push(from + step * i + random() * step * 0.6);
-    }
+    const blows = PATTERNS[pattern](count, spec.activeMs, random);
+    schedule = blows.map((blow) => ({
+      at: blow.at,
+      damage: (blow.hits || 1) * spec.damage,
+      steal: spec.steal || 0,
+      poisons: !!spec.poisons,
+      mega: !!blow.mega,
+    }));
   }
 
   /**
    * Advance the clock.
    * @returns {Array<{type: 'warn'|'erupt'|'strike'|'calm'}>} in the order they
-   *   happened. A strike carries the whole cost of one hit so the engine does
+   *   happened. A strike carries the whole cost of one blow so the engine does
    *   not have to reach back into the spec.
    */
   function tick(dt) {
@@ -103,18 +208,20 @@ export function createHazard(spec, random = Math.random) {
         erupted = true;
         eruptions += 1;
         scheduleStrikes();
-        events.push({ type: 'erupt' });
+        events.push({ type: 'erupt', charging: isCharge });
+        return events;
       }
       return events;
     }
 
-    while (schedule.length && t >= schedule[0]) {
-      schedule.shift();
+    while (schedule.length && t >= schedule[0].at) {
+      const blow = schedule.shift();
       events.push({
         type: 'strike',
-        damage: spec.damage,
-        steal: spec.steal || 0,
-        poisons: !!spec.poisons,
+        damage: blow.damage,
+        steal: blow.steal,
+        poisons: blow.poisons,
+        mega: blow.mega,
       });
     }
     if (t >= spec.activeMs) {
@@ -137,12 +244,33 @@ export function createHazard(spec, random = Math.random) {
     return Math.max(0, 1 - t / FADE_MS);
   }
 
+  /**
+   * HOW FULL THE THING ON THE HORIZON IS, 0..1
+   * -------------------------------------------------------------------------
+   * Only a `charge` special has one, and it is the whole point of that pattern:
+   * the player has the entire warning and the entire active window to watch it
+   * fill, so the shot that takes four lives is never a surprise — it is a thing
+   * they could see coming and had to fight around. -1 for everything else.
+   *
+   * It starts during the WARNING rather than at the eruption, because a rift
+   * that is quiet for two seconds and then suddenly full has hidden the half of
+   * the wind-up the player most needed.
+   */
+  function chargeLevel() {
+    if (!isCharge) return -1;
+    if (phase === HAZARD_PHASES.WARNING) return Math.min(1, t / spec.warnMs) * 0.3;
+    if (phase !== HAZARD_PHASES.ACTIVE) return -1;
+    return Math.min(1, 0.3 + 0.7 * (t / (spec.activeMs * CHARGE_RELEASE)));
+  }
+
   return {
     id: spec.id,
     spec,
     tick,
     skyLevel,
     getPhase: () => phase,
+    /** Which of the six shapes this one's eruption takes. */
+    getPattern: () => pattern,
     isActive: () => phase === HAZARD_PHASES.ACTIVE,
     /** True once a one-shot has been and gone; permanent ones never are. */
     isSpent: () => !!spec.oneShot && erupted && phase === HAZARD_PHASES.DORMANT,
@@ -152,11 +280,14 @@ export function createHazard(spec, random = Math.random) {
     getState: () => ({
       id: spec.id,
       phase,
+      pattern,
       t,
       eruptions,
       sky: skyLevel(),
       /** 0..1 through the active window; -1 when it is not erupting. */
       activeK: phase === HAZARD_PHASES.ACTIVE ? Math.min(1, t / spec.activeMs) : -1,
+      /** 0..1 as a charge special fills; -1 for the other five. */
+      charge: chargeLevel(),
     }),
   };
 }

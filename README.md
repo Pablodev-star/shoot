@@ -121,12 +121,12 @@ raises something behind the road that is there for the rest of the fight:
 
 | World | Special | What it does |
 | ----- | ------- | ------------ |
-| Dust Flats | **Dust Devil** | Sweeps the road every 22s. 2 lives, and it empties a chamber |
-| Wildgrass Prairie | **Hornet Tree** | The swarm comes out every 20s. 2 lives, and it leaves you poisoned |
-| Whitecrown Pass | **Hanging Cornice** | Breaks every 22s. 2 lives |
-| Blackwater Bayou | **Blackdamp** | The bog breathes out every 20s. 2 lives, and it leaves you poisoned |
-| Brimstone Basin | **Volcano** | Erupts every 20s. 3 lives, and the lava stays on the road |
-| Galaxy | **The Rift** | Empties every 18s. 3 lives, and it takes a round with it |
+| Dust Flats | **Dust Devil** | A wall crossing the road every 22s on a dead-even beat. 2 lives, and it empties a chamber |
+| Wildgrass Prairie | **Hornet Tree** | The nest empties in one flurry every 20s. 2 lives, and it leaves you poisoned |
+| Whitecrown Pass | **Hanging Cornice** | The slab comes off every 22s — all of it inside half a second. 2 lives |
+| Blackwater Bayou | **Blackdamp** | The bog breathes out every 20s, slowly, still arriving when you think it is over. 2 lives, and it leaves you poisoned |
+| Brimstone Basin | **Volcano** | Throws rock across an eight-second eruption every 20s. 3 lives, and the lava stays on the road |
+| Galaxy | **The Rift** | **Charges** for five seconds every 20s and then fires **once**: 3 lives in a single shot, and it takes a round with it |
 
 That clock is real time. Every other rule in this game waits for you to press
 something; a volcano does not. It stands on the horizon doing nothing, the sky
@@ -135,6 +135,20 @@ countdown on the chip above the fight is the one number in a duel worth
 hurrying for. A shield is no use under any of it (it is the ground, not a shot),
 the vest still stops a fatal one, and the diadem does not touch it: the diadem
 blocks things aimed at you, and a mountain is not aiming.
+
+**They do not all erupt the same way.** They used to: every special spread the
+same number of hits evenly across its window, so six landmarks were one
+metronome in six colours and surviving one taught you all of them. Each names a
+*pattern* now — an even sweep, one flurry, the whole slab at once, a slow drip,
+a barrage — and the Galaxy's is the one that changes what a special is. The Rift
+throws nothing at all. It opens, and then it spends five seconds visibly drawing
+the road into itself while a percentage counts up on the chip, and at the end of
+that it fires a single shot worth the entire eruption. Three lives together, not
+three lives eventually — so it is a countdown you have to fight around rather
+than weather you sit through. Then it goes quiet and starts charging again.
+
+Whatever the rhythm, an eruption is worth the same total it always was: the
+pattern decides how the cost is spent, never how much it is.
 
 ### What you can do back
 
@@ -501,11 +515,25 @@ new ability that reuses one is pure data:
 3. Put its id in a world's `enemy.abilities` in `src/game/worlds.js`.
 
 A **special** is the same shape with a landmark on the end of it: an entry in
-`SPECIALS` (cycle, warning, active window, strikes, damage, the colour the sky
-goes, and what it throws), a builder in `src/art/sprites-hazards.js` for the
-thing on the horizon, and `special` / `specialChance` on the world. The clock,
-the damage and the drawing are all generic — nothing in `duel-hazard.js`,
-`duel-engine.js` or `duel-scene.js` knows what a volcano is.
+`SPECIALS` (cycle, warning, active window, strikes, damage, the `pattern` it
+erupts in, the colour the sky goes, and what it throws), a builder in
+`src/art/sprites-hazards.js` for the thing on the horizon, and `special` /
+`specialChance` on the world. The clock, the damage and the drawing are all
+generic — nothing in `duel-hazard.js`, `duel-engine.js` or `duel-scene.js` knows
+what a volcano is.
+
+A **pattern** is one entry in the table at the top of `duel-hazard.js`: given
+the number of blows and the length of the window, it says when each one lands.
+Six exist (`barrage`, `volley`, `sweep`, `swarm`, `lingering`, `charge`) and a
+seventh is a few lines there and a name on a special. A pattern may not change
+what an eruption costs — the total is always `strikes * damage`, which is what
+keeps `specialDamage` honest for the shop card and the tooltip.
+
+`charge` is the one with a second half in the art: it publishes a 0..1 fill
+level the whole way up, the scene picks a frame out of the landmark's `charge`
+layer by that number rather than by the clock, and the chip over the fight reads
+a percentage instead of a countdown. A landmark that wants a wind-up needs
+`charge` frames in its builder; one that does not, does not.
 
 Both halves reach the player for free. `src/game/items.js` turns the catalogue
 into shop entries at load, so a new ability is on sale in its own world's shop

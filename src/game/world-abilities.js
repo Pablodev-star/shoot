@@ -925,16 +925,34 @@ export const ABILITIES = {
  *
  * Every one of them is the same machine with different weather: a landmark
  * drawn behind the road, a dormant stretch, a warning, and a window in which it
- * throws `strikes` things at the player for `damage` each. What separates them
- * is the art, the colour the sky goes, and the two extras below — `steal`
- * (rounds knocked out of the cylinder) and `poisons` — which exist so the six
- * are not the same three lives in six colours.
+ * spends `strikes * damage` lives on whoever it was raised against.
  *
  *   cycleMs   quiet time between the end of one eruption and the next warning
  *   warnMs    the sky changing, before anything is thrown
- *   activeMs  the window the strikes are spread across
- *   strikes   how many of them land on the player
- *   damage    lives per strike — so a volcano costs `strikes * damage` a cycle
+ *   activeMs  the window the eruption happens inside
+ *   strikes   how many blows the pattern has to spend
+ *   damage    lives per blow — so a volcano costs `strikes * damage` a cycle
+ *   pattern   HOW it spends them. See src/duel/duel-hazard.js
+ *
+ * THE PATTERN IS WHAT MAKES THEM SIX THINGS AND NOT ONE
+ * ---------------------------------------------------------------------------
+ * They all used to erupt identically — `strikes` evenly spread, `damage` each —
+ * so the volcano, the hornet tree and a tear in the sky were the same
+ * metronome in three colours, and a player who had survived one had survived
+ * all six. The numbers are almost unchanged; the RHYTHM is not:
+ *
+ *   twister    an even, unjittered beat — a wall crossing the road
+ *   hornets    one flurry at the front of the window, then the buzzing
+ *   cornice    the whole slab at once, inside a third of a second
+ *   blackdamp  slow and even, still arriving when you think it is over
+ *   volcano    rock thrown out across the window, one at a time
+ *   rift       nothing, nothing, nothing — and then all of it in ONE shot
+ *
+ * The last one is the interesting one, and it is why patterns exist at all. See
+ * the note on the rift at the bottom of this table.
+ *
+ * The two extras — `steal` (rounds knocked out of the cylinder) and `poisons` —
+ * are what keep the totals from being the same three lives in six colours.
  *
  * The volcano is the reference implementation and the numbers it was specified
  * with: twenty seconds quiet, then rocks, and three lives across the eruption.
@@ -955,6 +973,8 @@ export const SPECIALS = {
     motif: 'mote',
     debris: [PALETTE.sandLight, PALETTE.sand, PALETTE.sandDark],
     sky: { color: '#c2914d', alpha: 0.42 },
+    /** A wall crossing the road: dead even, so you can hear the next one due. */
+    pattern: 'sweep',
     cycleMs: 22000,
     warnMs: 2200,
     activeMs: 6000,
@@ -978,6 +998,8 @@ export const SPECIALS = {
     motif: 'hornet',
     debris: [PALETTE.gold, PALETTE.ink, PALETTE.goldLight],
     sky: { color: '#d9c34b', alpha: 0.36 },
+    /** Everything out of the nest at once, and then a long minute of buzzing. */
+    pattern: 'swarm',
     cycleMs: 20000,
     warnMs: 2000,
     activeMs: 6500,
@@ -1001,6 +1023,13 @@ export const SPECIALS = {
     motif: 'flake',
     debris: [PALETTE.snowLight, PALETTE.snow, PALETTE.snowShade],
     sky: { color: '#9cb4d2', alpha: 0.5 },
+    /**
+     * A slab does not come off a mountain in instalments. The whole eruption
+     * lands inside a third of a second, early — the rest of the window is the
+     * snow still coming down after it, which is a better picture of an
+     * avalanche than two evenly spaced taps ever was.
+     */
+    pattern: 'volley',
     cycleMs: 22000,
     warnMs: 2400,
     activeMs: 5500,
@@ -1022,6 +1051,8 @@ export const SPECIALS = {
     motif: 'gas',
     debris: [PALETTE.algae, PALETTE.lichen, PALETTE.bogLight],
     sky: { color: '#4e8a3a', alpha: 0.44 },
+    /** Gas does not hit, it accumulates: still arriving when you think it is over. */
+    pattern: 'lingering',
     cycleMs: 20000,
     warnMs: 2200,
     activeMs: 7000,
@@ -1059,6 +1090,8 @@ export const SPECIALS = {
     motif: 'rock',
     debris: [PALETTE.char, PALETTE.magma, PALETTE.emberGlow],
     sky: { color: '#c2451c', alpha: 0.52 },
+    /** The reference rhythm: rock thrown out over the window, one at a time. */
+    pattern: 'barrage',
     cycleMs: 20000,
     warnMs: 2400,
     activeMs: 8000,
@@ -1069,22 +1102,52 @@ export const SPECIALS = {
     sfx: 'rumble',
   },
 
-  /** 6 · a tear in the middle distance that keeps pulling things through it. */
+  /**
+   * 6 · THE RIFT — the one that does not throw anything.
+   *
+   * Every other special is weather: it goes off, it scatters its cost across a
+   * window, and being hit by it is a thing that happens to you two or three
+   * times while you are trying to duel. The galaxy's is a WEAPON. The tear
+   * opens, and then it spends five whole seconds visibly drawing the road into
+   * itself — the light bends towards it, the core fills, the horizon goes
+   * violet — and at the end of that it fires ONCE, straight down the road, for
+   * everything the eruption was worth in a single shot.
+   *
+   * The arithmetic is deliberately unchanged: three lives an eruption, exactly
+   * as before. What changed is that they arrive together, which turns a
+   * background nuisance into a countdown you have to fight around — kill him
+   * before it lands, or take three at once. And then it goes quiet and starts
+   * charging again, like anything else on this road.
+   *
+   * It also still takes a round with it, because a gun with nothing in it is
+   * the worst possible thing to be holding when the next one starts filling.
+   */
   rift: {
     id: 'rift',
     world: 6,
     label: 'The Rift',
     icon: 'rift',
-    tip: 'Tears the sky open for the rest of the duel. It empties every 18 seconds',
+    tip: 'Tears the sky open for the rest of the duel. Every 20 seconds it charges, then fires once for everything at once',
     banner: 'THE RIFT!',
     warnBanner: 'IT IS OPENING',
+    /** Said when the wind-up starts, so nobody mistakes the quiet for safety. */
+    chargeBanner: 'IT IS DRAWING BREATH',
+    /** And said on the frame the beam arrives. */
+    megaBanner: 'ANNIHILATION!',
     art: 'rift',
     motif: 'shard',
     debris: [PALETTE.astralLight, PALETTE.astral, PALETTE.purple],
     sky: { color: '#4c2f80', alpha: 0.55 },
-    cycleMs: 18000,
-    warnMs: 2000,
-    activeMs: 7000,
+    pattern: 'charge',
+    /**
+     * Two seconds longer between eruptions than the old rift, and a window
+     * that is all wind-up: from the sky turning to the beam landing is a hair
+     * over six seconds, which is long enough to be a real decision — press the
+     * fight, or spend the round shielding something a shield cannot stop.
+     */
+    cycleMs: 20000,
+    warnMs: 2600,
+    activeMs: 4600,
     strikes: 3,
     damage: 1,
     steal: 1,
@@ -1298,7 +1361,15 @@ export function playerSpecial(id) {
     warnMs: 900,
     activeMs: 2600,
     cycleMs: 0,
-    desc: `Calls it down on your rival: ${row.strikes} lives over one eruption. Charges in ${row.charge} rounds.`,
+    /**
+     * A charge special reads differently on a card, because it IS different:
+     * four lives spread over an eruption is a bad few seconds, and four lives
+     * in one shot is a rival who was on three.
+     */
+    desc:
+      spec.pattern === 'charge'
+        ? `Winds up on your rival and fires once: ${row.strikes} lives in a single shot. Charges in ${row.charge} rounds.`
+        : `Calls it down on your rival: ${row.strikes} lives over one eruption. Charges in ${row.charge} rounds.`,
   };
 }
 

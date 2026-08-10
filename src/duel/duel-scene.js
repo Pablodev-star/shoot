@@ -491,15 +491,25 @@ export function createDuelScene({
      * wherever that hazard throws from and lands on the target, and the
      * impact, the shake and the mark it leaves are all hung off its landing
      * rather than fired here — so a life is lost when the rock arrives.
+     *
+     * `mega` is the other kind: the single shot a `charge` special fires at the
+     * end of its wind-up (see src/duel/duel-hazard.js). Nothing is thrown for
+     * that one — a beam leaves the core and the road is where it lands.
+     *
+     * @param {'player'|'enemy'} side who it is landing on
+     * @param {'player'|'enemy'} owner whose landmark threw it
+     * @param {{mega?: boolean}} [opts]
      */
-    hazardStrike(side = 'player', owner = 'enemy') {
+    hazardStrike(side = 'player', owner = 'enemy', opts = {}) {
       const hz = hazards[owner];
       if (!hz || !layout) return;
+      if (opts.mega) return spawnBeam(hz, side);
       const L = layout[side];
       const tx = L.originX + FIGHTER_W * L.fs * 0.5;
       const ty = L.topY + 12 * L.fs;
       const from = strikeOrigin(hz, tx, ty);
-      debris.push({
+      const s = lastView ? lastView.scale : 3;
+      addDebris({
         kind: 'strike',
         hz,
         side,
@@ -509,10 +519,13 @@ export function createDuelScene({
         sy: from.y,
         tx,
         ty,
+        /** Gas comes up, so it is the one thing that does not arc over. */
+        arc: hz.motif === 'gas' ? 0 : s * 6,
         t: 0,
         life: from.ms,
-        size: Math.max(2, (lastView ? lastView.scale : 3) * 2),
+        size: Math.max(2, s * 2),
       });
+      return undefined;
     },
 
     /**
@@ -1111,6 +1124,27 @@ export function createDuelScene({
    * it is, which is the only arrangement in which you can tell at a glance
    * whose mountain just went off.
    *
+   * WHAT A LANDMARK IS MADE OF, ON SCREEN
+   * ---------------------------------------------------------------------------
+   * It used to be a sprite, a sprite of fire over it, some falling squares and
+   * a colour wash. That is four things and only one of them moved, which is why
+   * the biggest object in the frame read as a backdrop. There are seven now,
+   * and each one answers a question the player is actually asking:
+   *
+   *   the body     what is it? — and it BREATHES: it swells through the
+   *                warning and jolts when it fires
+   *   the halo     how hot is it right now? — a radial glow that tracks the
+   *                clock, so "about to go off" is visible from the corner of
+   *                the eye without reading a chip
+   *   the pool     is it real? — light thrown down onto the road under it
+   *   the tells    warning rings that leave the thing every second while it
+   *                winds up
+   *   the drift    what it has in the air: rock, grit, hornets, gas, embers
+   *   the strike   the piece with somebody's name on it — motif-shaped, with a
+   *                tail, and it BURSTS where it lands
+   *   the beam     and, for a charge special, the shot at the end of the
+   *                wind-up. See `spawnBeam`.
+   *
    * How hard each one throws, per phase. `dormant` is what it does while it is
    * only standing there — a thread of smoke off a volcano, grit off a twister,
    * a bubble out of the bog. It matters more than it sounds: a landmark with
@@ -1119,23 +1153,66 @@ export function createDuelScene({
    *
    * Rates are particles per millisecond.
    */
-  const HAZARD_RATE = { dormant: 0.004, warning: 0.03, active: 0.09 };
+  const HAZARD_RATE = { dormant: 0.006, warning: 0.045, active: 0.11 };
 
   /** Where each side's landmark stands, as a fraction of the view's width. */
   const HAZARD_X = { enemy: 0.6, player: 0.28 };
 
+  /**
+   * Where the business end of each landmark is, down its own sprite: the
+   * crater, the eye of the funnel, the nest, the lip, the vent, the core of the
+   * rift. Everything that leaves a hazard leaves from here, and the halo, the
+   * warning rings and the beam are all centred on it — so a rock comes out of
+   * the crater rather than out of the middle of the mountain.
+   */
+  const HAZARD_CORE = { rock: 0.2, flake: 0.26, mote: 0.44, shard: 0.43, hornet: 0.6, gas: 0.84 };
+
+  /** Anything past this and the oldest loose particle is dropped. */
+  const DEBRIS_CAP = 340;
+
   const liveHazards = () => [hazards.enemy, hazards.player].filter(Boolean);
+
+  /** `#rrggbb` plus an alpha, for the gradients. The palette is all six-digit. */
+  function rgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+
+  /** The point a hazard emits from, in screen pixels. Null before first draw. */
+  function hazardCore(hz) {
+    const box = hz.box;
+    if (!box) return null;
+    return {
+      x: box.x + box.w / 2,
+      y: box.y + box.h * (HAZARD_CORE[hz.motif] ?? 0.35),
+      s: box.s,
+    };
+  }
+
+  /** How lit a hazard is: the sky it is putting out, or its charge, whichever. */
+  const hazardHeat = (hz) => Math.max(hz.state.sky || 0, Math.max(0, hz.state.charge ?? -1));
 
   /** Where a strike comes from, and how long it takes to arrive. */
   function strikeOrigin(hz, tx, ty) {
     const s = lastView ? lastView.scale : 3;
-    if (hz.motif === 'gas') return { x: tx, y: groundLine + s * 4, ms: 260 };
+    const core = hazardCore(hz);
+    if (hz.motif === 'gas') return { x: tx, y: groundLine + s * 4, ms: 320 };
     if (hz.motif === 'mote' || hz.motif === 'hornet') {
-      const box = hz.box;
-      return { x: box ? box.x + box.w / 2 : tx + 200, y: ty - s * 4, ms: 320 };
+      return { x: core ? core.x : tx + 200, y: core ? core.y : ty - s * 4, ms: 340 };
     }
     // Rock, snow and shards all arrive the same way: out of the sky, fast.
-    return { x: tx + (Math.random() - 0.5) * s * 20, y: -s * 12, ms: 300 };
+    return { x: tx + (Math.random() - 0.5) * s * 20, y: -s * 12, ms: 320 };
+  }
+
+  /** Push a particle, and keep the list from growing without limit. */
+  function addDebris(bit) {
+    debris.push(bit);
+    if (debris.length > DEBRIS_CAP) {
+      // Never at the expense of something that is going to cost somebody a
+      // life: the aimed pieces outrank all the scenery.
+      const i = debris.findIndex((p) => p.kind !== 'strike' && p.kind !== 'beam');
+      debris.splice(i < 0 ? 0 : i, 1);
+    }
   }
 
   /** One piece of whatever a hazard is made of, thrown from its landmark. */
@@ -1143,11 +1220,12 @@ export function createDuelScene({
     const box = hz.box;
     if (!box) return;
     const s = box.s;
-    const cx = box.x + box.w / 2;
-    const crest = box.y + s * 6;
+    const core = hazardCore(hz);
+    const cx = core.x;
+    const crest = core.y;
     const colors = hz.colors;
     const pick = colors[Math.floor(Math.random() * colors.length)];
-    const add = (bit) => debris.push({ hz, ...bit });
+    const add = (bit) => addDebris({ hz, ...bit });
 
     switch (hz.motif) {
       case 'rock':
@@ -1170,9 +1248,9 @@ export function createDuelScene({
         // A slab comes off the lip and slides down the face of the pass.
         add({
           kind: 'rock',
-          x: box.x + box.w * (0.55 + Math.random() * 0.35),
+          x: box.x + box.w * (0.42 + Math.random() * 0.4),
           y: box.y + s * (4 + Math.random() * 6),
-          vx: -(0.04 + Math.random() * 0.06) * s,
+          vx: (0.03 + Math.random() * 0.07) * s,
           vy: 0.02 * s,
           g: 0.00012 * s,
           size: Math.max(2, Math.round(s * (0.8 + Math.random()))),
@@ -1200,7 +1278,7 @@ export function createDuelScene({
         add({
           kind: 'hornet',
           x: cx + (Math.random() - 0.5) * s * 10,
-          y: box.y + box.h * 0.45,
+          y: crest,
           vx: (hz.owner === 'enemy' ? -1 : 1) * (0.05 + Math.random() * 0.08) * s,
           vy: (Math.random() - 0.5) * 0.02 * s,
           wobble: 120 + Math.random() * 200,
@@ -1227,20 +1305,180 @@ export function createDuelScene({
         });
         break;
       default:
-        // Shards, pulled out of the rift and dropped.
+        /**
+         * Shards, and they do not fall — they ORBIT. Everything else here is
+         * something the world threw; a rift is something the world is being
+         * pulled into, so its loose pieces circle the core and shorten their
+         * radius until they are gone through it.
+         */
         add({
-          kind: 'rock',
-          x: cx + (Math.random() - 0.5) * box.w * 0.5,
-          y: box.y + box.h * (0.2 + Math.random() * 0.5),
-          vx: (Math.random() - 0.5) * 0.12 * s,
-          vy: -(0.02 + Math.random() * 0.05) * s,
-          g: 0.00014 * s,
+          kind: 'orbit',
+          cx,
+          cy: crest,
+          r: s * (6 + Math.random() * 10),
+          a: Math.random() * Math.PI * 2,
+          spin: (0.0016 + Math.random() * 0.0022) * (Math.random() < 0.5 ? -1 : 1),
+          pull: 0.0022 * s,
           size: Math.max(2, Math.round(s * 1.1)),
           color: pick,
           hot: true,
           t: 0,
-          life: 9000,
+          life: 2600 + Math.random() * 1200,
         });
+    }
+  }
+
+  /**
+   * WHAT A LANDMARK DOES WHILE IT IS ONLY STANDING THERE
+   * ---------------------------------------------------------------------------
+   * `plume` on the art (src/art/sprites-hazards.js) is the slow thing that
+   * comes off it whatever the clock says: smoke out of the crater, marsh gas
+   * off the water. It is deliberately separate from the motif above, because
+   * that one stops and starts with the eruption and this one never stops — a
+   * volcano with a column of smoke over it is a volcano even in the twenty
+   * seconds when it is doing nothing, which is most of the fight.
+   */
+  function spawnPlume(hz) {
+    const core = hazardCore(hz);
+    if (!core) return;
+    const s = core.s;
+    const smoke = hz.art.plume === 'smoke';
+    addDebris({
+      hz,
+      kind: 'plume',
+      x: core.x + (Math.random() - 0.5) * s * (smoke ? 5 : 16),
+      y: smoke ? core.y : groundLine - Math.random() * s * 2,
+      vx: (Math.random() - 0.3) * 0.012 * s,
+      vy: -(0.012 + Math.random() * 0.014) * s,
+      size: Math.max(2, Math.round(s * (1.4 + Math.random() * 1.4))),
+      color: smoke ? PALETTE.charLight : PALETTE.bogHaze,
+      t: 0,
+      life: 3400 + Math.random() * 2200,
+    });
+  }
+
+  /**
+   * THE WIND-UP, WHICH IS THE ONLY EFFECT HERE THAT POINTS INWARDS
+   * ---------------------------------------------------------------------------
+   * Everything else a hazard does throws something away from itself. A charge
+   * special does the opposite for five seconds — it pulls — and drawing that
+   * as anything other than light travelling towards a core would be drawing it
+   * as an explosion that has not happened yet.
+   *
+   * So: sparks appear on a ring that shrinks as the thing fills, run inwards,
+   * and are gone when they arrive. Half of them come up off the road itself,
+   * because what is being drawn in is the fight.
+   */
+  function spawnInflow(hz, charge) {
+    const core = hazardCore(hz);
+    if (!core) return;
+    const s = core.s;
+    const fromGround = Math.random() < 0.4;
+    const a = Math.random() * Math.PI * 2;
+    const r = s * (26 - charge * 10) * (0.6 + Math.random() * 0.6);
+    const x = fromGround ? core.x + (Math.random() - 0.5) * s * 44 : core.x + Math.cos(a) * r;
+    const y = fromGround ? groundLine - Math.random() * s * 3 : core.y + Math.sin(a) * r * 0.7;
+    addDebris({
+      hz,
+      kind: 'spark',
+      x,
+      y,
+      sx: x,
+      sy: y,
+      color: Math.random() < 0.5 ? hz.colors[0] : PALETTE.white,
+      size: Math.max(1, Math.round(s * (Math.random() < 0.3 ? 1.4 : 0.8))),
+      t: 0,
+      life: 320 + Math.random() * 260,
+    });
+  }
+
+  /** A ring of light leaving the landmark. The tell that it is waking up. */
+  function spawnTell(hz, strength = 1) {
+    const core = hazardCore(hz);
+    if (!core) return;
+    addDebris({
+      hz,
+      kind: 'ring',
+      x: core.x,
+      y: core.y,
+      r0: core.s * 4,
+      r1: core.s * (26 + 18 * strength),
+      flat: 0.55,
+      color: hz.colors[0],
+      t: 0,
+      life: 620 + 260 * strength,
+    });
+  }
+
+  /**
+   * THE SHOT AT THE END OF A WIND-UP
+   * ---------------------------------------------------------------------------
+   * A `charge` special does not throw anything (see src/duel/duel-hazard.js).
+   * It spends its whole window filling and then fires ONCE, and the entire
+   * eruption's worth of damage arrives on that one frame — so this is the only
+   * thing a hazard does that gets the full cinematic treatment: the frame slams
+   * white, a shockwave leaves the point of impact, the camera is thrown, and a
+   * column of light stays lying across the road for half a second afterwards
+   * while the dust comes down.
+   *
+   * The beam is drawn from the core to the target and it does NOT travel: at
+   * this range a shot of light is instantaneous, and animating it crossing the
+   * road would be animating a lie. What takes time is the flare before it and
+   * the wreckage after.
+   */
+  function spawnBeam(hz, side) {
+    const core = hazardCore(hz);
+    const L = layout && layout[side];
+    if (!core || !L) return;
+    addDebris({
+      hz,
+      kind: 'beam',
+      side,
+      sx: core.x,
+      sy: core.y,
+      tx: L.originX + FIGHTER_W * L.fs * 0.5,
+      ty: L.topY + 12 * L.fs,
+      width: core.s * 3.2,
+      hit: false,
+      t: 0,
+      /** A beat of aim, and then the rest of it is the wreckage. */
+      hitAt: 130,
+      life: 900,
+    });
+    fx.shake = Math.max(fx.shake, 420);
+  }
+
+  /** Everything that flies off the point a strike landed on. */
+  function spawnBurst(hz, x, y, power = 1) {
+    const s = lastView ? lastView.scale : 3;
+    addDebris({
+      hz,
+      kind: 'ring',
+      x,
+      y,
+      r0: s,
+      r1: s * (10 + 14 * power),
+      flat: 0.8,
+      color: hz.colors[0],
+      t: 0,
+      life: 260 + 180 * power,
+    });
+    for (let i = 0; i < Math.round(10 + 16 * power); i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = (0.05 + Math.random() * 0.16) * s * (0.7 + power);
+      addDebris({
+        hz,
+        kind: 'chip',
+        x,
+        y,
+        vx: Math.cos(a) * speed,
+        vy: Math.sin(a) * speed - 0.04 * s,
+        g: 0.0004 * s,
+        size: Math.max(1, Math.round(s * (Math.random() < 0.3 ? 1.4 : 0.8))),
+        color: hz.colors[Math.floor(Math.random() * hz.colors.length)],
+        t: 0,
+        life: 420 + Math.random() * 420,
+      });
     }
   }
 
@@ -1252,27 +1490,68 @@ export function createDuelScene({
    * that accumulates, and it is the reason a long duel in the basin ends on a
    * road that has visibly been under a mountain for two minutes.
    */
-  function addScar(hz, x) {
+  function addScar(hz, x, power = 1) {
     const s = lastView ? lastView.scale : 3;
     scars.push({
       x,
-      w: s * (4 + Math.random() * 5),
+      w: s * (4 + Math.random() * 5) * power,
       t: 0,
       lava: !!hz.spec.lava,
       color: hz.colors[hz.colors.length - 1],
+      hot: hz.colors[0],
     });
     if (scars.length > 26) scars.shift();
   }
 
   function stepHazard(dt) {
     for (const hz of liveHazards()) {
-      const rate = HAZARD_RATE[hz.state.phase || 'dormant'] || 0;
-      if (hz.box && rate) {
-        let n = rate * dt;
-        while (n > 0) {
-          if (n >= 1 || Math.random() < n) spawnDebris(hz);
-          n -= 1;
+      const phase = hz.state.phase || 'dormant';
+      const charge = hz.state.charge ?? -1;
+      if (!hz.box) continue;
+
+      /**
+       * A charging hazard is NOT throwing anything — that is the whole point of
+       * it — so its motif emitter is turned right down and the budget goes into
+       * the in-fall instead. The player should be able to tell a rift that is
+       * filling from a mountain that is erupting with the sound off.
+       */
+      const rate = charge >= 0 && phase !== 'dormant' ? HAZARD_RATE.dormant : HAZARD_RATE[phase] || 0;
+      let n = rate * dt;
+      while (n > 0) {
+        if (n >= 1 || Math.random() < n) spawnDebris(hz);
+        n -= 1;
+      }
+
+      if (hz.art.plume) {
+        let m = 0.0035 * dt * (0.6 + hazardHeat(hz));
+        while (m > 0) {
+          if (m >= 1 || Math.random() < m) spawnPlume(hz);
+          m -= 1;
         }
+      }
+
+      if (charge >= 0 && phase !== 'dormant') {
+        let k = (0.02 + charge * 0.09) * dt;
+        while (k > 0) {
+          if (k >= 1 || Math.random() < k) spawnInflow(hz, charge);
+          k -= 1;
+        }
+      }
+
+      /**
+       * The tells. One ring a second while it is waking up, and faster the
+       * closer a charge special is to letting go — a countdown drawn on the
+       * world instead of on the interface.
+       */
+      const tellEvery = phase === 'warning' ? 620 : charge > 0 ? 900 - charge * 520 : 0;
+      if (tellEvery) {
+        hz.tell = (hz.tell || 0) + dt;
+        if (hz.tell >= tellEvery) {
+          hz.tell = 0;
+          spawnTell(hz, charge > 0 ? charge : 0.6);
+        }
+      } else {
+        hz.tell = 0;
       }
     }
 
@@ -1286,13 +1565,58 @@ export function createDuelScene({
         // lands, so a life is never lost before the thing that took it arrives.
         const k = Math.min(1, p.t / p.life);
         p.x = p.sx + (p.tx - p.sx) * k;
-        p.y = p.sy + (p.ty - p.sy) * k;
+        // A shallow arc on the way in, so it falls onto somebody rather than
+        // sliding towards them along a ruler.
+        p.y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * (p.arc || 0);
+        trailPush(p);
         if (k >= 1) {
           impact(p.side);
           fx.shake = Math.max(fx.shake, 340);
+          spawnBurst(p.hz, p.x, p.y, 1);
           if (p.hz.spec.lava || p.hz.motif === 'rock') addScar(p.hz, p.tx);
           debris.splice(i, 1);
         }
+        continue;
+      }
+
+      if (p.kind === 'beam') {
+        if (!p.hit && p.t >= p.hitAt) {
+          p.hit = true;
+          impact(p.side);
+          fx.shake = Math.max(fx.shake, 1000);
+          fx.slam = Math.max(fx.slam, 130);
+          fx.ring = 0;
+          fx.rays = Math.max(fx.rays, 0.7);
+          spawnBurst(p.hz, p.tx, p.ty, 2.4);
+          // It does not leave a chip in the road, it leaves a crater.
+          for (let k = -1; k <= 1; k++) addScar(p.hz, p.tx + k * (lastView ? lastView.scale : 3) * 5, 1.6);
+        }
+        if (p.t >= p.life) debris.splice(i, 1);
+        continue;
+      }
+
+      if (p.kind === 'ring') {
+        if (p.t >= p.life) debris.splice(i, 1);
+        continue;
+      }
+
+      if (p.kind === 'spark') {
+        // Straight in, and gone at the core.
+        const core = hazardCore(p.hz);
+        const k = Math.min(1, p.t / p.life);
+        const ease = k * k;
+        p.x = p.sx + ((core ? core.x : p.sx) - p.sx) * ease;
+        p.y = p.sy + ((core ? core.y : p.sy) - p.sy) * ease;
+        if (k >= 1) debris.splice(i, 1);
+        continue;
+      }
+
+      if (p.kind === 'orbit') {
+        p.a += p.spin * dt;
+        p.r = Math.max(0, p.r - p.pull * dt * 0.06);
+        p.x = p.cx + Math.cos(p.a) * p.r;
+        p.y = p.cy + Math.sin(p.a) * p.r * 0.7;
+        if (p.t >= p.life || p.r <= 1) debris.splice(i, 1);
         continue;
       }
 
@@ -1307,9 +1631,15 @@ export function createDuelScene({
 
       // Anything solid that reaches the road stops there and marks it.
       if (p.kind === 'rock' && groundLine && p.y >= groundLine) {
-        addScar(p.hz, p.x);
+        addScar(p.hz, p.x, 0.7);
+        spawnBurst(p.hz, p.x, groundLine, 0.3);
         debris.splice(i, 1);
         continue;
+      }
+      if (p.kind === 'chip' && groundLine && p.y >= groundLine && p.vy > 0) {
+        // Chips bounce once, badly, and then lie still.
+        p.vy = -p.vy * 0.3;
+        p.vx *= 0.5;
       }
       if (p.t >= p.life || p.x < -80 || p.y > groundLine + 200) debris.splice(i, 1);
     }
@@ -1319,6 +1649,13 @@ export function createDuelScene({
       // Lava crusts over and stays; everything else is gone in a few seconds.
       if (!scars[i].lava && scars[i].t > 5200) scars.splice(i, 1);
     }
+  }
+
+  /** Remember where a moving piece has been, for the tail behind it. */
+  function trailPush(p) {
+    if (!p.trail) p.trail = [];
+    p.trail.push(p.x, p.y);
+    if (p.trail.length > 12) p.trail.splice(0, 2);
   }
 
   function drawHazardBody(ctx, view, gy) {
@@ -1336,25 +1673,89 @@ export function createDuelScene({
       );
       const w = HAZARD_W * s;
       const h = HAZARD_H * s;
-      const x = Math.round(view.w * (HAZARD_X[hz.owner] ?? 0.5) - w / 2);
+      const heat = hazardHeat(hz);
+      /**
+       * IT BREATHES, AND WHEN IT FIRES IT JOLTS
+       * -----------------------------------------------------------------------
+       * A landmark that is pixel-identical from the moment it is raised to the
+       * moment somebody dies is a piece of scenery, however good the sprite is.
+       * Two movements, and both of them are information rather than decoration:
+       * a slow swell that gets deeper as the thing heats up, so "it is close"
+       * is readable at a glance, and a hard shudder while it is actually
+       * throwing.
+       */
+      const swell = 1 + Math.sin(elapsed / 460) * 0.012 * (0.4 + heat);
+      const jolt = hz.state.activeK >= 0 ? Math.round((Math.random() - 0.5) * s * 1.4) : 0;
+      const dw = Math.round(w * swell);
+      const dh = Math.round(h * swell);
+      const x = Math.round(view.w * (HAZARD_X[hz.owner] ?? 0.5) - dw / 2) + jolt;
       // Its foot sits a little under the walk line, so it reads as standing
       // further down the road rather than balanced on the same crust the
       // duellists are on.
-      const y = Math.round(gy - h + s * 3);
-      hz.box = { x, y, w, h, s };
+      const y = Math.round(gy - dh + s * 3);
+      hz.box = { x, y, w: dw, h: dh, s };
+
+      // The light it throws down onto the road it is standing on. Under the
+      // sprite, so the landmark is lit rather than surrounded.
+      drawHazardPool(ctx, hz, gy, heat);
 
       // A twister has no still frame: its body IS the animation.
       const body = hz.art.frames
-        ? hz.art.frames[Math.floor(elapsed / 110) % hz.art.frames.length]
+        ? hz.art.frames[Math.floor(elapsed / 100) % hz.art.frames.length]
         : hz.art.body;
-      drawSprite(ctx, body, x, y, s);
+      drawSprite(ctx, body, x, y, s * swell);
     }
+  }
+
+  /** A pool of the hazard's own colour on the ground beneath it. */
+  function drawHazardPool(ctx, hz, gy, heat) {
+    const { x, w, s } = hz.box;
+    const k = 0.18 + heat * 0.55;
+    const cx = x + w / 2;
+    const rx = w * (0.42 + heat * 0.14);
+    const g = ctx.createRadialGradient(cx, gy, 0, cx, gy, rx);
+    g.addColorStop(0, rgba(hz.colors[0], 0.5 * k));
+    g.addColorStop(0.5, rgba(hz.colors[hz.colors.length - 1], 0.22 * k));
+    g.addColorStop(1, rgba(hz.colors[hz.colors.length - 1], 0));
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - rx, gy - s * 5, rx * 2, s * 10);
+    ctx.restore();
+  }
+
+  /**
+   * The halo.
+   *
+   * The single biggest reason the old landmarks read as flat: a volcano full of
+   * fire threw no light. This is a radial wash centred on whatever the thing's
+   * business end is, added rather than painted, and its size and strength track
+   * the clock — so the frame gets brighter around it as the countdown runs out
+   * and nobody has to look at a chip to know.
+   */
+  function drawHazardHalo(ctx, hz) {
+    const core = hazardCore(hz);
+    if (!core) return;
+    const heat = hazardHeat(hz);
+    if (heat <= 0.02) return;
+    const pulse = 0.86 + Math.sin(elapsed / 240) * 0.14;
+    const r = hz.box.w * (0.3 + heat * 0.5) * pulse;
+    const g = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, r);
+    g.addColorStop(0, rgba(hz.colors[0], 0.42 * heat));
+    g.addColorStop(0.35, rgba(hz.colors[0], 0.2 * heat));
+    g.addColorStop(1, rgba(hz.colors[hz.colors.length - 1], 0));
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = g;
+    ctx.fillRect(core.x - r, core.y - r, r * 2, r * 2);
+    ctx.restore();
   }
 
   function drawHazardGlow(ctx, view) {
     for (const hz of liveHazards()) {
       if (!hz.box) continue;
       const { x, y, s } = hz.box;
+      drawHazardHalo(ctx, hz);
       const glow = hz.art.glow;
       if (glow && glow.length) {
         // It is never entirely dark: a mountain with fire in it has fire in it
@@ -1362,6 +1763,20 @@ export function createDuelScene({
         // the whole hazard is trading on.
         ctx.globalAlpha = 0.3 + 0.7 * (hz.state.sky || 0);
         drawSprite(ctx, glow[Math.floor(elapsed / 150) % glow.length], x, y, s);
+        ctx.globalAlpha = 1;
+      }
+      /**
+       * The wind-up, drawn by the number rather than by the clock: the frame is
+       * picked out of the art by how full the thing actually is, so the picture
+       * and the hazard's own charge level can never disagree. See
+       * `buildRiftCharge` in src/art/sprites-hazards.js.
+       */
+      const charge = hz.state.charge ?? -1;
+      const chargeArt = hz.art.charge;
+      if (charge >= 0 && chargeArt && chargeArt.length) {
+        const frame = Math.min(chargeArt.length - 1, Math.floor(charge * chargeArt.length));
+        ctx.globalAlpha = Math.min(1, 0.45 + charge * 0.55);
+        drawSprite(ctx, chargeArt[frame], x, y, s);
         ctx.globalAlpha = 1;
       }
     }
@@ -1374,43 +1789,176 @@ export function createDuelScene({
       ctx.globalAlpha = 0.85 * k;
       ctx.fillStyle = scar.lava ? PALETTE.magmaDeep : scar.color;
       ctx.fillRect(Math.round(scar.x - scar.w / 2), Math.round(groundLine - s), Math.round(scar.w), s * 2);
-      if (scar.lava) {
-        ctx.globalAlpha = k * (0.55 + Math.sin(elapsed / 420 + scar.x) * 0.25);
-        ctx.fillStyle = PALETTE.magma;
+      // Everything leaves an ember in it for a moment, not only lava — a rock
+      // that has just landed is hot, and that is the frame it lands on.
+      const fresh = scar.lava ? 1 : Math.max(0, 1 - scar.t / 900);
+      if (fresh > 0.01) {
+        ctx.globalAlpha = k * fresh * (0.55 + Math.sin(elapsed / 420 + scar.x) * 0.25);
+        ctx.fillStyle = scar.lava ? PALETTE.magma : scar.hot;
         ctx.fillRect(Math.round(scar.x - scar.w / 4), Math.round(groundLine - s), Math.round(scar.w / 2), s);
       }
     }
     ctx.globalAlpha = 1;
 
-    for (const p of debris) {
-      const size = p.size || s;
-      if (p.kind === 'strike') {
-        // The incoming one is drawn bigger and with a tail, because it is the
-        // only piece on screen that is going to cost anybody anything.
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = p.hz.colors[0];
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
-        ctx.globalAlpha = 0.5;
-        ctx.fillStyle = p.hz.colors[p.hz.colors.length - 1];
-        ctx.fillRect(Math.round(p.x - size / 2), Math.round(p.y - size), size * 2, size * 2);
-        continue;
-      }
-      const fade = p.kind === 'gas' || p.kind === 'mote' ? 1 - p.t / p.life : 1;
-      ctx.globalAlpha = Math.max(0, Math.min(1, fade));
-      ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
-      if (p.hot) {
-        ctx.globalAlpha = Math.max(0, fade * 0.6);
-        ctx.fillStyle = PALETTE.emberGlow;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(1, size - 1), Math.max(1, size - 1));
-      }
-      if (p.kind === 'hornet') {
-        // Two pixels of wing, which is all a hornet at this size can have.
-        ctx.globalAlpha = 0.5;
-        ctx.fillStyle = PALETTE.bone;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y - 1), size, 1);
-      }
+    for (const p of debris) drawDebris(ctx, p, s);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /** One loose piece, whatever kind it turned out to be. */
+  function drawDebris(ctx, p, s) {
+    const size = p.size || s;
+
+    if (p.kind === 'beam') return drawBeam(ctx, p, s);
+
+    if (p.kind === 'ring') {
+      const k = p.t / p.life;
+      if (k >= 1) return;
+      const r = p.r0 + (p.r1 - p.r0) * (1 - (1 - k) ** 2);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (1 - k) * 0.6;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1, s * (1 - k) * 1.6);
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, r, r * p.flat, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
     }
+
+    if (p.kind === 'spark') {
+      // Drawn as a streak along the way it came, which is the only thing that
+      // says "inwards" rather than "a dot that happens to be moving".
+      const k = p.t / p.life;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(1, (1 - k) * 1.6);
+      ctx.fillStyle = p.color;
+      const dx = p.sx - p.x;
+      const dy = p.sy - p.y;
+      const len = Math.hypot(dx, dy);
+      const tail = Math.min(len, s * 5);
+      if (len > 0.1) {
+        for (let i = 0; i < 4; i++) {
+          const f = (i / 4) * (tail / len);
+          ctx.globalAlpha = Math.min(1, (1 - k) * 1.6) * (1 - i / 4);
+          ctx.fillRect(Math.round(p.x + dx * f), Math.round(p.y + dy * f), size, size);
+        }
+      }
+      ctx.restore();
+      return;
+    }
+
+    if (p.kind === 'strike') {
+      // The incoming one is drawn bigger, with a tail and a halo, because it is
+      // the only piece on screen that is going to cost anybody anything.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const trail = p.trail || [];
+      for (let i = 0; i < trail.length; i += 2) {
+        const f = i / Math.max(2, trail.length - 2);
+        ctx.globalAlpha = 0.5 * f;
+        ctx.fillStyle = p.hz.colors[p.hz.colors.length - 1];
+        const ts = Math.max(1, size * f);
+        ctx.fillRect(Math.round(trail[i] - ts / 2), Math.round(trail[i + 1] - ts / 2), ts, ts);
+      }
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = p.hz.colors[0];
+      ctx.fillRect(Math.round(p.x - size), Math.round(p.y - size), size * 3, size * 3);
+      ctx.restore();
+      // And the piece itself, solid, on top of its own glow.
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = p.hz.colors[0];
+      ctx.fillRect(Math.round(p.x - size / 2), Math.round(p.y - size / 2), size * 2, size * 2);
+      ctx.fillStyle = PALETTE.white;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    const fade =
+      p.kind === 'gas' || p.kind === 'mote' || p.kind === 'plume' || p.kind === 'chip'
+        ? 1 - p.t / p.life
+        : 1;
+    if (p.kind === 'plume') {
+      // Smoke thins and spreads as it climbs, which is the only way a column of
+      // squares reads as smoke.
+      const grow = 1 + (p.t / p.life) * 1.8;
+      ctx.globalAlpha = Math.max(0, fade * 0.4);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.round(size * grow), Math.round(size * grow));
+      ctx.globalAlpha = 1;
+      return;
+    }
+    ctx.globalAlpha = Math.max(0, Math.min(1, fade));
+    ctx.fillStyle = p.color;
+    ctx.fillRect(Math.round(p.x), Math.round(p.y), size, size);
+    if (p.hot) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.max(0, fade * 0.55);
+      ctx.fillStyle = p.kind === 'orbit' ? PALETTE.white : PALETTE.emberGlow;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(1, size - 1), Math.max(1, size - 1));
+      ctx.restore();
+    }
+    if (p.kind === 'hornet') {
+      // Two pixels of wing, which is all a hornet at this size can have.
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = PALETTE.bone;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y - 1), size, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * The mega shot itself: three stacked lines from the core to the target, a
+   * flare at each end, and a width that snaps open on the frame it lands and
+   * then bleeds away. Everything additive, because it is light.
+   */
+  function drawBeam(ctx, p, s) {
+    const k = p.t / p.life;
+    if (k >= 1) return;
+    // Before it fires it is a thread — the aim. After, it is the whole shot.
+    const aim = Math.min(1, p.t / p.hitAt);
+    const w = p.hit
+      ? p.width * Math.max(0.1, 1 - (p.t - p.hitAt) / (p.life - p.hitAt)) ** 0.6
+      : s * 0.6 * aim;
+    const alpha = p.hit ? Math.max(0, 1 - (p.t - p.hitAt) / (p.life - p.hitAt)) : 0.5 * aim;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    const passes = [
+      [w * 2.4, p.hz.colors[p.hz.colors.length - 1], 0.22],
+      [w * 1.3, p.hz.colors[0], 0.5],
+      [Math.max(1, w * 0.45), PALETTE.white, 0.9],
+    ];
+    for (const [width, color, a] of passes) {
+      ctx.globalAlpha = alpha * a;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, width);
+      ctx.beginPath();
+      ctx.moveTo(p.sx, p.sy);
+      ctx.lineTo(p.tx, p.ty);
+      ctx.stroke();
+    }
+    /**
+     * The flare at the muzzle end and the one where it lands. Kept small and
+     * local on purpose: the frame already takes a white impact frame on this
+     * beat (`fx.slam`), and a full-width additive bloom on top of that turns
+     * the whole picture into a sheet of paper for a quarter of a second.
+     */
+    for (const [fx0, fy0, scale] of [[p.sx, p.sy, 1], [p.tx, p.ty, 1.4]]) {
+      const r = Math.max(1, w * 1.4 * scale);
+      const g = ctx.createRadialGradient(fx0, fy0, 0, fx0, fy0, r);
+      g.addColorStop(0, rgba(PALETTE.white, alpha * 0.85));
+      g.addColorStop(0.4, rgba(p.hz.colors[0], alpha * 0.45));
+      g.addColorStop(1, rgba(p.hz.colors[0], 0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(fx0 - r, fy0 - r, r * 2, r * 2);
+    }
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 
@@ -1444,6 +1992,26 @@ export function createDuelScene({
       ctx.fillStyle = sky.color;
       ctx.fillRect(0, 0, view.w, view.h);
       ctx.globalAlpha = 1;
+    }
+    /**
+     * AND THE FRAME CLOSES IN AS A CHARGE FILLS
+     * -------------------------------------------------------------------------
+     * The one full-frame effect that belongs to a single pattern. As the rift
+     * winds up the edges of the picture darken towards its own colour and the
+     * middle stays clear — the same instinct a camera has when something is
+     * about to happen, and it does the job the sky wash cannot: the sky says
+     * "it is up", this says "it is nearly ready".
+     */
+    const charge = hz.state.charge ?? -1;
+    if (charge > 0.05) {
+      const g = ctx.createRadialGradient(
+        view.w / 2, view.h / 2, Math.min(view.w, view.h) * (0.5 - charge * 0.22),
+        view.w / 2, view.h / 2, Math.max(view.w, view.h) * 0.75,
+      );
+      g.addColorStop(0, rgba(sky.color, 0));
+      g.addColorStop(1, rgba(sky.color, 0.15 + charge * 0.45));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, view.w, view.h);
     }
   }
   // --- the cut-scene's furniture ----------------------------------------------

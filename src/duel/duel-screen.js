@@ -264,7 +264,14 @@ export const DuelScreen = {
           }),
         );
         const badge = enemyAbilities.lastElementChild;
-        const tip = `${spec.label} — ${spec.tip}. ${cost} ${cost === 1 ? 'life' : 'lives'} an eruption`;
+        // "Three lives an eruption" is the wrong promise for a charge special:
+        // the whole threat is that they arrive together, and a player reading
+        // the card is deciding whether they can afford to trade rounds with it.
+        const rate =
+          spec.pattern === 'charge'
+            ? `${cost} ${cost === 1 ? 'life' : 'lives'} in one shot`
+            : `${cost} ${cost === 1 ? 'life' : 'lives'} an eruption`;
+        const tip = `${spec.label} — ${spec.tip}. ${rate}`;
         badge.dataset.tip = tip;
         badge.setAttribute('aria-label', tip);
       }
@@ -860,9 +867,28 @@ export const DuelScreen = {
       play(entry.spec.sfx || 'rumble');
     }
 
+    /**
+     * The window opening.
+     *
+     * For five of the six that means rock is already in the air, and it gets
+     * the whole noise. For a `charge` special it means the opposite — nothing
+     * is coming for another five seconds — so it gets a quieter, longer beat
+     * and a line that says what the quiet is for. Selling a wind-up as an
+     * eruption would teach the player to brace at exactly the wrong moment.
+     */
     function handleHazardErupt(event) {
       const entry = hazardOf(event);
       if (!entry) return;
+      if (event.charging) {
+        scene.fx.shake = Math.max(scene.fx.shake, 320);
+        if (entry.owner === 'enemy') {
+          scene.fx.banner = entry.spec.chargeBanner || 'IT IS GATHERING';
+          scene.fx.bannerTimer = 1500;
+          setCallout(`The ${entry.spec.label.toLowerCase()} is winding up`, 'is-bad');
+        }
+        play('rumble');
+        return;
+      }
       scene.fx.shake = 700;
       scene.fx.rays = 0.5;
       play(entry.spec.sfx || 'rumble');
@@ -872,16 +898,35 @@ export const DuelScreen = {
      * One strike landing. The engine has already taken the life — this throws
      * the thing that took it, and the scene hangs the impact and the shake off
      * where it lands rather than off this call.
+     *
+     * A `mega` strike is the whole eruption arriving at once out of a charge
+     * special, and it is the biggest single thing that happens in an ordinary
+     * duel: it gets the beam, the name and a noise nothing else here makes.
      */
     function handleHazardStrike(event) {
       const owner = event.owner || 'enemy';
       const side = event.side || 'player';
-      scene.hazardStrike(side, owner);
+      const spec = hazardOf(event)?.spec;
+      scene.hazardStrike(side, owner, { mega: event.mega });
       const card = side === 'player' ? playerCard : enemyCard;
       card.classList.remove('is-hit');
       void card.offsetWidth;
       card.classList.add('is-hit');
-      play('hit');
+      if (event.mega) {
+        scene.fx.banner = spec?.megaBanner || 'DIRECT HIT!';
+        scene.fx.bannerTimer = 1500;
+        play('thunder');
+        play('hit');
+        const took = `${event.damage} ${event.damage === 1 ? 'life' : 'lives'}`;
+        setCallout(
+          side === 'player'
+            ? `The ${spec?.label.toLowerCase() || 'rift'} fires — ${took} at once`
+            : `Your ${spec?.label.toLowerCase() || 'rift'} fires — ${took} at once`,
+          side === 'player' ? 'is-bad' : 'is-good',
+        );
+      } else {
+        play('hit');
+      }
       if (event.steal && side === 'player') {
         toast('The blast knocked a round out of your gun', 'bad');
       }
@@ -989,21 +1034,38 @@ export const DuelScreen = {
       }
     }
 
+    /**
+     * The countdown over the fight.
+     *
+     * Dormant it reads seconds, because seconds is the thing worth hurrying
+     * for. A charge special reads a PERCENTAGE instead once it starts winding
+     * up: what the player needs from a rift is not "it is erupting" — it is
+     * erupting for five seconds and nothing has happened yet — but how much of
+     * that five seconds is left before three lives arrive in one piece.
+     */
     function updateHazardChip(hz) {
       const phase = hz.getPhase();
       const label = hz.spec.label;
-      const key = phase === 'dormant' ? `d${hz.secondsToNext()}` : phase;
+      const charge = hz.getState().charge ?? -1;
+      const pct = charge >= 0 ? Math.min(100, Math.round(charge * 100)) : -1;
+      const key =
+        phase === 'dormant' ? `d${hz.secondsToNext()}` : pct >= 0 ? `c${Math.round(pct / 4)}` : phase;
       if (key === hazardChipKey) return;
       hazardChipKey = key;
       hazardChip.hidden = false;
       hazardChip.textContent =
         phase === 'dormant'
           ? `${label} · ${hz.secondsToNext()}s`
-          : phase === 'warning'
-            ? `${label} · NOW`
-            : `${label} · ERUPTING`;
+          : pct >= 0
+            ? `${label} · CHARGING ${pct}%`
+            : phase === 'warning'
+              ? `${label} · NOW`
+              : `${label} · ERUPTING`;
       hazardChip.classList.toggle('is-erupting', phase !== 'dormant');
-      hazardChip.dataset.tip = `${hz.spec.tip}. ${specialDamage(hz.spec)} lives an eruption`;
+      const cost = specialDamage(hz.spec);
+      hazardChip.dataset.tip = `${hz.spec.tip}. ${
+        hz.getPattern() === 'charge' ? `${cost} lives in one shot` : `${cost} lives an eruption`
+      }`;
     }
 
     /**

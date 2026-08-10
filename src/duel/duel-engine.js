@@ -481,6 +481,13 @@ export function createDuel(config) {
       damage: ev.damage,
       hit,
       steal: ev.steal || 0,
+      /**
+       * The whole eruption arriving as one shot rather than one of several
+       * rocks — see the `charge` pattern in src/duel/duel-hazard.js. Nothing in
+       * here treats it differently; the screen does, because three lives at
+       * once deserves a bigger noise than three lives one at a time.
+       */
+      mega: !!ev.mega,
       lives: victim.lives,
     });
     if (checkEnd()) terminationCause = entry.owner === 'enemy' ? 'hazard' : 'ability';
@@ -496,7 +503,14 @@ export function createDuel(config) {
       const entry = hazards[i];
       for (const ev of entry.clock.tick(dt)) {
         if (ev.type === 'strike') applyHazardStrike(entry, ev);
-        else log(`hazard-${ev.type}`, { special: entry.spec.id, owner: entry.owner });
+        else {
+          log(`hazard-${ev.type}`, {
+            special: entry.spec.id,
+            owner: entry.owner,
+            /** True when the window that just opened is a wind-up, not a barrage. */
+            charging: !!ev.charging,
+          });
+        }
         if (over) return;
       }
       // A one-shot is done the moment it goes quiet: the mountain the player
