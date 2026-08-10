@@ -150,6 +150,34 @@ than weather you sit through. Then it goes quiet and starts charging again.
 Whatever the rhythm, an eruption is worth the same total it always was: the
 pattern decides how the cost is spent, never how much it is.
 
+**The Dust Devil turns.** The twister was the one landmark of the six that was
+supposed to be moving and was not. It was built as a stack of ellipse outlines
+with grit scattered round them, and the scatter was re-rolled from a
+frame-seeded generator on every frame — so it did not spin, it BOILED: four
+static fields a second, which the eye reads as a picture being redrawn rather
+than as an object turning. It is built as the thing itself now. Every row of
+the funnel is one slice of a rotating surface, so each pixel across it has a
+real angle on the wall; that angle is shaded for the light on one side plus
+three ribbons of grit going round, and the result is ordered-dithered, so the
+shadowed side is see-through and the lit side is solid. The ribbons lean as
+they climb and rise with the frame. Six chunks it has torn off the road orbit
+the column at twice that rate and pass in front of it and behind it. There is a
+wall cloud overhead with a collar turning in the mouth of it and a ring of grit
+being dragged round the foot, and the eight frames loop seamlessly because
+every angular term is a whole multiple of the spin. The 16 x 16 icon was redrawn
+to match: one lit run per row, walking across the funnel as the eye goes down.
+
+**And a shockwave is made of pixels.** Every wave a special throws — the ring
+that leaves a landmark as it wakes up, the burst where a strike lands, the one
+that crosses the whole frame when the Rift's shot arrives — used to be a
+stroked ellipse: a smooth antialiased curve with a fractional line width and a
+grey fringe on either side of it in colours that are not in the palette. They
+are drawn on the scene's own pixel grid now, one block per source pixel, with
+the cells collected before anything is filled so an additive pass never doubles
+up at the poles. The fade is quantised to eighths, and past its half life the
+ring drops to a checker and then to a quarter of its cells, so a wave comes
+apart into grit instead of dissolving.
+
 ### What you can do back
 
 Everything above is for sale, in the world it belongs to and nowhere else, and
@@ -314,7 +342,29 @@ Speech is a general system, not part of that one scene: a portrait, a name
 plate and a line typing itself out, for anybody on either side of the road.
 Tapping catches the typing up; tapping again moves on.
 
-Three save slots. Progress writes after every encounter.
+## Saving, and losing
+
+Three save slots. Progress writes after every encounter, and again the moment
+you leave from the road.
+
+**Dying erases the slot.** A run that reaches zero lives — to a rider's bullet
+or to an empty gauge — is over, and the file goes with it. It used to be kept:
+losing a duel deliberately skipped the save, so the slot still held the state
+from before the fight and "Continue" put you back on the road with the lives
+you had walked in with. That is a game with no losing condition in it. Every
+duel in the last four worlds was survivable by walking into it, dying, and
+walking into it again — and the vest, the Dusk Totem and the bed at the inn,
+three whole systems whose only job is to buy you one more mistake, were worth
+nothing next to a free retry.
+
+The other half of the bargain is that **leaving is always safe**. Quit from the
+road and the run is written exactly as it stands; it is there tomorrow. What
+you cannot do is leave a fight — the duel has no way back to the menu, and the
+run controller refuses one — so the decision to risk the slot is taken on the
+road, before the shooting, which is where a decision belongs.
+
+The Dusk Totem still refuses the game over, and it is now the only thing that
+does.
 
 ## Online
 
@@ -396,6 +446,22 @@ Three rules hold the architecture together:
 3. **The duel engine knows nothing about input or drawing.** Each side is an
    agent with one method, `chooseMove()`. Story mode passes a UI agent and an AI
    agent; online will pass a network agent and change nothing else.
+
+And one that had to be learned. **The router queues a navigation, it never
+drops one.** `go()` used to return silently if a transition was already in
+flight — a fair guard against two screens mounting on top of each other, and
+the wrong way to do it, because a `go` is not always a button press. The walk
+engine fires `ENCOUNTER_REACHED` from inside its own frame and the run
+controller answers with a `go`; the saloon doors are open for 640 ms around
+every mount and the walk is running for the second half of that, so an
+encounter that came up inside the out-swing was thrown away. The engine had
+already paused itself and marked the event resolved, so nothing was ever going
+to fire it again — the player stood on an empty road in the walk's idle pose
+with no way forward. That was the "loading a slot freezes the character" bug: a
+saved position lands wherever it lands, and any save made within about twenty
+pixels of the next encounter reloaded straight into the dead window. A request
+that arrives during a transition is remembered now and run when that one
+finishes; the last one asked for wins.
 
 ## Tuning
 

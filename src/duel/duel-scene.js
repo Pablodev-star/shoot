@@ -112,6 +112,93 @@ const FIRE_MS = FIRE_FRAME_MS.reduce((a, b) => a + b, 0);
 const SMOKE_LIFE = 810;
 const SHELL_LIFE = 560;
 
+// ---------------------------------------------------------------------------
+// Shockwaves
+// ---------------------------------------------------------------------------
+
+/**
+ * A SHOCKWAVE IS A RING OF PIXELS, NOT A STROKED ELLIPSE
+ * ---------------------------------------------------------------------------
+ * Every wave a world special throws — the tell that leaves a landmark as it
+ * wakes up, the burst where a strike lands, the ring off the rift's shot —
+ * used to be `ctx.ellipse` with a `lineWidth` and a `stroke`. It worked, and
+ * it was the one thing in the frame that was not made of pixels: a smooth
+ * antialiased curve, a fractional line width, and a soft grey fringe on both
+ * sides of it in colours that are not in the palette. Next to a twister built
+ * out of single pixels it read as the developer's console drawing on top of
+ * the game.
+ *
+ * These are built the way everything else here is:
+ *
+ *   THE GRID    every block is exactly one source pixel — `view.scale` device
+ *               pixels — and is SNAPPED to that grid, so the ring steps the
+ *               way a pixel circle steps and two waves at different radii
+ *               land on the same lattice
+ *   NO OVERLAP  the cells of one pass are collected in a set before anything
+ *               is filled. Walking an ellipse by angle visits the same cell
+ *               many times over near the poles, and under `lighter` every
+ *               repeat is another dose of light — that is what put the two
+ *               bright caps on the old rings
+ *   STEPPED     the fade is quantised to eighths. A wave that dims smoothly is
+ *               a wave with a hundred alpha values in it; this one has eight,
+ *               which is what a palette-limited fade looks like
+ *   IT BREAKS   past its half life the ring drops to a checker and then to a
+ *               quarter of its cells, so it comes apart into grit instead of
+ *               dissolving. Dithering out is how pixel art fades
+ */
+
+/** Alpha, in eighths. Anything below the bottom step is not drawn at all. */
+function quantAlpha(a) {
+  return Math.round(Math.max(0, Math.min(1, a)) * 8) / 8;
+}
+
+/**
+ * One ring of single-pixel blocks on the scene's own grid.
+ *
+ * @param {Set<number>} drawn cells already filled by this wave, so the passes
+ *   of one shockwave never stack on each other
+ * @param {number} gap 0 solid, 1 checkerboard, 2 one cell in four
+ */
+function pixelRing(ctx, cx, cy, r, flat, s, color, alpha, drawn, gap = 0) {
+  const a = quantAlpha(alpha);
+  if (a <= 0 || r < s * 0.6) return;
+  const steps = Math.max(24, Math.round((r * 7) / s));
+  ctx.globalAlpha = a;
+  ctx.fillStyle = color;
+  for (let i = 0; i < steps; i++) {
+    const th = (i / steps) * Math.PI * 2;
+    const gx = Math.round((cx + Math.cos(th) * r) / s);
+    const gy = Math.round((cy + Math.sin(th) * r * flat) / s);
+    if (gap === 1 && ((gx + gy) & 1)) continue;
+    if (gap === 2 && ((gx & 1) || (gy & 1))) continue;
+    // Offset before packing so a cell left of or above the origin still keys
+    // to a unique positive number.
+    const key = (gx + 4096) * 8192 + (gy + 4096);
+    if (drawn.has(key)) continue;
+    drawn.add(key);
+    ctx.fillRect(gx * s, gy * s, s, s);
+  }
+}
+
+/**
+ * The whole wave: a bright leading rim with two dimmer rings following it in,
+ * coming apart into grit as it goes.
+ *
+ * @param {number} k 0..1, how far through its life the wave is
+ */
+function drawShockwave(ctx, cx, cy, r, flat, s, color, hot, k) {
+  const drawn = new Set();
+  const fade = (1 - k) ** 1.4;
+  const gap = k > 0.72 ? 2 : k > 0.42 ? 1 : 0;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  pixelRing(ctx, cx, cy, r, flat, s, hot, fade * 0.95, drawn, gap);
+  pixelRing(ctx, cx, cy, r - s, flat, s, color, fade * 0.6, drawn, gap);
+  pixelRing(ctx, cx, cy, r - s * 2, flat, s, color, fade * 0.3, drawn, Math.min(2, gap + 1));
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 /**
  * @param {object} o
  * @param {number} [o.enemyScale] how many times the fighters' own size the
@@ -1427,7 +1514,12 @@ export function createDuelScene({
       r0: core.s * 4,
       r1: core.s * (26 + 18 * strength),
       flat: 0.55,
-      color: hz.colors[0],
+      // Two steps off the hazard's own ramp: the rim it leads with and the
+      // body behind it. Both out of the palette, because the wave is drawn as
+      // pixels now and a pixel is a colour somebody chose — see
+      // `drawShockwave`.
+      hot: hz.colors[0],
+      color: hz.colors[Math.min(1, hz.colors.length - 1)],
       t: 0,
       life: 620 + 260 * strength,
     });
@@ -1482,6 +1574,7 @@ export function createDuelScene({
       r0: s,
       r1: s * (10 + 14 * power),
       flat: 0.8,
+      hot: PALETTE.white,
       color: hz.colors[0],
       t: 0,
       life: 260 + 180 * power,
@@ -1844,15 +1937,9 @@ export function createDuelScene({
       const k = p.t / p.life;
       if (k >= 1) return;
       const r = p.r0 + (p.r1 - p.r0) * (1 - (1 - k) ** 2);
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = (1 - k) * 0.6;
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = Math.max(1, s * (1 - k) * 1.6);
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, r, r * p.flat, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      // The wave a special throws, in blocks on the scene's own grid. See the
+      // note on `drawShockwave` for why it is not a stroked ellipse any more.
+      drawShockwave(ctx, p.x, p.y, r, p.flat, s, p.color, p.hot || PALETTE.white, k);
       return;
     }
 
@@ -2152,26 +2239,31 @@ export function createDuelScene({
     ctx.globalAlpha = 1;
   }
 
-  /** A shockwave: one ring of blocks, thinning as it goes. */
+  /**
+   * The big one: the wave that crosses the whole frame when the rift's shot
+   * lands or the Stranger drops his cowl.
+   *
+   * It was already made of blocks and it was not pixel art. Every block was
+   * two source pixels across but stepped on a one-pixel grid, so the ring came
+   * out as a chain of overlapping squares at a dozen different offsets — and
+   * the steps were spaced by radius rather than by cell, so the two poles of
+   * the ellipse got a solid double-bright bar and the sides got gaps. It is
+   * the same wave the specials throw, at the scale of the frame: see
+   * `drawShockwave`.
+   */
   function drawRing(ctx, view, k) {
     const s = view.scale;
-    const cx = view.w / 2;
-    const cy = view.h / 2;
-    const r = k * Math.max(view.w, view.h) * 0.75;
-    const alpha = Math.max(0, 1 - k) ** 1.5;
-    const steps = Math.max(28, Math.round(r / (s * 1.5)));
-    ctx.fillStyle = PALETTE.astralLight;
-    ctx.globalAlpha = alpha * 0.9;
-    for (let i = 0; i < steps; i++) {
-      const a = (i / steps) * Math.PI * 2;
-      ctx.fillRect(
-        Math.round((cx + Math.cos(a) * r) / s) * s,
-        Math.round((cy + Math.sin(a) * r * 0.72) / s) * s,
-        s * 2,
-        s * 2,
-      );
-    }
-    ctx.globalAlpha = 1;
+    drawShockwave(
+      ctx,
+      view.w / 2,
+      view.h / 2,
+      k * Math.max(view.w, view.h) * 0.75,
+      0.72,
+      s,
+      PALETTE.astral,
+      PALETTE.astralLight,
+      Math.min(1, k / 1.4),
+    );
   }
 
   // --- drawing ---------------------------------------------------------------

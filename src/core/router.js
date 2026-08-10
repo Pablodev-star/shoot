@@ -20,6 +20,8 @@ let current = null;
 let root = null;
 let overlay = null;
 let transitioning = false;
+/** The navigation asked for while one was already running. See `go`. */
+let pending = null;
 
 export function initRouter(rootNode, overlayNode) {
   root = rootNode;
@@ -55,8 +57,65 @@ export async function go(id, params = {}, opts = {}) {
     console.error(`[router] unknown screen "${id}"`);
     return;
   }
-  if (transitioning) return;
+
+  /**
+   * A NAVIGATION ASKED FOR DURING A TRANSITION IS QUEUED, NEVER DROPPED
+   * -------------------------------------------------------------------------
+   * This used to be `if (transitioning) return;` — a guard against two screens
+   * mounting on top of each other, which is a real thing to guard against and
+   * the wrong way to do it. A `go` is not always a button press: the walk
+   * engine fires ENCOUNTER_REACHED from inside its own frame, and the run
+   * controller answers that with a `go`. The doors are open for 640 ms around
+   * every mount, and the walk is running for the second half of that — so an
+   * encounter that came up inside the out-swing was silently thrown away.
+   *
+   * The engine had already paused itself and marked the event resolved by
+   * then, so nothing was ever going to fire it again: the player stood on an
+   * empty road, in the walk's idle pose, with no way forward. THAT is the
+   * "loading a slot freezes the character" bug — a saved position lands
+   * wherever it lands, and any save made within about twenty pixels of the
+   * next encounter reloaded straight into the dead window.
+   *
+   * So the request is remembered instead. The transition in flight finishes
+   * its own mount, then runs whatever came in behind it; the last one asked
+   * for wins, because a screen that has been superseded before it was ever
+   * shown is not worth showing.
+   */
+  if (transitioning) {
+    const superseded = pending;
+    const queued = { id, params, opts };
+    pending = queued;
+    // The one it replaced is never going to be mounted; its caller is told so
+    // now rather than left waiting on a promise nothing will settle.
+    superseded?.resolve?.();
+    return new Promise((resolve) => {
+      queued.resolve = resolve;
+    });
+  }
+
   transitioning = true;
+  let next = { id, params, opts };
+  try {
+    while (next) {
+      pending = null;
+      try {
+        await navigate(next.id, next.params, next.opts);
+      } catch (err) {
+        console.error(`[router] navigation to "${next.id}" threw`, err);
+      }
+      next.resolve?.();
+      next = pending;
+    }
+  } finally {
+    pending = null;
+    transitioning = false;
+  }
+}
+
+/** One mount, doors and all. Only ever called from `go`. */
+async function navigate(id, params, opts) {
+  const screen = screens.get(id);
+  if (!screen) return;
 
   if (!opts.silent) play(opts.back ? 'back' : 'click');
 
@@ -84,7 +143,6 @@ export async function go(id, params = {}, opts = {}) {
   emit(EVENTS.SCREEN_CHANGED, { id, params });
 
   await runTransition('out');
-  transitioning = false;
 }
 
 /** Pop back to the previous screen (or to a fallback when the stack is empty). */

@@ -126,11 +126,22 @@ export const VictoryScreen = {
   },
 };
 
+/**
+ * The end of a run, and of the slot that was holding it.
+ *
+ * This screen used to say the opposite: "your slot still holds the run as it
+ * stood at the last encounter — pick it up and try that fight again". It does
+ * not any more. Death erases the file (see `die` in src/game/run.js), and the
+ * card the player is looking at is the one place that has to say so plainly,
+ * because the next thing they will see is a slot picker with an empty card
+ * where their run was.
+ */
 export const GameOverScreen = {
   id: 'gameOver',
 
   mount(root, params = {}) {
     const world = getWorld(params.world || getState().world);
+    const slot = params.slot;
     // You went down somewhere in particular — show that somewhere.
     startMenuScene({ biome: world.biome, tint: world.tint });
     play('lose');
@@ -147,12 +158,17 @@ export const GameOverScreen = {
           statTile('Duels won', player.stats.duelsWon),
           statTile('Gold', player.gold, 'coin'),
         ]),
+        el('p.center', {
+          style: { marginTop: 'var(--sp-4)', color: 'var(--red-light)' },
+          text: slot
+            ? `Slot ${slot} has been erased. That run is gone for good.`
+            : 'That run has been erased. It is gone for good.',
+        }),
         el('p.muted.center', {
-          style: { marginTop: 'var(--sp-4)' },
-          text: 'Your slot still holds the run as it stood at the last encounter — pick it up and try that fight again.',
+          text: 'Leaving from the road saves. Dying does not — there is nothing to pick back up.',
         }),
         el('div.row', { style: { justifyContent: 'center', marginTop: 'var(--sp-5)' } }, [
-          el('button.btn.btn--primary', { onclick: () => go('slots') }, ['Try again']),
+          el('button.btn.btn--primary', { onclick: () => go('slots') }, ['Start again']),
           el('button.btn.btn--ghost', { onclick: () => go('title') }, ['Main menu']),
         ]),
       ]),

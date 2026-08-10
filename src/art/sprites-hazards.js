@@ -269,102 +269,299 @@ function buildVolcanoGlow() {
 // ---------------------------------------------------------------------------
 
 /**
- * A TWISTER IS A STACK OF RINGS, NOT A FILLED SHAPE
+ * A TWISTER IS A SURFACE YOU CAN SEE THROUGH, NOT A SILHOUETTE
  * ---------------------------------------------------------------------------
- * Two attempts at this went wrong the same way. Draw the funnel as a solid
- * silhouette and you get a wedge — a flat blade of sand with a hard edge, and
- * no amount of banding painted onto it reads as rotation, because a solid
- * shape has no inside to see into.
+ * Three attempts at this went wrong, and each one is a general mistake about
+ * drawing a round thing in pixels, so all three are worth writing down.
  *
- * What a dust devil actually is, is AIR YOU CAN SEE THROUGH with grit going
- * round in it. So it is built as a column of flattened rings — ellipse
- * OUTLINES, not fills — each one a little narrower than the one above and each
- * turned a little further round than its neighbour:
+ *   1. AS A SOLID SHAPE it is a wedge — a flat blade of sand with a hard edge,
+ *      and no amount of banding painted on top of it reads as rotation,
+ *      because a solid shape has no inside to see into.
+ *   2. AS A STACK OF RING OUTLINES it has an inside and no OUTSIDE. At the head
+ *      the rings sit five rows apart, so the left and right of the column come
+ *      out as two dotted diagonals; the eye never finds an edge and the whole
+ *      thing reads as a smear of grit hanging in the air.
+ *   3. AS RINGS PLUS SCATTER — outlines with loose grit thrown round them to
+ *      fill the gaps — it is noise. Worse, the scatter was re-rolled every
+ *      frame from a frame-seeded rng, so it BOILED: four static fields a
+ *      second, which the eye reads as a shape being redrawn rather than a
+ *      shape moving.
  *
- *   `axis(k)`  the spine bends: it hangs out of the cloud, curves back under
- *              itself, and only touches down at the bottom
- *   `half(k)`  wide and loose at the head, pinched hard at the foot
- *   the rings  are spaced so the gaps between them are the road showing
- *              through, which is what stops it reading as a cut-out
+ * What it is built as now is the thing itself: A ROTATING SURFACE, shaded.
+ * Every row of the column is one horizontal slice of a funnel, so for each
+ * pixel across that row there is an actual angle on the wall it is looking at —
+ * `a = acos((x - cx) / rx)` — and the whole sprite falls out of shading that
+ * angle and dithering the result:
  *
- * The rotation is free: each ring carries a bright arc at an angle that is a
- * function of its height and the frame, so the highlights spiral up the column
- * and the whole thing turns without a single pixel being animated by hand.
+ *   the shade    `cos(a - turn)` for the light on one side, plus
+ *                `cos(3(a - turn))` for three ribbons of grit going round.
+ *                One highlight per ring is a gradient at this size; three
+ *                separate ribbons crossing the silhouette per turn is what
+ *                says "fast"
+ *   the twist    `turn` is `k * TW_TWIST - spin`, so the ribbons lean as they
+ *                climb and the whole pattern rises with the frame. Minus, not
+ *                plus — get the sign wrong and the tornado politely pours its
+ *                grit down into the ground
+ *   the dither   an ordered 4x4 threshold, NOT a random one. Dark pixels drop
+ *                out first, so the shadowed side of the column is see-through
+ *                and the lit side is solid — translucency and shading off one
+ *                number, and stable from frame to frame because it is a
+ *                function of position rather than of chance
+ *   the far wall shows through the holes, always at least two steps darker,
+ *                so the funnel has a depth as well as a face
+ *
+ * There is still exactly one rng and the frame is NOT in it. It places the
+ * lumps in the wall cloud and the grit lying on the road — the parts that are
+ * the same in every frame. Everything that moves is a function of `spin`.
+ *
+ * On top of the surface go the six CHUNKS it has torn off the road, orbiting
+ * at twice the shading's rate: an object passing in front of the funnel and
+ * then behind it is the one unambiguous statement that the funnel is turning.
+ *
+ * And it is attached to the world at both ends — a wall cloud with a collar
+ * turning in the mouth of it, a shadow and a fan of torn ground beneath, and a
+ * ring of grit being dragged round the foot — because a funnel that starts
+ * nowhere and lands nowhere is a decal.
+ *
+ * The eight frames loop seamlessly: every angular term is an integer multiple
+ * of `spin`, and `spin` runs a clean 2π across them.
+ */
+
+/** Frames in the funnel's turn. One full revolution, and it must divide 2π. */
+const TW_FRAMES = 8;
+/** Where the funnel leaves the cloud, and where it meets the road. */
+const TW_TOP = 7;
+const TW_FOOT = HAZARD_H - 3;
+/** How far round the column twists between the road and the cloud, in radians. */
+const TW_TWIST = 5.6;
+
+/**
+ * The spine. It leans downwind and curves back under itself — but only just:
+ * the lean has to stay well UNDER the rate the funnel is narrowing at, or one
+ * of the two edges comes out vertical and the silhouette is a wedge with a
+ * diagonal down one side instead of a funnel with two.
  */
 function twisterAxis(k) {
-  return HAZARD_W / 2 + Math.sin(k * 2.0 - 0.5) * 6 - 2;
+  return 28 + k * 4 + Math.sin(k * 3.4) * 2.6;
 }
 
 function twisterHalf(k) {
-  return Math.max(1.8, 15 * (1 - k) ** 1.6 + 1.6);
+  // Wide and loose at the head, pinched hard three quarters of the way down,
+  // and kicking back out into the skirt where it drags on the ground.
+  const body = 11.5 * (1 - k) ** 1.3 + 1.5;
+  const waver = Math.sin(k * 7.4 + 0.8) * 0.8 * (1 - k);
+  const skirt = k > 0.86 ? ((k - 0.86) / 0.14) ** 2 * 2.6 : 0;
+  return Math.max(1.4, body + waver + skirt);
 }
 
-/** One flattened ring of the column, lit on the arc facing `turn`. */
-function twisterRing(ctx, cx, cy, rx, ry, turn, rng) {
-  const steps = Math.max(10, Math.round(rx * 3));
+/** How flat a slice is, seen from a road that is nearly edge-on to it. */
+const twisterRy = (rx) => Math.max(1, rx * 0.26);
+
+/**
+ * The sand ramp as five steps of brightness, so every part of the twister can
+ * be shaded off one number and they all agree with each other.
+ */
+const TW_RAMP = [PALETTE.sandDeep, PALETTE.sandDark, PALETTE.sandMid, PALETTE.sand, PALETTE.sandLight];
+
+/**
+ * How bright a point on the wall is: the light on one side of the column, plus
+ * three ribbons of grit going round it. Returns -1..1.
+ */
+function twisterShade(a, turn) {
+  return Math.cos(a - turn) * 0.48 + Math.cos((a - turn) * 3) * 0.52;
+}
+
+/** Pick off the ramp. `near` false is the far wall, which can never out-shine. */
+function twisterColor(v, near) {
+  const step = Math.max(0, Math.min(4, Math.round((v + 1) * 2)));
+  return TW_RAMP[near ? step : Math.max(0, Math.min(1, step - 1))];
+}
+
+/**
+ * The ordered dither. A Bayer matrix rather than a coin toss, because the
+ * pattern has to be a function of WHERE a pixel is and nothing else: a random
+ * one gives the same average coverage and reshuffles every frame, which is the
+ * boil this sprite was rebuilt to get rid of.
+ */
+const TW_BAYER = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+];
+
+const twisterThreshold = (x, y) => (TW_BAYER[((y % 4) + 4) % 4][((x % 4) + 4) % 4] + 0.5) / 16;
+
+/**
+ * One flattened ring, as an outline. The column is not built out of these any
+ * more — only the collar in the mouth of the cloud and the skirt on the road
+ * are, where a single turning ellipse is exactly the right drawing.
+ */
+function twisterRing(ctx, cx, cy, rx, ry, turn) {
+  const steps = Math.max(12, Math.round(rx * 3.4));
   for (let i = 0; i < steps; i++) {
     const a = (i / steps) * Math.PI * 2;
-    const x = cx + Math.cos(a) * rx;
-    const y = cy + Math.sin(a) * ry;
-    // The near half of the ring — the bottom of the ellipse — is in front, so
-    // it is the solid one; the far half is dropped to a dotted line, which is
-    // the cheapest possible way to draw "you are looking through it".
+    const x = Math.round(cx + Math.cos(a) * rx);
+    const y = Math.round(cy + Math.sin(a) * ry);
     const near = Math.sin(a) > 0;
-    if (!near && rng.chance(0.45)) continue;
-    // How close this point is to the lit arc, 0..1.
-    const lit = (Math.cos(a - turn) + 1) / 2;
-    const color =
-      lit > 0.82 ? PALETTE.sandLight : lit > 0.5 ? PALETTE.sand : near ? PALETTE.sandDark : PALETTE.sandDeep;
-    px(ctx, x, y, color);
+    const v = twisterShade(a, turn);
+    if (!near && v < 0.1) continue;
+    px(ctx, x, y, twisterColor(v, near));
+  }
+}
+
+/**
+ * The column: every row of it, shaded as the surface it is.
+ *
+ * `cover` is how solid this pixel of wall is — a floor of a third even on the
+ * dark side, so the funnel never breaks up into two lines, rising to fully
+ * solid where a ribbon is facing us. The two edge pixels are always drawn
+ * whatever the shade says: they are the silhouette, and a silhouette with
+ * holes in it is not one.
+ */
+function twisterColumn(ctx, spin) {
+  for (let y = TW_TOP; y <= TW_FOOT; y++) {
+    const k = (y - TW_TOP) / (TW_FOOT - TW_TOP);
+    const cx = twisterAxis(k);
+    const rx = twisterHalf(k);
+    const turn = k * TW_TWIST - spin;
+    const x0 = Math.round(cx - rx);
+    const x1 = Math.round(cx + rx);
+    for (let x = x0; x <= x1; x++) {
+      const u = Math.max(-1, Math.min(1, (x - cx) / rx));
+      // The angle on the near wall this column of pixels is looking at.
+      const a = Math.acos(u);
+      const v = twisterShade(a, turn);
+      const edge = x === x0 || x === x1;
+      const cover = edge ? 1 : 0.22 + 0.9 * ((v + 1) / 2);
+      if (cover > twisterThreshold(x, y)) {
+        px(ctx, x, y, twisterColor(v, true));
+      } else if ((x + y * 2) % 3 === 0) {
+        // Through the gap, the back of the funnel: same wall, opposite angle,
+        // and never bright enough to be mistaken for the front of it.
+        px(ctx, x, y, twisterColor(twisterShade(-a, turn), false));
+      }
+    }
+  }
+}
+
+/**
+ * The six things it has torn off the road and not let go of.
+ *
+ * `k` is how far down the column each one rides and `off` where it started;
+ * they all go round at twice the rate the shading does, and they are drawn
+ * outside the wall, so each one crosses the silhouette twice a turn.
+ */
+const TW_CHUNKS = [
+  { k: 0.16, off: 0.0, size: 2 },
+  { k: 0.31, off: 2.5, size: 2 },
+  { k: 0.46, off: 4.4, size: 2 },
+  { k: 0.61, off: 1.1, size: 2 },
+  { k: 0.75, off: 3.4, size: 1 },
+  { k: 0.88, off: 5.6, size: 1 },
+];
+
+function twisterChunks(ctx, spin) {
+  for (const chunk of TW_CHUNKS) {
+    const k = chunk.k;
+    const cx = twisterAxis(k);
+    const cy = TW_TOP + k * (TW_FOOT - TW_TOP);
+    const rx = twisterHalf(k) * 1.25;
+    const ry = Math.max(1.3, twisterRy(rx) * 1.4);
+    const a = chunk.off + spin * 2;
+    const near = Math.sin(a) > 0;
+    // The smear it is dragging: two steps back along its own arc.
+    for (let t = 1; t <= 2; t++) {
+      const b = a - t * 0.34;
+      px(
+        ctx,
+        Math.round(cx + Math.cos(b) * rx),
+        Math.round(cy + Math.sin(b) * ry),
+        near ? PALETTE.sand : PALETTE.sandDeep,
+      );
+    }
+    px(
+      ctx,
+      Math.round(cx + Math.cos(a) * rx),
+      Math.round(cy + Math.sin(a) * ry),
+      near ? PALETTE.sandLight : PALETTE.sandDark,
+      chunk.size,
+      chunk.size,
+    );
   }
 }
 
 function buildTwister(frame) {
   const { canvas, ctx } = sheet();
-  const rng = makeRng(0x30dd + frame * 131);
-  const phase = frame * 1.6;
-  const TOP = 4;
+  /** Shape only, and the frame is not in it. See the note above. */
+  const rng = makeRng(0x30dd);
+  const spin = (frame / TW_FRAMES) * Math.PI * 2;
+  const footX = twisterAxis(1);
+
+  // --- the road it is standing on ------------------------------------------
+  // Drawn first, so everything the funnel throws lands on top of it.
+  for (let dx = -16; dx <= 16; dx++) {
+    const fall = 1 - Math.abs(dx) / 17;
+    px(ctx, footX + dx, HAZARD_H - 1, PALETTE.sandDeep);
+    if (fall > 0.45) px(ctx, footX + dx, HAZARD_H - 2, PALETTE.sandDeep);
+  }
+  for (let i = 0; i < 60; i++) {
+    const spread = rng.range(-16, 16);
+    const reach = 1 - Math.abs(spread) / 18;
+    const y = HAZARD_H - 1 - Math.round(rng.range(0, 6) * reach * reach);
+    px(ctx, footX + spread, y, rng.chance(0.45) ? PALETTE.sandMid : PALETTE.sandDark);
+  }
+  /**
+   * The spinning skirt: a flat ring of grit dragged round the foot. Twice the
+   * column's rate and the other way round the clock, because this is the
+   * underside of the same rotation — and without it the funnel comes to a
+   * point and the point is nowhere.
+   */
+  twisterRing(ctx, footX, HAZARD_H - 4, 12, 2.6, -spin * 2);
+  twisterRing(ctx, footX, HAZARD_H - 3, 8, 1.8, -spin * 2 + 1.7);
+
+  // --- the wall cloud it hangs out of --------------------------------------
+  /**
+   * A lumpy underside rather than a bar: the depth at each column of pixels is
+   * a fixed profile roughened by the shape rng, deepest right over the mouth
+   * because that is where it is being wound, dark below and lit along the top.
+   */
+  const headX = twisterAxis(0);
+  for (let x = 1; x < HAZARD_W - 1; x++) {
+    const d = Math.abs(x - headX) / 34;
+    const lump = 0.7 + rng.range(0, 0.6);
+    const bulge = 3.4 * Math.max(0, 1 - Math.abs(x - headX) / 15) ** 1.5;
+    const depth = Math.round((5.5 * (1 - d * d) + bulge) * lump);
+    if (depth <= 0) continue;
+    px(ctx, x, 0, PALETTE.sandDark, 1, depth);
+    px(ctx, x, 0, PALETTE.sandMid, 1, Math.max(1, depth - 3));
+    if (rng.chance(0.3)) px(ctx, x, rng.int(0, 1), PALETTE.sandLight);
+  }
+
+  // --- the funnel ----------------------------------------------------------
+  twisterColumn(ctx, spin);
+  // The collar, over the top of the column's first rows: the mouth of the
+  // funnel turning inside the cloud that is feeding it.
+  twisterRing(ctx, headX, TW_TOP - 1, twisterHalf(0) * 1.15, 2.6, -spin);
 
   /**
-   * The head: the wall cloud it is hanging out of, spread across the top of
-   * the frame. Without it the funnel is a shape that starts nowhere.
+   * And what it has lost: grit torn clear of the wall, loosest at the head,
+   * thrown off whichever side the ribbon is currently on so even the strays
+   * are going round. Deliberately sparse — this is the effect that, overdone,
+   * ate the silhouette in the version before this one.
    */
-  for (let x = 2; x < HAZARD_W - 2; x++) {
-    const d = Math.abs(x - twisterAxis(0)) / 30;
-    const depth = Math.round(6 * (1 - d * d));
-    if (depth <= 0) continue;
-    px(ctx, x, TOP - 3, PALETTE.sandDark, 1, depth);
-    px(ctx, x, TOP - 3, PALETTE.sandMid, 1, Math.max(1, depth - 3));
-    if (rng.chance(0.35)) px(ctx, x, TOP - 4 + rng.int(0, 1), PALETTE.sandLight);
-  }
-
-  // The debris skirt: what it has torn off the road, kicked out in a low fan.
-  const footX = twisterAxis(1);
-  for (let i = 0; i < 130; i++) {
-    const spread = rng.range(-20, 20);
-    const reach = 1 - Math.abs(spread) / 22;
-    const y = HAZARD_H - 1 - Math.round(rng.range(0, 8) * reach * reach);
-    px(ctx, footX + spread, y, rng.chance(0.5) ? PALETTE.sandMid : PALETTE.sandDark);
-    if (rng.chance(0.25)) px(ctx, footX + spread * 1.2, y - rng.int(1, 4), PALETTE.sandLight);
-  }
-
-  // The column itself, ring by ring from the cloud down to the road.
-  const RINGS = 21;
-  for (let i = 0; i < RINGS; i++) {
-    const k = i / (RINGS - 1);
-    const cy = TOP + k * (HAZARD_H - TOP - 2);
+  for (let y = TW_TOP; y <= TW_FOOT; y += 2) {
+    const k = (y - TW_TOP) / (TW_FOOT - TW_TOP);
     const rx = twisterHalf(k);
-    twisterRing(ctx, twisterAxis(k), cy, rx, Math.max(1, rx * 0.3), phase + k * 5.5, rng);
-    // A dim core down the middle, so the far wall of the funnel is not simply
-    // the background: it is the inside of something.
-    if (rx > 3) {
-      px(ctx, twisterAxis(k) - rx * 0.4, cy, PALETTE.sandDark, Math.max(1, Math.round(rx * 0.8)), 1);
-    }
-    // Grit torn clear, loosest at the head.
-    const looseness = 0.5 * (1 - k) + 0.1;
-    if (rng.chance(looseness)) px(ctx, twisterAxis(k) - rx - rng.int(1, 5), cy, PALETTE.sandMid);
-    if (rng.chance(looseness)) px(ctx, twisterAxis(k) + rx + rng.int(1, 5), cy, PALETTE.sandMid);
+    if (rx <= 3) continue;
+    const turn = k * TW_TWIST - spin;
+    if (!rng.chance(0.34 * (1 - k) + 0.08)) continue;
+    const dir = Math.cos(turn) >= 0 ? 1 : -1;
+    px(ctx, Math.round(twisterAxis(k) + dir * (rx + rng.int(2, 6))), y, PALETTE.sandMid);
   }
+
+  // --- and what it is carrying ---------------------------------------------
+  twisterChunks(ctx, spin);
   return canvas;
 }
 
@@ -924,10 +1121,11 @@ function buildRiftCharge() {
 const BUILDERS = {
   volcano: () => ({ body: buildVolcano(), glow: buildVolcanoGlow(), plume: 'smoke' }),
   duststorm: () => ({
-    // The twister has no still frame: the body IS the animation, so all four
-    // frames are bodies and it has no glow at all.
+    // The twister has no still frame: the body IS the animation, so every one
+    // of its frames is a body and it has no glow at all. Eight of them, which
+    // is one revolution — see TW_FRAMES.
     body: buildTwister(0),
-    frames: [0, 1, 2, 3].map(buildTwister),
+    frames: Array.from({ length: TW_FRAMES }, (unused, i) => buildTwister(i)),
     glow: [],
     plume: null,
   }),
