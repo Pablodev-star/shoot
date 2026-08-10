@@ -294,6 +294,21 @@ There is no level select. You walk, and the road decides what you meet.
   duel, shop, inn and boss marked on it, with your own position as a blue
   circle. Drag it, zoom it, and open it as often as you like — it is bought
   once and kept, not spent per look. It still shows no numbers.
+
+  **The ground on it has a shape now.** Every sheet is painted off a height
+  field: the elevation picks a step of the biome's own five-colour ramp and is
+  dithered between steps, the slope of the land is lit by one sun in the
+  north-west corner, and a contour line is drawn every few steps of height. So
+  the country has high ground and hollows — water pools in the low places, scrub
+  grows thickest there and thins out on the tops, and the rock comes through
+  where the soil has gone. On top of that each world gets what only it has: dry
+  washes cut through the Dust Flats, a creek with plank bridges where it crosses
+  the road on the prairie, fractured ice in the pass, a whole braided channel
+  network through the bayou, fissures with the fire still in them in the basin,
+  and seams of astral light under a star field out in the Galaxy. The road is
+  cased like a road on a real map — a worn band with a dark line either side,
+  wagon ruts and kerb stones — so it is findable at a glance on all six, and the
+  sheet carries its own name on a board nailed up in the corner.
 - **The Dusk Totem is the only thing in the game that refuses a game over**, and
   it is the only item with a scene. When the last life goes — to a rider's
   bullet, to a rock off an erupting mountain, to an empty gauge on a road with
@@ -420,7 +435,9 @@ src/
                           rooms behind them are furnished with
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
-    map-art.js            the trail map: ground, markers, road, compass
+    map-art.js            the trail map: the height field the ground is
+                          painted, shaded and contoured off, the water, the
+                          cracks, the markers, the cased road and the rose
   ui/                    shared widgets, saddlebag, trail map, toasts, dialogs,
                          speech
   menu/                  title, online, profile, settings, credits
@@ -510,7 +527,14 @@ world never rebalances it.
    digits and punctuation, the letters having run out.
 3. Register it in `BIOME_ART` in `src/art/sprites-environment.js`, and give it a
    `TERRAIN` entry in `src/art/map-art.js` so the trail map knows what its
-   ground looks like from above.
+   ground looks like from above. That entry is all data: a five-colour `ramp`
+   light to dark, `base`/`spread`/`relief` for where the flat ground sits on it
+   and how broken the country is, and then whichever detail passes the place
+   earns — `ripples` or `blades`, `contour`, `veins` (one branching-crack
+   routine that is a dry wash, an ice fracture, a magma fissure or a seam of
+   light depending only on the colours handed to it), `ponds`, `river`,
+   `outcrops`, `craters`, `mist`, `embers`, `stars`. Leave one out and that pass
+   does not run.
 4. Give it a weather table in `src/game/biomes.js`. Add the state itself to
    `src/explore/weather.js` first if it needs one that does not exist yet — a
    weather is a table entry, a spawn case, a step case and a draw case.

@@ -330,6 +330,11 @@ export function openTrailMap(opts = {}) {
         nodes: model.nodes,
         tint: world.tint,
         topBand: TOP_BAND,
+        // The header of the panel says where you are; so does the sheet, on a
+        // board nailed up in the corner of it. The header belongs to the
+        // window and goes away with it — the name on the map belongs to the
+        // map, which is what makes it a map of somewhere.
+        title: world.name,
       });
       // Open fitted to the map's width, which is the axis the road runs along:
       // you see the full breadth of the country and scroll down it, rather than
