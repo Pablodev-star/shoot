@@ -86,6 +86,23 @@ export const ForgeScreen = {
     /** True from the moment gold is taken until the ritual has finished. */
     let busy = false;
     const timers = [];
+    /**
+     * True once the router has taken this screen down.
+     *
+     * A ritual is nearly two seconds long and the road is one button away for
+     * every one of them, so the player CAN walk out in the middle of a
+     * performance — and the half of `improve` that runs after `await wait(ms)`
+     * would then land on a screen that no longer exists: a toast about a gun
+     * printed over the desert, and a `render` into detached nodes. Clearing the
+     * timers cannot help with that one, because the wait is a promise rather
+     * than a handle we hold. So the continuation checks whether it still has a
+     * screen to finish on.
+     *
+     * The gun itself is safe either way: `upgradeGun` has already taken the
+     * gold and moved the level before any of this, and the ritual is only the
+     * telling of it.
+     */
+    let disposed = false;
 
     // --- the gun on the plate -----------------------------------------------
     const plate = makeCanvas(PLATE.w * PLATE.scale, PLATE.h * PLATE.scale);
@@ -197,6 +214,7 @@ export const ForgeScreen = {
       }, Math.round(ms * 0.62)));
 
       await wait(ms);
+      if (disposed) return;
       shop.classList.remove('is-working');
       busy = false;
       render();
@@ -252,6 +270,7 @@ export const ForgeScreen = {
     attachButtonSounds(screen);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       for (const id of timers) clearTimeout(id);
       band.dispose();
