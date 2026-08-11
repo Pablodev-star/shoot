@@ -237,6 +237,37 @@ export const VOID_PROPS = {
     '..&&&&&...',
   ],
 
+  // --- clutter -------------------------------------------------------------
+  // The litter band, on its own tight grid under the props. Out here it is
+  // rubble off the shelf and one seed of the light that grows into the spires
+  // — the only thing in the game's last landscape that suggests it is not
+  // finished breaking.
+
+  /** Chips of the shelf, sharp-edged because nothing has weathered them. */
+  shardChip: [
+    '..!?.....',
+    '.!??&.!?.',
+    '!???&!??&',
+    '&&&&.&&&.',
+  ],
+
+  /** Grit, with one facet catching whatever light there is. */
+  voidGrit: [
+    '...!.....',
+    '.!?&.!?..',
+    '?&..!??&.',
+    '&....&&..',
+  ],
+
+  /** A seed of crystal, a hundred years off being a spire. */
+  astralSeed: [
+    '....=....',
+    '...=:;...',
+    '..:=:;;..',
+    '..!??!;..',
+    '..&&&&...',
+  ],
+
   /**
    * A vent of dust standing straight up. There is no wind out here to bend it,
    * which is the whole reason it is drawn as a column rather than a plume —
@@ -400,6 +431,59 @@ function shelfEdge(ctx, heights, rng, height) {
 }
 
 /**
+ * The near edge of the shelf: the last of the rock between the traveller and
+ * whatever is under it, with crystal growing up out of the break.
+ *
+ * The one rule this fringe follows that the other five do not: it is allowed
+ * to have holes in it. Every other biome's near band is solid ground going
+ * into shadow, and out here the ground is a broken plate — so the bottom of
+ * the frame is rock, then gaps with stars in them, which is the same argument
+ * the ground layer makes and the reason this world reads as a place with
+ * nothing under it.
+ */
+function makeVoidFringe({ seed, height }) {
+  return makeRidgeLayer({
+    seed,
+    height,
+    baseline: Math.round(height * 0.55),
+    amplitude: 5,
+    roughness: 1,
+    crest: 2,
+    colors: { body: PALETTE.cosmicHigh, light: PALETTE.voidRockDark, dark: PALETTE.shadow },
+    decorate: (ctx, heights, rng, h) => {
+      for (let x = 0; x < LAYER_TILE_W; x++) {
+        const top = h - heights[x];
+        // Crystal along the break, lit from inside.
+        if (rng.chance(0.07)) {
+          const len = rng.int(3, 7);
+          ctx.fillStyle = PALETTE.astralDark;
+          ctx.fillRect(x, top - len, 1, len);
+          ctx.fillStyle = PALETTE.astral;
+          ctx.fillRect(x, top - len, 1, 2);
+        }
+        // A cold rim light along the very lip, which is the only thing keeping
+        // the near rock from merging into the near sky.
+        if (rng.chance(0.5)) {
+          ctx.fillStyle = PALETTE.voidRock;
+          ctx.fillRect(x, top, 1, 1);
+        }
+      }
+      // Gaps: columns punched clean through the plate, with a star in some of
+      // them. Drawn as erasures so whatever is behind the layer shows.
+      ctx.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 14; i++) {
+        const x = rng.int(0, LAYER_TILE_W - 1);
+        const w = rng.int(2, 7);
+        const top = h - heights[x] + rng.int(2, 6);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x, top, w, h - top);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  });
+}
+
+/**
  * The ground: a dust road over a shelf of fractured stone, with the cracks
  * open to whatever is underneath.
  *
@@ -426,8 +510,19 @@ function makeVoidGround({ seed, height }) {
     bot[x] = Math.round(21 + Math.sin(u * Math.PI * 2 + 0.8) * 2.6 + Math.sin(u * Math.PI * 7) * 1.1);
     ctx.fillStyle = PALETTE.voidRock;
     ctx.fillRect(x, 0, 1, bot[x]);
-    ctx.fillStyle = PALETTE.voidRockLight;
-    ctx.fillRect(x, 0, 1, 2);
+    /**
+     * The lit lip along the far edge of the road. It wanders and it breaks,
+     * because two unbroken rows of the palest violet running the full width of
+     * the tile is a straight line 320 pixels long at exactly boot height — and
+     * against a ground this dark it read as a bright rule drawn across the
+     * frame rather than as the edge of anything. The basin's road had the same
+     * fault and got the same fix.
+     */
+    const lip = Math.round(1.6 + Math.sin(u * Math.PI * 2 + 2.1) * 1.1 + Math.sin(u * Math.PI * 11) * 0.7);
+    if (lip > 0) {
+      ctx.fillStyle = PALETTE.voidRockLight;
+      ctx.fillRect(x, 0, 1, lip);
+    }
     ctx.fillStyle = PALETTE.voidRockDark;
     ctx.fillRect(x, bot[x] - 2, 1, 2);
   }
@@ -691,14 +786,16 @@ export const VOID_ART = {
       decorate: shelfEdge,
     }),
     ground: makeVoidGround({ seed: 8585, height: 72 }),
+    fringe: makeVoidFringe({ seed: 5757, height: 26 }),
   }),
 
   manifest: [
     { name: 'clouds', speed: 0.05, y: -118 },
     { name: 'far', speed: 0.15, y: -82 },
     { name: 'mid', speed: 0.4, y: -58 },
-    { name: 'shelf', speed: 0.7, y: -38 },
+    { name: 'shelf', speed: 0.7, y: -38, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
+    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
   ],
 
   /**
@@ -720,6 +817,37 @@ export const VOID_ART = {
     { name: 'ribArch', weight: 3 },
     { name: 'voidArch', weight: 2 },
   ],
+
+  /**
+   * Chips off the shelf and one seed of light. The emptiest litter band in the
+   * game after the pass's, because this road is meant to feel like the last
+   * one — but not empty enough to be bare, which is what it was.
+   */
+  clutter: [
+    { name: 'shardChip', weight: 12 },
+    { name: 'voidGrit', weight: 10 },
+    { name: 'astralSeed', weight: 5 },
+  ],
+  clutterCell: 25,
+
+  /**
+   * The far band: monoliths and spires on the shelf behind the road. The haze
+   * is the astral light rather than a rock tone — there is no air out here to
+   * grey anything out, so distance is read from the glow that hangs around
+   * everything instead.
+   */
+  backdrop: {
+    cell: 92,
+    y: -7,
+    gap: 0.34,
+    haze: PALETTE.astralDark,
+    hazeA: 0.3,
+    scatter: [
+      { name: 'monolith', weight: 20 },
+      { name: 'crystalSpire', weight: 16 },
+      { name: 'brokenColumn', weight: 10 },
+    ],
+  },
 
   scatterCell: 84,
 

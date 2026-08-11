@@ -16,12 +16,15 @@
  *     about them is the ground they stand on.
  *  3. THE STORM DECK — the overcast layer the weather system fades in. Rain
  *     cloud is rain cloud wherever you are.
- *  4. THE TUMBLEWEED — desert scenery, but the menu backdrop rolls it and the
- *     menu is always the desert.
+ *
+ * The tumbleweed used to be a fourth entry on that list. It lives in
+ * `env-kit.js` now, because three places want it — this registry, the menu
+ * backdrop, and the desert's own ambient, which rolls one across the road —
+ * and none of the three can import the other two.
  *
  * PARALLAX SPEC (consumed by src/explore/parallax.js)
  * ---------------------------------------------------------------------------
- * Every biome publishes five depth layers as a horizontally tileable canvas
+ * Every biome publishes six depth layers as a horizontally tileable canvas
  * each, plus a manifest giving each one a scroll `speed` (the fraction of the
  * camera's movement it travels at) and a `y` offset from the walk line:
  *
@@ -29,13 +32,28 @@
  *   far      speed 0.15   distant range
  *   mid      speed 0.40   middle hills / mesas
  *   dunes|hills|drifts|bank|crags|shelf   speed 0.70   the rise just behind
- *                         the walk line, named for whatever it is made of
+ *                         the walk line, named for whatever it is made of.
+ *                         Flagged `near: true` — that is the layer the far
+ *                         prop band is planted behind
  *   ground   speed 1.00   the strip the character walks on
+ *   fringe   speed 1.30   the near bank, flagged `front: true` so it is drawn
+ *                         after the props and the buildings, and
+ *                         `anchor: 'bottom'` so its `y` is measured from the
+ *                         bottom edge of the frame instead of from the road
  *
  * The layer *names* are the biome's own — the desert's fourth layer is
  * `dunes` and the prairie's is `hills` — because the renderer only ever reads
  * them through the manifest. Layers are authored at 1x pixel scale and
  * upscaled by the renderer, so the pixel grid stays consistent with sprites.
+ *
+ * On top of the layers a biome declares up to three bands of loose props, all
+ * placed by the same seeded-cell machinery in `parallax.js`:
+ *
+ *   backdrop  { cell, y, gap, haze, hazeA, shrink, scatter } — hazed
+ *             silhouettes standing behind the `near` layer. Their art is baked
+ *             here, tinted, into `backdropProps`
+ *   scatter   the roadside props, on the walk line
+ *   clutter   litter on a much tighter `clutterCell`, drawn under the props
  *
  * ADDING A BIOME
  * ---------------------------------------------------------------------------
@@ -45,9 +63,9 @@
  */
 
 import { PALETTE } from './palette.js';
-import { bake, makeCanvas } from './pixel.js';
-import { drawText, measureText } from './font.js';
-import { KEY, LAYER_TILE_W, makeCloudLayer, rotate90 } from './env-kit.js';
+import { bake, makeCanvas, tinted } from './pixel.js';
+import { drawText, measureText, GLYPH_H } from './font.js';
+import { KEY, LAYER_TILE_W, makeCloudLayer, getTumbleweedFrames } from './env-kit.js';
 import { DESERT_ART } from './biomes/desert.js';
 import { MEADOW_ART } from './biomes/meadow.js';
 import { SNOW_ART } from './biomes/snow.js';
@@ -76,26 +94,6 @@ const BIOME_ART = {
 };
 
 export const DEFAULT_BIOME = 'desert';
-
-/**
- * Tumbleweed. One tangle, rolled a quarter turn per frame: a hand-drawn
- * four-frame cycle never quite keeps its mass, and this one cannot drift.
- * Twigs only — the old ink lattice read as a black scribble once it started
- * rolling across pale sand.
- */
-const WEED = [
-  '...xwx...',
-  '.xwBwBwx.',
-  '.wxwBwxw.',
-  'xwBxwxBwx',
-  'wBxwwwxBw',
-  'xwBxwxBwx',
-  '.wxwBwxw.',
-  '.xwBwBwx.',
-  '...xwx...',
-];
-
-const TUMBLEWEED = [WEED, rotate90(WEED), rotate90(rotate90(WEED)), rotate90(rotate90(rotate90(WEED)))];
 
 // ---------------------------------------------------------------------------
 // Sky bodies
@@ -223,12 +221,27 @@ function makeMoonPhase(age) {
 }
 
 // ---------------------------------------------------------------------------
-// Buildings — 40 x 34 source pixels, ground line on the last row.
+// Buildings — 60 source pixels wide, ground line on the last row.
 //
 // Both are false-front frontier buildings: a tall flat parapet hiding a low
 // roof, a boardwalk under a porch, and a sign the player can read from across
 // the screen. The shop is the wider, busier one; the inn is quieter and taller
 // so the two never get mistaken for each other on the horizon.
+//
+// THEY ARE MEASURED AGAINST THE MAN, AND THEY USED NOT TO BE
+// ---------------------------------------------------------------------------
+// The first pair were 40 x 34, which is a shade over one and a third of the
+// gunslinger's height, and a building a man could put his elbow on the roof of
+// is not a building — it is a market stall. Every screenshot of the road had
+// the same thing wrong with it and it was never the thing you noticed, because
+// nothing on screen contradicted it: the props are small too.
+//
+// So the shop is 60 x 59 and the inn 60 x 68, which is two and a half to three
+// times the traveller. That is enough to put a real storey above the porch — a
+// row of lit upstairs windows over the inn, which is the whole reason anybody
+// stops at one — and enough sign board to letter at 2x, so the word over the
+// door is legible from the far side of the frame instead of being a smudge you
+// learn by position.
 //
 // The only per-biome part is the apron they stand on — the last two rows,
 // keyed `r` and `s`. A shop with a sand footprint dropped into a prairie was
@@ -237,97 +250,172 @@ function makeMoonPhase(age) {
 // ---------------------------------------------------------------------------
 
 const SHOP = [
-  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
-  '...kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk...',
-  '...kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk...',
-  '...kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk...',
-  '...kXwWkkkkkkkkkkkkkkkkkkkkkkkkkkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkbbbbbbbbbbbbbbbbbbbbbbbbkWwXk...',
-  '...kXwWkkkkkkkkkkkkkkkkkkkkkkkkkkWwXk...',
-  '...kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk...',
-  '...kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk...',
-  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
-  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
-  '..kxWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWxk..',
-  '..kxkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkxk..',
-  '...kxWwwwwwwwwwwwwwwwwwwwwwwwwwwwwWxk...',
-  '...kxWkkkkkkkwwwkkkkkkkkwwwkkkkkkkWxk...',
-  '...kxWkCcccckwwwkXwwwwXkwwwkCcccckWxk...',
-  '...kxWkCcccckwwwkXwWWwXkwwwkCcccckWxk...',
-  '...kxWkccccckwwwkXwWWwXkwwwkccccckWxk...',
-  '...kxWkccccckwwwkXwwOwXkwwwkccccckWxk...',
-  '...kxWkkkkkkkwwwkXwwwwXkwwwkkkkkkkWxk...',
-  '...kxWwwwwwwwwwwkXwwwwXkwwwwwwwwwwWxk...',
-  '...kxWwwwwwwwwwwkXwwwwXkwwwwwwwwwwWxk...',
-  '...kxWwwwwwwwwwwkkkkkkkkwwwwwwwwwwWxk...',
-  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
-  '.kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
-  '.kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
-  '.rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.',
-  'ssssssssssssssssssssssssssssssssssssssss',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '..kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk..',
+  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk..',
+  '..kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk..',
+  '..kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXwxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxwXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
+  '.kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.',
+  '.kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwWwx..',
+  '..WwxwwwwkkkkkkkkkkkkkkwwwwwwwwwwwwwwkkkkkkkkkkkkkkwwwwWwx..',
+  '..WwxwwwwkCCCCCCwCCCCCkwwwwwwwwwwwwwwkCCCCCCwCCCCCkwwwwWwx..',
+  '..WwxxxxxkCCCCCCwCCCCCkxxxxxxxxxxxxxxkCCCCCCwCCCCCkxxxxWwx..',
+  '..WwxwwwwkCCCCCCwCCCCCkwwwkkkkkkkkwwwkCCCCCCwCCCCCkwwwwWwx..',
+  '..WwxwwwwkCCCCCCwCCCCCkwwwkXXXXXXkwwwkCCCCCCwCCCCCkwwwwWwx..',
+  '..WwxwwwwkwwwwwwwwwwwwkwwwkxxxxxxkwwwkwwwwwwwwwwwwkwwwwWwx..',
+  '..WwxxxxxkccccccwccccckxxxkXXXXXXkxxxkccccccwccccckxxxxWwx..',
+  '..WwxwwwwkccccccwccccckwwwkXXXXXXkwwwkccccccwccccckwwwwWwx..',
+  '..WwxwwwwkccccccwccccckwwwkXXXXXOkwwwkccccccwccccckwwwwWwx..',
+  '..WwxwwwwkccccccwccccckwwwkXXXXXXkwwwkccccccwccccckwwwwWwx..',
+  '..WwxxxxxkccccccwccccckxxxkxxxxxxkxxxkccccccwccccckxxxxWwx..',
+  '..WwxwwwwkkkkkkkkkkkkkkwwwkXXXXXXkwwwkkkkkkkkkkkkkkwwwwWwx..',
+  '..WwxwwwWWWWWWWWWWWWWWWWwwkXXXXXXkwwWWWWWWWWWWWWWWWWwwwWwx..',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwwwWwx..',
+  '..WwxxxxxxxxxxxxxxxxxxxxxxkXXXXXXkxxxxxxxxxxxxxxxxxxxxxWwx..',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwwwWwx..',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwkkkkkkkkwwwwwwwwwwwwwwwwwwwwwWwx..',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
+  '.kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.',
+  '.kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
+  '.rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.',
+  'ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss',
 ];
 
 const INN = [
-  '.....kkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.....',
-  '.....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXk.....',
-  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
-  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
-  '.....kXwWkkkkkkkkkkkkkkkkkkkkkkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkbbbbbbbbbbbbbbbbbbbbkWwXk.....',
-  '.....kXwWkkkkkkkkkkkkkkkkkkkkkkWwXk.....',
-  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
-  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
-  '.....kwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.....',
-  '.....kwwwwwkkkkkwwwwwwwwkkkkkwwwwwk.....',
-  '.....kwwwwwkOOkkwwwwwwwwkOOkkwwwwwk.....',
-  '.....kwwwwwkOOOkwwwwwwwwkOOOkwwwwwk.....',
-  '.....kwwwwwkkkkkwwwwwwwwkkkkkwwwwwk.....',
-  '.....kwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.....',
-  '....kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk....',
-  '....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk....',
-  '....kxWWWWWWWWWWWWWWWWWWWWWWWWWWWWxk....',
-  '....kxkkkkkkkkkkkkkkkkkkkkkkkkkkkkxk....',
-  '.....kxWkkkkkkwwkkkkkkkkwwkkkkkkWxk.....',
-  '.....kxWkCccckwwkXwwwwXkwwkCccckWxk.....',
-  '.....kxWkcccckwwkXwWWwXkwwkcccckWxk.....',
-  '.....kxWkkkkkkwwkXwwOwXkwwkkkkkkWxk.....',
-  '.....kxWwwwwwwwwkXwwwwXkwwwwwwwwWxk.....',
-  '.....kxWwwwwwwwwkkkkkkkkwwwwwwwwWxk.....',
-  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
-  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk...',
-  '..rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr..',
+  '.....kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.....',
+  '.....kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.....',
+  '.....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
+  '.....kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk.....',
+  '.....kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk.....',
+  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXwwwwkkkkkkkkkkwwwwkkkkkkkkkkwwwwkkkkkkkkkkwwwwXk.....',
+  '.....kXwwXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXwwXk.....',
+  '.....kXwxXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXxwXk.....',
+  '.....kXwwXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXwwXk.....',
+  '.....kXwwXWkooooxoookWXXWkooooxoookWXXWkooooxoookWXwwXk.....',
+  '.....kXwwXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXwwXk.....',
+  '.....kXwwXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXwwXk.....',
+  '.....kXwxXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXxwXk.....',
+  '.....kXwwXWkOOOOxOOOkWXXWkOOOOxOOOkWXXWkOOOOxOOOkWXwwXk.....',
+  '.....kXwwwwkkkkkkkkkkwwwwkkkkkkkkkkwwwwkkkkkkkkkkwwwwXk.....',
+  '.....kXwwwWWWWWWWWWWWWwwWWWWWWWWWWWWwwWWWWWWWWWWWWwwwXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk.....',
+  '.....kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.....',
+  '.....kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk.....',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
+  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk...',
+  '...kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk...',
+  '...kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk...',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
+  '....WwxwwwwwwwwwwkwwwwwwwwwwwwwwwwwwwwwwwwkwwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwkOkwwwwwwwkkkkkkkkwwwwwwwkOkwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwkOOOkwwwwwwkXXXXXXkwwwwwwkOOOkwwwwwwwwWwx....',
+  '....WwxxxxxxxxxkOoOkxxxxxxkxxxxxxkxxxxxxkOoOkxxxxxxxxWwx....',
+  '....WwxwwwwwwwwwkokwwwwwwwkXOOOOXkwwwwwwwkokwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkXOOOOXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxxxxxxxxxxxxxxxxxxxxkXXXXXXkxxxxxxxxxxxxxxxxxxxWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkXXXXXOkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkxxxxxxkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxxxWWWWWWWxxxxxxxxxxkXXXXXXkxxxxxxxxxxxxxxxxxxxWwx....',
+  '....WwxwwxxxxxxxwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxwwwwwwwwwwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxwwxwwwwwxwwwwwwwwwwkXXXXXXkwwwwwwwwwwwwwwwwwwwWwx....',
+  '....WwxxxxxxxxxxxxxxxxxxxxkkkkkkkkxxxxxxxxxxxxxxxxxxxWwx....',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk...',
+  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk...',
+  '...kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk...',
+  '...kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk...',
+  '..rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr..',
+  '.ssssssssssssssssssssssssssssssssssssssssssssssssssssssssss.',
 ];
 
 /**
  * The sign boards above are left blank in the art and lettered here, using the
- * game's own 5x7 font at 1:1. Hand-drawn letters at this size come out as
+ * game's own 5x7 font at 2x. Hand-drawn letters at this size come out as
  * approximations of the real typeface; borrowing the font means the sign over
  * the shop and the text in the shop screen are literally the same glyphs.
+ *
+ * `board` is the blank panel in building coordinates — the word is centred in
+ * it both ways, so nudging the art never means recounting a magic offset.
  */
 const SIGNS = {
-  shop: { text: 'SHOP', x: 8, y: 5, boardW: 24 },
-  inn: { text: 'INN', x: 10, y: 5, boardW: 20 },
+  shop: { text: 'SHOP', board: { x: 6, y: 6, w: 48, h: 16 } },
+  inn: { text: 'INN', board: { x: 9, y: 6, w: 42, h: 16 } },
 };
+
+/** Painted, not carved: the letters get a highlight under them. */
+const SIGN_SCALE = 2;
 
 function bakeBuilding(rows, sign, groundKey) {
   const canvas = bake({ key: groundKey ? { ...KEY, ...groundKey } : KEY, rows });
   const ctx = canvas.getContext('2d');
-  const width = measureText(sign.text, 1);
-  const x = sign.x + Math.floor((sign.boardW - width) / 2);
-  drawText(ctx, sign.text, x, sign.y, {
-    scale: 1,
+  const { board } = sign;
+  const width = measureText(sign.text, 1) * SIGN_SCALE;
+  const x = board.x + Math.floor((board.w - width) / 2);
+  const y = board.y + Math.floor((board.h - GLYPH_H * SIGN_SCALE) / 2);
+  // A one-pixel shadow under the word, in the same wood the frame is: paint on
+  // a board catches the light along its lower edge, and without it the word
+  // sits on the bone like a decal.
+  drawText(ctx, sign.text, x, y + 1, {
+    scale: SIGN_SCALE,
+    spacing: 1,
+    color: PALETTE.boneDark,
+  });
+  drawText(ctx, sign.text, x, y, {
+    scale: SIGN_SCALE,
     spacing: 1,
     color: PALETTE.woodDeep,
   });
@@ -381,8 +469,6 @@ function getStormLayer() {
   return stormCache;
 }
 
-let tumbleweedCache = null;
-
 const bundles = new Map();
 
 /**
@@ -398,8 +484,6 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
   const art = BIOME_ART[biomeId] || BIOME_ART[DEFAULT_BIOME];
   const cached = bundles.get(art.id);
   if (cached) return cached;
-
-  if (!tumbleweedCache) tumbleweedCache = TUMBLEWEED.map((rows) => bake({ key: KEY, rows }));
 
   /**
    * Everything a biome declares passes straight through — `id`, `manifest`,
@@ -418,10 +502,31 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
   const props = {};
   for (const [name, rows] of Object.entries(propRows)) props[name] = bake({ key: KEY, rows });
 
+  /**
+   * The far band's art. Same props, washed with the biome's own haze before
+   * anything is drawn with them.
+   *
+   * The wash is baked rather than applied per frame for the obvious reason —
+   * it is the same wash every time — and the colour is the biome's, never a
+   * neutral grey: distance drains a landscape *towards its own sky*, so the
+   * prairie's far trees go blue-green and the basin's far crags go orange. A
+   * grey wash on both would have made two different places recede the same way.
+   */
+  const backdropProps = {};
+  if (declared.backdrop) {
+    const { haze, hazeA = 0.5 } = declared.backdrop;
+    for (const entry of declared.backdrop.scatter) {
+      const source = props[entry.name];
+      if (!source) continue;
+      backdropProps[entry.name] = haze ? tinted(source, haze, hazeA) : source;
+    }
+  }
+
   const bundle = {
     ...declared,
     props,
-    tumbleweed: tumbleweedCache,
+    backdropProps,
+    tumbleweed: getTumbleweedFrames(),
     sky: getSkyArt(),
     buildings: {
       shop: bakeBuilding(SHOP, SIGNS.shop, structureGround),

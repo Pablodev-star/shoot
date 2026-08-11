@@ -35,7 +35,7 @@
  */
 
 import { PALETTE } from './palette.js';
-import { makeCanvas } from './pixel.js';
+import { bake, makeCanvas } from './pixel.js';
 import { makeRng } from '../core/rng.js';
 
 export const KEY = {
@@ -53,6 +53,11 @@ export const KEY = {
   s: PALETTE.sand,
   S: PALETTE.sandLight,
   z: PALETTE.sandDeep,
+  // Mesa rock, light to dark. The letters ran out four biomes ago (see below),
+  // and these three arrived after even the punctuation had been dealt out.
+  '-': PALETTE.mesaLight,
+  _: PALETTE.mesa,
+  '/': PALETTE.mesaDark,
   // Grass ramp
   h: PALETTE.grassLight,
   H: PALETTE.grass,
@@ -145,6 +150,44 @@ export function rotate90(rows) {
     out.push(line);
   }
   return out;
+}
+
+/**
+ * Tumbleweed. One tangle, rolled a quarter turn per frame: a hand-drawn
+ * four-frame cycle never quite keeps its mass, and this one cannot drift.
+ * Twigs only — the old ink lattice read as a black scribble once it started
+ * rolling across pale sand.
+ *
+ * It lives down here with the machinery rather than up in the desert, because
+ * three places want it and none of them can import the other two: the menu
+ * backdrop rolls it across the title screen, the biome registry hands it to
+ * that backdrop, and the desert's own ambient sends one across the road.
+ */
+const WEED = [
+  '...xwx...',
+  '.xwBwBwx.',
+  '.wxwBwxw.',
+  'xwBxwxBwx',
+  'wBxwwwxBw',
+  'xwBxwxBwx',
+  '.wxwBwxw.',
+  '.xwBwBwx.',
+  '...xwx...',
+];
+
+let weedCache = null;
+
+/** The four rolled frames, baked once and shared. */
+export function getTumbleweedFrames() {
+  if (!weedCache) {
+    let rows = WEED;
+    weedCache = [];
+    for (let i = 0; i < 4; i++) {
+      weedCache.push(bake({ key: KEY, rows }));
+      rows = rotate90(rows);
+    }
+  }
+  return weedCache;
 }
 
 /**

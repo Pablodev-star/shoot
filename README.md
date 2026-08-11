@@ -427,7 +427,8 @@ src/
     sprites-hazards.js    the six landmarks a special raises, built not typed
     env-kit.js            the colour key + the shared layer generators
     biomes/               one file per landscape — desert, meadow, snow, swamp,
-                          inferno, void: props, layers, ground, ambient life
+                          inferno, void: props, layers, ground, the far band,
+                          the near fringe, the litter and the ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-portraits.js  32 x 32 faces, for speech and for the cut-scene (2e)
     sprites-venue.js      what a shop and an inn are made of: the two beds,
@@ -521,6 +522,27 @@ world never rebalances it.
    ones do: `props` (pixel strings), `buildLayers()`, `manifest`, `scatter`,
    `groundFill`, `dust`, and optionally `scatterCell`, `structureGround` and an
    `ambient` factory.
+
+   A landscape is built out of **six tiled layers and three bands of props**,
+   and the difference between a biome that reads as a place and one that reads
+   as a painted wall is almost entirely in the bands:
+
+   | | what it is | where it goes |
+   |---|---|---|
+   | `backdrop` | hazed silhouettes — trees, spires, buttes | behind the layer the manifest marks `near: true`, so the rise buries their feet |
+   | `scatter` | the roadside props | on the walk line |
+   | `clutter` | litter on a tight `clutterCell` — pebbles, twigs, chips | on the walk line, drawn under the props |
+   | `fringe` | a tiled strip of near ground, `front: true` + `anchor: 'bottom'`, running faster than the camera | in front of everything, along the bottom edge |
+
+   `backdrop` takes `{ cell, y, gap, haze, hazeA, shrink, scatter }`. The haze
+   is baked into a tinted copy of each prop at load time and should be the
+   biome's *own* far colour, never a neutral grey — distance drains a landscape
+   towards its own sky. `shrink: true` draws the band a whole pixel step down,
+   which only works where the props are tall enough to still clear the ridge.
+
+   Any scatter entry may carry `flip: false`. Everything else is mirrored at
+   random, which doubles the apparent size of the prop set for free; opt out
+   for anything with writing on it or a shape the eye knows one way round.
 2. Give any new colours a home in `src/art/palette.js` and a character of their
    own in `KEY` in `src/art/env-kit.js`. One character means one colour
    *everywhere in the game* — which is why the last four biomes are drawn in

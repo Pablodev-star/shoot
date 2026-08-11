@@ -233,6 +233,36 @@ export const INFERNO_PROPS = {
     '..~>>~..',
   ],
 
+  // --- clutter -------------------------------------------------------------
+  // The litter band, on its own tight grid under the props. Everything in it
+  // carries one warm pixel at most: the basin's whole look depends on there
+  // being very few of them, and a floor sprinkled with orange dots is a floor
+  // with a rash.
+
+  /** Loose scoria, thrown and cooled. */
+  cinders: [
+    '..%$..%..',
+    '.%$$%.%$.',
+    '%$$<$%$$%',
+    '.~>>~.~>.',
+  ],
+
+  /** A chip of slag with the heat not quite out of it. */
+  slagChip: [
+    '...$$$...',
+    '..$><<$..',
+    '.$><~<>$.',
+    '..~>>>~..',
+  ],
+
+  /** Bone that has been through the fire, and lost. */
+  ashBone: [
+    '..B......',
+    '.BbB..B..',
+    '..B..BbB.',
+    '..$..$$..',
+  ],
+
   /** Slag: what ran out of a vent, cooled, and never went anywhere. */
   slagFlow: [
     '.......$$$$$$....',
@@ -436,6 +466,62 @@ function cragRim(ctx, heights, rng, height) {
 }
 
 /**
+ * The near ledge at the bottom of the frame: broken crust a pace in front of
+ * the traveller, with the fire still in the cracks of it.
+ *
+ * It is the only fringe in the game that emits rather than reflects. The other
+ * five are the ground going into shadow as it comes towards the camera, which
+ * is what ground does; this one gets *brighter* at the near edge, because the
+ * light in the basin comes from underneath and the closest crack is the one
+ * with the most of it showing.
+ */
+function makeInfernoFringe({ seed, height }) {
+  return makeRidgeLayer({
+    seed,
+    height,
+    baseline: Math.round(height * 0.6),
+    amplitude: 4,
+    roughness: 1,
+    crest: 2,
+    colors: { body: PALETTE.charDark, light: PALETTE.char, dark: PALETTE.shadow },
+    decorate: (ctx, heights, rng, h) => {
+      for (let x = 0; x < LAYER_TILE_W; x++) {
+        const top = h - heights[x];
+        // Spurs of cold rock standing off the lip.
+        if (rng.chance(0.08)) {
+          ctx.fillStyle = PALETTE.char;
+          ctx.fillRect(x, top - rng.int(1, 4), rng.int(1, 2), 5);
+        }
+      }
+      // Fissures running down the face of the ledge: dark first, then lit
+      // along the middle, exactly as the ground's cracks are drawn.
+      for (let i = 0; i < 22; i++) {
+        let x = rng.int(0, LAYER_TILE_W - 1);
+        const top = h - heights[x];
+        let y = rng.int(top + 2, h - 2);
+        const len = rng.int(5, 16);
+        for (let t = 0; t < len; t++) {
+          x = wrapX(x + rng.int(-1, 1));
+          y += 1;
+          if (y >= h) break;
+          ctx.fillStyle = PALETTE.shadow;
+          ctx.fillRect(x, y, 2, 1);
+          ctx.fillStyle = t % 3 === 0 ? PALETTE.emberGlow : PALETTE.magma;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+      // Grit and cinders over the whole face.
+      speckle(ctx, rng, {
+        from: h - Math.round(height * 0.4),
+        to: h - 1,
+        count: 180,
+        colors: [PALETTE.char, PALETTE.shadow, PALETTE.charLight],
+      });
+    },
+  });
+}
+
+/**
  * The ground: a cracked basalt floor with fire underneath it.
  *
  * The cracks are generated as a network rather than as scattered lines —
@@ -450,11 +536,27 @@ function makeInfernoGround({ seed, height }) {
 
   ctx.fillStyle = PALETTE.char;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
-  // The road itself is trodden flatter and paler than the crust around it.
-  ctx.fillStyle = PALETTE.charLight;
-  ctx.fillRect(0, 0, LAYER_TILE_W, 3);
-  ctx.fillStyle = PALETTE.char;
-  ctx.fillRect(0, 3, LAYER_TILE_W, 1);
+
+  /**
+   * The road itself is trodden flatter and paler than the crust around it —
+   * but its edge WANDERS, and it used to not.
+   *
+   * A `fillRect` of `charLight` three rows deep across the whole tile is a
+   * perfectly straight, perfectly uniform band 320 pixels long, and on screen
+   * that is not a trodden path: it is a pale rule drawn across the frame at
+   * exactly the height of the traveller's boots. The eye finds a mathematical
+   * horizontal instantly, and in a biome with no other straight line in it the
+   * effect was of a seam between two images. The void's road had the same
+   * fault and got the same fix.
+   */
+  for (let x = 0; x < LAYER_TILE_W; x++) {
+    const u = x / LAYER_TILE_W;
+    const lip = Math.round(3 + Math.sin(u * Math.PI * 2 + 1.4) * 1.2 + Math.sin(u * Math.PI * 9) * 0.8);
+    ctx.fillStyle = PALETTE.charLight;
+    ctx.fillRect(x, 0, 1, Math.max(1, lip));
+    ctx.fillStyle = PALETTE.char;
+    ctx.fillRect(x, Math.max(1, lip), 1, 1);
+  }
 
   // Plates: broad polygons of slightly different value, so the floor is a
   // pavement rather than one sheet.
@@ -741,14 +843,16 @@ export const INFERNO_ART = {
       decorate: cragRim,
     }),
     ground: makeInfernoGround({ seed: 7070, height: 72 }),
+    fringe: makeInfernoFringe({ seed: 3030, height: 26 }),
   }),
 
   manifest: [
     { name: 'clouds', speed: 0.05, y: -110 },
     { name: 'far', speed: 0.15, y: -86 },
     { name: 'mid', speed: 0.4, y: -60 },
-    { name: 'crags', speed: 0.7, y: -40 },
+    { name: 'crags', speed: 0.7, y: -40, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
+    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
   ],
 
   /**
@@ -772,6 +876,36 @@ export const INFERNO_ART = {
     { name: 'ironStake', weight: 3 },
     { name: 'skullEmber', weight: 2 },
   ],
+
+  /**
+   * What the basin leaves lying: cinders, a chip of slag with the heat still
+   * in it, and bone that has been through the fire.
+   */
+  clutter: [
+    { name: 'cinders', weight: 13 },
+    { name: 'slagChip', weight: 9 },
+    { name: 'ashBone', weight: 5 },
+  ],
+  clutterCell: 22,
+
+  /**
+   * The far band: columns and burnt trunks standing on the crag behind the
+   * road. The haze is the basin's own ember light rather than a grey — the
+   * air down here is full of it, and distance in a place lit from below means
+   * MORE glow, not less.
+   */
+  backdrop: {
+    cell: 78,
+    y: -8,
+    gap: 0.3,
+    haze: PALETTE.magmaDeep,
+    hazeA: 0.3,
+    scatter: [
+      { name: 'basaltColumn', weight: 22 },
+      { name: 'charredTree', weight: 14 },
+      { name: 'cinderMound', weight: 10 },
+    ],
+  },
 
   scatterCell: 62,
 
