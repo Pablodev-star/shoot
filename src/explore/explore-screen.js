@@ -213,7 +213,7 @@ export const ExploreScreen = {
         // The prairie's fluff and fireflies drift on regardless of the walk —
         // the same rule the weather follows. A world that stops the moment the
         // saddlebag opens is a world the player can tell is a backdrop.
-        parallax.updateAmbient(dt);
+        parallax.updateAmbient(dt, lastView);
         parallax.setStructures(engine.visibleStructures());
       },
 
@@ -222,8 +222,10 @@ export const ExploreScreen = {
         const s = view.scale;
         const cameraX = engine.getCameraX();
         const gy = parallax.groundY(view);
-        // The rain needs to know where the road is before it can break on it.
-        weather.setGroundLine(gy);
+        // The rain needs to know where the road is before it can break on it —
+        // both edges of it, so a downpour lands across the depth of the floor
+        // instead of stopping dead along the walk line.
+        weather.setGroundLine(gy, parallax.planeTop(view));
         // Backdrop only: the light goes on after the traveller is in the scene,
         // so he stands in the hour of the day instead of in front of it.
         parallax.renderBackdrop(ctx, view, cameraX);
@@ -274,6 +276,13 @@ export const ExploreScreen = {
           }
           ctx.globalAlpha = 1;
         }
+
+        // The near side of the road: the litter lane between the traveller and
+        // the camera, and the bank at the bottom of the frame. It goes on after
+        // him, which is the whole point of it — the road passes in front of the
+        // man walking down it, and until it did he was standing on top of a
+        // picture of one.
+        parallax.renderForeground(ctx, view, cameraX);
 
         // Everything above is lit together, traveller included.
         parallax.applyLighting(ctx, view);

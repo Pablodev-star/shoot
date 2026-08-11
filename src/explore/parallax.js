@@ -56,22 +56,49 @@
  * contents are derived from a seeded RNG keyed by the cell index. Same cell,
  * same props, forever, with no memory cost.
  *
- * THERE ARE THREE BANDS OF SCENERY, NOT ONE
+ * THERE ARE FIVE BANDS OF SCENERY, NOT ONE
  * ---------------------------------------------------------------------------
  * A single row of props standing on the walk line is what a side-scroller looks
  * like before anybody has finished it: the scene is a painted wall, a strip of
  * road, and nothing in between or in front. So the same cell machinery runs
- * three times over, at three depths:
+ * several times over, at several depths, and each band scrolls at the speed of
+ * the floor it is standing on rather than at a speed somebody picked:
  *
  *   backdrop  props hazed back and planted BEHIND the near ridge, at the mid
  *             layer's speed. Their feet are buried in the ridge, which is the
  *             whole trick — a distant tree whose base you can see is a small
  *             tree standing next to you.
+ *   verge     the far side of the road, a pixel step smaller and a little
+ *             slower than the camera, standing on the part of the floor that
+ *             is behind the traveller.
  *   scatter   the roadside proper, on the walk line, at camera speed.
+ *   clutter   litter on a tighter grid, just in front of the walk line.
+ *   near      a thin band of small stuff on the floor BETWEEN the traveller
+ *             and the camera, drawn after he is, so the road occasionally
+ *             passes in front of him instead of always behind.
  *   fringe    a tiled strip of near ground at the very bottom of the frame,
- *             running FASTER than the camera. It is the cheapest depth cue
+ *             running faster than any of them. It is the cheapest depth cue
  *             there is and the only one that puts the player inside the scene
  *             rather than in front of it.
+ *
+ * THE FLOOR IS A PLANE, AND IT IS NOT ALL ONE SPEED
+ * ---------------------------------------------------------------------------
+ * The ground layer is sliced into horizontal bands and each is scrolled at the
+ * speed of its own depth — see the long note over `PLANE_RISE` in
+ * `src/art/env-kit.js`, which owns that geometry and the rules the six floors
+ * are drawn to. The walk line sits `PLANE_RISE` rows INTO the layer rather than
+ * on its top edge, so the traveller walks along a road with ground on both
+ * sides of him, and everything the rest of this file anchors to the horizon —
+ * the ridges, the far prop band, the buildings' footings — hangs off the top of
+ * that plane instead.
+ *
+ * LANDMARKS ARE NOT TILED
+ * ---------------------------------------------------------------------------
+ * Anything the player is supposed to recognise — the basin's volcano, the barn
+ * on the prairie — is drawn once every few hundred paces from its own world
+ * grid rather than baked into a 320-pixel layer tile. A mountain that comes
+ * round again every 320 pixels is not a mountain, it is wallpaper, and no
+ * amount of detail in it survives being seen four times at once.
  */
 
 import { PALETTE } from '../art/palette.js';
@@ -82,10 +109,11 @@ import {
   SKY_BODY_SIZE,
   SKY_GLOW_SIZE,
 } from '../art/sprites-environment.js';
+import { PLANE_RISE, planeBands, planeSpeed } from '../art/env-kit.js';
 import { PLAYER_SIZE } from '../art/sprites-character.js';
 import { makeRng } from '../core/rng.js';
 import { getSky } from './daynight.js';
-import { getWeatherState } from './weather.js';
+import { getGroundWind, getWeatherState } from './weather.js';
 
 /**
  * One prop per cell at most, placed inside the middle half of the cell. That
@@ -171,16 +199,39 @@ export function createParallax(options = {}) {
   const ambient = env.createAmbient ? env.createAmbient(seed ^ 0xa1b2c3) : null;
   /** Buildings placed by the encounter system: [{ worldX, kind }] */
   let structures = [];
+  /**
+   * The last camera position the backdrop was drawn at. The foreground and the
+   * ambient are drawn from separate calls that the screens make later in the
+   * frame, and asking them all to carry the camera around was one more thing
+   * for a screen to get wrong — the duel already draws its road twice under two
+   * different transforms.
+   */
+  let lastCameraX = 0;
   /** Palette shift applied per world (Galaxy tints everything violet). */
   let worldTint = options.tint || null;
 
   /**
    * The walk line. Duels raise it so the fighters never sit under the action
    * buttons; exploration keeps it low so more desert is visible.
+   *
+   * It is the line the BOOTS land on, which since the floor became a plane is
+   * no longer the top of the ground layer: `planeTop` is, and it sits
+   * `PLANE_RISE` rows above this. Everything outside this file — the traveller,
+   * the duellists, the rain's landing line, the shadows — wants this one.
    */
   const groundRatio = options.groundRatio ?? 0.78;
   function groundY(view) {
     return Math.round((view.h * groundRatio) / view.scale) * view.scale;
+  }
+
+  /**
+   * The far edge of the floor: where the ground plane starts and the last ridge
+   * ends. Every layer behind the traveller hangs off this rather than off the
+   * walk line, so raising the walk line into the middle of the road did not
+   * drag the whole horizon down with it.
+   */
+  function planeTop(view) {
+    return groundY(view) - PLANE_RISE * view.scale;
   }
 
   function setStructures(list) {
@@ -309,6 +360,21 @@ export function createParallax(options = {}) {
     drawHorizonGlow(ctx, view, sky, gy);
     drawStars(ctx, view, sky);
 
+    /**
+     * Whatever the biome hangs in the sky itself — the pass's aurora is the
+     * only one so far.
+     *
+     * It is drawn HERE, inside the destination-over pass and after the stars,
+     * and both halves of that matter. Behind everything already on the canvas,
+     * so the peaks and the spruce and the traveller stand in front of it
+     * instead of it being painted over the top of the mountains it is supposed
+     * to be forty miles beyond. And after the stars, so the stars come out in
+     * front of the curtain — which is what you actually see, because an aurora
+     * is thinner than it looks and there is nothing in it to hide a star
+     * behind.
+     */
+    if (ambient?.renderSky) ambient.renderSky(ctx, view, sky);
+
     const pattern = skyPattern(ctx, view, sky);
     ctx.imageSmoothingEnabled = false;
     ctx.scale(s, s);
@@ -413,18 +479,19 @@ export function createParallax(options = {}) {
   /**
    * One tiled strip.
    *
-   * `layer.y` is measured from the walk line, except on a strip that declares
-   * `anchor: 'bottom'` — the near fringe does, because it belongs to the bottom
-   * edge of the frame rather than to the road. Anchored to the walk line it
-   * would climb up the picture on a tall window and sit in mid-air on a short
-   * one, and the one thing a foreground has to do is stay in the foreground.
+   * `layer.y` is measured from the top of the ground plane, except on a strip
+   * that declares `anchor: 'bottom'` — the near fringe does, because it belongs
+   * to the bottom edge of the frame rather than to the road. Anchored to the
+   * horizon it would climb up the picture on a tall window and sit in mid-air
+   * on a short one, and the one thing a foreground has to do is stay in the
+   * foreground.
    */
   function drawLayer(ctx, view, layer, cameraX, gy) {
     const sprite = env.layers[layer.name];
     if (!sprite) return;
     const s = view.scale;
     const tileW = LAYER_TILE_W * s;
-    const anchorY = layer.anchor === 'bottom' ? view.h : gy;
+    const anchorY = layer.anchor === 'bottom' ? view.h : gy - PLANE_RISE * s;
     const y = anchorY + layer.y * s;
     let offset = -((cameraX * layer.speed * s) % tileW);
     if (offset > 0) offset -= tileW;
@@ -432,12 +499,81 @@ export function createParallax(options = {}) {
     for (let x = offset; x < view.w + tileW; x += tileW) {
       ctx.drawImage(sprite, Math.round(x), Math.round(y), tileW, h);
     }
-    // The ground layer must reach the bottom of the screen on tall windows.
-    if (layer.name === 'ground') {
-      const bottom = y + h;
-      if (bottom < view.h) {
-        ctx.fillStyle = env.groundFill;
-        ctx.fillRect(-MARGIN, Math.round(bottom), view.w + MARGIN * 2, view.h - bottom + MARGIN);
+  }
+
+  /**
+   * The floor, drawn one depth band at a time.
+   *
+   * Same tiled strip as any other layer, cut into `planeBands` horizontal
+   * slices and scrolled at each slice's own speed, so the ground nearest the
+   * camera outruns the ground by the verge. That is the whole of the 3D in the
+   * scene and it is four lines of arithmetic: everything else — the grain
+   * growing towards the camera, the props standing in lanes, the shadow pooling
+   * under the near edge — is there to keep the eye agreeing with it.
+   *
+   * The bands are drawn back to front so a band that has been rounded a pixel
+   * tall is covered by the one in front of it rather than leaving a seam.
+   */
+  function drawGroundPlane(ctx, view, cameraX, gy) {
+    const sprite = env.layers.ground;
+    if (!sprite) return;
+    const s = view.scale;
+    const tileW = LAYER_TILE_W * s;
+    const top = gy - PLANE_RISE * s;
+    const bands = planeBands(sprite.height);
+
+    for (const band of bands) {
+      const rows = band.y1 - band.y0;
+      if (rows <= 0) continue;
+      const y = top + band.y0 * s;
+      let offset = -((cameraX * band.speed * s) % tileW);
+      if (offset > 0) offset -= tileW;
+      for (let x = offset; x < view.w + tileW; x += tileW) {
+        ctx.drawImage(
+          sprite,
+          0, band.y0, LAYER_TILE_W, rows,
+          Math.round(x), Math.round(y), tileW, rows * s,
+        );
+      }
+    }
+
+    // The floor must reach the bottom of the screen on tall windows.
+    const bottom = top + sprite.height * s;
+    if (bottom < view.h) {
+      ctx.fillStyle = env.groundFill;
+      ctx.fillRect(-MARGIN, Math.round(bottom), view.w + MARGIN * 2, view.h - bottom + MARGIN);
+    }
+  }
+
+  /**
+   * Landmarks: one big thing every few hundred paces, on its own world grid.
+   *
+   * They are placed like the scatter — a seeded cell, a position inside it —
+   * but with a spacing measured in screens rather than in paces, and they are
+   * drawn against the layer they belong to so the volcano stands on the same
+   * plain its foothills do. A biome with none pays nothing.
+   */
+  function drawLandmarks(ctx, view, cameraX, gy, host) {
+    const list = env.landmarks;
+    if (!list) return;
+    const s = view.scale;
+    for (const mark of list) {
+      if ((mark.after || 'far') !== host) continue;
+      const sprite = env.landmarkArt?.[mark.name];
+      if (!sprite) continue;
+      const speed = mark.speed ?? 0.15;
+      const spacing = mark.spacing || 900;
+      const camera = cameraX * speed;
+      const baseline = gy - PLANE_RISE * s + (mark.y ?? 0) * s;
+      const first = Math.floor((camera - sprite.width) / spacing);
+      const last = Math.ceil((camera + view.w / s) / spacing);
+      for (let cell = first; cell <= last; cell++) {
+        const rng = makeRng((seed + cell * 2246822519 + 0x1a2b) >>> 0);
+        if (rng() < (mark.gap ?? 0)) continue;
+        const worldX = cell * spacing + rng.range(0, mark.jitter ?? spacing * 0.5);
+        const sx = (worldX - camera) * s;
+        if (sx < -sprite.width * s || sx > view.w + sprite.width * s) continue;
+        drawSprite(ctx, sprite, sx, baseline - sprite.height * s, s, mark.flip !== false && rng.chance(0.5));
       }
     }
   }
@@ -465,12 +601,15 @@ export function createParallax(options = {}) {
   /**
    * Roadside props. Two rules, both of them things the old scatter got wrong:
    *
-   *  1. EVERYTHING SITS ON THE WALK LINE. Props used to be lifted 6 and 13
-   *     pixels off the ground to fake depth, but the road here is a flat
-   *     side-on strip with no receding plane to lift them into — so a raised
-   *     cactus did not read as further away, it read as hovering. They are all
-   *     planted on the same line now, and depth comes from the parallax layers
-   *     behind them and from the two other bands, which is what those are for.
+   *  1. A PROP IS LIFTED OFF THE WALK LINE ONLY IF IT IS SCROLLING AT THE SPEED
+   *     OF THE ROW IT IS LIFTED ONTO. Props used to be raised 6 and 13 pixels
+   *     to fake depth while still travelling at the camera's speed, and a
+   *     cactus that is higher up the screen but moving exactly as fast as the
+   *     one beside it does not read as further away — it reads as hovering, and
+   *     it did. Now the ground under them is a plane with a speed for every row
+   *     of it (`planeSpeed`), so a prop planted twelve rows back is drawn
+   *     twelve rows up AND scrolls at what that row scrolls at, and the lift
+   *     finally means what it always looked like it meant.
    *  2. THEY KEEP THEIR DISTANCE. One prop per cell, placed in the middle half
    *     of it, so no two are ever closer than half a cell.
    */
@@ -504,26 +643,40 @@ export function createParallax(options = {}) {
   }
 
   /**
-   * One pass of the cell machinery along the walk line.
+   * One pass of the cell machinery along one lane of the road.
    *
-   * Both roadside bands run through here: the props themselves, and the
-   * clutter — twigs, pebbles, chips of bone — on a much tighter grid
-   * underneath them. Two bands rather than one tighter table because they want
-   * opposite things. Props need room around them or the road turns into a
-   * hedge, and litter needs none at all: it is what fills the room the props
-   * are keeping.
+   * Four roadside bands run through here — the verge behind the traveller, the
+   * props themselves, the clutter on a much tighter grid, and the near band
+   * between him and the camera. Separate bands rather than one tighter table
+   * because they want opposite things: props need room around them or the road
+   * turns into a hedge, litter needs none at all, and the two outer lanes need
+   * a different speed and a different size from either.
+   *
+   * The cells are counted in the band's OWN camera space — `cameraX * speed` —
+   * exactly as the far backdrop band has always done. Counting them in the
+   * road's space and then drawing them at another speed is the one thing that
+   * cannot work: the two spaces drift apart forever, so props would slide out
+   * of the cells that decide whether they exist and start popping in and out
+   * of the world a screen and a half from either edge.
    *
    * @param {object} band
    * @param {Array}  band.table   weighted [{ name, weight, flip }]
    * @param {number} band.total   the table's weights, summed
    * @param {number} band.cell    spacing in source pixels
    * @param {number} band.gap     chance a cell is left empty
-   * @param {number} band.salt    keeps the two bands' generators apart
+   * @param {number} band.salt    keeps the bands' generators apart
+   * @param {number} band.lane    rows from the walk line: negative is behind
+   *   the traveller, positive between him and the camera
+   * @param {boolean} [band.shrink] draw a whole pixel step smaller
    */
   function drawBand(ctx, view, cameraX, gy, band) {
     const s = view.scale;
-    const first = Math.floor((cameraX - 60) / band.cell);
-    const last = Math.ceil((cameraX + view.w / s + 60) / band.cell);
+    const speed = band.speed ?? 1;
+    const camera = cameraX * speed;
+    const first = Math.floor((camera - 60) / band.cell);
+    const last = Math.ceil((camera + view.w / s + 60) / band.cell);
+    const scale = band.shrink ? Math.max(1, s - 1) : s;
+    const baseline = gy + band.lane * s;
 
     for (let cell = first; cell <= last; cell++) {
       const rng = makeRng((seed + cell * 2654435761 + band.salt) >>> 0);
@@ -534,7 +687,7 @@ export function createParallax(options = {}) {
       if (!sprite) continue;
 
       const worldX = cell * band.cell + band.cell * (0.25 + rng() * 0.5);
-      const sx = (worldX - cameraX) * s;
+      const sx = (worldX - camera) * s;
       if (sx < -140 * s || sx > view.w + 140 * s) continue;
       /**
        * A saguaro growing through the shop's porch roof was the last thing on
@@ -542,13 +695,17 @@ export function createParallax(options = {}) {
        * two systems that had never been introduced. The cell is skipped rather
        * than nudged: a prop shoved aside leaves a gap you can see is a gap,
        * and an empty forecourt in front of a building is what a forecourt is.
+       *
+       * The buildings stand on the road, so the question is asked in the
+       * road's space — this band's own position converted back into it — and
+       * not in whatever space this band happens to be counting cells in.
        */
-      if (underStructure(worldX + sprite.width / 2)) continue;
+      if (underStructure(sx / s + cameraX + sprite.width / 2)) continue;
       // Size varies by a whole pixel step, never a fraction: half-scaled pixel
       // art is mush.
-      const drawScale = rng() < 0.3 ? Math.max(1, s - 1) : s;
-      // 1–2 source pixels of the base sit below the walk line, so the prop is
-      // bedded into the sand rather than balanced on the crust line.
+      const drawScale = rng() < 0.3 ? Math.max(1, scale - 1) : scale;
+      // 1–2 source pixels of the base sit below its own line, so the prop is
+      // bedded into the ground rather than balanced on top of it.
       const sink = (1 + (rng() < 0.4 ? 1 : 0)) * s;
       /**
        * Every second one faces the other way. It costs nothing — the blitter
@@ -559,11 +716,51 @@ export function createParallax(options = {}) {
        * way round, opts out with `flip: false` in the scatter table.
        */
       const flip = entry.flip !== false && rng() < 0.5;
-      drawSprite(ctx, sprite, sx, gy + sink - sprite.height * drawScale, drawScale, flip);
+      drawSprite(ctx, sprite, sx, baseline + sink - sprite.height * drawScale, drawScale, flip);
     }
   }
 
-  const propBand = { table: env.scatter, total: scatterWeight, cell: scatterCell, gap: 0.18, salt: 0 };
+  /**
+   * The lanes, from the back of the floor to the front of it. Every speed here
+   * is `planeSpeed` of the row the lane stands on rather than a number chosen
+   * by eye, which is what keeps a prop moving with the ground under it.
+   *
+   * `VERGE_LANE` is well behind the walk line but still in front of the near
+   * ridge, and its props are drawn a step smaller: it is the far side of the
+   * road, and the far side of a road is where most of what you see growing
+   * beside one actually is. `NEAR_LANE` is the other end of the same idea and
+   * the reason the traveller now walks *through* the scene — see `drawNear`.
+   */
+  const VERGE_LANE = -13;
+  const NEAR_LANE = 13;
+
+  const propBand = {
+    table: env.scatter,
+    total: scatterWeight,
+    cell: scatterCell,
+    gap: 0.18,
+    salt: 0,
+    lane: 0,
+    speed: 1,
+  };
+
+  /**
+   * The far verge. It runs the biome's own scatter table — a prairie's far
+   * verge is the same grass as its near one — but at a wider spacing, because
+   * anything back there is competing with the ridge behind it and a solid hedge
+   * of props along the horizon buries the skyline the ridge is there to draw.
+   */
+  const vergeBand = {
+    table: env.scatter,
+    total: scatterWeight,
+    cell: Math.round(scatterCell * 1.35),
+    gap: 0.3,
+    salt: 0x7e12,
+    lane: VERGE_LANE,
+    speed: planeSpeed(PLANE_RISE + VERGE_LANE),
+    shrink: true,
+  };
+
   const clutterBand = env.clutter
     ? {
       table: env.clutter,
@@ -571,12 +768,41 @@ export function createParallax(options = {}) {
       cell: env.clutterCell || 21,
       gap: 0.34,
       salt: 0x51ed,
+      lane: 3,
+      speed: planeSpeed(PLANE_RISE + 3),
+    }
+    : null;
+
+  /**
+   * The near lane. Only litter goes in it, and only a third of its cells are
+   * filled: this is the one band that can stand between the player and his own
+   * legs, and a saguaro doing that is a bug however good the parallax is. A
+   * pebble and a dry tuft doing it is the scene closing around him.
+   */
+  const nearBand = env.clutter
+    ? {
+      table: env.clutter,
+      total: env.clutter.reduce((sum, e) => sum + e.weight, 0),
+      cell: Math.round((env.clutterCell || 21) * 2.4),
+      gap: 0.62,
+      salt: 0x2f77,
+      lane: NEAR_LANE,
+      speed: planeSpeed(PLANE_RISE + NEAR_LANE),
     }
     : null;
 
   function drawScatter(ctx, view, cameraX, gy) {
-    if (clutterBand) drawBand(ctx, view, cameraX, gy, clutterBand);
+    drawBand(ctx, view, cameraX, gy, vergeBand);
     drawBand(ctx, view, cameraX, gy, propBand);
+    // Litter last: it lies a few rows nearer the camera than the props do, and
+    // a pebble drawn behind the cactus it is lying in front of is a pebble the
+    // eye reads as being inside the cactus.
+    if (clutterBand) drawBand(ctx, view, cameraX, gy, clutterBand);
+  }
+
+  /** The lane in front of the traveller, drawn after he is. */
+  function drawNear(ctx, view, cameraX, gy) {
+    if (nearBand) drawBand(ctx, view, cameraX, gy, nearBand);
   }
 
   /**
@@ -602,7 +828,9 @@ export function createParallax(options = {}) {
     const cell = backdrop.cell || 96;
     const speed = backdrop.speed ?? 0.4;
     const scale = backdrop.shrink ? Math.max(1, s - 1) : s;
-    const baseline = gy + (backdrop.y ?? -7) * s;
+    // Measured from the top of the floor, not from the walk line: this band is
+    // planted behind the near ridge, and the near ridge's feet are up there.
+    const baseline = gy - PLANE_RISE * s + (backdrop.y ?? -7) * s;
     const camera = cameraX * speed;
     const first = Math.floor((camera - 80) / cell);
     const last = Math.ceil((camera + view.w / s + 80) / cell);
@@ -680,14 +908,30 @@ export function createParallax(options = {}) {
     const alpha = (0.1 + e * 0.2) * sky.light;
 
     ctx.fillStyle = `rgba(24, 16, 12, ${alpha})`;
-    // The long cast, one pixel deep, then the darker patch under the feet.
+    // The long cast, one pixel deep.
     ctx.fillRect(
       Math.round((dir > 0 ? cx : cx - len) / s) * s,
       gy,
       Math.round(len / s) * s,
       s,
     );
-    ctx.fillRect(Math.round((x + w * 0.12) / s) * s, gy, Math.round((w * 0.76) / s) * s, s * 2);
+    /**
+     * The pool under the feet, as three rows narrowing towards the camera
+     * rather than one flat bar.
+     *
+     * A shadow is cast on a SURFACE, so its shape says which way that surface
+     * is facing: a rectangle says the ground is a wall the figure is standing
+     * against, and an ellipse foreshortened along the vertical says the ground
+     * is a plane running away from you. It is four extra fillRects and it is
+     * the cheapest thing in this file that makes the floor read as a floor.
+     */
+    const rows = [0.76, 0.58, 0.34];
+    for (let i = 0; i < rows.length; i++) {
+      const pw = Math.round((w * rows[i]) / s) * s;
+      ctx.globalAlpha = 1 - i * 0.22;
+      ctx.fillRect(Math.round((cx - pw / 2) / s) * s, gy + i * s, pw, s);
+    }
+    ctx.globalAlpha = 1;
   }
 
   // --- ambient light --------------------------------------------------------
@@ -751,6 +995,7 @@ export function createParallax(options = {}) {
    */
   function renderBackdrop(ctx, view, cameraX) {
     const gy = groundY(view);
+    lastCameraX = cameraX;
     for (const layer of env.manifest) {
       // The near fringe waits until the road, its props and its buildings are
       // all down: it is the only thing in the manifest that is in FRONT of the
@@ -760,24 +1005,69 @@ export function createParallax(options = {}) {
       // feet. `near` is the biome's own name for that layer — `dunes`,
       // `drifts`, `crags` — and the manifest is where it is written down.
       if (layer.near) drawBackdrop(ctx, view, cameraX, gy);
-      drawLayer(ctx, view, layer, cameraX, gy);
+      if (layer.name === 'ground') drawGroundPlane(ctx, view, cameraX, gy);
+      else drawLayer(ctx, view, layer, cameraX, gy);
+      // Landmarks stand ON the layer they name, so they go down straight after
+      // it and are covered by everything in front of it.
+      drawLandmarks(ctx, view, cameraX, gy, layer.name);
       if (layer.name === 'clouds') drawStormDeck(ctx, view, cameraX, gy);
     }
     drawScatter(ctx, view, cameraX, gy);
     drawStructures(ctx, view, cameraX, gy);
+    // Whatever the biome keeps in the air BEHIND the traveller — a tumbleweed
+    // rolling along the far verge, a bird landed up the road. It goes in here
+    // rather than with the rest of the ambient because it is part of the
+    // scene: it is occluded by him, and the hour of the day falls on it.
+    if (ambient?.renderBehind) ambient.renderBehind(ctx, view, getSky(), ambientContext(view));
+  }
+
+  /**
+   * Everything on the near side of the traveller: the litter lane between him
+   * and the camera, the fringe at the bottom of the frame, and whatever the
+   * biome is rolling past in front of him.
+   *
+   * It is a separate call from `renderBackdrop` for one reason — the caller
+   * draws its actors between the two, so the road can pass IN FRONT of them.
+   * While the fringe was drawn at the end of the backdrop it was, despite its
+   * name and its speed, behind everything on the road.
+   */
+  function renderForeground(ctx, view, cameraX = lastCameraX) {
+    const gy = groundY(view);
+    drawNear(ctx, view, cameraX, gy);
     for (const layer of env.manifest) {
       if (layer.front) drawLayer(ctx, view, layer, cameraX, gy);
     }
+    if (ambient?.renderFront) ambient.renderFront(ctx, view, getSky(), ambientContext(view));
   }
 
   // --- ambient life ---------------------------------------------------------
 
   /**
+   * What the air is told about the world it is drifting through: where the
+   * floor is, where the camera has got to, and how hard the wind is blowing.
+   *
+   * The wind is the interesting one. It comes off the weather rather than out
+   * of the biome, and it is why a tumbleweed picks up speed when a sandstorm
+   * arrives instead of rolling along at its fair-weather pace through a wall of
+   * driven sand. Handing it over here — rather than letting the biome art
+   * import the weather — keeps `src/art/` a place where nothing knows what a
+   * game state is.
+   */
+  function ambientContext(view) {
+    return {
+      cameraX: lastCameraX,
+      groundY: groundY(view),
+      planeTop: planeTop(view),
+      wind: getGroundWind(),
+    };
+  }
+
+  /**
    * Move whatever the biome keeps in the air. Safe to call for a biome with
    * nothing in it — the desert's air is empty and the call is a no-op.
    */
-  function updateAmbient(dt) {
-    if (ambient) ambient.update(dt);
+  function updateAmbient(dt, view) {
+    if (ambient) ambient.update(dt, view ? ambientContext(view) : { wind: getGroundWind() });
   }
 
   /**
@@ -786,12 +1076,13 @@ export function createParallax(options = {}) {
    * itself how the hour affects it, from the sky snapshot it is handed.
    */
   function renderAmbient(ctx, view) {
-    if (ambient) ambient.render(ctx, view, getSky());
+    if (ambient) ambient.render(ctx, view, getSky(), ambientContext(view));
   }
 
-  /** Backdrop and light in one call, for scenes with nothing to insert. */
+  /** Backdrop, foreground and light in one call, for scenes with nothing to insert. */
   function render(ctx, view, cameraX) {
     renderBackdrop(ctx, view, cameraX);
+    renderForeground(ctx, view, cameraX);
     applyLighting(ctx, view);
     renderAmbient(ctx, view);
   }
@@ -799,11 +1090,13 @@ export function createParallax(options = {}) {
   return {
     render,
     renderBackdrop,
+    renderForeground,
     applyLighting,
     updateAmbient,
     renderAmbient,
     drawGroundShadow,
     groundY,
+    planeTop,
     setStructures,
     setTint,
     /** The colour of the dust this ground throws up under boots and hooves. */

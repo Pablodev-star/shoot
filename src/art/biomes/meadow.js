@@ -30,9 +30,20 @@
  */
 
 import { PALETTE } from '../palette.js';
-import { makeCanvas } from '../pixel.js';
+import { bake, makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
-import { LAYER_TILE_W, makeCloudLayer, makeRidgeLayer } from '../env-kit.js';
+import {
+  BIRD_POSES,
+  KEY,
+  LAYER_TILE_W,
+  bandFit,
+  drawBird,
+  makeCloudLayer,
+  makeRidgeLayer,
+  planeGrain,
+  planePebble,
+  planeZoom,
+} from '../env-kit.js';
 
 export const MEADOW_PROPS = {
   /**
@@ -371,6 +382,22 @@ export const MEADOW_PROPS = {
     '.llJ.llJ.',
   ],
 
+  /**
+   * A dry-stone wall, tumbled at one end. It is the one prop on the prairie
+   * with a straight line in it, which is exactly why it is here: everything
+   * else out here grew, and a man-made edge among all that softness is what
+   * makes the rest of it read as country rather than as texture.
+   */
+  stoneWall: [
+    '....yYYy.yYy...',
+    '..yYYyyYYyyYYy.',
+    '.yYYyvyyvyYYyvv',
+    'yYYyvvyYYyvyyvv',
+    'yYyvvyYYyvvyYyv',
+    'yyvvyYyvvyyvvyv',
+    'lllllllllllllll',
+  ],
+
   /** A round bale, wound tight. The gold arcs inside are the wind of it. */
   hayBale: [
     '.....OOOO......',
@@ -391,30 +418,184 @@ export const MEADOW_PROPS = {
 // Layers
 // ---------------------------------------------------------------------------
 
+const wrapX = (x) => ((x % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W;
+
 /**
- * Sum of sines whose periods divide the tile width exactly, so anything driven
- * by it wraps seamlessly. Used for the wandering edges of the trail.
+ * THE RANGE ON THE HORIZON, AND WHY IT IS NOT A SINE ANY MORE
+ * ---------------------------------------------------------------------------
+ * The far layer used to be nothing but `makeRidgeLayer` with a haze colour in
+ * it: a sum of five sines, three of them at low frequency, drawn as a solid
+ * silhouette with a two-pixel lit crest. Which is a *hill*, repeated — and
+ * because a sine has no corner in it and the same five waves ran across all 320
+ * pixels of the tile, what the player actually saw was one green-grey hump
+ * arriving again every screen and a half, forever. It was the single most
+ * repetitive thing in the game.
+ *
+ * A mountain is not a smooth curve. It is two straight slopes of DIFFERENT
+ * steepness meeting at a summit that is usually off to one side, with a spur
+ * running down the front of it, gullies cut into its faces, and other mountains
+ * standing behind and between it. All of that is drawn here explicitly:
+ *
+ *   - two ranges, the back one paler and lower, so the horizon has depth in it
+ *     rather than being one cut-out
+ *   - each peak gets its own asymmetry, so no two are the same shape and none
+ *     of them is symmetrical
+ *   - the lit face (left, like every light in this game) is one step up the
+ *     haze ramp and the shaded face one step down, with the ridge line between
+ *     them — which is what makes a triangle read as a solid
+ *   - gullies down the shaded face and a scree fan where they run out
+ *   - the odd wood on the lower slopes, four pixels of darker green apiece
+ *
+ * The generator's sine is still under all of it as the *plain* the range stands
+ * on. That is what a plain is for.
  */
-function wave(x, terms) {
-  let v = 0;
-  for (const [periods, amp, phase] of terms) {
-    v += Math.sin((x / LAYER_TILE_W) * Math.PI * 2 * periods + phase) * amp;
+function mountainRange(ctx, heights, rng, height) {
+  const plot = (x, y, color) => {
+    if (y < 0 || y >= height) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(wrapX(x), y, 1, 1);
+  };
+
+  /**
+   * One peak. `back` puts it in the further range: paler, and drawn before the
+   * front one so the front range overlaps it.
+   */
+  const peak = (cx, h, back) => {
+    /**
+     * The front range is DARKER than the back one, which is the right way
+     * round and looks wrong written down: distance drains a landscape towards
+     * the sky, so the peaks eight miles off are pale and the ones two miles off
+     * are not. Both share the lit ridge line, because both are catching the
+     * same sun.
+     */
+    const body = back ? PALETTE.hillHaze : PALETTE.hillHazeDark;
+    const lit = back ? PALETTE.hillHazeLight : PALETTE.hillHaze;
+    const ridge = PALETTE.hillHazeLight;
+    // The two slopes. A mountain with the same run either side of the summit is
+    // a pyramid, and the eye has never seen one on a horizon.
+    const leftRun = h * rng.range(1.5, 2.6);
+    const rightRun = h * rng.range(1.5, 2.6);
+    const gullyAt = rng.range(0.3, 0.7);
+
+    for (let dx = -Math.round(leftRun); dx <= Math.round(rightRun); dx++) {
+      const run = dx < 0 ? leftRun : rightRun;
+      const k = Math.abs(dx) / run;
+      if (k > 1) continue;
+      /**
+       * The profile: steep near the summit and easing out towards the foot,
+       * which is what a mountain does and what a straight line does not. `k**1.6`
+       * is the whole of it — a slope that is concave in exactly this way is the
+       * difference between a mountain and a tent.
+       */
+      const local = Math.round(h * (1 - k ** 1.6));
+      if (local < 1) continue;
+      const foot = height - heights[wrapX(cx + dx)];
+      const top = foot - local;
+      const bottom = Math.min(height, foot + 1);
+      for (let y = Math.max(0, top); y < bottom; y++) {
+        plot(cx + dx, y, dx < 0 ? lit : body);
+      }
+      // The ridge line, and the summit cap on top of it.
+      plot(cx + dx, top, ridge);
+      // A gully down the shaded face, with the scree it has dropped at the end
+      // of it. Only on the big ones — a gully on a foothill is a scratch.
+      if (!back && dx > 0 && h > 14) {
+        const gully = Math.round(rightRun * gullyAt);
+        if (dx === gully || dx === gully + 1) {
+          for (let y = top + 2; y < bottom - 1; y++) plot(cx + dx, y, PALETTE.hillHazeDark);
+        }
+      }
+    }
+
+    // Woods on the lower slopes: four pixels each, and only ever below the
+    // halfway line. Trees on a summit is a hill with a hat on.
+    if (back) return;
+    for (let i = 0; i < Math.round(h / 3); i++) {
+      const dx = rng.int(-Math.round(leftRun) + 1, Math.round(rightRun) - 1);
+      const run = dx < 0 ? leftRun : rightRun;
+      const k = Math.abs(dx) / run;
+      if (k < 0.45) continue;
+      const foot = height - heights[wrapX(cx + dx)];
+      const local = Math.round(h * (1 - k ** 1.6));
+      const y = foot - rng.int(1, Math.max(2, local));
+      plot(cx + dx, y, PALETTE.hillHazeDark);
+      plot(cx + dx - 1, y + 1, PALETTE.hillHazeDark);
+      plot(cx + dx + 1, y + 1, PALETTE.hillHazeDark);
+    }
+  };
+
+  // The back range: low, pale, and placed on its own grid so it does not sit
+  // in step with the front one.
+  for (let i = 0; i < 7; i++) {
+    peak(rng.int(0, LAYER_TILE_W - 1), rng.int(9, 19), true);
   }
-  return v;
+  // And the front range. Sorted by height and drawn small-first, so the big
+  // ones overlap the small ones rather than being interrupted by them.
+  const front = Array.from({ length: 6 }, () => ({
+    cx: rng.int(0, LAYER_TILE_W - 1),
+    h: rng.int(13, 34),
+  })).sort((a, b) => a.h - b.h);
+  for (const p of front) peak(p.cx, p.h, false);
 }
 
 /**
- * The wooded crest of the middle hills. Little crowns pushed down onto the
- * ridge line, in a green one step darker than the hill they stand on, with a
- * lit top — at this distance a tree is four pixels and a suggestion, and any
- * more detail than that turns the horizon into noise.
+ * The wooded crest of the middle hills, and the fields under it.
+ *
+ * The crowns are little masses pushed down onto the ridge line, in a green one
+ * step darker than the hill they stand on, with a lit top — at this distance a
+ * tree is four pixels and a suggestion, and any more detail than that turns the
+ * horizon into noise.
+ *
+ * What is new is everything they are standing in. A middle distance of plain
+ * green with a fringe of trees along the top of it was the other half of the
+ * prairie's emptiness: the eye had a skyline to read and then forty pixels of
+ * nothing beneath it. So the slope is now farmed — patches of crop and pasture
+ * at slightly different values, with a hedgerow along the join and the odd bare
+ * furrowed field among them. It is the oldest trick in landscape painting and
+ * it is doing the same job here that it does there: patchwork is what tells you
+ * a hillside is a hillside and not a wall.
  */
-function treeLine(ctx, heights, rng, height) {
+function fieldedHills(ctx, heights, rng, height) {
   const plot = (x, y, color) => {
+    if (y < 0 || y >= height) return;
     ctx.fillStyle = color;
-    ctx.fillRect(((x % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W, y, 1, 1);
+    ctx.fillRect(wrapX(x), y, 1, 1);
   };
-  for (let i = 0; i < 46; i++) {
+
+  // --- the fields ---
+  for (let i = 0; i < 26; i++) {
+    const cx = rng.int(0, LAYER_TILE_W - 1);
+    const w = rng.int(14, 46);
+    const top = rng.int(1, 10);
+    const h = rng.int(5, 16);
+    const tone = rng.pick([PALETTE.grass, PALETTE.grassLight, PALETTE.grassDark, PALETTE.goldLight]);
+    const crop = tone === PALETTE.goldLight;
+    for (let dx = 0; dx < w; dx++) {
+      const x = cx + dx;
+      const base = height - heights[wrapX(x)];
+      // A field lies ON the slope: its top edge follows the ridge down.
+      const y0 = base + top;
+      for (let y = y0; y < Math.min(height, y0 + h); y++) {
+        // Ripe crop is drawn as rows rather than as a flat colour, which is
+        // what stops four gold fields from reading as four gold rectangles.
+        if (crop && (y - y0) % 2 === 1) continue;
+        ctx.globalAlpha = crop ? 0.7 : 0.55;
+        plot(x, y, tone);
+        ctx.globalAlpha = 1;
+      }
+      // The hedgerow along the top edge, broken by gateways.
+      if (rng.chance(0.72)) plot(x, y0, PALETTE.grassDeep);
+    }
+    // And the one down the near side of it.
+    for (let y = 0; y < h; y++) {
+      const base = height - heights[wrapX(cx)];
+      if (rng.chance(0.3)) continue;
+      plot(cx, base + top + y, PALETTE.grassDeep);
+    }
+  }
+
+  // --- the tree line along the crest ---
+  for (let i = 0; i < 54; i++) {
     const cx = rng.int(0, LAYER_TILE_W - 1);
     const base = height - heights[cx] + 1;
     const h = rng.int(4, 9);
@@ -444,89 +625,92 @@ function grassFringe(ctx, heights, rng, height) {
 }
 
 /**
- * The ground the player actually walks on: a dirt trail worn through grass.
+ * The ground the player actually walks on: a dirt trail worn through grass,
+ * drawn as a floor running away from the camera.
  *
- * THE TRAIL STARTS AT ROW ZERO, AND THAT IS NOT AN ACCIDENT
+ * THE TRAIL HAS TWO VERGES NOW, AND THAT IS THE WHOLE CHANGE
  * ---------------------------------------------------------------------------
- * Row zero of this layer is the walk line — where the boots land. The first
- * version of this put a grass verge across the top and started the dirt six
- * pixels down, and because the hill layer in front of it already covers the
- * ground strip's first rows, what you actually got on screen was a man walking
- * along a green ledge with a ploughed field in front of him. The dirt has to
- * begin at the walk line for the trail to be the thing he is walking on.
+ * The boots used to land on row zero of this layer, so the trail started there
+ * and every blade of grass in the biome was in front of the traveller. He
+ * walked along the back edge of his own path. The walk line sits `PLANE_RISE`
+ * rows down now, so the field comes back over the top: grass behind him, dirt
+ * under him, grass in front. It is the same three ingredients and it reads as
+ * a path through a meadow instead of a meadow with a path in front of it.
  *
- * Below the trail the field comes back, falling into shadow towards the
- * camera. Both edges of the trail wander on a tileable wave and are broken up
- * with blades crossing them, because a path with two straight edges is a
- * runway.
+ * The trail's edges are straight rather than wandering, and the blades and
+ * stones lying along them do the work the wave used to. That is forced — the
+ * renderer scrolls this canvas in depth bands and a wave crossing four of them
+ * is torn into four — but it is also better: the litter along the edge is
+ * band-local, so it travels at the speed of the ground it is lying on, and
+ * three speeds of scattered edge says depth where one speed of smooth edge only
+ * ever said shape. See the note over `PLANE_RISE` in `env-kit.js`.
  */
 function makeMeadowGround({ seed, height }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
 
+  /** Where the dirt begins and ends, in rows. The walk line is at 22. */
+  const trailTop = 9;
+  const trailBot = 38;
+
   ctx.fillStyle = PALETTE.grass;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
 
-  const topTerms = [[1, 1.4, 0.7], [3, 0.8, 2.1], [7, 0.5, 4.4]];
-  const botTerms = [[1, 3.2, 2.9], [2, 1.8, 0.3], [5, 0.9, 5.1]];
-  const trailTop = new Array(LAYER_TILE_W);
-  const trailBot = new Array(LAYER_TILE_W);
-
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    trailTop[x] = Math.max(0, Math.round(wave(x, topTerms)));
-    trailBot[x] = Math.round(21 + wave(x, botTerms));
-  }
+  // --- the field behind the trail, lit and slightly hazed by distance ---
+  ctx.fillStyle = PALETTE.grassMid;
+  ctx.fillRect(0, 0, LAYER_TILE_W, trailTop);
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = PALETTE.hillHaze;
+  ctx.fillRect(0, 0, LAYER_TILE_W, 3);
+  ctx.globalAlpha = 1;
 
   // --- the trail ---
+  ctx.fillStyle = PALETTE.soil;
+  ctx.fillRect(0, trailTop, LAYER_TILE_W, trailBot - trailTop);
+  // Lit lip along the far edge, shadowed lip along the near one: the trail is
+  // a shallow dish, not a decal.
+  ctx.fillStyle = PALETTE.soilLight;
+  ctx.fillRect(0, trailTop, LAYER_TILE_W, 2);
+  ctx.fillStyle = PALETTE.soilDark;
+  ctx.fillRect(0, trailBot - 2, LAYER_TILE_W, 2);
+
+  // One wheel rut, in the band just in front of the boots. Two of them plus the
+  // two lips gave the trail four horizontal lines across it and it read as
+  // strata; one, broken, reads as a rut.
   for (let x = 0; x < LAYER_TILE_W; x++) {
-    const t = trailTop[x];
-    const b = trailBot[x];
-    ctx.fillStyle = PALETTE.soil;
-    ctx.fillRect(x, t, 1, b - t);
-    // Lit lip along the far edge, shadowed lip along the near one: the trail
-    // is a shallow dish, not a decal.
-    ctx.fillStyle = PALETTE.soilLight;
-    ctx.fillRect(x, t, 1, 2);
+    if (rng.chance(0.24)) continue;
     ctx.fillStyle = PALETTE.soilDark;
-    ctx.fillRect(x, b - 2, 1, 2);
+    ctx.fillRect(x, 27, 1, 1);
+    if (rng.chance(0.4)) {
+      ctx.fillStyle = PALETTE.soilLight;
+      ctx.fillRect(x, 28, 1, 1);
+    }
   }
 
-  // One wheel rut down the middle of it. Two of them plus the two lips gave
-  // the trail four horizontal lines across it, and it read as strata.
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    if (rng.chance(0.22)) continue; // the rut breaks up rather than running true
-    const y = Math.round(trailTop[x] + (trailBot[x] - trailTop[x]) * 0.52);
-    ctx.fillStyle = PALETTE.soilDark;
-    ctx.fillRect(x, y, 1, 1);
-  }
+  // Grit in the dirt, growing towards the camera.
+  planeGrain(ctx, rng, {
+    height,
+    from: trailTop + 2,
+    to: trailBot - 3,
+    count: 380,
+    colors: [PALETTE.soilLight, PALETTE.soilDeep, PALETTE.soilDark],
+  });
 
-  // Grit and small stones in the dirt.
-  for (let i = 0; i < 240; i++) {
+  // Hoof-cut earth: shallow scoops with the soil thrown up behind them.
+  for (let i = 0; i < 26; i++) {
+    const y = bandFit(rng.int(trailTop + 3, trailBot - 4), 2, height);
+    const zoom = planeZoom(y, height);
     const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(trailTop[x] + 2, Math.max(trailTop[x] + 3, trailBot[x] - 3));
-    ctx.fillStyle = rng.chance(0.6) ? PALETTE.soilLight : PALETTE.soilDeep;
-    ctx.fillRect(x, y, rng.chance(0.18) ? 2 : 1, 1);
-  }
-
-  // Blades leaning in over both edges, so neither reads as a cut line.
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    if (trailTop[x] > 0 && rng.chance(0.4)) {
-      ctx.fillStyle = PALETTE.grassMid;
-      ctx.fillRect(x, trailTop[x], 1, rng.int(1, 2));
-    }
-    if (rng.chance(0.45)) {
-      ctx.fillStyle = PALETTE.grassDark;
-      ctx.fillRect(x, trailBot[x] - rng.int(1, 3), 1, rng.int(1, 3));
-    }
+    ctx.fillStyle = PALETTE.soilDeep;
+    ctx.fillRect(x, y, Math.max(2, Math.round(3 * zoom)), 1);
+    ctx.fillStyle = PALETTE.soilLight;
+    ctx.fillRect(x, y - 1, Math.max(1, Math.round(2 * zoom)), 1);
   }
 
   // --- foreground grass, falling into shadow towards the camera ---
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    const b = trailBot[x];
-    ctx.fillStyle = PALETTE.grass;
-    ctx.fillRect(x, b, 1, height - b);
-  }
-  const near = Math.round(height * 0.55);
+  ctx.fillStyle = PALETTE.grass;
+  ctx.fillRect(0, trailBot, LAYER_TILE_W, height - trailBot);
+  const near = Math.round(height * 0.66);
   for (let y = near; y < height; y++) {
     const k = (y - near) / (height - near);
     ctx.globalAlpha = k * 0.6;
@@ -535,20 +719,58 @@ function makeMeadowGround({ seed, height }) {
   }
   ctx.globalAlpha = 1;
 
-  // Blade texture over the whole foreground: short vertical dashes, never
-  // single dots — a dot field reads as static, a dash field reads as grass.
-  for (let i = 0; i < 560; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(trailBot[x] + 1, height - 1);
+  /**
+   * Blade texture over both verges: short vertical dashes, never single dots —
+   * a dot field reads as static, a dash field reads as grass. They get taller
+   * towards the camera, which is the same perspective the stones and the ruts
+   * are drawn to and the reason the far verge reads as being further off rather
+   * than just being smaller.
+   */
+  for (let i = 0; i < 900; i++) {
+    const far = rng.chance(0.3);
+    const y = far ? rng.int(0, trailTop - 1) : rng.int(trailBot, height - 1);
+    const zoom = planeZoom(y, height);
+    const len = Math.max(1, Math.round(rng.range(1, 2.6) * zoom));
     ctx.fillStyle = rng.chance(0.45) ? PALETTE.grassMid : PALETTE.grassDark;
-    ctx.fillRect(x, y, 1, rng.int(1, 3));
+    ctx.fillRect(rng.int(0, LAYER_TILE_W - 1), bandFit(y, len, height), 1, len);
   }
-  // A handful of blooms down there too, so the near field is not flat green.
-  for (let i = 0; i < 26; i++) {
+
+  // Blades leaning in over both lips of the trail, so neither reads as a cut
+  // line. This is what replaced the wandering edge, and it is doing it better.
+  for (let x = 0; x < LAYER_TILE_W; x++) {
+    if (rng.chance(0.45)) {
+      ctx.fillStyle = PALETTE.grassMid;
+      ctx.fillRect(x, trailTop - rng.int(0, 1), 1, rng.int(1, 2));
+    }
+    if (rng.chance(0.5)) {
+      ctx.fillStyle = PALETTE.grassDark;
+      ctx.fillRect(x, trailBot - 1, 1, rng.int(1, 3));
+    }
+  }
+
+  // Stones the plough turned up, lying in both verges with a shadow under each.
+  for (let i = 0; i < 60; i++) {
+    planePebble(ctx, rng, {
+      height,
+      y: rng.chance(0.3) ? rng.int(1, trailTop - 1) : rng.int(trailBot + 1, height - 3),
+      colors: { body: PALETTE.grey, light: PALETTE.steel, shadow: PALETTE.grassDeep },
+    });
+  }
+
+  // Blooms, so neither verge is flat green. Bigger and brighter near the
+  // camera; at the back of the plane a flower is one pixel, and should be.
+  for (let i = 0; i < 60; i++) {
+    const far = rng.chance(0.35);
+    const y = far ? rng.int(1, trailTop - 1) : rng.int(trailBot + 1, height - 4);
+    const zoom = planeZoom(y, height);
+    const bloom = rng.pick([PALETTE.bloomCream, PALETTE.bloomPink, PALETTE.goldLight, PALETTE.bloomBlue]);
+    const w = Math.max(1, Math.round(zoom - 0.4));
+    const py = bandFit(y, 2, height);
     const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(trailBot[x] + 2, height - 8);
-    ctx.fillStyle = rng.pick([PALETTE.bloomCream, PALETTE.bloomPink, PALETTE.goldLight]);
-    ctx.fillRect(x, y, 1, 1);
+    ctx.fillStyle = PALETTE.grassDark;
+    ctx.fillRect(x, py + 1, 1, 1);
+    ctx.fillStyle = bloom;
+    ctx.fillRect(x, py, w, 1);
   }
 
   return canvas;
@@ -602,6 +824,53 @@ function makeMeadowFringe({ seed, height }) {
 }
 
 // ---------------------------------------------------------------------------
+// Landmarks
+// ---------------------------------------------------------------------------
+
+/**
+ * A barn and its silo, out on the middle hills.
+ *
+ * It is a LANDMARK rather than a scatter prop or a decoration baked into a
+ * layer, which is a distinction worth keeping straight: layers tile every 320
+ * pixels, so anything drawn into one is back again in a screen and a half, and
+ * scatter props stand on the road where the player walks past them at arm's
+ * length. This is neither. It stands a long way off, it comes round once every
+ * eight hundred paces, and the whole of its job is to be the thing on the
+ * horizon that the player recognises when the road bends back towards it.
+ *
+ * Red, because a barn is red and because there is no other red in the prairie —
+ * one warm rectangle in forty thousand pixels of green is worth more than any
+ * amount of detail anywhere else in the frame.
+ */
+const BARN = [
+  '.........................',
+  '.........wwwww...........',
+  '.......wwqqqqqww.........',
+  '.....wwqqqqqqqqqww.......',
+  '...wwqqqqqqqqqqqqqww.....',
+  '..wqqqqqqqqqqqqqqqqqw....',
+  '..xqqqqqqqqqqqqqqqqqx....',
+  '..eeeeeeeeeeeeeeeeeee.WW.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..eqeeeebbbbbeeeeqeee.Ww.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..eeqeeebbbbbeeeeeqee.Ww.',
+  '..eeeeeebbbbbeeeeeeee.Ww.',
+  '..xxxxxxxxxxxxxxxxxxx.xx.',
+  '..lllllllllllllllllllll..',
+];
+
+let barnCache = null;
+
+function buildMeadowLandmarks() {
+  if (!barnCache) barnCache = { barn: bake({ key: KEY, rows: BARN }) };
+  return barnCache;
+}
+
+// ---------------------------------------------------------------------------
 // Ambient life
 // ---------------------------------------------------------------------------
 
@@ -652,6 +921,33 @@ function createMeadowAmbient(seed) {
     color: rng.chance(0.5) ? PALETTE.bloomPink : PALETTE.goldLight,
   }));
 
+  /**
+   * A flock crossing the sky, and the one thing in this biome that is properly
+   * animated rather than merely moving.
+   *
+   * Five birds in a loose skein: each one holds a station relative to the
+   * leader, and each one beats its wings on its OWN clock, a little out of
+   * phase with its neighbour. That last part is the whole effect. Five birds
+   * flapping in unison is a decal being dragged sideways; five birds flapping
+   * out of step is a flock, and the difference is one number per bird.
+   *
+   * They fly in bounds rather than on a line — a beat or two of climb, then a
+   * glide with the wings half folded — which is what most small birds actually
+   * do and what the vultures over the desert deliberately never do.
+   */
+  const flock = {
+    x: 1.3,
+    y: rng.range(0.16, 0.34),
+    vx: rng.range(-0.05, -0.03),
+    wait: rng.range(3000, 12000),
+    birds: Array.from({ length: 5 }, (_, i) => ({
+      dx: -i * rng.range(0.018, 0.03),
+      dy: (i % 2 ? 1 : -1) * rng.range(0.008, 0.024),
+      rate: rng.range(120, 190),
+      phase: rng.range(0, Math.PI * 2),
+    })),
+  };
+
   const wrap = (p) => {
     if (p.x < -0.05) p.x = 1.05;
     if (p.x > 1.05) p.x = -0.05;
@@ -682,6 +978,21 @@ function createMeadowAmbient(seed) {
         b.y += Math.sin(clock / 900 + b.phase) * b.bob * step * 8;
         wrap(b);
       }
+
+      // The flock crosses, then the sky is empty for a while. A skein that
+      // wraps round and comes back every eight seconds is a carousel.
+      if (flock.x < -0.25) {
+        flock.wait -= dt;
+        if (flock.wait <= 0) {
+          flock.x = 1.3;
+          flock.y = rng.range(0.14, 0.36);
+          flock.vx = rng.range(-0.06, -0.03);
+          flock.wait = rng.range(6000, 22000);
+        }
+      } else {
+        flock.x += flock.vx * step;
+        flock.y += Math.sin(clock / 3400) * 0.0006 * step * 60;
+      }
     },
 
     /**
@@ -692,6 +1003,23 @@ function createMeadowAmbient(seed) {
       const s = view.scale;
       const day = Math.max(0, Math.min(1, (sky.light - 0.4) / 0.4));
       const night = sky.stars;
+
+      // --- the flock ---
+      if (day > 0.05 && flock.x > -0.25) {
+        ctx.fillStyle = PALETTE.inkSoft;
+        ctx.globalAlpha = day * 0.72;
+        for (const b of flock.birds) {
+          const x = Math.round(((flock.x + b.dx) * view.w) / s) * s;
+          const y = Math.round(((flock.y + b.dy) * view.h) / s) * s;
+          if (x < -6 * s || x > view.w + 6 * s) continue;
+          // Bounding flight: the bird rises on the beat and dips through the
+          // glide, so the whole skein undulates instead of sliding.
+          const t = clock / b.rate + b.phase;
+          const bob = Math.round(Math.sin(t) * 1.4) * s;
+          drawBird(ctx, x, y + bob, s, BIRD_POSES.bound, Math.floor(t / (Math.PI / 2)));
+        }
+        ctx.globalAlpha = 1;
+      }
 
       if (day > 0.02) {
         ctx.fillStyle = PALETTE.bloomCream;
@@ -771,23 +1099,28 @@ export const MEADOW_ART = {
       size: [4, 9],
       tones: [PALETTE.white, PALETTE.white, '#c3cfdd'],
     }),
-    // Distant ranges, drained towards the sky. Smooth, because roughness at
-    // this depth just reads as dither noise.
+    /**
+     * The range. The sine here is the PLAIN the mountains stand on and nothing
+     * else — it is low and nearly flat on purpose, because everything the eye
+     * reads as the skyline is drawn by `mountainRange`. That is the same
+     * division of labour the desert's mesas and the pass's peaks use, and it
+     * arrived here last: this was the layer that was still a row of identical
+     * humps long after the other five had a horizon with a shape.
+     */
     far: makeRidgeLayer({
       seed: 8123,
-      height: 76,
-      baseline: 34,
-      amplitude: 24,
-      // Enough waves that the range does not read as one cone repeated across
-      // the tile, but not so many that it turns into dither noise at this depth.
-      roughness: 0.5,
+      height: 84,
+      baseline: 14,
+      amplitude: 5,
+      roughness: 0.4,
       colors: {
         body: PALETTE.hillHaze,
         light: PALETTE.hillHazeLight,
         dark: PALETTE.hillHazeDark,
       },
+      decorate: mountainRange,
     }),
-    // The wooded middle hills — the layer that says "prairie" rather than
+    // The farmed middle hills — the layer that says "prairie" rather than
     // "somewhere green".
     mid: makeRidgeLayer({
       seed: 3311,
@@ -796,7 +1129,7 @@ export const MEADOW_ART = {
       amplitude: 13,
       roughness: 0.5,
       colors: { body: PALETTE.grassMid, light: PALETTE.grass, dark: PALETTE.grassDark },
-      decorate: treeLine,
+      decorate: fieldedHills,
     }),
     /**
      * The near rise, with blades standing off its crest. Its bottom row lands
@@ -819,13 +1152,29 @@ export const MEADOW_ART = {
 
   manifest: [
     { name: 'clouds', speed: 0.05, y: -110 },
-    { name: 'far', speed: 0.15, y: -76 },
+    { name: 'far', speed: 0.15, y: -84 },
     { name: 'mid', speed: 0.4, y: -60 },
-    // -36 with a height of 36: the rise ends where the trail begins.
+    // -36 with a height of 36: the rise ends where the floor begins.
     { name: 'hills', speed: 0.7, y: -36, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.3, y: -16, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.9, y: -16, anchor: 'bottom', front: true },
   ],
+
+  /**
+   * One barn, out on the middle hills, every eight hundred paces or so.
+   *
+   * It is drawn straight after the `mid` layer and its baseline is set LOW —
+   * near enough to the top of the floor that the near rise, which is drawn
+   * after it, comes down over its footings. That is the same trick the far prop
+   * band uses and it is the whole reason the barn reads as being a field away
+   * instead of as a red box parked on a hilltop: you never see the bottom of a
+   * distant building, because there is always a fold of ground in front of it.
+   */
+  landmarks: [
+    { name: 'barn', after: 'mid', speed: 0.4, spacing: 820, jitter: 300, y: -26, gap: 0.25 },
+  ],
+
+  buildLandmarks: buildMeadowLandmarks,
 
   /**
    * Weights, tuned so the common case is grass and the rare case is a
@@ -849,6 +1198,7 @@ export const MEADOW_ART = {
     { name: 'hayBale', weight: 4 },
     { name: 'thistle', weight: 7 },
     { name: 'mushrooms', weight: 5 },
+    { name: 'stoneWall', weight: 5 },
     // A scarecrow is a man-shape, and a man-shape the player has seen once is
     // a landmark. Rare enough that meeting one is an event, and never mirrored
     // — a scarecrow with its hat brim the other way round is a different

@@ -57,6 +57,17 @@
  * down in the foreground), which is what stops the ground from reading as a
  * single flat shelf everything happens to stop at.
  *
+ * THE GROUND IS A PLANE, AND THE SKY KNOWS IT
+ * ---------------------------------------------------------------------------
+ * The screens hand over two lines rather than one — the walk line and the far
+ * edge of the floor behind it (see `setGroundLine`) — and every weather that
+ * touches the ground is spread between them: rain and snow break at three
+ * depths across the whole plane, sand streams along it in three lanes, and the
+ * fog, the ash and the wet-road wash all run heaviest at one edge of it and
+ * thinnest at the other. A weather that ends on a single horizontal is a
+ * weather that flattens the road back into a wall, however carefully the road
+ * itself was drawn.
+ *
  * THE CLOCK AND THE ANIMATION ARE SEPARATE
  * ---------------------------------------------------------------------------
  * `paused` stops the *clock* — how much longer this weather lasts — and nothing
@@ -207,13 +218,22 @@ export const WEATHER = {
  * does the work the size used to be doing.
  *
  * Rain depths, in source pixels per 60Hz frame. `land` is how far below the
- * walk line this depth breaks: negative is behind the road (up against the
- * dunes), positive is in front of it.
+ * walk line this depth breaks: negative is behind the traveller, up at the far
+ * edge of the floor, positive is in front of him.
+ *
+ * The three of them are spread across the whole depth of the plane on purpose.
+ * They used to break at 0, 5 and 11 — all three within half a pace of each
+ * other — so a downpour that was supposed to be three curtains at three
+ * distances stopped along what was very nearly one line, and the rain landed
+ * on the road like water hitting a shelf. Now the far curtain breaks up by the
+ * verge, the middle one at the boots and the near one down in the foreground,
+ * which is the same trick the floor's own scroll bands play and it costs two
+ * numbers.
  */
 const RAIN_DEPTHS = [
-  { len: 2, vy: 3.4, alpha: 0.4, w: 1, land: 0, share: 0.42 },
-  { len: 3, vy: 4.8, alpha: 0.56, w: 1, land: 5, share: 0.34 },
-  { len: 5, vy: 6.4, alpha: 0.78, w: 1, land: 11, share: 0.24 },
+  { len: 2, vy: 3.4, alpha: 0.4, w: 1, land: -20, share: 0.42 },
+  { len: 3, vy: 4.8, alpha: 0.56, w: 1, land: 1, share: 0.34 },
+  { len: 5, vy: 6.4, alpha: 0.78, w: 1, land: 17, share: 0.24 },
 ];
 
 /**
@@ -332,6 +352,8 @@ const state = {
   biome: getBiome('desert'),
   /** Walk line in device pixels; the screens hand it over each frame. */
   groundY: null,
+  /** Top of the ground plane, a little behind the walk line. */
+  planeTop: null,
 };
 
 function clearParticles() {
@@ -380,13 +402,50 @@ function roll(next) {
  * Tell the weather where the ground is, in device pixels. Called by whichever
  * screen is drawing, because the duel raises the walk line and the road does
  * not.
+ *
+ * Two lines, since the floor became a plane: the walk line, and the top of that
+ * plane a little way behind it. Weather that only knows one of them can only
+ * ever break along one horizontal, and a whole sky's worth of rain stopping
+ * dead on a single row is the fastest way to flatten a scene that the rest of
+ * the renderer is working to give depth to.
  */
-export function setGroundLine(y) {
+export function setGroundLine(y, planeTop = null) {
   state.groundY = y;
+  state.planeTop = planeTop;
 }
 
 function groundOf(view) {
   return state.groundY ?? view.h * 0.78;
+}
+
+/** The far edge of the floor, in device pixels. */
+function planeOf(view) {
+  return state.planeTop ?? groundOf(view) - 22 * view.scale;
+}
+
+/**
+ * How hard the weather is driving things along the ground, in source pixels per
+ * second, and always westward — this is a wind, not a breeze that changes its
+ * mind.
+ *
+ * It is read by the parallax renderer and handed to whatever the biome keeps
+ * rolling about on the floor. A tumbleweed in a sandstorm should not be
+ * ambling: it should be going exactly as fast as the sand is, and it should
+ * pick that speed up while the storm is still arriving rather than the instant
+ * the state flips. `intensity` is the fade the storm rolls in on, so this
+ * number ramps with it and everything driven by it accelerates in step.
+ */
+export function getGroundWind() {
+  const id = state.shown.id;
+  const drive = {
+    // The sand's own middle depth, in source pixels per 60Hz frame.
+    sandstorm: SAND_DEPTHS[1].vx,
+    snow: -1.6,
+    ash: -1.1,
+    rain: -1.5,
+    fog: -0.4,
+  }[id] || 0;
+  return -drive * 60 * state.intensity;
 }
 
 /**
@@ -460,8 +519,9 @@ function stepParticles(dt, view) {
   const W = view.w / view.scale;
   const H = view.h / view.scale;
   const gy = groundOf(view) / view.scale;
+  const pt = planeOf(view) / view.scale;
 
-  while (state.particles.length < count) state.particles.push(spawn(W, H, id, gy));
+  while (state.particles.length < count) state.particles.push(spawn(W, H, id, gy, pt));
   while (state.particles.length > count) state.particles.pop();
 
   const step = dt / 16.67;
@@ -482,10 +542,10 @@ function stepParticles(dt, view) {
         // The far curtain does not splash: at that distance a single pixel of
         // spray is noise, and 200 of them turned the road into gravel.
         if (p.depth > 0) addSplash(p.x, landY, p.depth);
-        Object.assign(p, spawn(W, H, id));
+        Object.assign(p, spawn(W, H, id, gy, pt));
         p.y = -rng.range(2, 30);
       } else if (p.x < -30 || p.x > W + 30) {
-        Object.assign(p, spawn(W, H, id));
+        Object.assign(p, spawn(W, H, id, gy, pt));
       }
     }
     return;
@@ -497,7 +557,7 @@ function stepParticles(dt, view) {
       p.x += p.vx * gust * step;
       p.y += p.vy * step;
       if (p.grit) p.y += Math.sin(state.clock / 260 + p.phase) * 0.28 * step;
-      if (p.x < -40 || p.y > H + 10 || p.y < -10) Object.assign(p, spawn(W, H, id, gy));
+      if (p.x < -40 || p.y > H + 10 || p.y < -10) Object.assign(p, spawn(W, H, id, gy, pt));
     }
     stepSheets(dt, W, H, SHEETS.sandstorm);
     return;
@@ -506,7 +566,7 @@ function stepParticles(dt, view) {
   // Fog has no particles at all: it is banks and haze, and nothing in it is
   // travelling fast enough to be a grain of anything.
   if (id === 'fog') {
-    stepSheets(dt, W, H, SHEETS.fog, gy);
+    stepSheets(dt, W, H, SHEETS.fog, pt);
     return;
   }
 
@@ -520,7 +580,7 @@ function stepParticles(dt, view) {
         p.y -= p.vy * step;
         p.x += Math.sin(state.clock / p.rate + p.phase) * 0.25 * step;
         p.life -= dt;
-        if (p.life <= 0 || p.y < -6) Object.assign(p, spawn(W, H, id, gy));
+        if (p.life <= 0 || p.y < -6) Object.assign(p, spawn(W, H, id, gy, pt));
         continue;
       }
       p.y += p.vy * step;
@@ -532,13 +592,13 @@ function stepParticles(dt, view) {
         // Snow lies where it lands. Ash does not — it is too hot and too fine,
         // and a grey crust building up over a lava field would read as snow.
         if (id === 'snow' && p.depth > 0) addSettled(p.x, landY, p.depth);
-        Object.assign(p, spawn(W, H, id, gy));
+        Object.assign(p, spawn(W, H, id, gy, pt));
         p.y = -rng.range(2, 24);
       } else if (p.x < -40 || p.x > W + 40) {
-        Object.assign(p, spawn(W, H, id, gy));
+        Object.assign(p, spawn(W, H, id, gy, pt));
       }
     }
-    stepSheets(dt, W, H, id === 'snow' ? SHEETS.snow : SHEETS.ash, id === 'ash' ? gy : null);
+    stepSheets(dt, W, H, id === 'snow' ? SHEETS.snow : SHEETS.ash, id === 'ash' ? pt : null);
     stepSettled(dt);
     return;
   }
@@ -551,7 +611,7 @@ function stepParticles(dt, view) {
       // A meteor is not recycled at the edge of the screen — it burns out on
       // its own clock, wherever it happens to be, and the next one starts
       // somewhere else. Nothing in a meteor shower crosses the whole sky.
-      if (p.t >= p.life || p.y > H + 20 || p.x < -60) Object.assign(p, spawn(W, H, id, gy));
+      if (p.t >= p.life || p.y > H + 20 || p.x < -60) Object.assign(p, spawn(W, H, id, gy, pt));
     }
   }
 }
@@ -582,11 +642,12 @@ function stepSettled(dt) {
 }
 
 /**
- * A new particle. `gy` is only consulted by the sandstorm, which piles its sand
- * up against the ground at spawn time; rain keeps its landing line as an offset
- * from whatever the ground happens to be when it gets there.
+ * A new particle. `gy` and `pt` — the walk line and the far edge of the floor —
+ * are consulted by the weathers that pile up against the ground at spawn time;
+ * rain and snow keep their landing line as an offset from whatever the ground
+ * happens to be when they get there.
  */
-function spawn(W, H, id, gy = H * 0.78) {
+function spawn(W, H, id, gy = H * 0.78, pt = gy - 22) {
   if (id === 'snow' || id === 'ash') {
     const table = id === 'snow' ? SNOW_DEPTHS : ASH_DEPTHS;
     const depth = pickDepth(table);
@@ -599,15 +660,22 @@ function spawn(W, H, id, gy = H * 0.78) {
       depth,
       ember,
       x: rng.range(-30, W + 30),
-      y: ember ? rng.range(gy - 10, gy + 6) : rng.range(-H, 0),
+      // An ember comes off the whole depth of the floor, not off one line of
+      // it: the crust is burning from the verge to the traveller's boots.
+      y: ember ? rng.range(pt, gy + 14) : rng.range(-H, 0),
       vy: ember ? rng.range(0.5, 1.1) : d.vy * rng.range(0.85, 1.2),
       wander: d.wander * rng.range(0.7, 1.3),
       rate: d.rate * rng.range(0.75, 1.35),
       phase: rng.range(0, Math.PI * 2),
       a: d.alpha * rng.range(0.75, 1.1),
       life: ember ? rng.range(900, 2600) : 0,
-      /** How far below the walk line this flake settles, in source pixels. */
-      landOffset: [0, 5, 11][depth] + rng.range(-3, 3),
+      /**
+       * How far below the walk line this flake settles, in source pixels —
+       * spread across the depth of the floor for the same reason the rain's is.
+       * Snow that lies in a single line across the road is snow lying on a
+       * shelf; snow that lies at three depths is snow lying on ground.
+       */
+      landOffset: [-20, 1, 17][depth] + rng.range(-3, 3),
     };
   }
 
@@ -636,12 +704,22 @@ function spawn(W, H, id, gy = H * 0.78) {
     const depth = pickDepth(SAND_DEPTHS);
     const d = SAND_DEPTHS[depth];
     const grit = rng.chance(0.14);
+    /**
+     * Sand hugs the ground, and each depth hugs its own part of it: the far
+     * grains stream past up by the verge, the near ones tear along the front of
+     * the floor, and only the rest of it is up in the air.
+     *
+     * Reading the storm's three depths off the same plane the floor is drawn on
+     * is what stops a sandstorm from being a flat sheet of dashes pulled across
+     * the road — the grains now travel at three heights AND three lengths, and
+     * the eye puts them at three distances without being told.
+     */
+    const lane = pt + ((depth + rng()) / 3) * (H - pt);
     return {
       depth,
       grit,
       x: rng.range(-30, W + 30),
-      // Sand hugs the ground: the lower half of the screen carries most of it.
-      y: rng.range(0, H) * 0.55 + rng.range(gy * 0.25, gy + 6) * 0.45,
+      y: rng.chance(0.6) ? lane : rng.range(0, gy),
       vx: d.vx * rng.range(0.85, 1.15),
       vy: rng.range(-0.35, 0.35),
       len: grit ? 2 : Math.round(rng.range(d.len[0], d.len[1])),
@@ -691,15 +769,16 @@ function stepSplashes(dt) {
 
 /**
  * @param {object} cfg one of SHEETS
- * @param {number} [gy] walk line in source pixels. Fog passes it so its banks
- *   pile up against the ground instead of spreading evenly up the screen —
- *   mist that is as thick at the top of the sky as it is on the grass is
- *   smoke, not fog.
+ * @param {number} [floor] the far edge of the ground plane, in source pixels.
+ *   Fog and smoke pass it so their banks pile up against the ground instead of
+ *   spreading evenly up the screen — mist that is as thick at the top of the
+ *   sky as it is on the grass is smoke, not fog — and so that the deepest of
+ *   them lie along the back of the floor rather than across the walk line.
  */
-function stepSheets(dt, W, H, cfg, gy = null) {
+function stepSheets(dt, W, H, cfg, floor = null) {
   const step = dt / 16.67;
-  const top = gy === null ? H * 0.3 : gy * 0.45;
-  const bottom = gy === null ? H * 0.95 : Math.min(H, gy + H * 0.1);
+  const top = floor === null ? H * 0.3 : floor * 0.45;
+  const bottom = floor === null ? H * 0.95 : H;
   const respawn = (sh, fresh) => {
     sh.x = fresh ? rng.range(0, W * 1.6) : W + rng.range(10, W * 0.6);
     sh.y = rng.range(top, bottom);
@@ -817,6 +896,7 @@ export function render(ctx, view) {
 
   const s = view.scale;
   const gy = groundOf(view);
+  const pt = planeOf(view);
   // Weather is lit by the same sky as everything else: silver rain at noon,
   // cold grey rain at midnight.
   const light = 0.45 + getSky().light * 0.55;
@@ -839,12 +919,17 @@ export function render(ctx, view) {
     // summer afternoon was the single least convincing thing on screen.
     bandWash(ctx, view, 'rgb(28, 34, 52)', 0, view.h, 0.6 * k, 0.7 * k);
 
-    // Wet ground: the road darkens under the rain and holds the reflection of
-    // the flash when one goes off.
-    ctx.globalAlpha = 0.22 * k;
-    ctx.fillStyle = 'rgb(30, 40, 66)';
-    ctx.fillRect(0, gy, view.w, view.h - gy);
-    ctx.globalAlpha = 1;
+    /**
+     * Wet ground: the floor darkens under the rain and holds the reflection of
+     * the flash when one goes off.
+     *
+     * It starts at the FAR edge of the plane and gets heavier towards the
+     * camera, rather than being one flat rectangle from the walk line down.
+     * Water pools where the ground is nearest and thins out towards the verge,
+     * and a wash that follows the plane says the plane is there — the flat
+     * rectangle said the road was a wall painted with a wet colour.
+     */
+    bandWash(ctx, view, 'rgb(30, 40, 66)', pt, view.h, 0.08 * k, 0.3 * k);
 
     drawRain(ctx, view, k, light);
     drawSplashes(ctx, view, k, light);
@@ -868,7 +953,16 @@ export function render(ctx, view) {
     drawSand(ctx, view, k, light);
     // Heavier haze from the horizon down — where the sand is actually coming
     // from — in the same quantised bands as everything else.
-    bandWash(ctx, view, 'rgb(176, 124, 58)', view.h * 0.3, view.h, 0, 0.55 * k);
+    bandWash(ctx, view, 'rgb(176, 124, 58)', view.h * 0.3, pt, 0, 0.44 * k);
+    /**
+     * And then it LIFTS off the floor again towards the camera. Sand blowing
+     * over open ground is thickest a foot above it and thins where it is
+     * actually scouring, so the near half of the plane comes back out of the
+     * haze — which is the one thing keeping the road visible under a storm this
+     * heavy, and the reason the floor still reads as receding rather than as
+     * the point where the picture stops.
+     */
+    bandWash(ctx, view, 'rgb(176, 124, 58)', pt, view.h, 0.44 * k, 0.16 * k);
     return;
   }
 
@@ -887,9 +981,11 @@ export function render(ctx, view) {
     drawSheets(ctx, view, k, SHEETS.snow.color);
     drawSettled(ctx, view, k);
     drawFlakes(ctx, view, k, light, SNOW_COLOR, SNOW_DEPTHS);
-    // A last thin wash lying on the ground, so the road is the brightest part
-    // of the frame rather than the sky.
-    bandWash(ctx, view, pale, gy - view.h * 0.08, view.h, 0.1 * k, 0.4 * k);
+    // A last thin wash lying on the floor, so the road is the brightest part of
+    // the frame rather than the sky. It runs from the far edge of the plane so
+    // the glare builds towards the camera with the ground, instead of arriving
+    // as a bar across the middle of it.
+    bandWash(ctx, view, pale, pt, view.h, 0.08 * k, 0.42 * k);
     return;
   }
 
@@ -908,9 +1004,11 @@ export function render(ctx, view) {
     bandWash(ctx, view, 'rgb(84, 70, 64)', 0, view.h, 0.34 * k, 0.44 * k);
     drawSheets(ctx, view, k, SHEETS.ash.color);
     drawFlakes(ctx, view, k, light, ASH_COLOR, ASH_DEPTHS);
-    // Heavier towards the ground, where it is coming from and where it is
-    // piling up — the same shape as the sandstorm's haze, in soot.
-    bandWash(ctx, view, 'rgb(60, 48, 48)', view.h * 0.4, view.h, 0, 0.32 * k);
+    // Heaviest where the floor meets the crags — the smoke is coming off the
+    // basin, so it banks against the far edge of the plane and thins towards
+    // the camera, which puts the traveller under it rather than in it.
+    bandWash(ctx, view, 'rgb(60, 48, 48)', view.h * 0.4, pt, 0, 0.34 * k);
+    bandWash(ctx, view, 'rgb(60, 48, 48)', pt, view.h, 0.34 * k, 0.1 * k);
     return;
   }
 
@@ -940,12 +1038,20 @@ export function render(ctx, view) {
 
     // A thin veil over everything, so even the sky loses its edge.
     bandWash(ctx, view, pale, 0, view.h, 0.16 * k, 0.3 * k);
-    // The body of it, banked from the horizon down to the walk line.
-    bandWash(ctx, view, pale, view.h * 0.25, gy, 0, 0.5 * k);
+    // The body of it, banked from the horizon down onto the far edge of the
+    // floor, where it is thickest: mist collects in the distance because you
+    // are looking through more of it, and that is the whole reason fog is a
+    // depth cue rather than a filter.
+    bandWash(ctx, view, pale, view.h * 0.25, pt, 0, 0.62 * k);
     drawSheets(ctx, view, k, SHEETS.fog.color);
-    // And the densest layer of all, lying on the ground the way it does at
-    // first light: the traveller's boots go into it.
-    bandWash(ctx, view, pale, gy - view.h * 0.1, view.h, 0.18 * k, 0.62 * k);
+    /**
+     * And then it CLEARS towards the camera. The densest band used to be the
+     * one lying on the traveller's own boots, which is backwards: you can see
+     * your own feet in fog, and what you cannot see is the road twenty paces
+     * off. Running it the other way — thick at the verge, thin at the front of
+     * the plane — turns the same three washes into distance.
+     */
+    bandWash(ctx, view, pale, pt, view.h, 0.62 * k, 0.22 * k);
   }
 }
 
@@ -987,20 +1093,25 @@ function drawSplashes(ctx, view, k, light) {
     const x = Math.round(sp.x) * s;
     const y = Math.round(sp.y) * s;
     const a = (1 - sp.t) * k * (near ? 0.8 : 0.5);
+    // A splash at the front of the plane is nearer, so it is bigger — the same
+    // rule the floor's own grain follows. Without it the far curtain broke into
+    // splashes exactly as wide as the near one and flattened the road back out
+    // between them.
+    const w = near ? s * 2 : s;
     ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
     if (sp.t < 0.34) {
       // The hit: one pixel of water standing up off the road.
-      ctx.fillRect(x, y - s, s, s);
-      ctx.fillRect(x, y, s, s);
+      ctx.fillRect(x, y - s, w, s);
+      ctx.fillRect(x, y, w, s);
     } else if (sp.t < 0.67) {
       // Two beads thrown sideways, one pixel each — a drop one pixel wide
       // cannot throw a five-pixel crown.
-      ctx.fillRect(x - s, y, s, s);
-      ctx.fillRect(x + s, y, s, s);
+      ctx.fillRect(x - w, y, w, s);
+      ctx.fillRect(x + w, y, w, s);
     } else {
       // The ring left behind on the wet ground.
       ctx.globalAlpha = 0.5;
-      ctx.fillRect(x - s, y, s * 3, s);
+      ctx.fillRect(x - w, y, w + s * 2, s);
       ctx.globalAlpha = 1;
     }
   }
@@ -1048,7 +1159,9 @@ function drawSettled(ctx, view, k) {
     const a = (1 - sp.t / sp.life) * k * (sp.depth === 2 ? 0.75 : 0.5);
     if (a <= 0.02) continue;
     ctx.fillStyle = `rgba(244, 250, 255, ${a})`;
-    ctx.fillRect(Math.round(sp.x) * s, Math.round(sp.y) * s, s * 2, s);
+    // Longer where it has settled nearer the camera: a drift of snow at the
+    // front of the plane covers more ground per pixel than one at the verge.
+    ctx.fillRect(Math.round(sp.x) * s, Math.round(sp.y) * s, s * (sp.depth + 1), s);
   }
   ctx.globalAlpha = 1;
 }

@@ -50,11 +50,19 @@ import { PALETTE } from '../palette.js';
 import { makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
 import {
+  BIRD_POSES,
   LAYER_TILE_W,
+  PLANE_RISE,
+  bandFit,
+  bandRange,
+  drawBird,
   getTumbleweedFrames,
   makeCloudLayer,
   makeRidgeLayer,
-  speckle,
+  planeGrain,
+  planePebble,
+  planeSpeed,
+  planeZoom,
 } from '../env-kit.js';
 
 export const DESERT_PROPS = {
@@ -561,85 +569,108 @@ function duneRipples(ctx, heights, rng, height) {
 }
 
 /**
- * The ground the player actually walks on: a wagon road worn through hardpan.
+ * The ground the player actually walks on: a wagon road worn through hardpan,
+ * seen as a plane running away from the camera.
  *
- * ROW ZERO IS THE WALK LINE
+ * THE WALK LINE IS IN THE MIDDLE OF IT, AND THAT CHANGED HOW IT IS DRAWN
  * ---------------------------------------------------------------------------
- * The boots land on row zero, so the road has to start there. The old desert
- * strip was a flat sand fill with grit thrown at it and a shadow towards the
- * camera — the same surface from the horizon to the bottom of the frame, which
- * is why the desert was the one biome where walking did not feel like walking
- * along anything. Now there is a road: two wheel ruts, hoof-cut earth between
- * them, a pale crust of blown sand either side, and the whole thing wanders on
- * a tileable wave so neither edge is a straight line.
+ * The boots used to land on row zero, so everything in this layer was in front
+ * of the traveller and the road was a strip he walked along the back edge of.
+ * They land on `PLANE_RISE` now — see the long note in `env-kit.js` — so this
+ * canvas is a floor with a road down the middle of it: crust and blown sand
+ * behind him, the wagon road under him, the cracked flat in front.
+ *
+ * THE SECOND CHANGE IS INVISIBLE HERE AND OBVIOUS ON SCREEN
+ * ---------------------------------------------------------------------------
+ * The renderer scrolls this layer in depth bands, each at its own speed, so a
+ * pebble at the bottom of the canvas crosses the frame nearly twice as fast as
+ * one at the top. Which imposes the single rule this file has to obey: NOTHING
+ * WITH A TOP AND A BOTTOM MAY CROSS A BAND BOUNDARY, because the two halves
+ * would slide apart forever. Every stone, rut and crack below is placed through
+ * `bandFit` or clamped to `bandRange`.
+ *
+ * It also killed the wandering road edges. A road whose lip moves up and down
+ * across four bands is torn into four lips, so the edges are horizontal now and
+ * the straightness is broken the way a real verge breaks it: with stones and
+ * dry stems lying ALONG it. That reads better than the old wave did, because
+ * the litter is band-local and therefore travels at the speed of the ground it
+ * is lying on — the eye reads a scattered edge moving at three speeds as depth,
+ * and it read a smooth wave moving at one as a shape.
  */
 function makeSandGround({ seed, height }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
 
-  const wave = (x, terms) => {
-    let v = 0;
-    for (const [periods, amp, phase] of terms) {
-      v += Math.sin((x / LAYER_TILE_W) * Math.PI * 2 * periods + phase) * amp;
-    }
-    return v;
-  };
+  /** Where the road begins and ends, in rows. The walk line is at 22. */
+  const roadTop = 10;
+  const roadBot = 40;
 
+  // --- the crust behind the road ---
   ctx.fillStyle = PALETTE.sand;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
   ctx.fillStyle = PALETTE.sandLight;
-  ctx.fillRect(0, 0, LAYER_TILE_W, 2);
-
-  const roadTop = new Array(LAYER_TILE_W);
-  const roadBot = new Array(LAYER_TILE_W);
+  ctx.fillRect(0, 0, LAYER_TILE_W, roadTop);
+  // The far edge dithers into the ridge above it rather than butting against
+  // it: one row of alternating pixels is worth more than any amount of blur,
+  // and unlike a blur it survives being scrolled.
   for (let x = 0; x < LAYER_TILE_W; x++) {
-    roadTop[x] = Math.max(1, Math.round(2 + wave(x, [[1, 1.6, 1.1], [4, 0.7, 3.3]])));
-    roadBot[x] = Math.round(19 + wave(x, [[1, 2.6, 0.4], [3, 1.2, 2.2], [7, 0.6, 5]]));
+    if (rng.chance(0.5)) continue;
+    ctx.fillStyle = PALETTE.sandMid;
+    ctx.fillRect(x, 0, 1, 1);
   }
 
   // --- the road ---
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    const t = roadTop[x];
-    const b = roadBot[x];
-    ctx.fillStyle = PALETTE.sandMid;
-    ctx.fillRect(x, t, 1, b - t);
-    ctx.fillStyle = PALETTE.sand;
-    ctx.fillRect(x, t, 1, 1);
-    ctx.fillStyle = PALETTE.sandDark;
-    ctx.fillRect(x, b - 2, 1, 2);
-  }
+  ctx.fillStyle = PALETTE.sandMid;
+  ctx.fillRect(0, roadTop, LAYER_TILE_W, roadBot - roadTop);
+  // Lit along its far lip, in shadow along its near one: the road is a shallow
+  // dish, and a dish has a bright side and a dark side.
+  ctx.fillStyle = PALETTE.sand;
+  ctx.fillRect(0, roadTop, LAYER_TILE_W, 1);
+  ctx.fillStyle = PALETTE.sandDark;
+  ctx.fillRect(0, roadBot - 2, LAYER_TILE_W, 2);
 
-  // Two wheel ruts, breaking rather than running true, with a lit lip on the
-  // near side of each: a rut is a groove, and a groove has two sides.
-  for (const share of [0.3, 0.68]) {
+  /**
+   * Two wheel ruts, and they are where they are for a reason: rows 14 and 32
+   * sit inside one band each, one behind the traveller and one in front. A rut
+   * is a groove, so each is a dark row with a lit one under it — and each
+   * breaks rather than running true, because 320 unbroken pixels is a rule and
+   * not a rut.
+   */
+  for (const y of [14, 32]) {
+    const zoom = planeZoom(y, height);
     for (let x = 0; x < LAYER_TILE_W; x++) {
-      if (rng.chance(0.34)) continue;
-      const y = Math.round(roadTop[x] + (roadBot[x] - roadTop[x]) * share);
+      if (rng.chance(0.3)) continue;
       ctx.fillStyle = PALETTE.sandDark;
-      ctx.fillRect(x, y, 1, 1);
+      ctx.fillRect(x, y, 1, Math.max(1, Math.round(zoom)));
       ctx.fillStyle = PALETTE.sand;
-      ctx.fillRect(x, y + 1, 1, 1);
+      ctx.fillRect(x, y + Math.max(1, Math.round(zoom)), 1, 1);
     }
   }
 
-  // Hoof scuffs between the ruts.
+  // Hoof scuffs between the ruts, each one a comma of shadow with the sand it
+  // threw lying beside it.
   for (let x = 2; x < LAYER_TILE_W; x += rng.int(7, 16)) {
-    const y = Math.round(roadTop[x] + (roadBot[x] - roadTop[x]) * rng.range(0.4, 0.6));
+    const y = bandFit(rng.int(roadTop + 3, roadBot - 5), 2, height);
+    const zoom = planeZoom(y, height);
+    const w = Math.max(2, Math.round(2 * zoom));
     ctx.fillStyle = PALETTE.sandDark;
-    ctx.fillRect(x, y, 2, 1);
+    ctx.fillRect(x, y, w, 1);
     ctx.fillStyle = PALETTE.sandLight;
     ctx.fillRect(x - 1, y, 1, 1);
   }
 
-  // Grit and small stones in the road surface.
-  for (let i = 0; i < 300; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(roadTop[x] + 1, Math.max(roadTop[x] + 2, roadBot[x] - 2));
-    ctx.fillStyle = rng.chance(0.5) ? PALETTE.sandDark : PALETTE.sandLight;
-    ctx.fillRect(x, y, rng.chance(0.2) ? 2 : 1, 1);
-  }
+  // Grit in the road surface, growing towards the camera.
+  planeGrain(ctx, rng, {
+    height,
+    from: roadTop + 1,
+    to: roadBot - 2,
+    count: 460,
+    colors: [PALETTE.sandDark, PALETTE.sandLight, PALETTE.sandMid],
+  });
 
   // --- the flat in front of the road, falling into shadow towards the camera --
+  ctx.fillStyle = PALETTE.sand;
+  ctx.fillRect(0, roadBot, LAYER_TILE_W, height - roadBot);
   const near = Math.round(height * 0.62);
   for (let y = near; y < height; y++) {
     const k = (y - near) / (height - near);
@@ -654,17 +685,22 @@ function makeSandGround({ seed, height }) {
    * that split rather than drawn as a grid — dried mud cracks into polygons
    * with three-way junctions, and a grid of squares reads as tiling, which is
    * exactly what this layer must not look like.
+   *
+   * They travel almost flat and they are clamped to the band they started in,
+   * which is not the compromise it sounds like: a crack seen on a floor running
+   * away from you IS mostly horizontal, and the near-vertical ones the old
+   * version drew were the reason the flat used to read as a ploughed field.
    */
-  for (let i = 0; i < 34; i++) {
+  for (let i = 0; i < 44; i++) {
     let x = rng.int(0, LAYER_TILE_W - 1);
-    let y = rng.int(roadBot[0] + 3, height - 2);
-    let dir = rng.range(0, Math.PI * 2);
-    const len = rng.int(6, 22);
+    let y = rng.int(roadBot + 2, height - 2);
+    const [top, bottom] = bandRange(y, height);
+    const dir = rng.chance(0.5) ? 1 : -1;
+    const len = rng.int(6, 26);
     for (let t = 0; t < len; t++) {
-      dir += rng.range(-0.6, 0.6);
-      x = wrapX(Math.round(x + Math.cos(dir)));
-      y = Math.round(y + Math.sin(dir) * 0.7);
-      if (y < roadBot[x] + 1 || y >= height - 1) break;
+      x = wrapX(x + dir);
+      if (rng.chance(0.3)) y += rng.chance(0.5) ? 1 : -1;
+      if (y < top + 1 || y >= bottom) break;
       ctx.fillStyle = PALETTE.sandDark;
       ctx.fillRect(x, y, 1, 1);
       ctx.fillStyle = PALETTE.sandLight;
@@ -672,29 +708,46 @@ function makeSandGround({ seed, height }) {
     }
   }
 
-  // Pebble clusters and dry stems in the near flat, so it is a surface and
-  // not a colour.
-  for (let i = 0; i < 40; i++) {
-    const cx = rng.int(0, LAYER_TILE_W - 1);
-    const cy = rng.int(roadBot[0] + 2, height - 3);
-    for (let p = 0; p < rng.int(2, 5); p++) {
-      ctx.fillStyle = rng.chance(0.5) ? PALETTE.sandDark : PALETTE.sandDeep;
-      ctx.fillRect(wrapX(cx + rng.int(-4, 4)), cy + rng.int(-2, 2), rng.int(1, 2), 1);
-    }
-  }
-  for (let i = 0; i < 30; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(roadBot[0] + 4, height - 4);
-    ctx.fillStyle = PALETTE.moss;
-    for (let b = 0; b < 3; b++) {
-      ctx.fillRect(wrapX(x + b - 1), y - rng.int(1, 3), 1, rng.int(2, 4));
-    }
+  /**
+   * Stones on the flat and along both lips of the road, each with a lit top
+   * and a shadow under it. This is the pass that does the most for the depth of
+   * the whole scene and it is the least interesting to read: two hundred small
+   * things sitting ON the floor, at four sizes, moving at four speeds.
+   */
+  for (let i = 0; i < 150; i++) {
+    planePebble(ctx, rng, {
+      height,
+      y: rng.chance(0.3) ? rng.int(1, roadTop - 1) : rng.int(roadBot, height - 2),
+      colors: {
+        body: rng.chance(0.5) ? PALETTE.sandDark : PALETTE.sandDeep,
+        light: PALETTE.sandLight,
+        shadow: PALETTE.sandDeep,
+      },
+    });
   }
 
-  speckle(ctx, rng, {
-    from: roadBot[0] + 1,
+  /**
+   * Dry stems, in threes, sized by how near they are. There are fourteen of
+   * them across the whole tile and they are drawn in dead moss rather than
+   * anything greener: this is hardpan, and the first pass at this — three times
+   * as many, in living green, scaled up by the perspective — left the flat
+   * looking like a lawn somebody had spilled sand on.
+   */
+  for (let i = 0; i < 14; i++) {
+    const x = rng.int(0, LAYER_TILE_W - 1);
+    const y = rng.chance(0.35) ? rng.int(2, roadTop - 1) : rng.int(roadBot + 2, height - 4);
+    const zoom = planeZoom(y, height);
+    const len = Math.max(1, Math.round(rng.range(1, 2.2) * zoom));
+    const base = bandFit(y, len, height);
+    ctx.fillStyle = rng.chance(0.5) ? PALETTE.moss : PALETTE.sandDeep;
+    for (let b = 0; b < 3; b++) ctx.fillRect(wrapX(x + b - 1), base, 1, len);
+  }
+
+  planeGrain(ctx, rng, {
+    height,
+    from: roadBot,
     to: height - 1,
-    count: 260,
+    count: 320,
     colors: [PALETTE.sandMid, PALETTE.sandDark],
   });
 
@@ -757,10 +810,37 @@ function makeSandFringe({ seed, height }) {
  * rather than only getting darker:
  *
  *   dust       fine grains lifted off the flat, out at every hour
- *   vultures   two of them, high and circling, daylight only. They are the
+ *   vultures   three of them, high and circling, daylight only. They are the
  *              only thing in the game that says something died here recently
- *   tumbleweed one at a time, crossing on the wind, at any hour
+ *   tumbleweed up to three at a time, at three depths, at any hour
  *   moths      pale, close to the ground, after dark
+ *
+ * THE TUMBLEWEEDS
+ * ---------------------------------------------------------------------------
+ * There used to be one weed, at one size, on one line, and it could roll either
+ * way. All four of those are now wrong for the same reason: the road is a plane
+ * with a depth to it, and anything crossing that plane has to say where on it
+ * it is.
+ *
+ *   THEY HAVE A LANE. Each weed rolls along one row of the floor, and that row
+ *   fixes everything else about it — how big it is drawn, how fast it crosses
+ *   (`planeSpeed` of its own row, exactly like the roadside props), and whether
+ *   it passes IN FRONT of the traveller or behind him. The far ones are drawn
+ *   with the scene, in `renderBehind`; the near ones after he is, in
+ *   `renderFront`. Watching one roll between you and the man walking is worth
+ *   more than any amount of shading.
+ *   THEY ALWAYS GO WEST. Rolling east was a coin flip that occasionally sent a
+ *   weed the way the traveller is walking, and the wind on this road blows one
+ *   way — every grain of sand, every gust sheet and every drop of rain in the
+ *   game leans west. A weed going the other way is the one object on screen
+ *   arguing with all of them.
+ *   THEY OBEY THE WIND. `world.wind` is what the weather is driving things
+ *   along the ground at, in source pixels a second (see `getGroundWind` in
+ *   src/explore/weather.js). In fair weather it is zero and a weed ambles at
+ *   its own pace; when a sandstorm arrives it climbs to the speed of the sand
+ *   itself, and the weeds accelerate up to it over a second or two rather than
+ *   snapping — so the storm visibly picks them up as it rolls in, and drops
+ *   them again as it blows out.
  */
 function createDesertAmbient(seed) {
   const rng = makeRng(seed >>> 0);
@@ -776,14 +856,26 @@ function createDesertAmbient(seed) {
     a: rng.range(0.15, 0.4),
   }));
 
-  const birds = Array.from({ length: 2 }, (_, i) => ({
-    // The pair share a thermal: one orbit, two birds a third of a turn apart.
-    t: i * 0.36,
+  /**
+   * The kettle: three birds sharing one thermal, a third of a turn apart.
+   *
+   * A vulture SOARS — that is the whole of what it does, and the old pair
+   * dropped their wingtips by a pixel when they crossed the near side of the
+   * orbit and did nothing else, forever. They now run the shared soar cycle
+   * (see `BIRD_POSES` in env-kit): mostly held flat, with the occasional slow
+   * adjustment, and a real flap only when the bird is climbing out of the far
+   * side of the turn. Each one is on its own clock, so the three never beat
+   * together.
+   */
+  const birds = Array.from({ length: 3 }, (_, i) => ({
+    t: i * 0.34,
     rate: rng.range(19000, 26000),
     cx: rng.range(0.42, 0.72),
-    cy: rng.range(0.14, 0.26),
+    cy: rng.range(0.13, 0.26),
     rx: rng.range(0.12, 0.2),
     ry: rng.range(0.03, 0.06),
+    beat: rng.range(280, 460),
+    phase: rng.range(0, Math.PI * 2),
   }));
 
   const moths = Array.from({ length: 12 }, () => ({
@@ -795,9 +887,37 @@ function createDesertAmbient(seed) {
     phase: rng.range(0, Math.PI * 2),
   }));
 
-  /** One weed on the road at a time, and long gaps between them. */
-  let weedState = null;
-  let weedWait = rng.range(2000, 9000);
+  /**
+   * The weeds on the road, and the wait until the next one. Three lanes, in
+   * source pixels from the walk line: one well behind the traveller, one on his
+   * own line, one between him and the camera.
+   */
+  const LANES = [-14, 2, 15];
+  const weeds = [];
+  let weedWait = rng.range(1200, 6000);
+
+  /** Position in the world, in source pixels, so the lanes can differ in speed. */
+  const spawnWeed = () => {
+    const lane = LANES[rng.int(0, LANES.length - 1)];
+    return {
+      lane,
+      /** Screen position as a fraction of the frame, right to left. */
+      x: 1.08 + rng.range(0, 0.3),
+      /**
+       * Its own pace on a still day, in fractions of the frame per second. The
+       * lane's `planeSpeed` is applied on top, so the near ones genuinely
+       * outrun the far ones instead of being drawn bigger.
+       */
+      pace: rng.range(0.075, 0.16),
+      /** What it is doing now — eased towards the wind, never snapped to it. */
+      speed: 0,
+      spin: rng.range(0, 4),
+      // Three sizes, in whole pixel steps: a weed scaled by a fraction is mush.
+      size: lane < -6 ? -1 : lane > 8 ? 1 : rng.chance(0.4) ? 1 : 0,
+      bounce: rng.range(2, 7),
+      hop: 0,
+    };
+  };
 
   const wrap = (p) => {
     if (p.x < -0.05) p.x = 1.05;
@@ -806,8 +926,31 @@ function createDesertAmbient(seed) {
     if (p.y > 1) p.y = 0.6;
   };
 
+  /**
+   * Draw the weeds in one lane group. Called twice a frame from two different
+   * places in the render order, which is the whole point of them having lanes.
+   */
+  const drawWeeds = (ctx, view, sky, world, front) => {
+    const s = view.scale;
+    const gy = world?.groundY ?? view.h * 0.78;
+    ctx.globalAlpha = 0.55 + sky.light * 0.45;
+    for (const p of weeds) {
+      if ((p.lane > 8) !== front) continue;
+      const frame = weed[Math.floor(p.spin) % weed.length];
+      const scale = Math.max(1, s + p.size);
+      ctx.drawImage(
+        frame,
+        Math.round((p.x * view.w) / s) * s,
+        Math.round((gy + (p.lane - p.hop) * s) / s) * s - frame.height * scale,
+        frame.width * scale,
+        frame.height * scale,
+      );
+    }
+    ctx.globalAlpha = 1;
+  };
+
   return {
-    update(dt) {
+    update(dt, world) {
       clock += dt;
       const step = dt / 1000;
       for (const d of dust) {
@@ -828,26 +971,51 @@ function createDesertAmbient(seed) {
       }
       for (const b of birds) b.t = (b.t + dt / b.rate) % 1;
 
-      if (weedState) {
-        weedState.x += weedState.vx * step;
-        weedState.spin += dt / 90;
-        // A weed does not roll level: it bounces off every stone it meets.
-        weedState.hop = Math.abs(Math.sin(weedState.spin * 0.5)) * weedState.bounce;
-        if (weedState.x < -0.12 || weedState.x > 1.12) weedState = null;
-      } else {
-        weedWait -= dt;
-        if (weedWait <= 0) {
-          weedWait = rng.range(9000, 26000);
-          const east = rng.chance(0.75);
-          weedState = {
-            x: east ? 1.1 : -0.1,
-            vx: (east ? -1 : 1) * rng.range(0.1, 0.2),
-            spin: 0,
-            bounce: rng.range(3, 8),
-            lane: rng.range(0.02, 0.16),
-          };
-        }
+      // --- the weeds ---
+      /**
+       * The wind, converted from source pixels a second into fractions of a
+       * 320-pixel-wide view a second, which is what the weeds are measured in.
+       * A sandstorm's sand runs at about six source pixels a frame, so this
+       * comes out well over a whole frame width a second and the weeds fairly
+       * fly — which is what a sandstorm does to them.
+       */
+      const wind = (world?.wind || 0) / LAYER_TILE_W;
+      for (let i = weeds.length - 1; i >= 0; i--) {
+        const p = weeds[i];
+        // Its own pace, or the wind's, whichever is asking for more. Eased at a
+        // fixed acceleration so the change happens over about a second: this is
+        // what makes a storm look like it is picking the weed up rather than
+        // teleporting it.
+        const target = Math.max(p.pace, wind) * planeSpeed(PLANE_RISE + p.lane);
+        p.speed += Math.sign(target - p.speed) * Math.min(Math.abs(target - p.speed), step * 1.6);
+        p.x -= p.speed * step;
+        // A rolling ball spins at the rate it travels: tie the two together and
+        // a weed that speeds up in a gust visibly spins faster.
+        p.spin += p.speed * dt * 0.09;
+        // It does not roll level, either — it bounces off every stone it meets.
+        p.hop = Math.abs(Math.sin(p.spin * 0.5)) * p.bounce;
+        if (p.x < -0.15) weeds.splice(i, 1);
       }
+      weedWait -= dt * (1 + wind * 2);
+      if (weedWait <= 0 && weeds.length < 3) {
+        // A storm tears more of them loose, and sooner.
+        weedWait = rng.range(6000, 20000) / (1 + wind);
+        weeds.push(spawnWeed());
+      }
+    },
+
+    /**
+     * The far weeds: drawn with the scene, before the traveller, so he passes
+     * in front of them and the hour of the day falls on them with everything
+     * else.
+     */
+    renderBehind(ctx, view, sky, world) {
+      drawWeeds(ctx, view, sky, world, false);
+    },
+
+    /** And the near ones, after him. */
+    renderFront(ctx, view, sky, world) {
+      drawWeeds(ctx, view, sky, world, true);
     },
 
     /**
@@ -858,7 +1026,6 @@ function createDesertAmbient(seed) {
       const s = view.scale;
       const day = Math.max(0, Math.min(1, (sky.light - 0.4) / 0.4));
       const night = sky.stars;
-      const gy = view.h * 0.78;
 
       // --- vultures ---
       if (day > 0.05) {
@@ -868,32 +1035,19 @@ function createDesertAmbient(seed) {
           const x = Math.round(((b.cx + Math.cos(a) * b.rx) * view.w) / s) * s;
           const y = Math.round(((b.cy + Math.sin(a) * b.ry) * view.h) / s) * s;
           ctx.globalAlpha = day * 0.7;
-          // Three pixels: two wings and a body. The wings drop by one when the
-          // bird is coming towards the camera, which is the whole animation and
-          // is enough — at this size a flap is a distraction, a soaring bird is
-          // a shape.
-          const near = Math.sin(a) > 0;
-          ctx.fillRect(x - 2 * s, y + (near ? s : 0), s, s);
-          ctx.fillRect(x - s, y, s, s);
-          ctx.fillRect(x, y, s, s);
-          ctx.fillRect(x + s, y + (near ? s : 0), s, s);
+          /**
+           * Soaring most of the way round, working the far half of the turn.
+           * A bird climbing away from you flaps and a bird gliding towards you
+           * does not, and the difference between those two is the only thing
+           * that says the orbit has a near side and a far side at all.
+           */
+          const climbing = Math.sin(a) < -0.2;
+          const pose = climbing ? BIRD_POSES.beat : BIRD_POSES.soar;
+          const frame = climbing
+            ? Math.floor(clock / b.beat + b.phase)
+            : Math.floor(clock / (b.beat * 6) + b.phase);
+          drawBird(ctx, x, y, s, pose, frame);
         }
-        ctx.globalAlpha = 1;
-      }
-
-      // --- tumbleweed ---
-      if (weedState) {
-        const frame = weed[Math.floor(weedState.spin) % weed.length];
-        const scale = Math.max(1, s - 1);
-        ctx.globalAlpha = 0.55 + sky.light * 0.45;
-        ctx.drawImage(
-          frame,
-          Math.round((weedState.x * view.w) / s) * s,
-          Math.round((gy + weedState.lane * view.h - weedState.hop * s) / s) * s
-            - frame.height * scale,
-          frame.width * scale,
-          frame.height * scale,
-        );
         ctx.globalAlpha = 1;
       }
 
@@ -976,8 +1130,14 @@ export const DESERT_ART = {
 
   /**
    * The renderer walks this back to front; `y` is the layer's top edge measured
-   * from the walk line. `near` marks the rise the far band is planted behind,
-   * and `front` the one strip that is drawn after everything else.
+   * from the TOP OF THE FLOOR, which is a little behind the walk line. `near`
+   * marks the rise the far band is planted behind, and `front` the one strip
+   * that is drawn after everything else — the traveller included.
+   *
+   * The fringe runs at 1.9 rather than the 1.3 it used to. The floor's own near
+   * edge now scrolls at about 1.7, and a foreground moving slower than the
+   * ground behind it is a foreground the eye puts *further away* however low
+   * down the frame it is drawn.
    */
   manifest: [
     { name: 'clouds', speed: 0.05, y: -104 },
@@ -985,7 +1145,7 @@ export const DESERT_ART = {
     { name: 'mid', speed: 0.4, y: -58 },
     { name: 'dunes', speed: 0.7, y: -34, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.9, y: -15, anchor: 'bottom', front: true },
   ],
 
   /** Props that can be scattered along the road, with their placement weights. */

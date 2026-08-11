@@ -707,7 +707,7 @@ export function createDuelScene({
        * costs the rain nothing.
        */
       weather.update(dt, getView());
-      parallax.updateAmbient(dt);
+      parallax.updateAmbient(dt, getView());
       if (fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt);
       if (fx.whiteout > 0) fx.whiteout = Math.max(0, fx.whiteout - dt);
       if (fx.bannerTimer > 0) {
@@ -776,7 +776,7 @@ export function createDuelScene({
 
       const gy = parallax.groundY(view);
       groundLine = gy;
-      weather.setGroundLine(gy);
+      weather.setGroundLine(gy, parallax.planeTop(view));
 
       /**
        * THE TWO SIDES DO NOT HAVE TO BE THE SAME SIZE
@@ -869,6 +869,10 @@ export function createDuelScene({
       // --- shields ---
       if (actors.player.pose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
       if (actors.enemy.pose === 'shield') drawShield(ctx, shield, enemyX, gy, efs, elapsed, true);
+
+      // The near side of the road, drawn after the fighters so the two of them
+      // are standing IN it rather than on the far side of it.
+      parallax.renderForeground(ctx, view, cameraX);
 
       /**
        * The light goes on here: everything above it (the road and both
