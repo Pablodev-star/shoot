@@ -189,7 +189,7 @@ export function createWalkEngine() {
     const mounted = getState().hasHorse;
     const out = [];
     for (const event of segment.events) {
-      if (event.type !== 'shop' && event.type !== 'inn') continue;
+      if (!['shop', 'inn', 'forge'].includes(event.type)) continue;
       // A stop that has been reached keeps the position it was reached at; the
       // ones still ahead are measured live, because the horse really does pull
       // them closer and the trigger uses the same figure. A stop resolved in

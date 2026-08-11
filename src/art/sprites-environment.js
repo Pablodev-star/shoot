@@ -407,6 +407,7 @@ const INN = [
 const SIGNS = {
   shop: { text: 'SHOP', board: { x: 6, y: 6, w: 48, h: 16 } },
   inn: { text: 'INN', board: { x: 9, y: 6, w: 42, h: 16 } },
+  forge: { text: 'FORGE', board: { x: 6, y: 6, w: 48, h: 16 } },
 };
 
 /** Painted, not carved: the letters get a highlight under them. */
@@ -551,6 +552,8 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
     buildings: {
       shop: bakeBuilding(SHOP, SIGNS.shop, structureGround),
       inn: bakeBuilding(INN, SIGNS.inn, structureGround),
+      // Taller false-front workshop: a distinct roadside silhouette and sign.
+      forge: bakeBuilding(INN, SIGNS.forge, structureGround),
     },
     layers: { ...buildLayers(), storm: getStormLayer() },
     /**

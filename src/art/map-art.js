@@ -182,6 +182,14 @@ const MARKERS = {
     '................',
   ],
 
+  /** A forge: anvil, hammer and a hot orange fire. */
+  forge: [
+    '................', '..........kk....', '.........kYYk...', '..........kk....',
+    '...kkkkkkkkkk...', '..kXXXXXXXXXXk..', '..kXRRROOXXXk...', '..kXqRRROXXXk...',
+    '..kkkkkkkkkkkk..', '.....kSSSSk.....', '...kkSSSSSSkk...', '..kSSSSSSSSSSk..',
+    '....kkMMMMkk....', '.....kMMMMk.....', '....kk....kk....', '................',
+  ],
+
   /** The boss: a skull wearing the hat, with the band and a jaw under it. */
   boss: [
     '................',

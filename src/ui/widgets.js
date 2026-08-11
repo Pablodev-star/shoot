@@ -24,8 +24,9 @@ export function livesRow(lives, maxLives, opts = {}) {
     role: 'img',
     'aria-label': `${lives} of ${maxLives} lives`,
   });
-  for (let i = 0; i < maxLives; i++) {
-    row.append(el('span.life', { class: `${i < lives ? '' : 'is-empty'} ${size}`.trim() }));
+  for (let i = 0; i < Math.ceil(maxLives); i++) {
+    const fill = Math.max(0, Math.min(1, lives - i));
+    row.append(el('span.life', { class: `${fill === 0 ? 'is-empty' : fill === 0.5 ? 'is-half' : ''} ${size}`.trim() }));
   }
   return row;
 }
@@ -35,19 +36,22 @@ export function livesRow(lives, maxLives, opts = {}) {
  * the nodes rather than rebuilding them is what makes the loss read as a hit.
  */
 export function updateLivesRow(row, lives, maxLives) {
-  while (row.children.length < maxLives) {
+  const slots = Math.ceil(maxLives);
+  while (row.children.length < slots) {
     const life = el('span.life.is-gained');
     const sizeClass = row.firstElementChild?.classList;
     if (sizeClass?.contains('life--lg')) life.classList.add('life--lg');
     if (sizeClass?.contains('life--sm')) life.classList.add('life--sm');
     row.append(life);
   }
-  while (row.children.length > maxLives) row.lastElementChild.remove();
+  while (row.children.length > slots) row.lastElementChild.remove();
 
   [...row.children].forEach((node, i) => {
     const wasFull = !node.classList.contains('is-empty');
-    const isFull = i < lives;
-    node.classList.toggle('is-empty', !isFull);
+    const fill = Math.max(0, Math.min(1, lives - i));
+    const isFull = fill === 1;
+    node.classList.toggle('is-empty', fill === 0);
+    node.classList.toggle('is-half', fill === 0.5);
     if (wasFull && !isFull) {
       node.classList.remove('is-lost');
       void node.offsetWidth; // restart the animation

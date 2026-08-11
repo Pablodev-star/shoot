@@ -36,6 +36,9 @@ function blankState() {
     exp: 0,
     gold: 60,
 
+    /** Permanent revolver tuning bought at forges. Level 0 deals half a life. */
+    gunLevel: 0,
+
     maxLives: STARTING_LIVES,
     lives: STARTING_LIVES,
     hunger: HUNGER_MAX,
@@ -116,9 +119,26 @@ function emitAll() {
 // ---------------------------------------------------------------------------
 
 export function setLives(value) {
-  state.lives = Math.max(0, Math.min(state.maxLives, Math.round(value)));
+  state.lives = Math.max(0, Math.min(state.maxLives, Math.round(value * 2) / 2));
   emit(EVENTS.LIVES_CHANGED, { lives: state.lives, maxLives: state.maxLives });
   return state.lives;
+}
+
+/** Damage and next upgrade cost depend only on the permanent gun level. */
+export function gunDamage() {
+  return 0.5 + state.gunLevel * 0.5;
+}
+
+export function gunUpgradeCost() {
+  // Cheap first filing, then a deliberately steep curve across the whole run.
+  return Math.round(25 * Math.pow(3.25, state.gunLevel));
+}
+
+export function upgradeGun() {
+  const cost = gunUpgradeCost();
+  if (!spendGold(cost)) return false;
+  state.gunLevel += 1;
+  return true;
 }
 
 /**
