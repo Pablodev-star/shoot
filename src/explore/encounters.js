@@ -87,6 +87,7 @@ export function generateSegment(worldId, seed) {
   const services = [
     ...Array(rollServiceCount(rng)).fill('shop'),
     ...Array(rollServiceCount(rng)).fill('inn'),
+    ...Array(worldId === 1 ? 2 : (rng.chance(0.8) ? 1 : 0)).fill('forge'),
   ];
   rng.shuffle(services);
 
@@ -189,5 +190,6 @@ export const ENCOUNTER_LABELS = {
   enemy: 'Duel',
   shop: 'Shop',
   inn: 'Inn',
+  forge: 'Forge',
   boss: 'Boss',
 };

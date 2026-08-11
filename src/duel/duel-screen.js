@@ -40,6 +40,7 @@ import {
   countOf,
   getEquippedAbilities,
   getBoon,
+  gunDamage,
 } from '../game/player.js';
 import { totemReviveLives } from '../game/progression.js';
 import { playTotemRevival } from '../ui/totem.js';
@@ -171,6 +172,7 @@ export const DuelScreen = {
          * and every run that spends its gold on bandages instead.
          */
         abilities: getEquippedAbilities(),
+        gunDamage: gunDamage(),
       },
       enemy,
       playerAgent: localAgent,

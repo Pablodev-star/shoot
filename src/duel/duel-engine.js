@@ -111,6 +111,7 @@ export function createDuel(config) {
       status: null,
       pendingItem: null,
       agent: config.playerAgent,
+      gunDamage: config.player.gunDamage ?? 0.5,
     },
     enemy: {
       id: 'enemy',
@@ -127,6 +128,7 @@ export function createDuel(config) {
       abilityChanceMul: config.enemy.abilityChanceMul || 1,
       accuracy: config.enemy.accuracy ?? 0.5,
       agent: config.enemyAgent,
+      gunDamage: config.enemy.gunDamage ?? 0.5,
     },
   };
 
@@ -824,12 +826,12 @@ export function createDuel(config) {
     if (target.status.reflect > 0) {
       target.status.reflect -= 1;
       log('reflect', { side: toId, back: fromId });
-      const back = 1 + (shooter.status.mark > 0 ? 1 : 0);
+      const back = shooter.gunDamage + (shooter.status.mark > 0 ? 1 : 0);
       const bouncedHit = damage(fromId, back, { ignoreShield: true, source: 'reflect' });
       return { hit: false, bounced: true, bouncedHit };
     }
 
-    let amount = 1;
+    let amount = shooter.gunDamage;
     if (shooter.status.doubleTap > 0) {
       shooter.status.doubleTap -= 1;
       amount += 1;

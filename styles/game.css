@@ -175,6 +175,17 @@
   align-items: center;
 }
 
+/* A half-filled diamond is still one life slot, visibly split down the middle. */
+.life.is-half { background: linear-gradient(135deg, var(--red) 0 50%, transparent 50%); }
+
+.forge-screen { --screen-max: 760px; justify-content: center; }
+.forge-panel { text-align: center; }
+.forge-anvil { position:relative; width:112px; height:72px; margin:0 auto var(--sp-3); image-rendering:pixelated; }
+.forge-anvil i { position:absolute; left:8px; top:12px; width:88px; height:18px; background:var(--steel); border:6px solid var(--ink); box-shadow:14px 18px 0 -2px var(--steel-dark), 26px 34px 0 -5px var(--steel-dark); }
+.forge-anvil b { position:absolute; right:5px; top:0; width:14px; height:58px; background:var(--leather); border:5px solid var(--ink); transform:rotate(38deg); }
+.forge-stats { display:flex; justify-content:center; gap:var(--sp-3); flex-wrap:wrap; margin:var(--sp-4) 0; }
+.forge-price { font-family:var(--font-display); color:var(--gold-light); font-size:var(--text-lg); }
+
 .bag-button { position: relative; }
 
 .bag-count {

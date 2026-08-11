@@ -37,7 +37,8 @@ const FLOOR_AT = 0.78;
 
 export function createInteriorScene(kind = 'shop') {
   const isInn = kind === 'inn';
-  const rng = makeRng(isInn ? 8123 : 4242);
+  const isForge = kind === 'forge';
+  const rng = makeRng(isInn ? 8123 : isForge ? 6161 : 4242);
 
   const motes = Array.from({ length: 34 }, () => ({
     x: rng(),
@@ -116,12 +117,63 @@ export function createInteriorScene(kind = 'shop') {
       const fs = view.w < 760 ? s : s * 2;
 
       if (isInn) drawInnRoom(ctx, view, s, fs, floorY, flicker, flames, sparks, t);
+      else if (isForge) drawForgeRoom(ctx, view, s, floorY, flicker, t);
       else drawShopRoom(ctx, view, s, fs, floorY, flicker, t);
 
       drawMotes(ctx, view, s, motes, flicker);
       drawVignette(ctx, view, isInn);
     },
   };
+}
+
+/** A soot-black workshop: brick furnace, glowing coals, anvil and tool rack. */
+function drawForgeRoom(ctx, view, s, floorY, flicker, t) {
+  const brickW = 8 * s;
+  const hearthW = Math.min(30 * s, view.w * 0.22);
+  const hx = 5 * s;
+  const hy = floorY - 42 * s;
+  ctx.fillStyle = PALETTE.greyDark;
+  ctx.fillRect(hx, hy, hearthW, 42 * s);
+  ctx.fillStyle = PALETTE.ink;
+  ctx.fillRect(hx + 5 * s, hy + 15 * s, hearthW - 10 * s, 22 * s);
+  for (let y = hy; y < floorY; y += 5 * s) {
+    ctx.fillStyle = PALETTE.steelDark;
+    ctx.fillRect(hx, y, hearthW, s);
+    for (let x = hx + ((y / (5 * s)) % 2) * brickW / 2; x < hx + hearthW; x += brickW) {
+      ctx.fillRect(x, y, s, 5 * s);
+    }
+  }
+  ctx.fillStyle = flicker > 0.82 ? PALETTE.goldLight : PALETTE.redLight;
+  ctx.fillRect(hx + 8 * s, floorY - 14 * s, hearthW - 16 * s, 10 * s);
+  ctx.fillStyle = PALETTE.red;
+  ctx.fillRect(hx + 6 * s, floorY - 5 * s, hearthW - 12 * s, 3 * s);
+
+  // Tool rack on the opposite wall, all locked to the source-pixel grid.
+  const rx = view.w - 29 * s;
+  ctx.fillStyle = PALETTE.woodDeep;
+  ctx.fillRect(rx, hy + 5 * s, 24 * s, 3 * s);
+  for (let i = 0; i < 4; i++) {
+    const x = rx + (3 + i * 6) * s;
+    ctx.fillStyle = PALETTE.steel;
+    ctx.fillRect(x, hy + 8 * s, 2 * s, (11 + (i % 2) * 5) * s);
+    ctx.fillStyle = PALETTE.leatherDark;
+    ctx.fillRect(x - s, hy + (19 + (i % 2) * 5) * s, 4 * s, 3 * s);
+  }
+
+  // The anvil in the near plane.
+  const ax = Math.round((view.w * 0.78) / s) * s;
+  const ay = floorY - 12 * s;
+  ctx.fillStyle = PALETTE.ink;
+  ctx.fillRect(ax - 15 * s, ay, 24 * s, 4 * s);
+  ctx.fillStyle = PALETTE.steel;
+  ctx.fillRect(ax - 14 * s, ay + s, 21 * s, 3 * s);
+  ctx.fillStyle = PALETTE.steelDark;
+  ctx.fillRect(ax - 7 * s, ay + 4 * s, 11 * s, 6 * s);
+  ctx.fillRect(ax - 11 * s, ay + 10 * s, 18 * s, 3 * s);
+  ctx.globalAlpha = 0.08 + Math.sin(t / 90) * 0.02;
+  ctx.fillStyle = PALETTE.goldLight;
+  ctx.fillRect(0, 0, view.w, view.h);
+  ctx.globalAlpha = 1;
 }
 
 // ---------------------------------------------------------------------------

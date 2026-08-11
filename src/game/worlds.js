@@ -65,7 +65,7 @@ export const WORLDS = [
     priceMul: 1,
     goldMul: 1,
     expMul: 1,
-    encounters: { duels: 7 },
+    encounters: { duels: 9 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
       lives: { 1: 80, 2: 18, 3: 2 },
@@ -102,7 +102,7 @@ export const WORLDS = [
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
-    encounters: { duels: 8 },
+    encounters: { duels: 10 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
       lives: { 1: 66, 2: 26, 3: 8 },
@@ -131,7 +131,7 @@ export const WORLDS = [
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
-    encounters: { duels: 10 },
+    encounters: { duels: 12 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
       lives: { 1: 50, 2: 32, 3: 14, 4: 4 },
@@ -161,7 +161,7 @@ export const WORLDS = [
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { duels: 11 },
+    encounters: { duels: 13 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
       lives: { 1: 36, 2: 34, 3: 22, 4: 8 },
@@ -195,7 +195,7 @@ export const WORLDS = [
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
-    encounters: { duels: 12 },
+    encounters: { duels: 14 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
       lives: { 1: 24, 2: 32, 3: 28, 4: 12, 5: 4 },
@@ -233,7 +233,7 @@ export const WORLDS = [
     goldMul: 5,
     expMul: 4.5,
     /** The Galaxy is short and brutal: a corridor straight to the boss. */
-    encounters: { duels: 5 },
+    encounters: { duels: 7 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
       lives: { 2: 30, 3: 34, 4: 24, 5: 12 },

@@ -24,6 +24,7 @@ import { SlotsScreen } from './game/slots.js';
 import { ExploreScreen } from './explore/explore-screen.js';
 import { ShopScreen } from './shops/shop-screen.js';
 import { InnScreen } from './shops/inn-screen.js';
+import { ForgeScreen } from './shops/forge-screen.js';
 import { DuelScreen } from './duel/duel-screen.js';
 import { WorldIntroScreen, VictoryScreen, GameOverScreen } from './game/interstitials.js';
 
@@ -37,6 +38,7 @@ const SCREENS = [
   ExploreScreen,
   ShopScreen,
   InnScreen,
+  ForgeScreen,
   DuelScreen,
   WorldIntroScreen,
   VictoryScreen,

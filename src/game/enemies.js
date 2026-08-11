@@ -92,6 +92,7 @@ export function generateEnemy(worldId, seed) {
     maxLives: lives,
     bullets: 0,
     accuracy: profile.accuracy,
+    gunDamage: worldId * 0.5,
     abilities,
     /** The world's landmark ability, if this one happens to be carrying it. */
     special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
@@ -114,6 +115,7 @@ export function generateBoss(worldId) {
     maxLives: phase.lives,
     bullets: phase.startBullets || 0,
     accuracy: phase.accuracy ?? cfg.accuracy,
+    gunDamage: worldId * 0.5,
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: phase.abilityChanceMul || 1,
     /** A boss always has its world's special. It is the fight's centrepiece. */
