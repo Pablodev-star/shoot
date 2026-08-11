@@ -244,10 +244,7 @@ export function planeBands(height) {
  * print, a puddle — is placed through here; see the note above for why.
  */
 export function bandFit(y, h, height) {
-  const step = height / PLANE_BANDS;
-  const band = Math.min(PLANE_BANDS - 1, Math.max(0, Math.floor(y / step)));
-  const top = Math.ceil(band * step);
-  const bottom = Math.floor((band + 1) * step);
+  const [top, bottom] = bandRange(y, height);
   if (bottom - top <= h) return top;
   return Math.max(top, Math.min(Math.round(y), bottom - h));
 }
@@ -258,9 +255,13 @@ export function bandFit(y, h, height) {
  * rather than being placed once and hoping.
  */
 export function bandRange(y, height) {
-  const step = height / PLANE_BANDS;
-  const band = Math.min(PLANE_BANDS - 1, Math.max(0, Math.floor(y / step)));
-  return [Math.ceil(band * step), Math.floor((band + 1) * step)];
+  // Read straight off `planeBands` rather than recomputed, so the art and the
+  // renderer can never disagree about where a boundary is by a pixel — which is
+  // the one disagreement that would tear a mark in half however carefully it
+  // was placed.
+  const bands = planeBands(height);
+  const i = Math.min(PLANE_BANDS - 1, Math.max(0, Math.floor((y / height) * PLANE_BANDS)));
+  return [bands[i].y0, bands[i].y1];
 }
 
 /**

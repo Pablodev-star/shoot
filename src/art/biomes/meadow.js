@@ -461,9 +461,16 @@ function mountainRange(ctx, heights, rng, height) {
    * front one so the front range overlaps it.
    */
   const peak = (cx, h, back) => {
+    /**
+     * The front range is DARKER than the back one, which is the right way
+     * round and looks wrong written down: distance drains a landscape towards
+     * the sky, so the peaks eight miles off are pale and the ones two miles off
+     * are not. Both share the lit ridge line, because both are catching the
+     * same sun.
+     */
     const body = back ? PALETTE.hillHaze : PALETTE.hillHazeDark;
     const lit = back ? PALETTE.hillHazeLight : PALETTE.hillHaze;
-    const ridge = back ? PALETTE.hillHazeLight : PALETTE.hillHazeLight;
+    const ridge = PALETTE.hillHazeLight;
     // The two slopes. A mountain with the same run either side of the summit is
     // a pyramid, and the eye has never seen one on a horizon.
     const leftRun = h * rng.range(1.5, 2.6);
