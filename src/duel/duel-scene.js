@@ -88,11 +88,19 @@ import { getView } from '../core/scene.js';
 import {
   getCharacterSprites,
   getRevolverSprites,
+  getTieredRevolver,
   CHARACTER_TIMING,
   FIRE_FRAME_MS,
   GUN_TRACK,
 } from '../art/sprites-character.js';
-import { getCombatFx, FX_TIMING, FLASH_ANCHOR, SMOKE_ANCHOR, IMPACT_ANCHOR } from '../art/sprites-fx.js';
+import {
+  getCombatFx,
+  getTintedFx,
+  FX_TIMING,
+  FLASH_ANCHOR,
+  SMOKE_ANCHOR,
+  IMPACT_ANCHOR,
+} from '../art/sprites-fx.js';
 import { getHazardArt, HAZARD_W, HAZARD_H } from '../art/sprites-hazards.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
 import { createCastFx } from './duel-cast.js';
@@ -111,6 +119,9 @@ const FIRE_MS = FIRE_FRAME_MS.reduce((a, b) => a + b, 0);
 /** Milliseconds a puff of powder smoke hangs, and a spent case is in the air. */
 const SMOKE_LIFE = 810;
 const SHELL_LIFE = 560;
+/** How long a spark burns, and how long a muzzle blast ring takes to cross. */
+const SPARK_LIFE = 420;
+const BLAST_MS = 260;
 
 // ---------------------------------------------------------------------------
 // Shockwaves
@@ -204,6 +215,10 @@ function drawShockwave(ctx, cx, cy, r, flat, s, color, hot, k) {
  * @param {number} [o.enemyScale] how many times the fighters' own size the
  *   enemy is drawn at. 1 for everybody in the game except the Stranger, who is
  *   2 and then 2.4 — see the note on `drawFighter`.
+ * @param {object} [o.playerGun] the rung of the forge ladder the player's
+ *   revolver is on — an entry of GUN_TIERS in src/game/gun-tiers.js. It decides
+ *   which gun is in the player's hand, what colour the shot is, and everything
+ *   the barrel carries between shots. Omitted, the player fires the trail iron.
  */
 export function createDuelScene({
   worldId,
@@ -213,6 +228,7 @@ export function createDuelScene({
   enemySprites,
   enemyScale = 1,
   shakeEnabled = true,
+  playerGun = null,
 }) {
   const parallax = createParallax({
     seed: (seed ^ (worldId * 31337)) >>> 0,
@@ -226,10 +242,24 @@ export function createDuelScene({
   const combat = getCombatFx();
 
   const guns = {
-    player: getRevolverSprites(playerSet.finish),
+    player: playerGun ? getTieredRevolver(playerGun) : getRevolverSprites(playerSet.finish),
     enemy: getRevolverSprites(enemySet.finish),
   };
   const sprites = { player: playerSet, enemy: enemySet };
+
+  /**
+   * What each side's shots are made of.
+   *
+   * The enemy always fires the shared gold-and-white powder flash. The player
+   * fires whatever the forge left on their gun: the same four frames of art
+   * baked through the tier's own key, so an Emberbore throws orange and the
+   * Nova throws starlight, with no second animation to keep in step.
+   */
+  const gunFx = playerGun?.fx || null;
+  const fxOf = {
+    player: getTintedFx(playerGun?.id || 'iron', gunFx?.flash),
+    enemy: combat,
+  };
 
   /**
    * Each duellist's pose and how long it has been held. One-shot poses (the
@@ -275,6 +305,20 @@ export function createDuelScene({
   const shells = [];
   const bullets = [];
   const impacts = [];
+  /**
+   * Sparks. Two things make them: the shot itself, which throws a handful off
+   * the muzzle, and a gun that is hot enough to shed them on its own — from the
+   * Emberbore up, the barrel drips light while it is simply held.
+   */
+  const sparks = [];
+  /**
+   * The muzzle blast ring: a pixel shockwave leaving the barrel, for the guns
+   * that are too much for the road. `null` on the first four rungs, which fire
+   * like guns.
+   */
+  const blasts = [];
+  /** Seconds' worth of leftover emission, so a sparkle rate can be fractional. */
+  let sparkDebt = 0;
 
   /**
    * The landmarks on the road, at most one per side: the enemy's permanent one
@@ -436,6 +480,40 @@ export function createDuelScene({
   // --- emitters -------------------------------------------------------------
 
   /**
+   * Where the barrel is RIGHT NOW, whatever pose is up — as opposed to
+   * `muzzleOf`, which is asked about a particular frame of a particular pose.
+   * Used by everything the gun does between shots.
+   */
+  function liveMuzzle(side) {
+    const actor = actors[side];
+    const track = GUN_TRACK[actor.pose];
+    if (!track) return null;
+    return muzzleOf(side, actor.pose, poseFrame(actor, track.length));
+  }
+
+  /**
+   * Throw `count` sparks from a point, in a cone along the bore.
+   *
+   * @param {number} spread 0 for a tight jet down the barrel, 1 for a burst
+   */
+  function spawnSparks(x, y, dir, fs, count, color, spread = 0.5, speed = 1) {
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.random() - 0.5) * Math.PI * spread;
+      const v = (0.012 + Math.random() * 0.02) * fs * speed;
+      sparks.push({
+        x,
+        y,
+        vx: Math.cos(angle) * v * dir,
+        vy: Math.sin(angle) * v - 0.006 * fs,
+        g: 0.00016 * fs,
+        fs,
+        color,
+        t: 0,
+      });
+    }
+  }
+
+  /**
    * Fire one shot. Plays the recoil pose and lights everything that goes with
    * it; the bullet itself is spawned here too so a shot can never be drawn
    * without the round that caused it.
@@ -477,20 +555,96 @@ export function createDuelScene({
         fs: m.fs,
         t: 0,
       });
+
+      /**
+       * THE SHOT ITSELF, ON TOP OF THE FLASH
+       * ---------------------------------------------------------------------
+       * Every gun in the game now throws a jet of burning grains down the bore
+       * — that is the part of a gunshot the old flash sprite could never do,
+       * because it lived and died in one place while the powder keeps going.
+       * The player's gun throws more of it, in its own colour, and from the
+       * Emberbore up it throws a shockwave with it.
+       */
+      const isPlayer = side === 'player';
+      const sparkColor = (isPlayer && gunFx?.spark?.color) || PALETTE.goldLight;
+      const grains = isPlayer ? 5 + Math.round((gunFx?.spark?.rate || 0) * 4) : 5;
+      spawnSparks(m.x, m.y, m.dir, m.fs, grains, sparkColor, 0.55, 1);
+
+      const ring = isPlayer ? gunFx?.ring : null;
+      if (ring) {
+        blasts.push({
+          x: m.x,
+          y: m.y,
+          dir: m.dir,
+          fs: m.fs,
+          t: 0,
+          scale: ring.scale,
+          color: ring.color,
+          hot: ring.hot,
+        });
+        // A gun that pushes the air also pushes the camera.
+        fx.shake = Math.max(fx.shake, 90 * ring.scale);
+      }
     }
-    bullets.push({ side, t: 0 });
+    bullets.push({ side, t: 0, tier: side === 'player' ? gunFx : null });
+  }
+
+  /**
+   * WHAT THE GUN DOES WHILE NOTHING IS HAPPENING
+   * ---------------------------------------------------------------------------
+   * A revolver that cost a whole run's gold should not sit there being a
+   * picture between rounds. From the Emberbore up the barrel sheds light on its
+   * own: embers off a bore that never cooled, cold sparks off the Starfall,
+   * and a slow fall of cosmic dust off the Nova.
+   *
+   * It only runs while the gun is actually in the hand — `liveMuzzle` is null
+   * for every pose that has not cleared leather — so a fighter standing in the
+   * idle loop is not quietly raining fire out of his hip.
+   */
+  function stepGunGlow(dt) {
+    const rate = gunFx?.spark?.rate || 0;
+    if (!rate || !layout) return;
+    const m = liveMuzzle('player');
+    if (!m) {
+      sparkDebt = 0;
+      return;
+    }
+    sparkDebt += (dt / 1000) * rate * 9;
+    while (sparkDebt >= 1) {
+      sparkDebt -= 1;
+      sparks.push({
+        x: m.x - m.dir * m.fs * Math.random() * 3,
+        y: m.y + (Math.random() - 0.5) * m.fs * 1.5,
+        vx: m.dir * (Math.random() - 0.2) * 0.004 * m.fs,
+        vy: -(0.004 + Math.random() * 0.006) * m.fs,
+        g: -0.00002 * m.fs, // it rises: this is light coming off, not grit
+        fs: m.fs,
+        color: gunFx.spark.color,
+        t: Math.random() * 120,
+      });
+    }
   }
 
   /** A round arriving: sparks and grit off whoever it went through. */
   function impact(side) {
     if (!layout) return;
     const { originX, topY, fs, flip } = layout[side];
-    impacts.push({
-      x: place(originX, fs, FIGHTER_W / 2, 1, flip),
-      y: topY + 13 * fs,
+    const x = place(originX, fs, FIGHTER_W / 2, 1, flip);
+    const y = topY + 13 * fs;
+    // A round that arrives on the enemy came out of the player's gun, so the
+    // hit is drawn in that gun's colours: the Nova does not punch gold holes.
+    const fromPlayer = side === 'enemy';
+    impacts.push({ x, y, fs, t: 0, art: fromPlayer ? fxOf.player : fxOf.enemy });
+    spawnSparks(
+      x,
+      y,
+      fromPlayer ? 1 : -1,
       fs,
-      t: 0,
-    });
+      fromPlayer ? 4 + Math.round((gunFx?.spark?.rate || 0) * 3) : 4,
+      (fromPlayer && gunFx?.spark?.color) || PALETTE.goldLight,
+      1.1,
+      0.8,
+    );
   }
 
   const renderer = {
@@ -759,6 +913,20 @@ export function createDuelScene({
         bullets[i].t += dt / 190;
         if (bullets[i].t >= 1) bullets.splice(i, 1);
       }
+
+      for (const sp of sparks) {
+        sp.t += dt;
+        sp.x += sp.vx * dt;
+        sp.y += sp.vy * dt;
+        sp.vy += sp.g * dt;
+      }
+      cull(sparks, SPARK_LIFE);
+      for (let i = blasts.length - 1; i >= 0; i--) {
+        blasts[i].t += dt / BLAST_MS;
+        if (blasts[i].t >= 1) blasts.splice(i, 1);
+      }
+
+      stepGunGlow(dt);
     },
 
     render(ctx, view) {
@@ -897,8 +1065,12 @@ export function createDuelScene({
       drawSmoke(ctx);
       drawShells(ctx);
       drawBullets(ctx);
+      drawBlasts(ctx);
       drawFlashes(ctx);
       drawImpacts(ctx);
+      // Sparks last of everything the guns throw: they are the smallest marks
+      // in the frame and the ones that have to survive being drawn over.
+      drawSparks(ctx);
 
       if (cam) ctx.restore();
 
@@ -2324,14 +2496,101 @@ export function createDuelScene({
     const gun = guns[side][track.art];
     const gx = track.hand.x - gun.hand.x;
     const gy = track.hand.y - gun.hand.y;
-    drawSprite(
-      ctx,
-      gun.sprite,
-      place(originX, fs, gx, gun.sprite.width, flip),
-      topY + gy * fs,
-      fs,
-      flip,
-    );
+    const px = place(originX, fs, gx, gun.sprite.width, flip);
+    const py = topY + gy * fs;
+
+    // Whatever the forge left burning inside the frame, laid down before the
+    // gun so the metal is drawn ON the light rather than under it.
+    if (side === 'player' && gunFx?.glow) {
+      drawGunGlow(ctx, px, py, gun.sprite, fs);
+    }
+
+    drawSprite(ctx, gun.sprite, px, py, fs, flip);
+
+    // …and the stars that go round it, which have to be in front.
+    if (side === 'player' && gunFx?.orbit) {
+      drawGunOrbit(ctx, px, py, gun.sprite, fs);
+    }
+  }
+
+  /**
+   * The light a bought gun sits in.
+   *
+   * A soft pool the size of the weapon, breathing on a slow clock, plus — for
+   * the Nova alone — a NEBULA: a handful of coloured pixels drifting inside the
+   * frame's own footprint, so the gun reads as a window onto somewhere else
+   * rather than as a purple gun.
+   */
+  function drawGunGlow(ctx, x, y, sprite, fs) {
+    const { color, alpha } = gunFx.glow;
+    const w = sprite.width * fs;
+    const h = sprite.height * fs;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const pulse = 0.78 + Math.sin(elapsed / 340) * 0.22;
+    const r = Math.max(w, h) * 0.9;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha * pulse;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, color);
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+    if (gunFx.nebula) {
+      const unit = Math.max(1, Math.round(fs / 2));
+      for (let i = 0; i < 7; i++) {
+        // Two sines a long way from a common multiple: the dust inside the
+        // frame never repeats a pattern the eye can catch.
+        const t = elapsed / (900 + i * 130) + i;
+        const nx = cx + Math.cos(t) * w * 0.34;
+        const ny = cy + Math.sin(t * 1.37) * h * 0.3;
+        ctx.globalAlpha = 0.28 + ((Math.sin(elapsed / 210 + i * 2.1) + 1) / 2) * 0.5;
+        ctx.fillStyle = i % 3 === 0 ? PALETTE.star : i % 3 === 1 ? PALETTE.astralLight : PALETTE.purple;
+        ctx.fillRect(Math.round(nx), Math.round(ny), unit, unit);
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Stars in orbit. They pass BEHIND the gun for half of every turn — the
+   * ellipse is flattened and the far half is drawn dimmer — which is the only
+   * thing that makes three moving pixels read as orbiting an object rather than
+   * as circling in front of it.
+   */
+  function drawGunOrbit(ctx, x, y, sprite, fs) {
+    const count = gunFx.orbit;
+    const w = sprite.width * fs;
+    const h = sprite.height * fs;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const unit = Math.max(1, Math.round(fs / 2));
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < count; i++) {
+      const th = elapsed / 520 + (i / count) * Math.PI * 2;
+      const front = Math.sin(th) > 0;
+      const sx = cx + Math.cos(th) * w * 0.62;
+      const sy = cy + Math.sin(th) * h * 0.34;
+      ctx.globalAlpha = front ? 0.95 : 0.4;
+      ctx.fillStyle = front ? PALETTE.star : PALETTE.astral;
+      ctx.fillRect(Math.round(sx), Math.round(sy), unit, unit);
+      // A one-pixel wake behind each star, so the orbit has a direction.
+      ctx.globalAlpha *= 0.4;
+      ctx.fillRect(
+        Math.round(cx + Math.cos(th - 0.35) * w * 0.62),
+        Math.round(cy + Math.sin(th - 0.35) * h * 0.34),
+        unit,
+        unit,
+      );
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   function drawFlashes(ctx) {
@@ -2341,7 +2600,22 @@ export function createDuelScene({
       if (index < 0) continue;
       const m = muzzleOf(f.side, 'fire', 0);
       if (!m) continue;
-      const sprite = combat.flash[index];
+      // A flash is the brightest thing in the frame; the light it throws on the
+      // road around it is what stops it reading as a decal stuck on the barrel.
+      if (index < 2) {
+        const glowColor = (f.side === 'player' && gunFx?.glow?.color) || PALETTE.goldLight;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = index === 0 ? 0.22 : 0.34;
+        const r = m.fs * (index === 0 ? 7 : 11);
+        const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, r);
+        g.addColorStop(0, glowColor);
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(m.x - r, m.y - r, r * 2, r * 2);
+        ctx.restore();
+      }
+      const sprite = fxOf[f.side].flash[index];
       const { originX, fs, flip } = layout[f.side];
       // The flash is drawn from its own anchor rather than from the fighter,
       // so it stays welded to the barrel at any scale.
@@ -2363,9 +2637,45 @@ export function createDuelScene({
     for (const p of impacts) {
       const index = frameOf(p.t, FX_TIMING.impact);
       if (index < 0) continue;
-      const sprite = combat.impact[index];
+      const sprite = (p.art || combat).impact[index];
       const fs = p.fs || layout.player.fs;
       drawSprite(ctx, sprite, p.x - IMPACT_ANCHOR.x * fs, p.y - IMPACT_ANCHOR.y * fs, fs);
+    }
+  }
+
+  /**
+   * Sparks. Drawn with `lighter` so two crossing each other brighten rather
+   * than overwrite, and shrinking through the three frames of the sprite — a
+   * spark dies by getting smaller.
+   */
+  function drawSparks(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const sp of sparks) {
+      const index = frameOf(sp.t, FX_TIMING.spark);
+      if (index < 0) continue;
+      const unit = Math.max(1, Math.round((sp.fs || 3) * 0.5));
+      // Three sizes, one per frame of FX_TIMING.spark: a cinder goes out by
+      // getting smaller. See the note in src/art/sprites-fx.js.
+      const size = (3 - index) * unit;
+      ctx.globalAlpha = Math.max(0, 1 - sp.t / SPARK_LIFE);
+      ctx.fillStyle = sp.color;
+      ctx.fillRect(Math.round(sp.x - size / 2), Math.round(sp.y - size / 2), size, size);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * The muzzle blast: a flattened ring leaving the barrel sideways, the way
+   * gas actually comes out of a compensator. Only the last three rungs of the
+   * ladder have one, which is what makes them read as too much gun.
+   */
+  function drawBlasts(ctx) {
+    for (const b of blasts) {
+      const k = b.t;
+      const r = b.fs * (2 + k * 9) * b.scale;
+      drawShockwave(ctx, b.x + b.dir * r * 0.35, b.y, r, 0.55, Math.max(1, Math.round(b.fs / 2)), b.color, b.hot, k);
     }
   }
 
@@ -2413,19 +2723,39 @@ export function createDuelScene({
       const y = y0 + (y1 - y0) * b.t;
       const dir = Math.sign(x1 - x0) || 1;
 
-      ctx.fillStyle = PALETTE.goldLight;
-      ctx.fillRect(Math.round(x), Math.round(y), fs, Math.max(2, fs / 2));
-      // Three tail segments, each fainter and shorter than the last.
-      for (let i = 1; i <= 3; i++) {
-        ctx.globalAlpha = 0.45 / i;
-        ctx.fillStyle = i === 1 ? PALETTE.gold : PALETTE.sandLight;
+      /**
+       * The round is drawn in its own gun's colours, and the tail is FIVE
+       * segments rather than three, laid down along the path it has already
+       * covered instead of hung off the nose. A tracer whose tail is a fixed
+       * length is a dash; one whose tail is where it has been is a shot.
+       */
+      const trail = b.tier?.tracer || {
+        core: PALETTE.goldLight,
+        tail: PALETTE.gold,
+        dust: PALETTE.sandLight,
+      };
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 5; i >= 1; i--) {
+        const back = Math.max(0, b.t - i * 0.055);
+        ctx.globalAlpha = 0.5 / i;
+        ctx.fillStyle = i <= 2 ? trail.tail : trail.dust;
         ctx.fillRect(
-          Math.round(x - dir * (i * 2.2) * fs),
-          Math.round(y),
-          Math.max(1, fs * (1.6 - i * 0.35)),
+          Math.round(x0 + (x1 - x0) * back),
+          Math.round(y0 + (y1 - y0) * back - (i > 3 ? fs / 4 : 0)),
+          Math.max(1, fs * (1.8 - i * 0.22)),
           Math.max(1, fs / 2),
         );
       }
+      ctx.restore();
+
+      ctx.fillStyle = trail.core;
+      ctx.fillRect(Math.round(x), Math.round(y), fs, Math.max(2, fs / 2));
+      // A hot bead at the nose, one pixel proud of the core, so the round has a
+      // direction as well as a position.
+      ctx.fillStyle = trail.tail;
+      ctx.fillRect(Math.round(x + dir * fs), Math.round(y), Math.max(1, fs / 2), Math.max(1, fs / 2));
       ctx.globalAlpha = 1;
     }
   }

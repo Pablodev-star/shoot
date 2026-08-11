@@ -368,6 +368,108 @@ const REVOLVERS = {
 };
 
 /**
+ * THE TWO GUNS THE PLAYER EARNS
+ * ---------------------------------------------------------------------------
+ * The forge sells six improvements, and a gun that only changes COLOUR six
+ * times is a gun that changes once — after the second finish the player stops
+ * looking. So the silhouette is cut twice on the way up, and these are the
+ * other two shapes it is cut into.
+ *
+ * Both are drawn to the same contract as the sixgun above: the bore runs two
+ * rows above the hand pixel, so a longer gun still points where the arm points
+ * and the muzzle anchors line up on the same track. That is the whole reason
+ * the extra length is added AT THE MUZZLE END and the grip stays put — the
+ * fighter's poses know where a fist is, and nothing here is allowed to move it.
+ */
+
+/**
+ * Longer barrel, a front sight blade, and an ejector rod under the bore.
+ *
+ * Eight rows, exactly like the sixgun, and the grip pixel is in the same place
+ * — all the extra gun is added at the muzzle end. That is not tidiness: the
+ * poses know where a fist is, and a gun that grew a row at the top would hang
+ * a pixel lower in every frame of the draw.
+ */
+const LONGBARREL = {
+  level: {
+    hand: { x: 2, y: 5 },
+    muzzle: { x: 12, y: 3 },
+    rows: [
+      '..kk......k.',
+      '.kggk....kgk',
+      'kkggkkkkkkgk',
+      'kgogggggggGk',
+      'kgGGGGGGGGGk',
+      '..TtkkkkkkGk',
+      '.kTTk.......',
+      '..kTk.......',
+    ],
+  },
+  raised: {
+    hand: { x: 2, y: 8 },
+    muzzle: { x: 9, y: -1 },
+    rows: [
+      '........kk.',
+      '.......kggk',
+      '......kggk.',
+      '.....kggk..',
+      '....kggk...',
+      '...kggk....',
+      '..kggk.....',
+      '.kgok......',
+      '.kTtk......',
+      '..kTk......',
+    ],
+  },
+};
+
+/**
+ * The Nova frame: a ported rib with the gas holes cut through it, a flared
+ * grip, and a round in the cylinder that is not a round.
+ */
+const NOVA = {
+  level: {
+    hand: { x: 2, y: 5 },
+    muzzle: { x: 13, y: 3 },
+    rows: [
+      '..kk.....kkk.',
+      '.kggk...kkggk',
+      'kkggkkkkkkggk',
+      'kgoggkgkgkggk',
+      'kgGGGGGGGGGGk',
+      '..TtkkkkkkkGk',
+      '.kTTk...kGGk.',
+      '..kTTk.......',
+      '...kk........',
+    ],
+  },
+  raised: {
+    hand: { x: 2, y: 9 },
+    muzzle: { x: 10, y: -1 },
+    rows: [
+      '.........kk.',
+      '........kggk',
+      '.......kggk.',
+      '......kggk..',
+      '.....kggk...',
+      '....kggk....',
+      '...kggk.....',
+      '..kggk......',
+      '.kgok.......',
+      '.kTtk.......',
+      '..kTTk......',
+    ],
+  },
+};
+
+/** Every silhouette a revolver in this game can have, by name. */
+const GUN_SHAPES = {
+  sixgun: REVOLVERS,
+  longbarrel: LONGBARREL,
+  nova: NOVA,
+};
+
+/**
  * Gun metal, for fighters who should not be carrying the same blued steel as
  * everyone else. The key is otherwise the fighter's own.
  */
@@ -394,6 +496,32 @@ export function getRevolverSprites(finish = 'steel') {
     out[name] = { sprite: bake({ key, rows: def.rows }), hand: def.hand, muzzle: def.muzzle };
   }
   gunCache.set(finish, out);
+  return out;
+}
+
+const tierCache = new Map();
+
+/**
+ * The player's gun at one rung of the forge ladder.
+ *
+ * The ladder itself — which shape, which metal, what it throws off when it
+ * fires — is data, and it lives in `src/game/gun-tiers.js`. This function is
+ * only the press: it takes a shape name and a set of palette overrides and
+ * hands back the same `{sprite, hand, muzzle}` pair the enemies' guns come in,
+ * so the duel renderer never learns that the player's revolver is special.
+ *
+ * @param {{id: string, shape?: string, key?: Record<string, string>}} tier
+ */
+export function getTieredRevolver(tier) {
+  const id = tier?.id || 'iron';
+  if (tierCache.has(id)) return tierCache.get(id);
+  const shape = GUN_SHAPES[tier?.shape] || REVOLVERS;
+  const key = { ...GUN_KEY, ...(tier?.key || {}) };
+  const out = {};
+  for (const [name, def] of Object.entries(shape)) {
+    out[name] = { sprite: bake({ key, rows: def.rows }), hand: def.hand, muzzle: def.muzzle };
+  }
+  tierCache.set(id, out);
   return out;
 }
 

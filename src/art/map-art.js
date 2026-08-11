@@ -182,12 +182,33 @@ const MARKERS = {
     '................',
   ],
 
-  /** A forge: anvil, hammer and a hot orange fire. */
+  /**
+   * A forge: the shed, seen from the road. A stack with smoke coming off it, a
+   * roof, the furnace mouth burning under it and the anvil standing beside it.
+   *
+   * It used to be a floating anvil with two grey ticks over it and an orange
+   * bar behind, which on the sheet read as a lump of rock. Every other marker
+   * on this map is a PLACE — a store with an awning, a house with a lantern —
+   * and the forge is the one place on the road where something is being made,
+   * so it is drawn as the building with the fire lit in it.
+   */
   forge: [
-    '................', '..........kk....', '.........kYYk...', '..........kk....',
-    '...kkkkkkkkkk...', '..kXXXXXXXXXXk..', '..kXRRROOXXXk...', '..kXqRRROXXXk...',
-    '..kkkkkkkkkkkk..', '.....kSSSSk.....', '...kkSSSSSSkk...', '..kSSSSSSSSSSk..',
-    '....kkMMMMkk....', '.....kMMMMk.....', '....kk....kk....', '................',
+    '.....y..........',
+    '....y.kk........',
+    '.....ykqqk......',
+    '..kkkkqqkkkkk...',
+    '.kXXXXXXXXXXXk..',
+    'kXXXXXXXXXXXXXk.',
+    'kkkkkkkkkkkkkkkk',
+    'kWWWWWWWWWWWWWWk',
+    'kkkkkkkkkkkkkkkk',
+    'kk<~<kkkkYYkkkkk',
+    'k<~O~<kkkYYYkkkk',
+    'k<~~~<kkkkYkkkkk',
+    'kk<~<kkkkkYkkkkk',
+    'kkkkkkkkkMMMkkkk',
+    'kMMMMMMMMMMMMMMk',
+    'kkkkkkkkkkkkkkkk',
   ],
 
   /** The boss: a skull wearing the hat, with the band and a jaw under it. */

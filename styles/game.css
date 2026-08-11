@@ -178,14 +178,6 @@
 /* A half-filled diamond is still one life slot, visibly split down the middle. */
 .life.is-half { background: linear-gradient(135deg, var(--red) 0 50%, transparent 50%); }
 
-.forge-screen { --screen-max: 760px; justify-content: center; }
-.forge-panel { text-align: center; }
-.forge-anvil { position:relative; width:112px; height:72px; margin:0 auto var(--sp-3); image-rendering:pixelated; }
-.forge-anvil i { position:absolute; left:8px; top:12px; width:88px; height:18px; background:var(--steel); border:6px solid var(--ink); box-shadow:14px 18px 0 -2px var(--steel-dark), 26px 34px 0 -5px var(--steel-dark); }
-.forge-anvil b { position:absolute; right:5px; top:0; width:14px; height:58px; background:var(--leather); border:5px solid var(--ink); transform:rotate(38deg); }
-.forge-stats { display:flex; justify-content:center; gap:var(--sp-3); flex-wrap:wrap; margin:var(--sp-4) 0; }
-.forge-price { font-family:var(--font-display); color:var(--gold-light); font-size:var(--text-lg); }
-
 .bag-button { position: relative; }
 
 .bag-count {
@@ -498,6 +490,283 @@
   border: var(--border) solid var(--edge-strong);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   box-shadow: inset 0 2px 0 rgba(242, 227, 198, 0.22), 0 6px 0 rgba(0, 0, 0, 0.42);
+}
+
+/* --- The forge ---------------------------------------------------------------
+
+   The third counter, and the only one that is made of IRON rather than of
+   plank and canvas. The shop is a stall you stand at and the inn is a room you
+   sleep in; a smithy is a hood, a bench and a fire, so the frame here is a
+   riveted iron hood over a scorched board bench, with the sign hung off it on
+   two chains and a plate of the same iron under the gun.
+
+   Everything glowing on this screen is glowing in the same orange the workshop
+   behind it is lit by — there is one fire on this screen and the interface is
+   near it.
+   --------------------------------------------------------------------------- */
+
+.forge-screen { --screen-max: 880px; }
+
+.forge-shop {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.6));
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* While the smith is working, the counter gets out of the way: what the player
+   just paid for is happening in the workshop behind the bench, and a panel
+   sitting on top of it at full strength is a receipt covering the event. */
+.forge-shop.is-working { opacity: 0.4; }
+
+/* The hood over the fire: sheet iron, riveted, with the heat on its lower lip. */
+.forge-hood {
+  position: relative;
+  height: clamp(20px, 3vw, 30px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.5)),
+    linear-gradient(180deg, var(--iron-face) 0%, var(--iron-mid) 55%, var(--iron-deep) 100%);
+  border: var(--border) solid var(--edge-strong);
+  border-bottom: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: inset 0 -3px 0 rgba(255, 140, 50, 0.22);
+}
+
+/* The rivets along it, and the underside catching the forge light. */
+.forge-hood::before {
+  content: '';
+  position: absolute;
+  inset: 6px 10px auto 10px;
+  height: 7px;
+  background-image: var(--rivet);
+  background-size: 7px 7px;
+  background-repeat: repeat-x;
+  opacity: 0.85;
+}
+
+.forge-sign {
+  position: relative;
+  z-index: 2;
+  align-self: center;
+  margin-top: clamp(22px, 3vw, 30px);
+  padding: var(--sp-2) clamp(18px, 3vw, 34px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.45)),
+    linear-gradient(180deg, var(--iron-face), var(--iron-deep));
+  border: var(--border-thick) solid var(--edge-strong);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--edge-highlight), var(--lift-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--gold-light);
+  text-shadow: 0 0 12px rgba(255, 150, 50, 0.45), 0 2px 0 var(--shadow);
+}
+
+/* Two chains, not ropes: nothing hangs off hemp in a room with a fire in it. */
+.forge-sign::before,
+.forge-sign::after {
+  content: '';
+  position: absolute;
+  top: clamp(-30px, -3vw, -22px);
+  width: 4px;
+  height: clamp(22px, 3vw, 30px);
+  background:
+    repeating-linear-gradient(180deg, var(--steel) 0 3px, var(--iron-deep) 3px 6px);
+}
+.forge-sign::before { left: 18%; }
+.forge-sign::after { right: 18%; }
+
+.forge-sign-text { position: relative; display: inline-block; }
+.forge-sign-text::before,
+.forge-sign-text::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rivet);
+}
+.forge-sign-text::before { left: calc(-1 * clamp(12px, 2vw, 22px)); }
+.forge-sign-text::after { right: calc(-1 * clamp(12px, 2vw, 22px)); }
+
+/* The bench: the gun on the left, what it is and what it costs on the right. */
+.forge-bench {
+  position: relative;
+  margin-top: calc(-1 * clamp(14px, 2vw, 20px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(var(--sp-4), 3vw, var(--sp-6));
+  padding: clamp(26px, 3.4vw, 38px) clamp(var(--sp-4), 3vw, var(--sp-6)) var(--sp-5);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.25) 30%, rgba(0, 0, 0, 0.5)),
+    var(--plank);
+  border-left: var(--border) solid var(--edge-strong);
+  border-right: var(--border) solid var(--edge-strong);
+}
+
+.forge-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* The iron plate the gun sits on, with the fire's light pooled under it. */
+.forge-plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-3);
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(255, 140, 50, 0.32), transparent 62%),
+    linear-gradient(180deg, var(--iron-mid), var(--iron-deep));
+  border: var(--border-thick) solid var(--edge-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 2px 0 var(--edge-highlight), var(--lift-2);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.forge-gun-canvas { max-width: 100%; height: auto; }
+
+/* The ladder. Seven notches: done, here, and not yet forged. */
+.forge-track {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.forge-notch {
+  width: 16px;
+  height: 8px;
+  background: var(--iron-deep);
+  border: 1px solid var(--edge-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.forge-notch.is-done { background: linear-gradient(180deg, var(--brass-face), var(--brass-deep)); }
+
+.forge-notch.is-here {
+  background: linear-gradient(180deg, #fff3c4, var(--gold));
+  box-shadow: 0 0 10px rgba(255, 200, 90, 0.8);
+  animation: forge-notch-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes forge-notch-pulse {
+  50% { box-shadow: 0 0 16px rgba(255, 210, 120, 1); }
+}
+
+.forge-info {
+  flex: 1 1 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.forge-tier-name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  letter-spacing: var(--tracking-tight);
+  color: var(--gold-light);
+  text-shadow: 0 2px 0 var(--shadow);
+}
+
+.forge-blurb { color: var(--text-dim); font-size: var(--text-sm); }
+
+.forge-stats {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin-top: var(--sp-1);
+}
+
+.forge-stat {
+  flex: 1 1 120px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.forge-stat .k {
+  display: flex;
+  gap: 6px;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-faint);
+}
+
+.forge-stat .v {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+}
+
+/* The rung you are being sold: brass edge, and the name of it beside "NEXT". */
+.forge-stat.is-next {
+  border-color: var(--brass-deep);
+  box-shadow: inset 0 0 0 1px rgba(240, 185, 90, 0.18);
+}
+.forge-stat.is-next .v { color: var(--gold-light); }
+.forge-next-name { color: var(--brass-face); }
+
+.forge-deal {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+}
+
+.forge-price {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--gold-light);
+}
+
+.forge-buy { flex: 1 1 auto; }
+
+/* Nothing left to buy: the price is a sentence, so it stops shouting and the
+   coin comes off it — there is no number for it to be the unit of. */
+.forge-deal.is-maxed .forge-price { font-size: var(--text-sm); color: var(--text-dim); }
+.forge-deal.is-maxed .forge-price img { display: none; }
+
+/* The bench top, cropped by the bottom of the frame — the thing that says the
+   gun is lying on something rather than floating in a panel. */
+.forge-counter {
+  height: clamp(16px, 2.4vw, 24px);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 64px, rgba(0, 0, 0, 0.55) 64px 66px),
+    linear-gradient(180deg, var(--iron-face) 0 3px, var(--iron-mid) 3px 45%, var(--iron-deep) 100%);
+  border: var(--border) solid var(--edge-strong);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: inset 0 2px 0 rgba(242, 227, 198, 0.14), 0 6px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* On a phone the bench stacks and the gun goes on top, where it belongs: it is
+   the thing being sold. */
+@media (max-width: 640px) {
+  .forge-bench { flex-direction: column; align-items: stretch; }
+  .forge-display { align-self: center; }
+  .forge-info { text-align: center; align-items: center; }
+  .forge-stats { justify-content: center; }
+  .forge-deal { justify-content: center; }
 }
 
 .shop-card {

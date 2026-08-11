@@ -122,6 +122,63 @@ export function innPremiumPrice(worldId) {
 }
 
 // ---------------------------------------------------------------------------
+// The revolver
+//
+// The one purchase in the game that is kept forever. Everything else in a run
+// is spent — food is eaten, a bed is slept in, an ability is thrown — and the
+// gun is the single line on the ledger that is still there in the last world,
+// which is why it is priced like nothing else on the road.
+// ---------------------------------------------------------------------------
+
+/**
+ * How many times the gun can be improved. Seven tiers, counting the iron you
+ * ride in with, and the last one is the Nova — see `src/game/gun-tiers.js`.
+ *
+ * There used to be no ceiling at all: the cost curve was the only thing
+ * stopping you, and a player who banked enough gold could walk into the last
+ * world doing six lives a shot at an enemy that has four. A ladder with a top
+ * rung is also what lets the art be a ladder — a finish per level, ending
+ * somewhere worth ending.
+ */
+export const GUN_MAX_LEVEL = 6;
+
+/** Lives taken per shot at a given gun level. Half a life per rung. */
+export function gunDamageAt(level) {
+  return 0.5 + Math.min(GUN_MAX_LEVEL, Math.max(0, level)) * 0.5;
+}
+
+/**
+ * What the next rung costs.
+ *
+ * Two things compound here rather than one. The base is exponential, as it
+ * always was; on top of it sits an ESCALATION term that grows with the level,
+ * so the ratio between one rung and the next widens as you climb — 3.8x for
+ * the first, better than 4.4x by the last. That is the difference between a
+ * curve that is steep and a curve that keeps getting steeper, and it is what
+ * stops a player who found one good boss purse from buying two tiers with it.
+ *
+ *   level 0 → 1 |      40   pocket change after a duel or two
+ *   level 1 → 2 |     150   a world-1 purse
+ *   level 2 → 3 |     565   most of a world-2 run's takings
+ *   level 3 → 4 |   2,090   a world-3/4 project
+ *   level 4 → 5 |   7,655   you are saving instead of buying food
+ *   level 5 → 6 |  27,845   the Nova. A whole run spent on one gun
+ *
+ * The old curve was `25 * 3.25^level` — 25 / 81 / 264 / 858 / 2,789 / 9,065 —
+ * so every rung above the first is between two and three times dearer than it
+ * was, and the top one is three times dearer again.
+ */
+export const GUN_COST_BASE = 40;
+export const GUN_COST_GROWTH = 3.35;
+export const GUN_COST_ESCALATION = 0.13;
+
+export function gunUpgradeCost(level) {
+  if (level >= GUN_MAX_LEVEL) return Infinity;
+  const raw = GUN_COST_BASE * Math.pow(GUN_COST_GROWTH, level) * (1 + level * GUN_COST_ESCALATION);
+  return Math.max(5, Math.round(raw / 5) * 5); // round to a tidy 5, like every other price
+}
+
+// ---------------------------------------------------------------------------
 // Hunger
 // ---------------------------------------------------------------------------
 

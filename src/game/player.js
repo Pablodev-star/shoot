@@ -21,6 +21,9 @@ import {
   sellPrice,
   HUNGER_MAX,
   totemReviveLives,
+  GUN_MAX_LEVEL,
+  gunDamageAt,
+  gunUpgradeCost as gunUpgradeCostAt,
 } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
@@ -36,7 +39,12 @@ function blankState() {
     exp: 0,
     gold: 60,
 
-    /** Permanent revolver tuning bought at forges. Level 0 deals half a life. */
+    /**
+     * Permanent revolver tuning bought at forges. Level 0 is the trail iron
+     * and deals half a life; level GUN_MAX_LEVEL is the Nova. The ladder — what
+     * each rung is called, what it is made of and what it throws off when it
+     * fires — is `src/game/gun-tiers.js`.
+     */
     gunLevel: 0,
 
     maxLives: STARTING_LIVES,
@@ -124,17 +132,26 @@ export function setLives(value) {
   return state.lives;
 }
 
-/** Damage and next upgrade cost depend only on the permanent gun level. */
+/**
+ * Damage, the next price and how far up the ladder you are — all of it reads
+ * off the one permanent number. The curves themselves live in
+ * `src/game/progression.js` with every other curve in the game.
+ */
 export function gunDamage() {
-  return 0.5 + state.gunLevel * 0.5;
+  return gunDamageAt(state.gunLevel);
 }
 
 export function gunUpgradeCost() {
-  // Cheap first filing, then a deliberately steep curve across the whole run.
-  return Math.round(25 * Math.pow(3.25, state.gunLevel));
+  return gunUpgradeCostAt(state.gunLevel);
+}
+
+/** True once the gun is a Nova and there is nothing left to buy. */
+export function gunIsMaxed() {
+  return state.gunLevel >= GUN_MAX_LEVEL;
 }
 
 export function upgradeGun() {
+  if (gunIsMaxed()) return false;
   const cost = gunUpgradeCost();
   if (!spendGold(cost)) return false;
   state.gunLevel += 1;

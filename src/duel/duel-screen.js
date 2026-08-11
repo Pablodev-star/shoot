@@ -43,6 +43,7 @@ import {
   gunDamage,
 } from '../game/player.js';
 import { totemReviveLives } from '../game/progression.js';
+import { gunTier } from '../game/gun-tiers.js';
 import { playTotemRevival } from '../ui/totem.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
@@ -141,6 +142,13 @@ export const DuelScreen = {
       enemySprites: enemy.sprites,
       enemyScale: enemy.scale || 1,
       shakeEnabled: getSettings().screenShake,
+      /**
+       * Which gun the player walks in with. Bought at forges and kept for the
+       * whole run, so the fight is the one place the money is visible: the
+       * shape in the hand, the colour of the flash and everything the barrel
+       * throws all come off this one number.
+       */
+      playerGun: gunTier(player.gunLevel),
     });
 
     const localAgent = createLocalAgent();
