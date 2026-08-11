@@ -396,6 +396,92 @@ const INN = [
 ];
 
 /**
+ * THE FORGE — 60 x 64, and the only roadside building with a FIRE in it.
+ *
+ * It used to be the inn with a different word painted on the sign, which meant
+ * the road offered you a bed and a gun improvement from the same picture. A
+ * smithy is not a false-front hotel: it is a shed with an open front, a stack
+ * over the fire, and everything in it visible from the road because there is no
+ * door on it — that is what a working forge looks like from a hundred yards,
+ * and it is why the silhouette is a CHIMNEY rather than a parapet.
+ *
+ * Inside the shed, from the left: the furnace with its mouth, a wall of tongs
+ * over a bench, and the anvil standing out where the light falls on it.
+ *
+ * `K` is the furnace mouth and nothing else in the art uses it. The parallax
+ * renderer finds that rectangle with `FORGE_GLOW` and burns a live fire in it
+ * as the building scrolls past — the one animated thing on any building in the
+ * game, and the reason you can tell there is a smith working from further away
+ * than you can read the sign.
+ */
+const FORGE = [
+  '.......kkkkkkkkkkkk.........................................',
+  '.......kYYYYYYYYYYk.........................................',
+  '.......kkkkkkkkkkkk.........................................',
+  '.......kqqqqqqqqqqk.........................................',
+  '.......kq$qq$qq$qqk.........................................',
+  '.......kqqqqqqqqqqk.........................................',
+  '.......kq$qq$qq$qqk.........................................',
+  '.......kqqqqqqqqqqk.........................................',
+  '.......kq$qq$qq$qqk.........................................',
+  '.....kkkkkkkkkkkkkkkk.......................................',
+  '.....kqqqqqqqqqqqqqqk.......................................',
+  '.....kqqqqqqqqqqqqqqk.......................................',
+  '.....kqqqqqqqqqqqqqqk.......................................',
+  '.....kqqqqqqqqqqqqqqk.......................................',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxk.',
+  '.kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk.',
+  '.kxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxxxxXxxk.',
+  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  'kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk',
+  'kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.',
+  '.kXwBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBwXk.',
+  '.kXwbbbubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbubbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbwXk.',
+  '.kXwbbbubbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbubbbwXk.',
+  '.kXwBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBwXk.',
+  '.kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk.',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '.kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
+  '.kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
+  '.kwx$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$xwk.',
+  '.kwx$$$$$$$$$$$$$$$$$$$$$$kkkkkkkkkkkkkkkkkk$$$$$$$$$$$$xwk.',
+  '.kwx$$kkkkkkkkkkkkkkkk$$$$kXXXXXXXXXXXXXXXXk$$$$$$$$$$$$xwk.',
+  '.kwx$$keeeeeeeeeeeeeek$$$$kkkkkkkkkkkkkkkkkk$$$$$$$$$$$$xwk.',
+  '.kwx$$kqqqqqqqqqqqqqqk$$$$$$$Y$$$Y$$$Y$$$Y$$$$$$$$$$$$$$xwk.',
+  '.kwx$$kqkkkkkkkkkkkkqk$$$$$$$Y$$$Y$$$Y$$$Y$$$$$$$$$$$$$$xwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$$$$$Y$$$Y$$$Y$$$Y$$$$$$$$$$$$$$xwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$$$$$Y$$$Y$$$Y$$$Y$$$$$$$$$$$$$$xwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$$$$$Y$$$Y$$$Y$$$Y$$$$kkkkkkkkkkxwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$$$$$y$$$y$$$y$$$y$$$$kYYYYYYYYkxwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$$$$$$$$$$$$$$$$$$$$$$kkkkkkkkkkxwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$kkkkkkkkkkkkkkkkkkkk$$$$yyyy$$$xwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$kWWWWWWWWWWWWWWWWWWk$$$$yyyy$$$xwk.',
+  '.kwx$$kqkKKKKKKKKKKkqk$$$kxxxxxxxxxxxxxxxxxxk$$$$yyyy$$$xwk.',
+  '.kwx$$kqkkkkkkkkkkkkqk$$$kxxxxxxxxxxxxxxxxxxk$$kkkkkkkk$xwk.',
+  '.kwx$$keeeeeeeeeeeeeek$$$kxxxxxxxxxxxxxxxxxxk$$kyyyyyyk$xwk.',
+  '.kwx$$kkkkkkkkkkkkkkkk$$$kkkkkkkkkkkkkkkkkkkk$$kkkkkkkk$xwk.',
+  'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+  'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
+  'ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss',
+];
+
+/**
  * The sign boards above are left blank in the art and lettered here, using the
  * game's own 5x7 font at 2x. Hand-drawn letters at this size come out as
  * approximations of the real typeface; borrowing the font means the sign over
@@ -407,17 +493,52 @@ const INN = [
 const SIGNS = {
   shop: { text: 'SHOP', board: { x: 6, y: 6, w: 48, h: 16 } },
   inn: { text: 'INN', board: { x: 9, y: 6, w: 42, h: 16 } },
-  forge: { text: 'FORGE', board: { x: 6, y: 6, w: 48, h: 16 } },
+  /**
+   * Five letters at 2x is 58 source pixels with the usual one-pixel gap, on a
+   * building that is 60 wide — so the forge's sign is the one place in the game
+   * that closes the letter spacing up. Painted signs are lettered tight; this
+   * one has to be.
+   */
+  forge: { text: 'FORGE', spacing: 0, board: { x: 4, y: 24, w: 52, h: 16 } },
 };
 
 /** Painted, not carved: the letters get a highlight under them. */
 const SIGN_SCALE = 2;
 
+/**
+ * The furnace mouth in the forge's art, in building coordinates, found by
+ * looking for the `K` region rather than written down beside it.
+ *
+ * The parallax renderer burns a live fire into this rectangle as the building
+ * goes past (see `drawStructures`), and a fire drawn outside the hole would
+ * paint over the brickwork the sprite already laid down. Measuring the art
+ * means editing a course of brick above can never put the fire in the wall.
+ */
+export const FORGE_GLOW = (() => {
+  let x0 = Infinity;
+  let x1 = -1;
+  let y0 = Infinity;
+  let y1 = -1;
+  FORGE.forEach((row, y) => {
+    const first = row.indexOf('K');
+    if (first < 0) return;
+    x0 = Math.min(x0, first);
+    x1 = Math.max(x1, row.lastIndexOf('K'));
+    y0 = Math.min(y0, y);
+    y1 = Math.max(y1, y);
+  });
+  return x1 < 0 ? { x: 0, y: 0, w: 0, h: 0 } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+})();
+
+/** Where the chimney comes out of the roof, for the smoke off it. */
+export const FORGE_CHIMNEY = { x: 12, y: 0 };
+
 function bakeBuilding(rows, sign, groundKey) {
   const canvas = bake({ key: groundKey ? { ...KEY, ...groundKey } : KEY, rows });
   const ctx = canvas.getContext('2d');
   const { board } = sign;
-  const width = measureText(sign.text, 1) * SIGN_SCALE;
+  const spacing = sign.spacing ?? 1;
+  const width = measureText(sign.text, spacing) * SIGN_SCALE;
   const x = board.x + Math.floor((board.w - width) / 2);
   const y = board.y + Math.floor((board.h - GLYPH_H * SIGN_SCALE) / 2);
   // A one-pixel shadow under the word, in the same wood the frame is: paint on
@@ -425,12 +546,12 @@ function bakeBuilding(rows, sign, groundKey) {
   // sits on the bone like a decal.
   drawText(ctx, sign.text, x, y + 1, {
     scale: SIGN_SCALE,
-    spacing: 1,
+    spacing,
     color: PALETTE.boneDark,
   });
   drawText(ctx, sign.text, x, y, {
     scale: SIGN_SCALE,
-    spacing: 1,
+    spacing,
     color: PALETTE.woodDeep,
   });
   return canvas;
@@ -552,8 +673,7 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
     buildings: {
       shop: bakeBuilding(SHOP, SIGNS.shop, structureGround),
       inn: bakeBuilding(INN, SIGNS.inn, structureGround),
-      // Taller false-front workshop: a distinct roadside silhouette and sign.
-      forge: bakeBuilding(INN, SIGNS.forge, structureGround),
+      forge: bakeBuilding(FORGE, SIGNS.forge, structureGround),
     },
     layers: { ...buildLayers(), storm: getStormLayer() },
     /**

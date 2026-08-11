@@ -37,9 +37,14 @@ loses. Lives are red diamonds, and always will be.
 
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
-does anyone fire: a muzzle flash off the barrel, a tracer crossing the road,
-the case out of the cylinder, and powder smoke left hanging. A life is lost
-when the round arrives, not when the gun appears.
+does anyone fire: the flash blooming down the bore in four beats, burning
+grains thrown after it, a tracer laying a tail along the road behind it, the
+case out of the cylinder, and powder smoke left hanging. A life is lost when
+the round arrives, not when the gun appears.
+
+**Your gun is whatever you have paid for.** The flash, the tracer, the sparks
+and the shockwave all come off the rung of the forge ladder you are on, so the
+last world can be walked into carrying something that lights the whole road up.
 
 Everything an ability does is shown as a pixel icon on the fighter it is
 working on, never as printed names, and every one of them carries the number of
@@ -291,6 +296,31 @@ There is no level select. You walk, and the road decides what you meet.
   foot, or a panelled frame with brass on the posts, two pillows, a quilt and a
   rug. The room they are in is drawn too — a stone hearth with a live fire in
   it, a window with the night behind it, a rug, a chair pulled up to the heat.
+- **The forge** sells the only thing in the game you keep forever: the gun. Six
+  improvements, each worth half a life a shot, and each one a **different
+  revolver** — the trail iron you rode in with, tempered steel, a brass
+  longbarrel, the silvered Ivory Hand, the Emberbore that never cooled, the
+  Starfall, and the Nova, which has a nebula burning inside the frame and three
+  stars in orbit around it. What you bought is visible in the fight: the shape
+  in your hand, the colour of the muzzle flash, the tracer, the sparks the
+  barrel sheds between rounds, and — from the Emberbore up — a shockwave off
+  every shot.
+
+  It is priced like nothing else on the road, and deliberately: 40 gold for the
+  first rung and 27,845 for the last, on a curve that gets steeper as it climbs
+  (see `gunUpgradeCost` in `src/game/progression.js`). The Nova is a whole run
+  spent on one gun.
+
+  The counter is a **smithy**, not a panel: an iron hood over a scorched bench,
+  the sign on two chains, the gun turning on a plate under it and the ladder
+  drawn as seven notches. Behind it is a working workshop — furnace, bellows,
+  anvil, quench trough, tool wall — and buying a rung **performs** it: three
+  blows on the anvil, brass poured, a quench that fills the room with steam, the
+  coals blown white, a ring of cold runes, or the roof opening onto a starfield.
+  One performance per rung, and no two are the same
+  (`src/shops/forge-scene.js`). Out on the road the forge is the one building
+  with something happening in it: the furnace burns in the doorway as you walk
+  past and the chimney smokes.
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
 - **The trail map** is a drawn map of the road you are on, not a list: the
@@ -423,7 +453,9 @@ src/
                           the revolver that comes out of it (Block 2a)
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
                           composed on the rig
-    sprites-fx.js         muzzle flash, powder smoke, spent brass, impact
+    sprites-fx.js         muzzle flash, powder smoke, spent brass, impact,
+                          sparks — and the same set re-baked in a gun tier's
+                          own colours
     sprites-abilities.js  an icon for every themed ability and world special
     sprites-casts.js      what an ability actually throws: the stick of
                           dynamite, the gourd, the rope, the rock — typed for
@@ -438,6 +470,9 @@ src/
     sprites-venue.js      what a shop and an inn are made of: the two beds,
                           and the crates, barrels, jars, hearth and window the
                           rooms behind them are furnished with
+    sprites-forge.js      what a smithy is made of: the furnace and its mouth,
+                          the anvil, the hammer, the bellows, the quench trough,
+                          the tool wall and the finished work on the rack
     sprites-items.js      item icons (Block 2c)
     sprites-ui.js         interface icons + the duel shield (Block 2d)
     map-art.js            the trail map: the height field the ground is
@@ -447,13 +482,14 @@ src/
                          speech
   menu/                  title, online, profile, settings, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
-  shops/                 shop and inn logic + screens
+  shops/                 shop, inn and forge logic + screens, and the workshop
+                         scene the six upgrade rituals are performed in
   duel/                  duel engine, agents, scene, screen, boss entrances,
                          the performance an ability plays when it is cast, and
                          the real-time clock a world special runs on
   game/                  items, worlds, progression maths, player state,
-                         enemies, world abilities, save slots, run controller,
-                         interstitials
+                         enemies, world abilities, the seven-rung revolver
+                         ladder, save slots, run controller, interstitials
 ```
 
 `docs/ui-audit.md` records what was wrong with the previous interface and why
@@ -505,8 +541,14 @@ Balance lives in data, not in code:
   `worlds.js`. Player and enemy fire the same numbers — the asymmetry is the
   turn rule, not the tuning.
 - `src/game/progression.js` — every curve: exp and the level ladder (tuned
-  together to hit ~1.4 levels per world), gold, prices, inn healing, hunger
-  drain, walking speed, the horse discount.
+  together to hit ~1.4 levels per world), gold, prices, inn healing, the gun's
+  damage and its deliberately super-exponential upgrade cost, hunger drain,
+  walking speed, the horse discount.
+- `src/game/gun-tiers.js` — the seven revolvers: what each rung is called, which
+  silhouette it is cut from, what it is made of, what it throws when it fires,
+  and which ritual the forge performs to make it. Nothing in it is a mechanic —
+  the damage is one line in `progression.js` — so the art can get as loud as it
+  likes without the balance moving.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up. The twenty-four ability
   entries are generated into it from the catalogue above rather than written

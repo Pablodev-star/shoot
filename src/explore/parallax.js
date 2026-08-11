@@ -108,6 +108,8 @@ import {
   LAYER_TILE_W,
   SKY_BODY_SIZE,
   SKY_GLOW_SIZE,
+  FORGE_GLOW,
+  FORGE_CHIMNEY,
 } from '../art/sprites-environment.js';
 import { PLANE_RISE, planeBands, planeSpeed } from '../art/env-kit.js';
 import { PLAYER_SIZE } from '../art/sprites-character.js';
@@ -878,7 +880,83 @@ export function createParallax(options = {}) {
       if (sx < -sprite.width * s * 1.2 || sx > view.w + sprite.width * s) continue;
       const sy = gy + 4 * s - sprite.height * s;
       drawSprite(ctx, sprite, sx, sy, s);
+      if (st.kind === 'forge') drawForgeLife(ctx, sx, sy, s);
     }
+  }
+
+  /**
+   * THE ONE BUILDING ON THE ROAD THAT IS DOING SOMETHING
+   * -------------------------------------------------------------------------
+   * A shop and an inn are places that will be open when you get there. A forge
+   * is a place where somebody is WORKING right now, and a shed with a cold
+   * black hole in it says the opposite — so the mouth of the furnace burns as
+   * the building scrolls past, throws its light on the ground in front of the
+   * shed, and puts smoke out of the chimney.
+   *
+   * All of it is hung off the art: `FORGE_GLOW` is the hole measured out of
+   * the character map and `FORGE_CHIMNEY` is where the stack is, so the fire
+   * cannot drift off the brickwork when the building is redrawn.
+   *
+   * It is cheap on purpose — nine bars of fire, one pool of light and five
+   * puffs of smoke — because there can be three of these on screen at once and
+   * every one of them is scrolling.
+   */
+  function drawForgeLife(ctx, sx, sy, s) {
+    // Wall clock rather than the scene's own: this is decoration on a building
+    // that scrolls past, and `lastNow` is only advanced by the star pass.
+    const t = performance.now();
+    const fx = sx + FORGE_GLOW.x * s;
+    const fy = sy + FORGE_GLOW.y * s;
+    const fw = FORGE_GLOW.w * s;
+    const fh = FORGE_GLOW.h * s;
+    // Two beats a long way from a common multiple, as everywhere else the game
+    // draws fire: the flicker never settles into something countable.
+    const flicker = 0.8 + Math.sin(t / 180) * 0.12 + Math.sin(t / 47) * 0.08;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(fx, fy, fw, fh);
+    ctx.clip();
+    ctx.fillStyle = PALETTE.magmaDeep;
+    ctx.fillRect(fx, fy + fh * 0.35, fw, fh * 0.65);
+    const bars = 9;
+    for (let i = 0; i < bars; i++) {
+      const k = (Math.sin(t / (260 + i * 37) + i * 1.7) + 1) / 2;
+      const h = Math.max(s, Math.round((fh * (0.35 + k * 0.6)) / s) * s);
+      ctx.fillStyle = i % 3 === 0 ? PALETTE.emberGlow : PALETTE.magma;
+      ctx.fillRect(fx + Math.round((i * fw) / bars), fy + fh - h, Math.ceil(fw / bars), h);
+    }
+    ctx.restore();
+
+    // The light it throws out of the shed, onto the apron in front of it.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const r = fw * 2.6;
+    const g = ctx.createRadialGradient(fx + fw / 2, fy + fh, 0, fx + fw / 2, fy + fh, r);
+    g.addColorStop(0, `rgba(255, 150, 60, ${0.34 * flicker})`);
+    g.addColorStop(0.5, `rgba(200, 70, 15, ${0.12 * flicker})`);
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(fx + fw / 2 - r, fy + fh - r, r * 2, r * 2);
+    ctx.restore();
+
+    // Smoke, climbing and spreading out of the stack. Each puff is on its own
+    // loop so the column never repeats.
+    const cx = sx + FORGE_CHIMNEY.x * s;
+    const cy = sy + FORGE_CHIMNEY.y * s;
+    for (let i = 0; i < 5; i++) {
+      const k = ((t / 2600 + i / 5) % 1);
+      const size = Math.max(s, Math.round((1 + k * 3)) * s);
+      ctx.globalAlpha = 0.34 * (1 - k);
+      ctx.fillStyle = i % 2 ? PALETTE.grey : PALETTE.greyDark;
+      ctx.fillRect(
+        Math.round(cx + Math.sin(k * 4 + i) * 3 * s),
+        Math.round(cy - k * 26 * s),
+        size,
+        size,
+      );
+    }
+    ctx.globalAlpha = 1;
   }
 
   // --- cast shadows ---------------------------------------------------------
