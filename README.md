@@ -215,8 +215,11 @@ different game.
 
 There is no level select. You walk, and the road decides what you meet.
 
-- **Auto-walk** through a side-scrolling landscape with five parallax layers. No
-  progress bar, no timer — you only ever see your character walking.
+- **Auto-walk** through a side-scrolling landscape with five parallax layers over
+  a floor that is itself a stack of depth bands — the traveller walks along a
+  road with ground on both sides of him, and the ground near the camera crosses
+  the frame faster than the ground by the verge. No progress bar, no timer — you
+  only ever see your character walking.
 - **Every world is a place, and every place is drawn.** The road opens in the
   **Dust Flats** and crosses the **Wildgrass Prairie**, **Whitecrown Pass**, the
   **Blackwater Bayou** and **Brimstone Basin** before the Galaxy. Six worlds,
@@ -224,10 +227,11 @@ There is no level select. You walk, and the road decides what you meet.
   snow-capped pass above the treeline, then a mud causeway through black water,
   then a basalt floor with the fire still under it, and finally a shelf of
   broken violet stone hanging in open space. Each one has its own props, its own
-  five depth layers, its own ground, its own weather and its own life in the air
-  — spindrift and an aurora on the pass, will-o'-the-wisps over the bayou,
-  embers rising through falling ash in the basin, dust that falls upward in the
-  void.
+  five depth layers, its own floor, its own weather and its own life in the air
+  — circling vultures and tumbleweeds rolling past at three depths in the flats,
+  a flock crossing the prairie, an aurora over the pass in green, violet or a
+  rare high red, will-o'-the-wisps over the bayou, embers rising through falling
+  ash in the basin, dust that falls upward in the void.
 - **Guided randomness**: a world's difficulty is a number of duels, and its
   shops and inns are rolled around them. One or two shops and — separately — one
   or two inns, usually two of each, shuffled into the road with at least a
@@ -523,16 +527,47 @@ world never rebalances it.
    `groundFill`, `dust`, and optionally `scatterCell`, `structureGround` and an
    `ambient` factory.
 
-   A landscape is built out of **six tiled layers and three bands of props**,
+   A landscape is built out of **six tiled layers and five bands of props**,
    and the difference between a biome that reads as a place and one that reads
    as a painted wall is almost entirely in the bands:
 
    | | what it is | where it goes |
    |---|---|---|
    | `backdrop` | hazed silhouettes — trees, spires, buttes | behind the layer the manifest marks `near: true`, so the rise buries their feet |
+   | `verge` | the same scatter table, a pixel step smaller | thirteen rows behind the walk line, at that row's own scroll speed |
    | `scatter` | the roadside props | on the walk line |
-   | `clutter` | litter on a tight `clutterCell` — pebbles, twigs, chips | on the walk line, drawn under the props |
-   | `fringe` | a tiled strip of near ground, `front: true` + `anchor: 'bottom'`, running faster than the camera | in front of everything, along the bottom edge |
+   | `clutter` | litter on a tight `clutterCell` — pebbles, twigs, chips | a few rows in front of the walk line, drawn over the props |
+   | `near` | a thin, sparse lane of the same litter | between the traveller and the camera, drawn **after** he is |
+   | `fringe` | a tiled strip of near ground, `front: true` + `anchor: 'bottom'`, running faster than any of them | in front of everything, along the bottom edge |
+
+   The three roadside bands are declared by the renderer rather than by the
+   biome: a biome supplies `scatter` and `clutter` and gets all five lanes. Each
+   lane scrolls at `planeSpeed` of the floor row it stands on, which is what
+   makes the lift read as distance instead of as hovering.
+
+   **The floor is a plane, not a strip.** The walk line sits `PLANE_RISE` rows
+   *into* the ground layer rather than along its top edge, so there is ground on
+   both sides of the traveller, and the renderer slices the layer into depth
+   bands and scrolls each at its own speed — the grain at his boots crosses the
+   frame nearly twice as fast as the grain up by the verge. That imposes exactly
+   one rule on a ground layer's art: **no mark with a top and a bottom may cross
+   a band boundary**, because the two halves would slide apart forever. Place
+   anything taller than a pixel with `bandFit`, clamp anything that wanders with
+   `bandRange`, and use `planeGrain` / `planePebble` for texture that grows
+   towards the camera. Rows are free — a colour constant along x, or a dithered
+   or randomly speckled one, looks the same wherever it is cut, which is why the
+   six roads have straight edges broken up with band-local litter rather than
+   the wandering edges they used to have. See the long note over `PLANE_RISE` in
+   `src/art/env-kit.js`.
+
+   **Landmarks** are the escape hatch from tiling. A biome may declare
+   `landmarks: [{ name, after, speed, spacing, jitter, y, gap, flip }]` and a
+   `buildLandmarks()` that bakes one canvas per name; each is drawn once every
+   `spacing` source pixels on its own world grid, straight after the layer named
+   by `after`. Anything the player is meant to *recognise* belongs here rather
+   than in a layer tile — the basin's volcano and the prairie's barn both came
+   out of layers for this reason, because a mountain that returns every 320
+   pixels is wallpaper however well it is drawn.
 
    `backdrop` takes `{ cell, y, gap, haze, hazeA, shrink, scatter }`. The haze
    is baked into a tinted copy of each prop at load time and should be the

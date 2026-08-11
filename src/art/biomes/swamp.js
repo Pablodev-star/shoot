@@ -39,7 +39,14 @@
 import { PALETTE } from '../palette.js';
 import { makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
-import { LAYER_TILE_W, makeCloudLayer, makeRidgeLayer } from '../env-kit.js';
+import {
+  LAYER_TILE_W,
+  bandFit,
+  makeCloudLayer,
+  makeRidgeLayer,
+  planeGrain,
+  planeZoom,
+} from '../env-kit.js';
 
 export const SWAMP_PROPS = {
   /**
@@ -541,47 +548,50 @@ function makeSwampGround({ seed, height }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
 
+  /**
+   * Where the causeway begins and ends. The walk line is at 22, so the
+   * traveller walks down the middle of it with water on both sides of him
+   * rather than along its back edge — which matters more here than in any other
+   * biome, because the whole idea of this place is that the road is the only
+   * solid thing in it. Standing at the back of it, half the bayou was behind
+   * his shoulder and invisible.
+   */
+  const top = 8;
+  const bot = 38;
+
   // Everything starts as water; the causeway is laid on top of it.
   ctx.fillStyle = PALETTE.bog;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
 
   // --- the far channel, above the road ---
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    ctx.fillStyle = PALETTE.bogDark;
-    ctx.fillRect(x, 0, 1, 3);
-  }
-  for (let i = 0; i < 70; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(0, 5);
+  ctx.fillStyle = PALETTE.bogDark;
+  ctx.fillRect(0, 0, LAYER_TILE_W, 4);
+  for (let i = 0; i < 90; i++) {
+    const y = rng.int(0, top - 1);
     ctx.fillStyle = rng.chance(0.5) ? PALETTE.bogLight : PALETTE.bogHaze;
-    ctx.fillRect(x, y, rng.int(2, 7), 1);
+    // Short at this distance: a reflection is as wide as the thing reflected,
+    // and the far channel is a long way off.
+    ctx.fillRect(rng.int(0, LAYER_TILE_W - 1), y, rng.int(2, 5), 1);
   }
 
   // --- the causeway ---
-  const top = new Array(LAYER_TILE_W);
-  const bot = new Array(LAYER_TILE_W);
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    const u = x / LAYER_TILE_W;
-    top[x] = Math.max(0, Math.round(4 + Math.sin(u * Math.PI * 2 + 1.1) * 1.6 + Math.sin(u * Math.PI * 8) * 0.7));
-    bot[x] = Math.round(22 + Math.sin(u * Math.PI * 2 + 3.4) * 2.4 + Math.sin(u * Math.PI * 6 + 0.9) * 1.2);
+  ctx.fillStyle = PALETTE.soil;
+  ctx.fillRect(0, top, LAYER_TILE_W, bot - top);
+  // The far edge is wet and dark where the water laps it; the near edge is the
+  // crumbling lip of the bank.
+  ctx.fillStyle = PALETTE.soilDeep;
+  ctx.fillRect(0, top, LAYER_TILE_W, 2);
+  ctx.fillStyle = PALETTE.soilLight;
+  ctx.fillRect(0, top + 2, LAYER_TILE_W, 1);
+  ctx.fillStyle = PALETTE.soilDark;
+  ctx.fillRect(0, bot - 3, LAYER_TILE_W, 3);
 
-    ctx.fillStyle = PALETTE.soil;
-    ctx.fillRect(x, top[x], 1, bot[x] - top[x]);
-    // The far edge is wet and dark where the water laps it; the near edge is
-    // the crumbling lip of the bank.
-    ctx.fillStyle = PALETTE.soilDeep;
-    ctx.fillRect(x, top[x], 1, 2);
-    ctx.fillStyle = PALETTE.soilLight;
-    ctx.fillRect(x, top[x] + 2, 1, 1);
-    ctx.fillStyle = PALETTE.soilDark;
-    ctx.fillRect(x, bot[x] - 3, 1, 3);
-  }
-
-  // Puddles standing in the ruts: the causeway never fully drains.
-  for (let i = 0; i < 26; i++) {
+  // Puddles standing in the ruts: the causeway never fully drains. Each sits
+  // inside one depth band, and the nearer ones are wider.
+  for (let i = 0; i < 30; i++) {
     const cx = rng.int(0, LAYER_TILE_W - 1);
-    const cy = rng.int(top[cx] + 4, Math.max(top[cx] + 5, bot[cx] - 5));
-    const rx = rng.int(3, 11);
+    const cy = bandFit(rng.int(top + 4, bot - 6), 2, height);
+    const rx = Math.round(rng.int(3, 11) * planeZoom(cy, height));
     ctx.fillStyle = PALETTE.bogDark;
     ctx.fillRect(cx - rx, cy, rx * 2, 2);
     ctx.fillStyle = PALETTE.bogLight;
@@ -589,23 +599,23 @@ function makeSwampGround({ seed, height }) {
   }
 
   // Grit, boot-churn and the odd tuft of weed pushing through the mud.
-  for (let i = 0; i < 260; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(top[x] + 2, Math.max(top[x] + 3, bot[x] - 2));
-    ctx.fillStyle = rng.chance(0.55) ? PALETTE.soilDark : PALETTE.soilLight;
-    ctx.fillRect(x, y, rng.chance(0.2) ? 2 : 1, 1);
-  }
-  for (let i = 0; i < 34; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
+  planeGrain(ctx, rng, {
+    height,
+    from: top + 2,
+    to: bot - 3,
+    count: 380,
+    colors: [PALETTE.soilDark, PALETTE.soilLight, PALETTE.soilDeep],
+  });
+  for (let i = 0; i < 40; i++) {
+    const y = rng.int(top + 4, bot - 2);
+    const len = Math.max(1, Math.round(rng.range(1.5, 3) * planeZoom(y, height)));
     ctx.fillStyle = rng.chance(0.5) ? PALETTE.algae : PALETTE.grassDeep;
-    ctx.fillRect(x, bot[x] - rng.int(2, 5), 1, rng.int(2, 4));
+    ctx.fillRect(rng.int(0, LAYER_TILE_W - 1), bandFit(y, len, height), 1, len);
   }
 
   // --- the near channel, in front of the road ---
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    ctx.fillStyle = PALETTE.bogDark;
-    ctx.fillRect(x, bot[x], 1, height - bot[x]);
-  }
+  ctx.fillStyle = PALETTE.bogDark;
+  ctx.fillRect(0, bot, LAYER_TILE_W, height - bot);
   const near = Math.round(height * 0.62);
   for (let y = near; y < height; y++) {
     const k = (y - near) / (height - near);
@@ -628,12 +638,14 @@ function makeSwampGround({ seed, height }) {
    * here is vertical, because a vertical highlight on still water is the one
    * mark that turns a lake back into a floor.
    */
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 170; i++) {
     const x = rng.int(0, LAYER_TILE_W - 1);
     const depth = rng() ** 1.8;              // biased towards the far side
-    const y = Math.round(bot[x] + 2 + depth * (height - bot[x] - 4));
+    const y = Math.round(bot + 2 + depth * (height - bot - 4));
     if (y >= height) continue;
-    const len = rng.int(3, 14);
+    // A reflection nearer the camera is a longer smear of the same thing: the
+    // water is running away from you and so is everything lying on it.
+    const len = Math.round(rng.int(3, 14) * planeZoom(y, height));
     ctx.globalAlpha = (1 - depth) * rng.range(0.3, 0.75);
     ctx.fillStyle = rng.chance(0.28) ? PALETTE.lichen : PALETTE.bogHaze;
     for (let t = 0; t < len; t++) {
@@ -651,13 +663,15 @@ function makeSwampGround({ seed, height }) {
    * so it is doing all the work of telling the near channel apart from the
    * shadow under the causeway.
    */
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 26; i++) {
     const cx = rng.int(0, LAYER_TILE_W - 1);
-    const cy = rng.int(near - 8, height - 3);
-    const rx = rng.int(6, 22);
+    const zoomY = rng.int(near - 8, height - 3);
+    const rx = Math.round(rng.int(6, 22) * planeZoom(zoomY, height));
     const ry = rng.int(1, 3);
-    for (let y = -ry; y <= ry; y++) {
-      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.001))));
+    const cy = bandFit(zoomY, ry * 2 + 1, height);
+    for (let y = 0; y <= ry * 2; y++) {
+      const k = (y - ry) / (ry + 0.001);
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - k * k)));
       for (let dx = -half; dx <= half; dx++) {
         if (rng.chance(0.35)) continue; // ragged, never a solid island
         const x = ((cx + dx) % LAYER_TILE_W + LAYER_TILE_W) % LAYER_TILE_W;
@@ -669,12 +683,16 @@ function makeSwampGround({ seed, height }) {
 
   // The last thing: a few flat glints on the water either side of the road, so
   // the surface reads as wet rather than as dark ground.
-  for (let i = 0; i < 40; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.chance(0.4) ? rng.int(0, 4) : rng.int(bot[x] + 1, height - 2);
+  for (let i = 0; i < 44; i++) {
+    const y = rng.chance(0.4) ? rng.int(0, top - 2) : rng.int(bot + 1, height - 2);
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = PALETTE.bogHaze;
-    ctx.fillRect(x, y, rng.int(2, 6), 1);
+    ctx.fillRect(
+      rng.int(0, LAYER_TILE_W - 1),
+      y,
+      Math.max(1, Math.round(rng.int(2, 6) * planeZoom(y, height))),
+      1,
+    );
   }
   ctx.globalAlpha = 1;
 
@@ -911,7 +929,7 @@ export const SWAMP_ART = {
     { name: 'mid', speed: 0.4, y: -56 },
     { name: 'bank', speed: 0.7, y: -34, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.35, y: -13, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.95, y: -13, anchor: 'bottom', front: true },
   ],
 
   /**

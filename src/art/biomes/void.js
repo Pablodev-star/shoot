@@ -39,7 +39,15 @@
 import { PALETTE } from '../palette.js';
 import { makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
-import { LAYER_TILE_W, makeCloudLayer, makeRidgeLayer } from '../env-kit.js';
+import {
+  LAYER_TILE_W,
+  bandFit,
+  bandRange,
+  makeCloudLayer,
+  makeRidgeLayer,
+  planePebble,
+  planeZoom,
+} from '../env-kit.js';
 
 export const VOID_PROPS = {
   /**
@@ -500,95 +508,117 @@ function makeVoidGround({ seed, height }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
 
+  /**
+   * The road runs from row 8 to row 40 with the walk line at 22, so there is
+   * shelf on both sides of the traveller. Out here that is worth more than in
+   * any other biome: the drop is what this place IS, and with the road along
+   * the top edge of the layer the only drop you could see was the one in front
+   * of you. Now the plate breaks up behind him as well.
+   */
+  const roadTop = 8;
+  const roadBot = 40;
+
   ctx.fillStyle = PALETTE.voidRockDark;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
 
   // --- the dust road ---
-  const bot = new Array(LAYER_TILE_W);
+  ctx.fillStyle = PALETTE.voidRock;
+  ctx.fillRect(0, roadTop, LAYER_TILE_W, roadBot - roadTop);
+  /**
+   * The lit lip along the far edge of the road, and the dark one along the
+   * near edge. Both are broken with a dithered row rather than being drawn
+   * solid: two unbroken rows of the palest violet running the full width of the
+   * tile is a straight line 320 pixels long, and against a ground this dark it
+   * reads as a bright rule ruled across the frame rather than as the edge of
+   * anything. A row that is half road and half shelf reads as a crumbling edge
+   * and — unlike the wandering lip this replaced — it survives the floor being
+   * scrolled in depth bands.
+   */
+  ctx.fillStyle = PALETTE.voidRockLight;
+  ctx.fillRect(0, roadTop, LAYER_TILE_W, 1);
   for (let x = 0; x < LAYER_TILE_W; x++) {
-    const u = x / LAYER_TILE_W;
-    bot[x] = Math.round(21 + Math.sin(u * Math.PI * 2 + 0.8) * 2.6 + Math.sin(u * Math.PI * 7) * 1.1);
-    ctx.fillStyle = PALETTE.voidRock;
-    ctx.fillRect(x, 0, 1, bot[x]);
-    /**
-     * The lit lip along the far edge of the road. It wanders and it breaks,
-     * because two unbroken rows of the palest violet running the full width of
-     * the tile is a straight line 320 pixels long at exactly boot height — and
-     * against a ground this dark it read as a bright rule drawn across the
-     * frame rather than as the edge of anything. The basin's road had the same
-     * fault and got the same fix.
-     */
-    const lip = Math.round(1.6 + Math.sin(u * Math.PI * 2 + 2.1) * 1.1 + Math.sin(u * Math.PI * 11) * 0.7);
-    if (lip > 0) {
+    if (rng.chance(0.45)) {
       ctx.fillStyle = PALETTE.voidRockLight;
-      ctx.fillRect(x, 0, 1, lip);
+      ctx.fillRect(x, roadTop + 1, 1, 1);
     }
-    ctx.fillStyle = PALETTE.voidRockDark;
-    ctx.fillRect(x, bot[x] - 2, 1, 2);
+    if (rng.chance(0.5)) {
+      ctx.fillStyle = PALETTE.voidRock;
+      ctx.fillRect(x, roadTop - 1, 1, 1);
+    }
   }
+  ctx.fillStyle = PALETTE.voidRockDark;
+  ctx.fillRect(0, roadBot - 2, LAYER_TILE_W, 2);
 
   // Dust: a pale scatter over the road, denser along its middle where it has
   // been walked. There is nothing to blow it about, so it stays where it fell.
   for (let i = 0; i < 900; i++) {
     const x = rng.int(0, LAYER_TILE_W - 1);
-    const mid = bot[x] * 0.5;
-    const y = Math.round(mid + (rng() + rng() - 1) * bot[x] * 0.5);
-    if (y < 0 || y >= bot[x]) continue;
+    const mid = (roadTop + roadBot) / 2;
+    const y = Math.round(mid + (rng() + rng() - 1) * (roadBot - roadTop) * 0.5);
+    if (y < roadTop || y >= roadBot) continue;
     ctx.globalAlpha = rng.range(0.25, 0.8);
     ctx.fillStyle = rng.chance(0.25) ? PALETTE.astralDark : PALETTE.voidRockLight;
-    ctx.fillRect(x, y, 1, 1);
+    ctx.fillRect(x, y, Math.max(1, Math.round(planeZoom(y, height) - 0.5)), 1);
   }
   ctx.globalAlpha = 1;
 
-  // Glowing seams in the road surface itself.
-  for (let i = 0; i < 12; i++) {
+  // Glowing seams in the road surface itself, each inside one depth band.
+  for (let i = 0; i < 16; i++) {
     let x = rng.int(0, LAYER_TILE_W - 1);
-    let y = rng.int(1, 6);
+    let y = rng.int(roadTop + 1, roadBot - 3);
+    const [bandTop, bandBottom] = bandRange(y, height);
     const len = rng.int(5, 16);
+    const dir = rng.chance(0.5) ? 1 : -1;
     for (let t = 0; t < len; t++) {
       const px = ((x % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W;
-      if (y >= bot[px] - 1) break;
+      if (y < bandTop || y >= bandBottom || y >= roadBot - 1) break;
       ctx.globalAlpha = 0.7 - (t / len) * 0.5;
       ctx.fillStyle = PALETTE.astralDark;
       ctx.fillRect(px, y, 1, 1);
-      y += 1;
-      x += rng.int(-1, 1);
+      x += dir;
+      if (rng.chance(0.35)) y += rng.chance(0.5) ? 1 : -1;
     }
   }
   ctx.globalAlpha = 1;
 
-  // --- the shelf breaking up in front of the road ---
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    ctx.fillStyle = PALETTE.voidRockDark;
-    ctx.fillRect(x, bot[x], 1, height - bot[x]);
-  }
+  // --- the shelf, breaking up on both sides of the road ---
+  ctx.fillStyle = PALETTE.voidRockDark;
+  ctx.fillRect(0, 0, LAYER_TILE_W, roadTop);
+  ctx.fillRect(0, roadBot, LAYER_TILE_W, height - roadBot);
 
   /**
-   * The gaps. Each one is a hole in the shelf: black, with a star or two in
-   * it and an astral rim along its upper edge where the broken face catches
-   * the light from below. They get bigger towards the camera, so the ground
-   * the player is standing on is visibly the last solid part of it.
+   * The gaps. Each one is a hole in the shelf: black, with a star or two in it
+   * and an astral rim along its upper edge where the broken face catches the
+   * light from below. They get bigger towards the camera, so the ground the
+   * player is standing on is visibly the last solid part of it — and the few
+   * behind him are small, which is the same perspective every other floor in
+   * the game is drawn to.
    */
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 30; i++) {
+    const far = rng.chance(0.3);
     const cx = rng.int(0, LAYER_TILE_W - 1);
-    const depth = rng.range(0, 1);
-    const cy = Math.round(bot[cx] + 4 + depth * (height - bot[cx] - 8));
-    const rx = Math.round(3 + depth * 14);
-    const ry = Math.round(1 + depth * 4);
-    for (let y = -ry; y <= ry; y++) {
-      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.001))));
+    const seedY = far
+      ? rng.int(1, Math.max(2, roadTop - 2))
+      : rng.int(roadBot + 2, height - 4);
+    const zoom = planeZoom(seedY, height);
+    const rx = Math.round(rng.range(3, 12) * zoom);
+    const ry = Math.max(1, Math.round(rng.range(1, 2.4) * zoom));
+    const cy = bandFit(seedY, ry * 2 + 1, height);
+    for (let y = 0; y <= ry * 2; y++) {
+      const k = (y - ry) / (ry + 0.001);
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - k * k)));
       for (let dx = -half; dx <= half; dx++) {
         const x = ((cx + dx) % LAYER_TILE_W + LAYER_TILE_W) % LAYER_TILE_W;
         const yy = cy + y;
         if (yy < 0 || yy >= height) continue;
-        ctx.fillStyle = y === -ry ? PALETTE.astralDark : PALETTE.cosmicHigh;
+        ctx.fillStyle = y === 0 ? PALETTE.astralDark : PALETTE.cosmicHigh;
         ctx.fillRect(x, yy, 1, 1);
       }
     }
     // Stars in the hole.
     for (let k = 0; k < rx / 3; k++) {
       const x = ((cx + rng.int(-rx + 1, rx - 1)) % LAYER_TILE_W + LAYER_TILE_W) % LAYER_TILE_W;
-      const yy = cy + rng.int(-ry + 1, ry);
+      const yy = cy + rng.int(1, Math.max(1, ry * 2 - 1));
       if (yy < 0 || yy >= height) continue;
       ctx.globalAlpha = rng.range(0.4, 1);
       ctx.fillStyle = PALETTE.star;
@@ -598,11 +628,16 @@ function makeVoidGround({ seed, height }) {
   }
 
   // Rubble on the broken part, catching a little light on its upper faces.
-  for (let i = 0; i < 220; i++) {
-    const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(bot[x] + 1, height - 1);
-    ctx.fillStyle = rng.chance(0.3) ? PALETTE.voidRock : PALETTE.voidRockDark;
-    ctx.fillRect(x, y, rng.chance(0.3) ? 2 : 1, 1);
+  for (let i = 0; i < 120; i++) {
+    planePebble(ctx, rng, {
+      height,
+      y: rng.chance(0.3) ? rng.int(1, Math.max(2, roadTop - 2)) : rng.int(roadBot, height - 3),
+      colors: {
+        body: rng.chance(0.3) ? PALETTE.voidRock : PALETTE.voidRockDark,
+        light: PALETTE.voidRockLight,
+        shadow: PALETTE.cosmicHigh,
+      },
+    });
   }
 
   return canvas;
@@ -795,7 +830,7 @@ export const VOID_ART = {
     { name: 'mid', speed: 0.4, y: -58 },
     { name: 'shelf', speed: 0.7, y: -38, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.9, y: -15, anchor: 'bottom', front: true },
   ],
 
   /**

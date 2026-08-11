@@ -38,7 +38,16 @@
 import { PALETTE } from '../palette.js';
 import { makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
-import { LAYER_TILE_W, makeCloudLayer, makeRidgeLayer, speckle } from '../env-kit.js';
+import {
+  LAYER_TILE_W,
+  bandFit,
+  bandRange,
+  makeCloudLayer,
+  makeRidgeLayer,
+  planeGrain,
+  planePebble,
+  planeZoom,
+} from '../env-kit.js';
 
 export const SNOW_PROPS = {
   /**
@@ -467,11 +476,15 @@ function driftCornice(ctx, heights, rng, height) {
 }
 
 /**
- * The ground: a track trodden through deep snow.
+ * The ground: a track trodden through deep snow, drawn as a floor running away
+ * from the camera.
  *
- * Row zero is the walk line, exactly as it is in the prairie, and for the same
- * reason — the trodden band has to start where the boots land or the traveller
- * walks along a white ledge with a road in front of him.
+ * The boots land `PLANE_RISE` rows down rather than on row zero, so there is
+ * open snow behind the traveller as well as in front of him and the track is
+ * something he is walking ALONG rather than standing at the back of. The
+ * renderer scrolls the rows at their own speeds, which is why nothing below has
+ * a wandering edge and why every print, runner and ice sheet is placed with
+ * `bandFit` — see the note over `PLANE_RISE` in `env-kit.js`.
  *
  * Three things make it read as snow rather than as pale sand: the track is a
  * *colder* value than the untouched snow rather than a warmer one (a path is
@@ -483,68 +496,76 @@ function makeSnowGround({ seed, height }) {
   const { canvas, ctx } = makeCanvas(LAYER_TILE_W, height);
   const rng = makeRng(seed);
 
+  /** Where the trodden band begins and ends. The walk line is at 22. */
+  const top = 8;
+  const bot = 38;
+
   ctx.fillStyle = PALETTE.snow;
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
 
   // --- the trodden band ---
-  const top = new Array(LAYER_TILE_W);
-  const bot = new Array(LAYER_TILE_W);
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    const t = Math.sin((x / LAYER_TILE_W) * Math.PI * 2) * 1.2
-      + Math.sin((x / LAYER_TILE_W) * Math.PI * 6 + 1.7) * 0.8;
-    const b = Math.sin((x / LAYER_TILE_W) * Math.PI * 2 + 2.4) * 3
-      + Math.sin((x / LAYER_TILE_W) * Math.PI * 10 + 0.4) * 1.1;
-    top[x] = Math.max(0, Math.round(t));
-    bot[x] = Math.round(23 + b);
-    ctx.fillStyle = PALETTE.snowMid;
-    ctx.fillRect(x, top[x], 1, bot[x] - top[x]);
-    // The far lip catches the light; the near one is the edge of a rut.
-    ctx.fillStyle = PALETTE.snowLight;
-    ctx.fillRect(x, top[x], 1, 1);
-    ctx.fillStyle = PALETTE.snowShade;
-    ctx.fillRect(x, bot[x] - 2, 1, 2);
-  }
+  ctx.fillStyle = PALETTE.snowMid;
+  ctx.fillRect(0, top, LAYER_TILE_W, bot - top);
+  // The far lip catches the light; the near one is the edge of a rut.
+  ctx.fillStyle = PALETTE.snowLight;
+  ctx.fillRect(0, top, LAYER_TILE_W, 1);
+  ctx.fillStyle = PALETTE.snowShade;
+  ctx.fillRect(0, bot - 2, LAYER_TILE_W, 2);
 
-  // Sled runners: two shallow blue lines that break rather than run true.
-  for (const share of [0.34, 0.66]) {
+  // Sled runners: two shallow blue lines, one on each side of the boots, that
+  // break rather than run true.
+  for (const y of [14, 32]) {
     for (let x = 0; x < LAYER_TILE_W; x++) {
       if (rng.chance(0.26)) continue;
-      const y = Math.round(top[x] + (bot[x] - top[x]) * share);
       ctx.fillStyle = PALETTE.snowShade;
-      ctx.fillRect(x, y, 1, 1);
+      ctx.fillRect(x, y, 1, Math.max(1, Math.round(planeZoom(y, height) - 0.4)));
     }
   }
 
   // Boot prints, in pairs, staggered down the middle of the track. Two pixels
-  // of cold shadow with one bright pixel of thrown snow behind the toe.
+  // of cold shadow with one bright pixel of thrown snow behind the toe, and
+  // both feet inside one band so a stride is never torn in half.
   for (let x = 4; x < LAYER_TILE_W; x += rng.int(9, 14)) {
-    const mid = Math.round(top[x] + (bot[x] - top[x]) * 0.5);
+    const py = bandFit(rng.int(top + 3, bot - 6), 5, height);
+    const w = Math.max(2, Math.round(2 * planeZoom(py, height)));
     for (let foot = 0; foot < 2; foot++) {
-      const py = mid + (foot ? 3 : -3);
+      const fy = py + foot * 3;
       ctx.fillStyle = PALETTE.snowDeep;
-      ctx.fillRect(x, py, 2, 1);
+      ctx.fillRect(x, fy, w, 1);
       ctx.fillStyle = PALETTE.snowShade;
-      ctx.fillRect(x, py + 1, 2, 1);
+      ctx.fillRect(x, fy + 1, w, 1);
       ctx.fillStyle = PALETTE.snowLight;
-      ctx.fillRect(x - 1, py, 1, 1);
+      ctx.fillRect(x - 1, fy, 1, 1);
     }
   }
 
-  // Scoured ice: flat sheets with a bright rim on the windward side.
-  for (let i = 0; i < 16; i++) {
+  /**
+   * Scoured ice: flat sheets with a bright rim on the windward side, wider the
+   * nearer they lie.
+   *
+   * They lie OFF the track, on either side of it. Scattered over the whole
+   * layer they broke the trodden band up into blue islands and the road stopped
+   * being findable at all — which matters more here than anywhere else, because
+   * white on white is the one biome where the road has almost no contrast to
+   * spare.
+   */
+  for (let i = 0; i < 12; i++) {
     const cx = rng.int(0, LAYER_TILE_W - 1);
-    const cy = rng.int(2, height - 6);
-    const rx = rng.int(4, 13);
-    const ry = rng.int(1, 3);
-    for (let y = -ry; y <= ry; y++) {
-      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.001))));
-      ctx.fillStyle = y < 0 ? PALETTE.iceLight : PALETTE.ice;
-      ctx.fillRect(cx - half, cy + y, half * 2 + 1, 1);
+    const cy = rng.chance(0.3) ? rng.int(1, top - 1) : rng.int(bot + 1, height - 6);
+    const zoom = planeZoom(cy, height);
+    const rx = Math.round(rng.int(4, 13) * zoom);
+    const ry = Math.max(1, Math.round(rng.int(1, 2) * zoom));
+    const base = bandFit(cy, ry * 2 + 1, height);
+    for (let y = 0; y <= ry * 2; y++) {
+      const k = (y - ry) / (ry + 0.001);
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - k * k)));
+      ctx.fillStyle = y < ry ? PALETTE.iceLight : PALETTE.ice;
+      ctx.fillRect(cx - half, base + y, half * 2 + 1, 1);
     }
   }
 
   // --- the fresh snow in front of the track ---
-  const near = Math.round(height * 0.5);
+  const near = Math.round(height * 0.6);
   for (let y = near; y < height; y++) {
     const k = (y - near) / (height - near);
     ctx.globalAlpha = k * 0.65;
@@ -553,21 +574,37 @@ function makeSnowGround({ seed, height }) {
   }
   ctx.globalAlpha = 1;
 
+  // Stones and stems the wind has scoured back out of the drift, on both sides
+  // of the track, each with its own blue pocket of shadow.
+  for (let i = 0; i < 46; i++) {
+    planePebble(ctx, rng, {
+      height,
+      y: rng.chance(0.35) ? rng.int(1, top - 1) : rng.int(bot + 1, height - 3),
+      colors: { body: PALETTE.greyDark, light: PALETTE.grey, shadow: PALETTE.snowDeep },
+    });
+  }
+
   /**
    * Sastrugi: the ridges wind cuts into open snow. Shallow arcs, lit on top
    * and blue underneath — the same pass the desert makes over its sand, which
    * is not a coincidence. Wind does the same thing to both, and drawing them
    * with the same hand is what keeps the six worlds looking like one game.
    */
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 130; i++) {
+    const y0 = rng.int(1, height - 3);
+    const [bandTop, bandBottom] = bandRange(y0, height);
+    const zoom = planeZoom(y0, height);
     const x0 = rng.int(-10, LAYER_TILE_W);
-    const y0 = rng.int(Math.max(2, bot[0]), height - 2);
-    const len = rng.int(8, 26);
-    const amp = rng.range(1, 3);
+    const len = Math.round(rng.int(8, 26) * zoom);
+    // The arc's rise is capped to the band it started in: an arc that climbed
+    // out of one band and back into the next would be cut in two and the two
+    // halves would slide apart down the road.
+    const amp = Math.min(bandBottom - bandTop - 2, Math.round(rng.range(1, 3) * zoom));
     for (let t = 0; t < len; t++) {
       const x = ((x0 + t) % LAYER_TILE_W + LAYER_TILE_W) % LAYER_TILE_W;
-      const y = Math.round(y0 - Math.sin((t / len) * Math.PI) * amp);
-      if (y < 1 || y >= height) continue;
+      const y = Math.round(
+        Math.min(bandBottom - 2, Math.max(bandTop + 1, y0 - Math.sin((t / len) * Math.PI) * amp)),
+      );
       ctx.fillStyle = PALETTE.snowShade;
       ctx.fillRect(x, y + 1, 1, 1);
       ctx.fillStyle = PALETTE.snowLight;
@@ -575,12 +612,13 @@ function makeSnowGround({ seed, height }) {
     }
   }
 
-  speckle(ctx, rng, {
+  planeGrain(ctx, rng, {
+    height,
     from: 1,
     to: height - 1,
-    count: 260,
+    count: 340,
     colors: [PALETTE.snowLight, PALETTE.snowMid],
-    wide: 0.1,
+    wide: 0.12,
   });
 
   return canvas;
@@ -643,20 +681,66 @@ function makeSnowFringe({ seed, height }) {
 // ---------------------------------------------------------------------------
 
 /**
- * What the air does up here.
+ * THE AURORA
+ * ---------------------------------------------------------------------------
+ * The counterpart of the prairie's fireflies: the thing that makes nightfall a
+ * change of character rather than a change of brightness. It was three flat
+ * green-and-cyan curtains drawn on top of the finished frame, and it had three
+ * separate things wrong with it.
+ *
+ * IT WAS IN FRONT OF THE MOUNTAINS. Drawn with the rest of the ambient life —
+ * after the lighting pass, over everything — so a light forty miles up was
+ * painted across peaks eight miles away, and the pass looked like it had green
+ * gauze hung in front of it. It is drawn through `renderSky` now, inside the
+ * renderer's `destination-over` pass, which puts it behind every solid thing in
+ * the scene and in front of nothing but the sky itself. See the call site in
+ * `src/explore/parallax.js`.
+ *
+ * IT WAS ONE COLOUR PER CURTAIN. A real aurora is not: the same curtain is red
+ * at the top, green through the body and violet along the hem, because those
+ * are three different gases lit at three different altitudes — atomic oxygen
+ * high up, atomic oxygen lower down, ionised nitrogen at the bottom edge. So
+ * every curtain here is drawn through a vertical RAMP rather than a colour, and
+ * the ramps are the real ones: the common green display, the rare all-red one,
+ * and the violet-hemmed green of a strong substorm. Which display you get is
+ * rolled per night, so the pass does not look the same twice.
+ *
+ * IT HAD NO STRUCTURE. An aurora is made of RAYS — near-vertical shafts along
+ * the field lines, brightening and dying independently — and folds, where the
+ * whole curtain kinks back on itself. Both are here: a per-column ray gain
+ * running on its own drifting noise, and a fold term in the curtain's base
+ * curve. Together they are the difference between a light in the sky and a
+ * green stripe.
+ *
+ * Everything is composited `lighter`, because light in the sky ADDS to what is
+ * behind it — an aurora painted with ordinary alpha puts a grey film over the
+ * stars — and the hem is the brightest part of every curtain, because a curtain
+ * is lit from the bottom, where the air it is exciting actually is.
+ *
+ * The rest of what the air does up here:
  *
  *   spindrift  loose snow the wind lifts off the drifts and drives along the
  *              ground. It is not weather — it blows on a clear day too, and
  *              that is the point: the pass is never still
  *   glints     the sun catching single crystals, out only in daylight
- *   aurora     three curtains high over the peaks, out only once the stars are
- *
- * The aurora is the counterpart of the prairie's fireflies: the thing that
- * makes nightfall a change of character rather than a change of brightness.
- * It is drawn as columns of stacked blocks with a wave running through them and
- * composited `lighter`, because light in the sky adds to what is behind it —
- * an aurora painted with ordinary alpha puts a grey film over the stars.
  */
+
+/**
+ * The displays, as vertical ramps: [top, upper, body, hem]. Every one of them
+ * is a real auroral spectrum rather than a colour somebody liked.
+ */
+const AURORA_DISPLAYS = [
+  // The common one: oxygen green with the faintest red crown over it.
+  { name: 'green', ramp: ['#4d2a52', '#2f7a5a', '#57d68f', '#a8f7c0'], weight: 5 },
+  // A strong substorm: green body, violet hem where the nitrogen lights up.
+  { name: 'violet', ramp: ['#3a2a6a', '#4a56b0', '#4fd6a0', '#c8a0ff'], weight: 3 },
+  // High red aurora — rare, and the one that makes a night memorable.
+  { name: 'red', ramp: ['#5a1030', '#9c2440', '#d4553f', '#f0a060'], weight: 2 },
+  // Cold aquamarine, the colour the void's crystal glows in: this world and
+  // the last one are the two cold places in the game and they rhyme on purpose.
+  { name: 'astral', ramp: ['#25406e', '#2a7f88', '#4fcac6', '#a2f7ec'], weight: 2 },
+];
+
 function createSnowAmbient(seed) {
   const rng = makeRng(seed >>> 0);
   let clock = 0;
@@ -678,15 +762,57 @@ function createSnowAmbient(seed) {
     phase: rng.range(0, Math.PI * 2),
   }));
 
+  /**
+   * Tonight's display, rolled once. Two of the three curtains take it and one
+   * is drawn from a different one at half strength — a real aurora has more
+   * than one arc up at a time and they are not always the same colour, but
+   * three unrelated colours at once is a screensaver.
+   */
+  const pickDisplay = () => {
+    const total = AURORA_DISPLAYS.reduce((sum, d) => sum + d.weight, 0);
+    let roll = rng() * total;
+    for (const d of AURORA_DISPLAYS) {
+      roll -= d.weight;
+      if (roll <= 0) return d;
+    }
+    return AURORA_DISPLAYS[0];
+  };
+  const tonight = pickDisplay();
+  const second = pickDisplay();
+
   const curtains = Array.from({ length: 3 }, (_, i) => ({
-    y: rng.range(0.04, 0.16) + i * 0.05,
-    h: rng.range(0.13, 0.26),
-    rate: rng.range(9000, 16000),
-    periods: rng.range(1.2, 2.6),
+    /**
+     * Where the crown of the curtain sits, and how far it hangs below it. Deep
+     * on purpose: a shallow band across the sky reads as a ribbon somebody has
+     * laid over the stars, and the thing that makes an aurora look like a
+     * curtain is that it HANGS.
+     */
+    y: rng.range(0.03, 0.12) + i * 0.05,
+    h: rng.range(0.26, 0.46),
+    /** The fold: how far the base curve kinks, and how fast it travels. */
+    rate: rng.range(11000, 19000),
+    periods: rng.range(1.1, 2.4),
+    fold: rng.range(0.6, 1.6),
     phase: rng.range(0, Math.PI * 2),
-    a: rng.range(0.16, 0.3),
-    color: i === 1 ? PALETTE.astral : PALETTE.greenLight,
+    /**
+     * How much of the sky's own colour the curtain replaces at its hem. It is
+     * high — this is not an overlay at 20% that the eye has to hunt for, it is
+     * the brightest thing in the frame at midnight, which is what an aurora
+     * over open snow actually is.
+     */
+    a: rng.range(0.5, 0.72) * (i === 2 ? 0.62 : 1),
+    /** Rays run on their own clock, at their own spacing. */
+    rayRate: rng.range(2600, 5200),
+    raySpacing: rng.range(11, 26),
+    rayPhase: rng.range(0, Math.PI * 2),
+    /** The substorm pulse: the whole curtain brightens and dies back. */
+    pulseRate: rng.range(7000, 15000),
+    pulsePhase: rng.range(0, Math.PI * 2),
+    ramp: (i === 1 ? second : tonight).ramp,
   }));
+
+  /** Sample a curtain's ramp at 0 (top) to 1 (hem). */
+  const rampAt = (ramp, k) => ramp[Math.min(ramp.length - 1, Math.floor(k * ramp.length))];
 
   return {
     update(dt) {
@@ -701,35 +827,126 @@ function createSnowAmbient(seed) {
       }
     },
 
-    render(ctx, view, sky) {
+    /**
+     * The aurora, drawn into the sky pass rather than over the finished frame.
+     * See the long note above this factory for what that buys and for why the
+     * colours are ramps rather than colours.
+     */
+    renderSky(ctx, view, sky) {
+      const night = sky.stars;
+      if (night <= 0.05) return;
+      const s = view.scale;
+      /**
+       * The compositing mode is INHERITED, and that is the whole design.
+       *
+       * The renderer is midway through its `destination-over` sky pass when it
+       * calls this, so every pixel drawn here lands only where the canvas is
+       * still transparent — which is exactly the sky, and nowhere else. The
+       * mountains, the spruce and the traveller are already down, so they mask
+       * the curtain perfectly and it cannot touch them.
+       *
+       * An earlier version set `lighter` here instead, out of habit: an aurora
+       * is emitted light and emitted light adds. It does — but `lighter` inside
+       * this pass composites the curtain OVER everything already drawn, which
+       * put it back in front of the peaks and washed pale green across their
+       * faces. Painting into the hole in the canvas and letting the sky ramp
+       * fill in behind gives the same glow, because the thing it is being mixed
+       * with is a night sky.
+       */
+      ctx.save();
+
+      /** Column width: three source pixels, so the rays land on the grid. */
+      const step = s * 3;
+      const cols = Math.ceil(view.w / step) + 1;
+      /** Vertical steps through the ramp. Nine is enough to read as a ramp. */
+      const bands = 9;
+
+      for (const c of curtains) {
+        // The substorm: the whole curtain swells and dies back over ten or
+        // fifteen seconds. Static brightness is the giveaway that a light in
+        // the sky was drawn rather than observed.
+        const pulse = 0.55 + 0.45 * Math.sin(clock / c.pulseRate + c.pulsePhase);
+
+        for (let i = 0; i < cols; i++) {
+          const x = i * step;
+          const u = i / cols;
+          /**
+           * The base curve. Two waves at unrelated periods, one of them slow
+           * and deep, so the curtain FOLDS — kinks back on itself — instead of
+           * rippling evenly like a flag. The deep one is the fold; the fast one
+           * is the wrinkle running along it.
+           */
+          const wave = Math.sin(u * Math.PI * 2 * c.periods + (clock / c.rate) * 6 + c.phase)
+            + 0.42 * Math.sin(u * Math.PI * 2 * (c.periods * 2.7) - (clock / c.rate) * 9)
+            + c.fold * 0.5 * Math.sin(u * Math.PI * 2 * 0.5 + (clock / c.rate) * 2.4);
+          const top = (c.y + wave * 0.038) * view.h;
+          // Depth varies along the curtain, so it is deeper where it folds
+          // towards you and thinner where it turns edge-on.
+          const h = c.h * view.h * (0.6 + 0.4 * Math.sin(u * 9 + clock / 2600 + c.phase));
+
+          /**
+           * The rays. A curtain is a row of vertical shafts along the magnetic
+           * field, each brightening and dying on its own — so this is two sine
+           * trains at different spacings drifting at different rates, squared to
+           * keep the gain mostly low with occasional bright shafts. It is the
+           * single thing that stopped the aurora reading as a painted band.
+           */
+          const ray = (Math.sin(i / c.raySpacing * Math.PI * 2 + clock / c.rayRate + c.rayPhase)
+            + Math.sin(i / (c.raySpacing * 0.37) * Math.PI * 2 - clock / (c.rayRate * 1.7)))
+            * 0.5;
+          const gain = 0.45 + 0.55 * ray * ray;
+
+          for (let b = 0; b < bands; b++) {
+            // 0 at the crown of the curtain, 1 at the hem.
+            const k = b / (bands - 1);
+            // Brightest at the bottom hem and almost gone at the top: a curtain
+            // is lit from below, where the air it is exciting actually is. The
+            // falloff is steep rather than linear because a real curtain has a
+            // hard lower border and a crown that fades into nothing.
+            ctx.globalAlpha = Math.min(1, c.a * night * pulse * gain * (0.04 + k ** 2.2));
+            ctx.fillStyle = rampAt(c.ramp, k);
+            const by = Math.round((top + h * k) / s) * s;
+            ctx.fillRect(Math.round(x), by, step, Math.ceil(h / bands / s) * s + s);
+          }
+
+          // The hem itself: one bright row along the bottom edge, in the hem
+          // colour, wherever a ray happens to be strong. Without it the curtain
+          // fades out at both ends and hangs in the sky like smoke.
+          if (gain > 0.72) {
+            ctx.globalAlpha = Math.min(1, c.a * night * pulse * 1.6);
+            ctx.fillStyle = rampAt(c.ramp, 1);
+            ctx.fillRect(Math.round(x), Math.round((top + h) / s) * s, step, s);
+          }
+        }
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    },
+
+    render(ctx, view, sky, world) {
       const s = view.scale;
       const day = Math.max(0, Math.min(1, (sky.light - 0.4) / 0.4));
-      const night = sky.stars;
 
-      // --- aurora ---
-      if (night > 0.05) {
+      /**
+       * The aurora lying on the snow.
+       *
+       * Two rows of the tonight's hem colour, added over the floor at almost
+       * nothing — you would not name it if you were asked what was on screen.
+       * It is here because the curtain is drawn behind the mountains, and a
+       * light source that big with no effect whatever on the ground under it is
+       * the one thing that would still give away that it is a backdrop. Snow is
+       * the only surface in the game bright enough to show it, which is why
+       * this is the only biome that does it.
+       */
+      if (sky.stars > 0.2 && world?.planeTop != null) {
+        const glow = curtains[0].ramp[3];
+        const wave = 0.6 + 0.4 * Math.sin(clock / curtains[0].pulseRate + curtains[0].pulsePhase);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const cols = Math.ceil(view.w / (s * 3));
-        for (const c of curtains) {
-          ctx.fillStyle = c.color;
-          for (let i = 0; i < cols; i++) {
-            const x = i * s * 3;
-            const u = i / cols;
-            // Two waves, so the curtain folds instead of rippling evenly.
-            const wave = Math.sin(u * Math.PI * 2 * c.periods + clock / c.rate * 6 + c.phase)
-              + 0.4 * Math.sin(u * Math.PI * 2 * (c.periods * 2.7) - clock / c.rate * 9);
-            const top = (c.y + wave * 0.035) * view.h;
-            const h = c.h * view.h * (0.7 + 0.3 * Math.sin(u * 9 + clock / 2600));
-            const bands = 7;
-            for (let b = 0; b < bands; b++) {
-              // Brightest at the bottom hem, gone at the top: a curtain is lit
-              // from below, where the air it is exciting actually is.
-              ctx.globalAlpha = c.a * night * ((b + 1) / bands) ** 2;
-              const by = Math.round((top + (h * b) / bands) / s) * s;
-              ctx.fillRect(Math.round(x), by, s * 3, Math.ceil(h / bands / s) * s);
-            }
-          }
+        for (let i = 0; i < 5; i++) {
+          ctx.globalAlpha = sky.stars * wave * 0.035 * (1 - i / 5);
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, world.planeTop + i * 4 * s, view.w, 4 * s);
         }
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -844,7 +1061,7 @@ export const SNOW_ART = {
     { name: 'mid', speed: 0.4, y: -62 },
     { name: 'drifts', speed: 0.7, y: -38, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.9, y: -15, anchor: 'bottom', front: true },
   ],
 
   /**

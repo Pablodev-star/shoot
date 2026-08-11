@@ -43,7 +43,17 @@
 import { PALETTE } from '../palette.js';
 import { makeCanvas } from '../pixel.js';
 import { makeRng } from '../../core/rng.js';
-import { LAYER_TILE_W, makeCloudLayer, makeRidgeLayer, speckle } from '../env-kit.js';
+import {
+  LAYER_TILE_W,
+  bandFit,
+  bandRange,
+  makeCloudLayer,
+  makeRidgeLayer,
+  planeGrain,
+  planePebble,
+  planeZoom,
+  speckle,
+} from '../env-kit.js';
 
 export const INFERNO_PROPS = {
   /**
@@ -330,7 +340,8 @@ function glowPatch(ctx, x, y, r) {
 const wrapX = (x) => ((x % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W;
 
 /**
- * The cones, and the one of them that is awake.
+ * The dead cones on the plain: low, cold, and there to give the erupting one
+ * something to be bigger than.
  *
  * Same argument as the peaks in `biomes/snow.js`: the ridge generator sums
  * sines, a sine has no corner in it, and a volcano is nothing *but* corners —
@@ -338,24 +349,23 @@ const wrapX = (x) => ((x % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W;
  * this horizon came out as two smooth brown hills with a fire on one of them,
  * which is a moor with a bonfire.
  *
- * A cinder cone is drawn instead: a trapezoid, wider at the foot than any
- * mountain, with a crater bitten out of the top. Four of them, and exactly one
- * lit — two eruptions on one skyline is a cartoon, and none at all is a
- * quarry.
+ * The LIVE one used to be drawn in here too, as whichever of these four
+ * happened to come out tallest. It is not any more, and the reason is the one
+ * thing about the basin that could not be fixed by drawing it better: this
+ * layer is a 320-pixel tile, so the erupting cone and its plume came round
+ * again every screen and a half, and on a wide window you could see three
+ * eruptions at once. A volcano is a place, and you cannot have four of it. It
+ * is a landmark now — see `buildInfernoLandmarks` — placed once every fourteen
+ * hundred paces on its own world grid.
  */
 function cinderCones(ctx, heights, rng, height) {
-  const cones = [];
-  for (let i = 0; i < 4; i++) {
-    cones.push({
-      cx: rng.int(0, LAYER_TILE_W - 1),
-      h: rng.int(14, 34),
-      // Cinder cones are squat: a cone as steep as a mountain is a mountain.
-      spread: rng.range(1.5, 2.4),
-      crater: rng.int(3, 7),
-    });
-  }
-  cones.sort((a, b) => a.h - b.h);
-  const live = cones[cones.length - 1];
+  const cones = Array.from({ length: 5 }, () => ({
+    cx: rng.int(0, LAYER_TILE_W - 1),
+    h: rng.int(10, 26),
+    // Cinder cones are squat: a cone as steep as a mountain is a mountain.
+    spread: rng.range(1.5, 2.4),
+    crater: rng.int(3, 6),
+  })).sort((a, b) => a.h - b.h);
 
   for (const cone of cones) {
     const half = Math.round(cone.h * cone.spread);
@@ -388,33 +398,275 @@ function cinderCones(ctx, heights, rng, height) {
         ctx.fillRect(x, Math.min(top + rng.int(1, 4), bottom - 1), 1, rng.int(2, 6));
       }
     }
+  }
+}
 
-    if (cone !== live) continue;
+// ---------------------------------------------------------------------------
+// The volcano
+// ---------------------------------------------------------------------------
 
-    // --- the live one ---
-    glowPatch(ctx, cone.cx, summit + 2, cone.crater - 1);
+/**
+ * THE MOUNTAIN THE WORLD IS NAMED AFTER
+ * ---------------------------------------------------------------------------
+ * One stratovolcano, drawn once, a hundred and forty pixels across and eighty
+ * high — six times the traveller, and the biggest single piece of art in the
+ * game. It stands on its own world grid rather than in a layer tile, so there
+ * is never more than one of it on screen and it arrives as an event rather than
+ * as a pattern.
+ *
+ * What makes it a volcano and not a triangle, in the order it matters:
+ *
+ *  1. THE PROFILE IS CONCAVE. A stratovolcano is built out of its own ejecta,
+ *     so the slope steepens as it climbs and flattens out into a long apron at
+ *     the foot. That curve — `k ** 1.75` below — is the single most
+ *     recognisable thing about the shape, and it is what the old squat
+ *     trapezoid never had.
+ *  2. THE SUMMIT IS A HOLE. Not a point: a crater with two lips, the far one
+ *     visible over the near one, and the fire in between them.
+ *  3. LAVA RUNS DOWNHILL, IN CHANNELS. Three tongues leave the crater and take
+ *     separate lines down the flanks, each one cooling from white through
+ *     orange to dull red as it goes, and each one narrowing and stopping before
+ *     it reaches the foot. A flow that runs the whole height of the mountain
+ *     reads as a crack in the sprite.
+ *  4. THE PLUME LEANS AND SPREADS. It climbs, drifts downwind and opens out at
+ *     the top where it hits the inversion — the anvil every real ash column
+ *     makes — and it goes from lit ash at the vent to cold grey by the time it
+ *     is that wide.
+ *  5. IT IS LIT FROM ITS OWN CRATER. The upper slopes catch the fire, so the
+ *     rock nearest the summit is warmer than the rock at the foot. Every other
+ *     mountain in the game is lit from the top left; this one is lit from the
+ *     middle, and that is why it reads as burning rather than as sunlit.
+ */
+/** 4x4 ordered dither thresholds, normalised. See `makeVolcano`. */
+const BAYER4 = [
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5,
+].map((v) => (v + 0.5) / 16);
 
+function makeVolcano(seed) {
+  const w = 140;
+  const h = 74;
+  const { canvas, ctx } = makeCanvas(w, h);
+  const rng = makeRng(seed);
+  const cx = Math.round(w / 2);
+  /** Rows of mountain, measured up from the bottom of the canvas. */
+  const peak = 52;
+  const foot = h;
+  const summit = foot - peak;
+  const crater = 7;
+
+  const plot = (x, y, color, alpha = 1) => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 1, 1);
+    ctx.globalAlpha = 1;
+  };
+
+  /** The mountain's own outline: how high it stands at `dx` from the middle. */
+  const profile = (dx) => {
+    const half = w / 2;
+    const k = Math.min(1, Math.abs(dx) / half);
+    return peak * (1 - k ** 1.75);
+  };
+
+  /**
+   * The crater, in three lines of arithmetic and a lot of consequence.
+   *
+   * `craterFar` is the far rim — the one you see across the bowl — and
+   * `craterNear` the one nearest the camera. Both are arcs rather than lines,
+   * so the summit is an ellipse seen from slightly above instead of a notch cut
+   * out of a triangle, and the ground between them is the inside of the
+   * mountain.
+   */
+  const craterArc = (dx) => Math.sqrt(Math.max(0, 1 - (dx / crater) ** 2));
+  const craterFar = (dx) => summit + Math.round(3 - craterArc(dx) * 3);
+  const craterNear = (dx) => summit + 4 + Math.round(craterArc(dx) * 3);
+
+  // --- the cone ---
+  for (let dx = -Math.floor(w / 2); dx < Math.ceil(w / 2); dx++) {
+    const x = cx + dx;
+    const local = Math.round(profile(dx) + Math.sin(dx * 0.7) * 0.9);
+    if (local < 1) continue;
+    const inCrater = Math.abs(dx) < crater;
+    const top = inCrater ? craterNear(dx) : foot - local;
+    for (let y = top; y < foot; y++) {
+      const up = (foot - y) / peak;          // 0 at the foot, 1 at the summit
+      /**
+       * A cone is ROUND, so it is shaded across its width and not just down
+       * one side. Three tones from the lit flank through the body to the far
+       * flank — the same treatment a barrel gets in the props — because the
+       * first pass used two, split at the middle, and a mountain painted in two
+       * flat halves is a paper cut-out however good its outline is.
+       */
+      const across = dx / (w / 2);
+      /**
+       * Four tones with DITHERED boundaries. Picking the tone with three hard
+       * comparisons — which is what the first pass did — painted the mountain
+       * in four vertical stripes, and a cone in four flat stripes is a folded
+       * paper fan. Rolling the die at the boundary scatters the change across a
+       * few pixels of noise, which is the same thing the sky does with its
+       * ordered dither and the reason that ramp reads as smooth.
+       */
+      const ramp = [PALETTE.grey, PALETTE.charLight, PALETTE.char, PALETTE.charDark];
+      const f = ((across + 1) / 2) * (ramp.length - 1);
+      /**
+       * A 4x4 ordered threshold, the same one the sky's gradient is dithered
+       * with. Two things it is not: a die rolled per pixel, which dithers the
+       * boundary and textures the entire flank at the same time and came out
+       * looking like television static; and a cheap `(x * 5 + y * 3) % 4`,
+       * which is ordered but *periodic along a diagonal*, so the mountain came
+       * out ribbed like corduroy. A Bayer matrix is the one arrangement of
+       * sixteen thresholds with no visible structure of its own.
+       */
+      const dither = BAYER4[(y % 4) * 4 + (x % 4)];
+      const step = Math.min(ramp.length - 1, Math.floor(f) + (f - Math.floor(f) > dither ? 1 : 0));
+      const tone = ramp[step];
+      // Rock warms towards the crater: the light in this world comes from the
+      // hole in the top of this mountain.
+      const hot = up > 0.74 && rng.chance((up - 0.74) * 2.6);
+      ctx.fillStyle = hot ? PALETTE.magmaDeep : y === top && !inCrater ? PALETTE.grey : tone;
+      ctx.fillRect(x, y, 1, 1);
+    }
     /**
-     * The plume. It widens and leans as it climbs, and it is drawn as a
-     * column of overlapping runs rather than as scattered pixels: smoke has a
-     * body, and a hundred single pixels drifting upwards is a swarm of flies.
+     * Ash layering: the bands of every eruption before this one, following the
+     * contour of the cone. They are what makes it a STRATOvolcano rather than a
+     * heap, and they are drawn as short arcs parallel to the outline rather
+     * than as horizontal lines, because a horizontal line across a cone reads
+     * as a shelf.
      */
-    for (let i = 0; i < 34; i++) {
-      const t = i / 34;
-      const y = summit - 1 - Math.round(t * 34);
-      if (y < 0) break;
-      const lean = Math.round(t * t * 14);
-      const spread = 1 + Math.round(t * 6);
-      const cx = cone.cx + lean + rng.int(-1, 1);
-      ctx.globalAlpha = (1 - t) ** 1.4 * 0.55;
-      ctx.fillStyle = t < 0.2 ? PALETTE.magmaDeep : t < 0.5 ? PALETTE.charLight : PALETTE.grey;
-      for (let dx = -spread; dx <= spread; dx++) {
-        if (rng.chance(0.25)) continue; // ragged edges, solid middle
-        ctx.fillRect(wrapX(cx + dx), y, 1, 1);
+    if (!inCrater && rng.chance(0.5)) {
+      const depth = rng.int(3, Math.max(4, Math.round(local * 0.8)));
+      const y = foot - local + depth;
+      if (y < foot - 1) plot(x, y, rng.chance(0.5) ? PALETTE.charDark : PALETTE.char, 0.5);
+    }
+    // Gullies down both flanks, cut into the ash. Broken and half-strength:
+    // solid black bars down a dithered slope read as railings leaning on it.
+    if (!inCrater && rng.chance(0.09)) {
+      let gy = foot - local + rng.int(2, 6);
+      const len = rng.int(4, 13);
+      for (let t = 0; t < len && gy + t < foot - 1; t++) {
+        if (rng.chance(0.25)) continue;
+        plot(x, gy + t, PALETTE.charDark, 0.7);
       }
     }
-    ctx.globalAlpha = 1;
   }
+
+  // --- the crater: the far wall in shadow, the lake at the bottom of it ---
+  for (let dx = -crater + 1; dx < crater; dx++) {
+    const x = cx + dx;
+    const from = craterFar(dx);
+    const to = craterNear(dx);
+    for (let y = from; y < to; y++) {
+      // The inside of the bowl: dark at the top where the far wall is in its
+      // own shadow, then the lake.
+      const k = (y - from) / Math.max(1, to - from);
+      ctx.fillStyle = k < 0.45
+        ? PALETTE.charDark
+        : k < 0.7
+          ? PALETTE.magmaDeep
+          : rng.chance(0.25) ? PALETTE.sulfurLight : PALETTE.emberGlow;
+      ctx.fillRect(x, y, 1, 1);
+    }
+    // The near lip, catching the light coming up out of the bowl. The far one
+    // is only picked out on its lit side: a bright row all the way across the
+    // top of the crater turned the summit into a table.
+    plot(x, to, PALETTE.magmaDeep, 0.7);
+    if (dx < 0) plot(x, from, PALETTE.charLight);
+  }
+
+  /**
+   * The light standing over the crater. Not `glowPatch`: that draws concentric
+   * rectangles, which is right for a vent seen flat-on in the floor and wrong
+   * for this — the first pass put a solid pale BRICK on the summit, and at any
+   * distance the mountain read as having a lit window in the top of it. A
+   * column of rows narrowing as it rises is what a glow over a hole looks like
+   * from the side.
+   */
+  for (let i = 0; i < 6; i++) {
+    const half = Math.max(1, crater - 3 - i);
+    const y = summit + 1 - i;
+    for (let dx = -half; dx <= half; dx++) {
+      // Faint, and gone within six rows. This is the light standing over the
+      // hole, not a beam coming out of it.
+      plot(cx + dx, y, i < 2 ? PALETTE.emberGlow : PALETTE.magma, 0.2 - i * 0.03);
+    }
+  }
+
+  /**
+   * --- the lava tongues ---
+   * Each leaves the crater lip and walks downhill, wandering a little and
+   * narrowing as it cools. The colour is a function of how far it has run, not
+   * of where it is on the mountain: that is what makes it read as flowing
+   * rather than as a painted stripe.
+   *
+   * They also stay ON the mountain — every step is clamped inside the profile —
+   * because a flow that wanders off the silhouette is a crack in the sky.
+   */
+  for (let i = 0; i < 3; i++) {
+    const dir = i === 1 ? (rng.chance(0.5) ? 1 : -1) : (i === 0 ? -1 : 1);
+    let x = cx + dir * rng.int(2, crater - 1);
+    let y = craterNear(x - cx) - 1;
+    const len = rng.int(20, 36);
+    for (let t = 0; t < len; t++) {
+      const k = t / len;
+      const width = Math.max(1, Math.round((1 - k) * 3));
+      const color = k < 0.25 ? PALETTE.emberGlow : k < 0.6 ? PALETTE.magma : PALETTE.magmaDeep;
+      // The crust either side of the channel, still glowing underneath.
+      plot(x - 1, y, PALETTE.magmaDeep, 0.5);
+      plot(x + width, y, PALETTE.magmaDeep, 0.5);
+      for (let dw = 0; dw < width; dw++) plot(x + dw, y, color);
+      y += 1;
+      // Downhill means outward as well as down, and it wanders as it goes.
+      x += dir * (rng.chance(0.5) ? 1 : 0) + rng.int(-1, 1);
+      if (y >= foot - 1 || y < foot - profile(x - cx)) break;
+    }
+  }
+
+  /**
+   * --- the plume ---
+   * Drawn as overlapping runs rather than scattered pixels: smoke has a body,
+   * and a hundred single pixels drifting upwards is a swarm of flies. It leans
+   * with `t * t` so it goes up before it goes sideways, and the spread opens
+   * fastest at the top, which is the anvil every ash column makes when it hits
+   * air it cannot climb through.
+   */
+  for (let y = summit - 1; y >= 0; y--) {
+    const t = 1 - y / Math.max(1, summit);
+    const lean = Math.round(t * t * 20);
+    const spread = 4 + Math.round(t ** 1.35 * 20);
+    const px = cx + lean + rng.int(-1, 1);
+    const alpha = (1 - t * 0.55) ** 1.2 * 0.75;
+    const color = t < 0.18 ? PALETTE.magmaDeep : t < 0.5 ? PALETTE.charLight : PALETTE.grey;
+    for (let dx = -spread; dx <= spread; dx++) {
+      // Solid through the middle, ragged at the edges: the chance of a pixel
+      // being missing rises with the square of how far out it is.
+      if (rng() < 0.85 * (Math.abs(dx) / spread) ** 2.2) continue;
+      plot(px + dx, y, color, alpha);
+    }
+  }
+
+  // Ash and bombs still in the air over the vent, thrown clear of the plume.
+  for (let i = 0; i < 26; i++) {
+    const t = rng();
+    const y = summit - Math.round(t * 30);
+    const x = cx + rng.int(-14, 22) + Math.round(t * t * 18);
+    plot(x, y, rng.chance(0.4) ? PALETTE.magma : PALETTE.charDark, rng.range(0.4, 0.9));
+  }
+
+  return { canvas, cx, summit };
+}
+
+let volcanoCache = null;
+
+function buildInfernoLandmarks() {
+  if (!volcanoCache) {
+    const built = makeVolcano(0x1a7a);
+    volcanoCache = { volcano: built.canvas, crater: { x: built.cx, y: built.summit } };
+  }
+  return { volcano: volcanoCache.volcano };
 }
 
 /**
@@ -538,38 +790,55 @@ function makeInfernoGround({ seed, height }) {
   ctx.fillRect(0, 0, LAYER_TILE_W, height);
 
   /**
-   * The road itself is trodden flatter and paler than the crust around it —
-   * but its edge WANDERS, and it used to not.
+   * The road: a band of crust trodden flatter and paler than the rest of the
+   * floor, with the walk line down the middle of it rather than along its top
+   * edge.
    *
-   * A `fillRect` of `charLight` three rows deep across the whole tile is a
-   * perfectly straight, perfectly uniform band 320 pixels long, and on screen
-   * that is not a trodden path: it is a pale rule drawn across the frame at
-   * exactly the height of the traveller's boots. The eye finds a mathematical
-   * horizontal instantly, and in a biome with no other straight line in it the
-   * effect was of a seam between two images. The void's road had the same
-   * fault and got the same fix.
+   * It is a straight band now. The old one wandered on a pair of sines, for a
+   * good reason — an unbroken 320-pixel horizontal reads as a rule drawn across
+   * the frame — but the floor is scrolled in depth bands and a wandering edge
+   * crossing four of them is torn into four. What breaks the straightness
+   * instead is what is lying ON the edge: scoria along both lips, in three
+   * sizes, at three speeds. That is a better answer anyway, because the litter
+   * moves with the ground it is lying on and the wave never did.
    */
-  for (let x = 0; x < LAYER_TILE_W; x++) {
-    const u = x / LAYER_TILE_W;
-    const lip = Math.round(3 + Math.sin(u * Math.PI * 2 + 1.4) * 1.2 + Math.sin(u * Math.PI * 9) * 0.8);
-    ctx.fillStyle = PALETTE.charLight;
-    ctx.fillRect(x, 0, 1, Math.max(1, lip));
-    ctx.fillStyle = PALETTE.char;
-    ctx.fillRect(x, Math.max(1, lip), 1, 1);
+  const roadTop = 10;
+  const roadBot = 40;
+  ctx.fillStyle = PALETTE.charLight;
+  ctx.fillRect(0, roadTop, LAYER_TILE_W, roadBot - roadTop);
+  // A dithered join at both lips rather than a cut: half the pixels of the row
+  // are the road and half the crust, which the eye reads as a crumbling edge
+  // and which survives being scrolled because it looks the same wherever it is
+  // cut.
+  for (const edge of [roadTop, roadBot - 1]) {
+    for (let x = 0; x < LAYER_TILE_W; x++) {
+      if (rng.chance(0.5)) continue;
+      ctx.fillStyle = PALETTE.char;
+      ctx.fillRect(x, edge, 1, 1);
+    }
   }
 
-  // Plates: broad polygons of slightly different value, so the floor is a
-  // pavement rather than one sheet.
-  for (let i = 0; i < 44; i++) {
+  /**
+   * Plates: broad polygons of slightly different value, so the floor is a
+   * pavement rather than one sheet. They are the one thing here that WANTS to
+   * be band-shaped — a cooling crust breaks into slabs, and a slab that is
+   * three rows deep and thirty wide is what a slab of it looks like from this
+   * angle — so each is fitted to a single depth band and given the width its
+   * depth deserves.
+   */
+  for (let i = 0; i < 52; i++) {
     const cx = rng.int(0, LAYER_TILE_W);
-    const cy = rng.int(0, height);
-    const rx = rng.int(10, 34);
-    const ry = rng.int(4, 12);
+    const cy = rng.int(0, height - 1);
+    const zoom = planeZoom(cy, height);
+    const rx = Math.round(rng.int(10, 34) * zoom);
+    const ry = Math.max(1, Math.round(rng.int(1, 3) * zoom));
+    const base = bandFit(cy, ry * 2 + 1, height);
     ctx.globalAlpha = rng.range(0.18, 0.4);
     ctx.fillStyle = rng.chance(0.5) ? PALETTE.charLight : PALETTE.charDark;
-    for (let y = -ry; y <= ry; y++) {
-      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
-      ctx.fillRect(cx - half, cy + y, half * 2 + 1, 1);
+    for (let y = 0; y <= ry * 2; y++) {
+      const k = (y - ry) / (ry + 0.001);
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - k * k)));
+      ctx.fillRect(cx - half, base + y, half * 2 + 1, 1);
     }
   }
   ctx.globalAlpha = 1;
@@ -592,10 +861,15 @@ function makeInfernoGround({ seed, height }) {
     let y = y0;
     let dx = dx0;
     let dy = dy0;
+    // A crack is a mark with a top and a bottom, so it lives inside one depth
+    // band or it is torn in half. It travels almost flat anyway — which is what
+    // a fracture across a floor running away from you looks like — so the clamp
+    // costs the shape nothing.
+    const [bandTop, bandBottom] = bandRange(y0, height);
     for (let t = 0; t < len; t++) {
       const px = ((Math.round(x) % LAYER_TILE_W) + LAYER_TILE_W) % LAYER_TILE_W;
       const py = Math.round(y);
-      if (py < 1 || py >= height) return;
+      if (py < bandTop + 1 || py >= bandBottom - 1) return;
       // The crack: a dark lip either side of it, and the heat in the middle.
       // Wider nearer the camera, because it is nearer.
       const w = py > height * 0.6 ? 2 : 1;
@@ -621,41 +895,60 @@ function makeInfernoGround({ seed, height }) {
       }
     }
   };
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 22; i++) {
     drawCrack(
       rng.int(0, LAYER_TILE_W - 1),
       rng.int(2, height - 4),
       rng.int(8, 26),
-      rng.chance(0.5) ? rng.range(0.7, 1.3) : rng.range(-1.3, -0.7),
-      rng.range(-0.3, 0.3),
+      rng.chance(0.5) ? rng.range(0.9, 1.6) : rng.range(-1.6, -0.9),
+      rng.range(-0.25, 0.25),
       0,
     );
   }
 
   // Vents: bright mouths sitting in the crust, mostly down near the camera
   // where there is room for the glow to spread.
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 11; i++) {
     const x = rng.int(0, LAYER_TILE_W - 1);
-    const y = rng.int(Math.round(height * 0.35), height - 6);
+    const y = bandFit(rng.int(Math.round(height * 0.25), height - 6), 4, height);
+    // Radius 1 to 3 and no perspective scaling. A vent is a hole, and the glow
+    // around it is drawn as concentric rectangles — scale one of those up by
+    // the near end of the plane and you do not get a bigger vent, you get a
+    // bright orange brick lying on the road.
     glowPatch(ctx, x, y, rng.int(1, 3));
   }
 
   // Ash drifted into the low corners of the crust, and cinder grit over
   // everything: the crust of a lava field is loose, not polished.
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 34; i++) {
     const x = rng.int(0, LAYER_TILE_W - 1);
     const y = rng.int(4, height - 2);
     ctx.globalAlpha = rng.range(0.1, 0.28);
     ctx.fillStyle = PALETTE.grey;
-    ctx.fillRect(x, y, rng.int(4, 16), 1);
+    ctx.fillRect(x, y, Math.round(rng.int(4, 16) * planeZoom(y, height)), 1);
   }
   ctx.globalAlpha = 1;
-  speckle(ctx, rng, {
+  planeGrain(ctx, rng, {
+    height,
     from: 4,
     to: height - 1,
-    count: 360,
+    count: 460,
     colors: [PALETTE.charLight, PALETTE.charDark],
   });
+
+  // Scoria lying on the floor and along both lips of the road: cold rock on
+  // top, a shadow under it, and a warm pixel where it has not finished cooling.
+  for (let i = 0; i < 90; i++) {
+    planePebble(ctx, rng, {
+      height,
+      y: rng.chance(0.35) ? rng.int(1, roadTop - 1) : rng.int(roadBot, height - 3),
+      colors: {
+        body: rng.chance(0.12) ? PALETTE.magmaDeep : PALETTE.charDark,
+        light: PALETTE.charLight,
+        shadow: PALETTE.shadow,
+      },
+    });
+  }
 
   // And the shadow the crust falls into towards the camera. It is deep here:
   // there is no sky light down among the rocks, only what the cracks give.
@@ -816,7 +1109,8 @@ export const INFERNO_ART = {
     far: makeRidgeLayer({
       seed: 2727,
       height: 86,
-      // The plain the cones stand on. `cinderCones` draws the cones.
+      // The plain the cones stand on. `cinderCones` draws the dead ones and
+      // the `landmarks` table below drops the live one in on its own grid.
       baseline: 26,
       amplitude: 9,
       roughness: 0.4,
@@ -852,8 +1146,28 @@ export const INFERNO_ART = {
     { name: 'mid', speed: 0.4, y: -60 },
     { name: 'crags', speed: 0.7, y: -40, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
-    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
+    { name: 'fringe', speed: 1.9, y: -15, anchor: 'bottom', front: true },
   ],
+
+  /**
+   * The volcano, once every fourteen hundred paces — about four screens of
+   * walking between sightings, so it leaves the frame entirely and comes back.
+   * It stands on the far plain with the dead cones, and it is never mirrored:
+   * the plume leans downwind, and the wind in this basin blows one way.
+   */
+  landmarks: [
+    {
+      name: 'volcano',
+      after: 'far',
+      speed: 0.15,
+      spacing: 1400,
+      jitter: 500,
+      y: -28,
+      flip: false,
+    },
+  ],
+
+  buildLandmarks: buildInfernoLandmarks,
 
   /**
    * Weighted so the common roll is broken rock and the rare roll is fire.

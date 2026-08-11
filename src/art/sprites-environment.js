@@ -35,9 +35,14 @@
  *                         the walk line, named for whatever it is made of.
  *                         Flagged `near: true` — that is the layer the far
  *                         prop band is planted behind
- *   ground   speed 1.00   the strip the character walks on
- *   fringe   speed 1.30   the near bank, flagged `front: true` so it is drawn
- *                         after the props and the buildings, and
+ *   ground   speed 1.00   the floor. It is NOT one speed: the renderer slices
+ *                         it into depth bands and scrolls each at its own rate,
+ *                         and the walk line lies PLANE_RISE rows down inside it
+ *                         rather than along its top edge. See the long note in
+ *                         `env-kit.js` for the geometry and for the one rule it
+ *                         puts on the art (no mark may cross a band boundary)
+ *   fringe   speed 1.90   the near bank, flagged `front: true` so it is drawn
+ *                         after the props, the buildings and the traveller, and
  *                         `anchor: 'bottom'` so its `y` is measured from the
  *                         bottom edge of the frame instead of from the road
  *
@@ -45,6 +50,14 @@
  * `dunes` and the prairie's is `hills` — because the renderer only ever reads
  * them through the manifest. Layers are authored at 1x pixel scale and
  * upscaled by the renderer, so the pixel grid stays consistent with sprites.
+ *
+ * Every `y` above is measured from the TOP of the floor, not from the walk
+ * line, so a manifest reads as a stack of things standing on the same horizon.
+ *
+ * A biome may also declare `landmarks` and a `buildLandmarks()` to bake them:
+ * one-off silhouettes placed on their own wide world grid — the basin's
+ * volcano, the prairie's barn — so the eye has something on the skyline that is
+ * not back again in 320 pixels.
  *
  * On top of the layers a biome declares up to three bands of loose props, all
  * placed by the same seeded-cell machinery in `parallax.js`:
@@ -497,7 +510,14 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
    * their results replace them, and the third is only meaningful while the
    * buildings are being baked.
    */
-  const { props: propRows, buildLayers, ambient, structureGround, ...declared } = art;
+  const {
+    props: propRows,
+    buildLayers,
+    buildLandmarks,
+    ambient,
+    structureGround,
+    ...declared
+  } = art;
 
   const props = {};
   for (const [name, rows] of Object.entries(propRows)) props[name] = bake({ key: KEY, rows });
@@ -533,6 +553,12 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
       inn: bakeBuilding(INN, SIGNS.inn, structureGround),
     },
     layers: { ...buildLayers(), storm: getStormLayer() },
+    /**
+     * The big single things: one canvas each, drawn once every few hundred
+     * paces from the `landmarks` table rather than tiled into a layer. A biome
+     * with nothing worth recognising on its horizon builds none.
+     */
+    landmarkArt: buildLandmarks ? buildLandmarks() : null,
     /** Factory for the biome's drifting life, or null if it has none. */
     createAmbient: ambient,
   };
