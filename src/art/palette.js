@@ -27,6 +27,15 @@ export const PALETTE = {
   sandDark: '#9a6b34',
   sandDeep: '#6f4a24',
 
+  // The rock the sand came off: the mesas and buttes on the desert horizon.
+  // Red-ochre rather than another step of brown, because a skyline drawn out
+  // of the ground's own ramp is the same colour as the ground and the eye
+  // reads the whole picture as one flat dune. Iron is what makes desert rock
+  // red, and it is the one hue that can sit behind sand without arguing.
+  mesaLight: '#c4794a',
+  mesa: '#9a552f',
+  mesaDark: '#6d371e',
+
   // --- Grass / prairie ----------------------------------------------------
   // A five-step green ramp, exactly parallel to the sand ramp above: the two
   // biomes are the same picture painted in two families, so anything authored

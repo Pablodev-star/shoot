@@ -275,6 +275,102 @@ export const MEADOW_PROPS = {
     '..lJl......lJl..',
   ],
 
+  /**
+   * Thistle. Purple heads on a spined stem — the one plant out here that is
+   * armed, and the only tall silhouette in the set that is not a tree, so a
+   * verge with two of them on it does not read as a hedge.
+   */
+  thistle: [
+    '..p...p....',
+    '.pOp.pOp...',
+    '..p...p..p.',
+    '..J..aJ.pOp',
+    '.aJa.aJ..p.',
+    '..J...J.aJ.',
+    '.aJ.aJa..J.',
+    '..J..J..aJ.',
+    '.aJa.J...J.',
+    '..JaaJaaaJ.',
+    '..lJJJJJJl.',
+    '...llJJll..',
+  ],
+
+  /**
+   * A ring of caps in the shade of something that is no longer there. Cream
+   * stems, brown caps, one on its side: a fairy ring drawn with every cap
+   * upright reads as a row of nails.
+   */
+  mushrooms: [
+    '..www......',
+    '.wWwwx..w..',
+    '..fBf..wWwx',
+    '..fBf.wWwwx',
+    'w.fBf..fBf.',
+    'WwwfBf.fBf.',
+    'fBffBf.fBf.',
+    'llllllllll.',
+  ],
+
+  /**
+   * Somebody's scarecrow, still standing over a field that is not there any
+   * more. It is the tallest man-made thing on the prairie and the one prop
+   * that is unmistakably a person's doing.
+   */
+  scarecrow: [
+    '....wwww....',
+    '...wWWWWx...',
+    '..wWWWWWWx..',
+    '...ffffff...',
+    '...fkffkf...',
+    '...ffffff...',
+    '...fffkff...',
+    '....ffff....',
+    '.....Ww.....',
+    'Www.eEEe.wwW',
+    'WWwweEEewwWW',
+    '.xx.eEEe.xx.',
+    '....eEEe....',
+    '....eEEe....',
+    '....OuOu....',
+    '....OuOu....',
+    '....Wwx.....',
+    '....Wwx.....',
+    '....Wwx.....',
+    '...hHjJh....',
+    '...llJJl....',
+  ],
+
+  // --- clutter -------------------------------------------------------------
+  // The tight band under the props: a few blades, a stone, a bloom. Nothing
+  // here has a silhouette worth the name, and that is the job — it is what
+  // fills the space the props are keeping between themselves.
+
+  /** Three blades and a seed head. */
+  grassSprig: [
+    '.h...h...',
+    '.h.j.h.j.',
+    'hHjjHhjHj',
+    '.lJJJJJl.',
+  ],
+
+  /** A stone the plough turned up. */
+  fieldStone: [
+    '..yY...',
+    '.yYYyv.',
+    'yYYyyvv',
+    '.lllll.',
+  ],
+
+  /** Dandelion clocks, waiting for weather. */
+  dandelion: [
+    '.f...f...',
+    'fff.fff..',
+    '.f...f..f',
+    '.h...h.fff',
+    '.hHj.hHjf',
+    '.llJ.llJ.',
+  ],
+
   /** A round bale, wound tight. The gold arcs inside are the wind of it. */
   hayBale: [
     '.....OOOO......',
@@ -378,7 +474,7 @@ function makeMeadowGround({ seed, height }) {
 
   for (let x = 0; x < LAYER_TILE_W; x++) {
     trailTop[x] = Math.max(0, Math.round(wave(x, topTerms)));
-    trailBot[x] = Math.round(24 + wave(x, botTerms));
+    trailBot[x] = Math.round(21 + wave(x, botTerms));
   }
 
   // --- the trail ---
@@ -456,6 +552,53 @@ function makeMeadowGround({ seed, height }) {
   }
 
   return canvas;
+}
+
+/**
+ * The near verge: the grass a pace in front of the traveller, running faster
+ * than the camera and cut off by the bottom of the frame.
+ *
+ * It is the same idea as the tree line on the middle hills, at the other end
+ * of the picture — a broken edge instead of a straight one — and it is doing
+ * the harder job of the two: the tree line says the horizon is far away, and
+ * this says the traveller is standing IN the field rather than in front of a
+ * painting of one.
+ */
+function makeMeadowFringe({ seed, height }) {
+  return makeRidgeLayer({
+    seed,
+    height,
+    baseline: Math.round(height * 0.6),
+    amplitude: 4,
+    roughness: 1,
+    crest: 2,
+    colors: { body: PALETTE.grassDeep, light: PALETTE.grassDark, dark: PALETTE.grassDeep },
+    decorate: (ctx, heights, rng, h) => {
+      // Blades off the top edge, two pixels wide as everywhere else in this
+      // biome, and the odd bloom among them.
+      for (let x = 0; x < LAYER_TILE_W; x++) {
+        const top = h - heights[x];
+        if (rng.chance(0.5)) {
+          ctx.fillStyle = rng.chance(0.5) ? PALETTE.grassDark : PALETTE.grassDeep;
+          ctx.fillRect(x, top - rng.int(2, 6), rng.chance(0.4) ? 2 : 1, 7);
+        }
+        if (rng.chance(0.035)) {
+          const bloom = rng.pick([PALETTE.bloomCream, PALETTE.bloomPink, PALETTE.goldLight]);
+          const top2 = top - rng.int(4, 8);
+          ctx.fillStyle = PALETTE.grassDark;
+          ctx.fillRect(x, top2, 1, 8);
+          ctx.fillStyle = bloom;
+          ctx.fillRect(x, top2 - 1, 1, 1);
+        }
+      }
+      for (let i = 0; i < 320; i++) {
+        const x = rng.int(0, LAYER_TILE_W - 1);
+        const y = rng.int(h - heights[x] + 2, h - 1);
+        ctx.fillStyle = rng.chance(0.5) ? PALETTE.grassDark : PALETTE.grassDeep;
+        ctx.fillRect(x, y, 1, rng.int(1, 3));
+      }
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -671,6 +814,7 @@ export const MEADOW_ART = {
       decorate: grassFringe,
     }),
     ground: makeMeadowGround({ seed: 4820, height: 72 }),
+    fringe: makeMeadowFringe({ seed: 2277, height: 28 }),
   }),
 
   manifest: [
@@ -678,8 +822,9 @@ export const MEADOW_ART = {
     { name: 'far', speed: 0.15, y: -76 },
     { name: 'mid', speed: 0.4, y: -60 },
     // -36 with a height of 36: the rise ends where the trail begins.
-    { name: 'hills', speed: 0.7, y: -36 },
+    { name: 'hills', speed: 0.7, y: -36, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
+    { name: 'fringe', speed: 1.3, y: -16, anchor: 'bottom', front: true },
   ],
 
   /**
@@ -702,7 +847,46 @@ export const MEADOW_ART = {
     { name: 'stump', weight: 5 },
     { name: 'fencePost', weight: 4 },
     { name: 'hayBale', weight: 4 },
+    { name: 'thistle', weight: 7 },
+    { name: 'mushrooms', weight: 5 },
+    // A scarecrow is a man-shape, and a man-shape the player has seen once is
+    // a landmark. Rare enough that meeting one is an event, and never mirrored
+    // — a scarecrow with its hat brim the other way round is a different
+    // scarecrow, and the eye notices that it is not.
+    { name: 'scarecrow', weight: 2, flip: false },
   ],
+
+  /** Blades, a stone, a clock of seed. */
+  clutter: [
+    { name: 'grassSprig', weight: 14 },
+    { name: 'dandelion', weight: 7 },
+    { name: 'fieldStone', weight: 5 },
+  ],
+  clutterCell: 19,
+
+  /**
+   * The far band: the wood on the other side of the field. Only the solid
+   * masses go in it — the tree, the sapling and the bush read as green
+   * silhouettes at any size, and a fence or a bale at that distance reads as
+   * a smudge somebody left on the hill.
+   */
+  backdrop: {
+    cell: 74,
+    y: -7,
+    gap: 0.26,
+    // The one biome whose far band is drawn a pixel step down. Its trees are
+    // the tallest props in the game, so there is height to spare above the
+    // crest even after shrinking them, and a full-size oak behind a low green
+    // rise reads as an oak standing in the next field rather than as woodland.
+    shrink: true,
+    haze: PALETTE.hillHaze,
+    hazeA: 0.5,
+    scatter: [
+      { name: 'tree', weight: 22 },
+      { name: 'sapling', weight: 14 },
+      { name: 'berryBush', weight: 10 },
+    ],
+  },
 
   /**
    * Tighter than the desert's 76. A prairie is crowded — the whole difference

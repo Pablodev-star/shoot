@@ -55,6 +55,23 @@
  * divided into fixed cells of the biome's scatter-cell size, and each cell's
  * contents are derived from a seeded RNG keyed by the cell index. Same cell,
  * same props, forever, with no memory cost.
+ *
+ * THERE ARE THREE BANDS OF SCENERY, NOT ONE
+ * ---------------------------------------------------------------------------
+ * A single row of props standing on the walk line is what a side-scroller looks
+ * like before anybody has finished it: the scene is a painted wall, a strip of
+ * road, and nothing in between or in front. So the same cell machinery runs
+ * three times over, at three depths:
+ *
+ *   backdrop  props hazed back and planted BEHIND the near ridge, at the mid
+ *             layer's speed. Their feet are buried in the ridge, which is the
+ *             whole trick — a distant tree whose base you can see is a small
+ *             tree standing next to you.
+ *   scatter   the roadside proper, on the walk line, at camera speed.
+ *   fringe    a tiled strip of near ground at the very bottom of the frame,
+ *             running FASTER than the camera. It is the cheapest depth cue
+ *             there is and the only one that puts the player inside the scene
+ *             rather than in front of it.
  */
 
 import { PALETTE } from '../art/palette.js';
@@ -147,6 +164,9 @@ export function createParallax(options = {}) {
   const seed = options.seed ?? 20260730;
   const scatterWeight = env.scatter.reduce((s, e) => s + e.weight, 0);
   const scatterCell = env.scatterCell || DEFAULT_SCATTER_CELL;
+  /** The far band, or null for a biome that has not been given one. */
+  const backdrop = env.backdrop || null;
+  const backdropWeight = backdrop ? backdrop.scatter.reduce((s, e) => s + e.weight, 0) : 0;
   /** Seed fluff, fireflies, whatever else this biome keeps in the air. */
   const ambient = env.createAmbient ? env.createAmbient(seed ^ 0xa1b2c3) : null;
   /** Buildings placed by the encounter system: [{ worldX, kind }] */
@@ -380,19 +400,32 @@ export function createParallax(options = {}) {
       const y = gy - (i + 1) * bandH;
       if (y + bandH < 0) break;
       ctx.globalAlpha = sky.glowA * 0.4 * (1 - i / bands) ** 1.5;
-      ctx.fillRect(0, y, view.w, bandH + 1);
+      // Out to the margin like every other full-width pass: a duel shakes the
+      // camera by translating the context, and a band that stopped at the
+      // frame edge slid off one side and left a cold notch on the other.
+      ctx.fillRect(-MARGIN, y, view.w + MARGIN * 2, bandH + 1);
     }
     ctx.globalAlpha = 1;
   }
 
   // --- tiled layers ---------------------------------------------------------
 
+  /**
+   * One tiled strip.
+   *
+   * `layer.y` is measured from the walk line, except on a strip that declares
+   * `anchor: 'bottom'` — the near fringe does, because it belongs to the bottom
+   * edge of the frame rather than to the road. Anchored to the walk line it
+   * would climb up the picture on a tall window and sit in mid-air on a short
+   * one, and the one thing a foreground has to do is stay in the foreground.
+   */
   function drawLayer(ctx, view, layer, cameraX, gy) {
     const sprite = env.layers[layer.name];
     if (!sprite) return;
     const s = view.scale;
     const tileW = LAYER_TILE_W * s;
-    const y = gy + layer.y * s;
+    const anchorY = layer.anchor === 'bottom' ? view.h : gy;
+    const y = anchorY + layer.y * s;
     let offset = -((cameraX * layer.speed * s) % tileW);
     if (offset > 0) offset -= tileW;
     const h = sprite.height * s;
@@ -404,7 +437,7 @@ export function createParallax(options = {}) {
       const bottom = y + h;
       if (bottom < view.h) {
         ctx.fillStyle = env.groundFill;
-        ctx.fillRect(0, Math.round(bottom), view.w, view.h - bottom + 1);
+        ctx.fillRect(-MARGIN, Math.round(bottom), view.w + MARGIN * 2, view.h - bottom + MARGIN);
       }
     }
   }
@@ -433,45 +466,160 @@ export function createParallax(options = {}) {
    * Roadside props. Two rules, both of them things the old scatter got wrong:
    *
    *  1. EVERYTHING SITS ON THE WALK LINE. Props used to be lifted 6 and 13
-   *     pixels off the ground to fake depth, but the desert here is a flat
+   *     pixels off the ground to fake depth, but the road here is a flat
    *     side-on strip with no receding plane to lift them into — so a raised
    *     cactus did not read as further away, it read as hovering. They are all
    *     planted on the same line now, and depth comes from the parallax layers
-   *     behind them, which is what those layers are for.
+   *     behind them and from the two other bands, which is what those are for.
    *  2. THEY KEEP THEIR DISTANCE. One prop per cell, placed in the middle half
    *     of it, so no two are ever closer than half a cell.
    */
-  function drawScatter(ctx, view, cameraX, gy) {
+
+  /** Pick one entry out of a weighted table with the cell's own generator. */
+  function pickEntry(table, total, rng) {
+    let roll = rng() * total;
+    let entry = table[0];
+    for (const e of table) {
+      roll -= e.weight;
+      if (roll <= 0) {
+        entry = e;
+        break;
+      }
+    }
+    return entry;
+  }
+
+  /**
+   * Half the buildings' width, in source pixels, plus a pace either side. A
+   * prop rooted inside that window is standing in the doorway.
+   */
+  const DOOR_CLEARANCE = 26;
+
+  /** Is this world position underneath a shop or an inn? */
+  function underStructure(worldX) {
+    for (const st of structures) {
+      if (Math.abs(st.worldX - worldX) < DOOR_CLEARANCE) return true;
+    }
+    return false;
+  }
+
+  /**
+   * One pass of the cell machinery along the walk line.
+   *
+   * Both roadside bands run through here: the props themselves, and the
+   * clutter — twigs, pebbles, chips of bone — on a much tighter grid
+   * underneath them. Two bands rather than one tighter table because they want
+   * opposite things. Props need room around them or the road turns into a
+   * hedge, and litter needs none at all: it is what fills the room the props
+   * are keeping.
+   *
+   * @param {object} band
+   * @param {Array}  band.table   weighted [{ name, weight, flip }]
+   * @param {number} band.total   the table's weights, summed
+   * @param {number} band.cell    spacing in source pixels
+   * @param {number} band.gap     chance a cell is left empty
+   * @param {number} band.salt    keeps the two bands' generators apart
+   */
+  function drawBand(ctx, view, cameraX, gy, band) {
     const s = view.scale;
-    const first = Math.floor((cameraX - 60) / scatterCell);
-    const last = Math.ceil((cameraX + view.w / s + 60) / scatterCell);
+    const first = Math.floor((cameraX - 60) / band.cell);
+    const last = Math.ceil((cameraX + view.w / s + 60) / band.cell);
 
     for (let cell = first; cell <= last; cell++) {
-      const rng = makeRng((seed + cell * 2654435761) >>> 0);
-      if (rng() < 0.18) continue; // empty stretch of road
+      const rng = makeRng((seed + cell * 2654435761 + band.salt) >>> 0);
+      if (rng() < band.gap) continue; // empty stretch of road
 
-      let roll = rng() * scatterWeight;
-      let entry = env.scatter[0];
-      for (const e of env.scatter) {
-        roll -= e.weight;
-        if (roll <= 0) {
-          entry = e;
-          break;
-        }
-      }
+      const entry = pickEntry(band.table, band.total, rng);
       const sprite = env.props[entry.name];
       if (!sprite) continue;
 
-      const worldX = cell * scatterCell + scatterCell * (0.25 + rng() * 0.5);
+      const worldX = cell * band.cell + band.cell * (0.25 + rng() * 0.5);
       const sx = (worldX - cameraX) * s;
       if (sx < -140 * s || sx > view.w + 140 * s) continue;
+      /**
+       * A saguaro growing through the shop's porch roof was the last thing on
+       * the road that gave away that the scenery and the stops were placed by
+       * two systems that had never been introduced. The cell is skipped rather
+       * than nudged: a prop shoved aside leaves a gap you can see is a gap,
+       * and an empty forecourt in front of a building is what a forecourt is.
+       */
+      if (underStructure(worldX + sprite.width / 2)) continue;
       // Size varies by a whole pixel step, never a fraction: half-scaled pixel
       // art is mush.
       const drawScale = rng() < 0.3 ? Math.max(1, s - 1) : s;
       // 1–2 source pixels of the base sit below the walk line, so the prop is
       // bedded into the sand rather than balanced on the crust line.
       const sink = (1 + (rng() < 0.4 ? 1 : 0)) * s;
-      drawSprite(ctx, sprite, sx, gy + sink - sprite.height * drawScale, drawScale);
+      /**
+       * Every second one faces the other way. It costs nothing — the blitter
+       * already knew how to mirror — and it doubles the apparent size of the
+       * prop set, which matters more here than anywhere else in the game
+       * because the road is the one screen the player looks at for minutes at
+       * a time. Anything with writing on it, or a shape the eye knows only one
+       * way round, opts out with `flip: false` in the scatter table.
+       */
+      const flip = entry.flip !== false && rng() < 0.5;
+      drawSprite(ctx, sprite, sx, gy + sink - sprite.height * drawScale, drawScale, flip);
+    }
+  }
+
+  const propBand = { table: env.scatter, total: scatterWeight, cell: scatterCell, gap: 0.18, salt: 0 };
+  const clutterBand = env.clutter
+    ? {
+      table: env.clutter,
+      total: env.clutter.reduce((sum, e) => sum + e.weight, 0),
+      cell: env.clutterCell || 21,
+      gap: 0.34,
+      salt: 0x51ed,
+    }
+    : null;
+
+  function drawScatter(ctx, view, cameraX, gy) {
+    if (clutterBand) drawBand(ctx, view, cameraX, gy, clutterBand);
+    drawBand(ctx, view, cameraX, gy, propBand);
+  }
+
+  /**
+   * The band behind the near ridge: the same cell machinery, one depth back.
+   *
+   * Two things make it read as distance rather than as a second row of props.
+   * It is washed with the biome's haze (baked in — see `backdropProps` in
+   * sprites-environment.js), and it is planted low enough that the ridge in
+   * front always covers the base. What is left is a skyline: crowns, spires
+   * and roofs standing over the hill, which is all you ever see of a thing
+   * that is far away.
+   *
+   * It is NOT drawn a pixel step smaller, which was the first thing tried and
+   * the wrong one. Shrinking it does read as distance, but the ridge it stands
+   * behind is drawn at full scale, so a shrunk prop planted low enough to keep
+   * its feet hidden had nothing left above the crest — the whole band came out
+   * as a row of green tips. A biome that wants the smaller silhouette asks for
+   * it with `shrink: true`.
+   */
+  function drawBackdrop(ctx, view, cameraX, gy) {
+    if (!backdrop) return;
+    const s = view.scale;
+    const cell = backdrop.cell || 96;
+    const speed = backdrop.speed ?? 0.4;
+    const scale = backdrop.shrink ? Math.max(1, s - 1) : s;
+    const baseline = gy + (backdrop.y ?? -7) * s;
+    const camera = cameraX * speed;
+    const first = Math.floor((camera - 80) / cell);
+    const last = Math.ceil((camera + view.w / s + 80) / cell);
+
+    for (let cellIndex = first; cellIndex <= last; cellIndex++) {
+      const rng = makeRng((seed + cellIndex * 40503 + 0x9e3779b9) >>> 0);
+      if (rng() < (backdrop.gap ?? 0.3)) continue;
+
+      const entry = pickEntry(backdrop.scatter, backdropWeight, rng);
+      const sprite = env.backdropProps[entry.name];
+      if (!sprite) continue;
+
+      const worldX = cellIndex * cell + cell * (0.15 + rng() * 0.7);
+      const sx = (worldX - camera) * s;
+      if (sx < -160 * s || sx > view.w + 160 * s) continue;
+      const flip = entry.flip !== false && rng() < 0.5;
+      drawSprite(ctx, sprite, sx, baseline - sprite.height * scale, scale, flip);
     }
   }
 
@@ -604,11 +752,22 @@ export function createParallax(options = {}) {
   function renderBackdrop(ctx, view, cameraX) {
     const gy = groundY(view);
     for (const layer of env.manifest) {
+      // The near fringe waits until the road, its props and its buildings are
+      // all down: it is the only thing in the manifest that is in FRONT of the
+      // scene rather than part of it.
+      if (layer.front) continue;
+      // The far band goes in behind the last ridge, so that ridge buries its
+      // feet. `near` is the biome's own name for that layer — `dunes`,
+      // `drifts`, `crags` — and the manifest is where it is written down.
+      if (layer.near) drawBackdrop(ctx, view, cameraX, gy);
       drawLayer(ctx, view, layer, cameraX, gy);
       if (layer.name === 'clouds') drawStormDeck(ctx, view, cameraX, gy);
     }
     drawScatter(ctx, view, cameraX, gy);
     drawStructures(ctx, view, cameraX, gy);
+    for (const layer of env.manifest) {
+      if (layer.front) drawLayer(ctx, view, layer, cameraX, gy);
+    }
   }
 
   // --- ambient life ---------------------------------------------------------

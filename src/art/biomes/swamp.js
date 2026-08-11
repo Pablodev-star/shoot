@@ -212,6 +212,36 @@ export const SWAMP_PROPS = {
     '..LLLLLL...',
   ],
 
+  // --- clutter -------------------------------------------------------------
+  // The litter band, on its own tight grid under the props. In a bayou this is
+  // the one that carries the place: bare mud is what a swamp never has.
+
+  /** Duckweed floating in a slack, with a bloom of scum through it. */
+  duckweed: [
+    '.UU..U...',
+    'UAAUUAAU.',
+    '.UAUUAAU.',
+    '..LLLLL..',
+  ],
+
+  /** A stick, rotting where it fell. */
+  bogTwig: [
+    '....+V...',
+    '..++VA...',
+    '+++......',
+    '.LLL.LL..',
+  ],
+
+  /** Two toadstools and a cap that has already gone over. */
+  toadstools: [
+    '..VA.....',
+    '.VAAV..V.',
+    '..W....VA',
+    '..W...VAA',
+    '.NMMN..W.',
+    '.LLLL.NMN',
+  ],
+
   /**
    * Spanish moss hanging off a low branch, and the one prop here with nothing
    * underneath it: it is drawn as an object in the air with a bare stub going
@@ -443,6 +473,55 @@ function reedFringe(ctx, heights, rng, height) {
       ctx.fillRect(x, top + rng.int(0, 3), 1, rng.int(2, 6));
     }
   }
+}
+
+/**
+ * The near bank at the bottom of the frame: reeds standing in the black water
+ * between the camera and the causeway.
+ *
+ * Every other biome's fringe is a bank of ground. This one is mostly *stems* —
+ * a low mass of near-black water with reed running up out of it — because the
+ * bayou has no near ground to stand on, and a solid bar across the bottom of
+ * the frame here would read as the causeway having a second edge.
+ */
+function makeSwampFringe({ seed, height }) {
+  return makeRidgeLayer({
+    seed,
+    height,
+    baseline: Math.round(height * 0.45),
+    amplitude: 3,
+    roughness: 1,
+    crest: 1,
+    colors: { body: PALETTE.bogDeep, light: PALETTE.bogDark, dark: PALETTE.bogDeep },
+    decorate: (ctx, heights, rng, h) => {
+      for (let x = 0; x < LAYER_TILE_W; x++) {
+        const top = h - heights[x];
+        // Reeds. Tall, thin, and much denser than the bank's fringe — this is
+        // the closest vegetation in the scene and it should crowd the frame.
+        if (rng.chance(0.5)) {
+          const len = rng.int(4, 14);
+          ctx.fillStyle = rng.chance(0.3) ? PALETTE.algae : PALETTE.bogDark;
+          ctx.fillRect(x, top - len, 1, len + 2);
+          // Every so often one carries a seed head.
+          if (rng.chance(0.1)) {
+            ctx.fillStyle = PALETTE.rot;
+            ctx.fillRect(x, top - len - 2, 1, 3);
+          }
+        }
+        if (rng.chance(0.06)) {
+          ctx.fillStyle = PALETTE.lichen;
+          ctx.fillRect(x, top - rng.int(1, 4), 1, 5);
+        }
+      }
+      // Scum lying on the water between the stems.
+      for (let i = 0; i < 90; i++) {
+        const x = rng.int(0, LAYER_TILE_W - 1);
+        const y = rng.int(h - heights[x] + 1, h - 1);
+        ctx.fillStyle = rng.chance(0.4) ? PALETTE.algae : PALETTE.bogDark;
+        ctx.fillRect(x, y, rng.int(1, 3), 1);
+      }
+    },
+  });
 }
 
 /**
@@ -775,7 +854,15 @@ export const SWAMP_ART = {
       count: 8,
       size: [5, 11],
       sag: 2,
-      tones: [PALETTE.bogHaze, PALETTE.bogDark, PALETTE.bogDeep],
+      /**
+       * Muggy overcast, not ink. These were the bog's own three darkest
+       * greens, and a bank of near-black blobs hanging in a bright blue
+       * daytime sky did not read as cloud at all — it read as holes in the
+       * picture, or as the tops of trees that had come loose. Cloud over a
+       * bayou is a wet grey-green haze, and the prairie's distant-hill ramp is
+       * already exactly that colour.
+       */
+      tones: [PALETTE.hillHazeLight, PALETTE.hillHaze, PALETTE.hillHazeDark],
     }),
     far: makeRidgeLayer({
       seed: 3720,
@@ -815,14 +902,16 @@ export const SWAMP_ART = {
       decorate: reedFringe,
     }),
     ground: makeSwampGround({ seed: 3344, height: 72 }),
+    fringe: makeSwampFringe({ seed: 6655, height: 24 }),
   }),
 
   manifest: [
     { name: 'clouds', speed: 0.05, y: -108 },
     { name: 'far', speed: 0.15, y: -74 },
     { name: 'mid', speed: 0.4, y: -56 },
-    { name: 'bank', speed: 0.7, y: -34 },
+    { name: 'bank', speed: 0.7, y: -34, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
+    { name: 'fringe', speed: 1.35, y: -13, anchor: 'bottom', front: true },
   ],
 
   /**
@@ -846,6 +935,35 @@ export const SWAMP_ART = {
   ],
 
   scatterCell: 48,
+
+  /**
+   * What floats and what rots. The busiest litter band in the game, to match
+   * the busiest scatter table: there is no bare mud in a bayou.
+   */
+  clutter: [
+    { name: 'duckweed', weight: 14 },
+    { name: 'bogTwig', weight: 9 },
+    { name: 'toadstools', weight: 7 },
+  ],
+  clutterCell: 18,
+
+  /**
+   * The far band: cypress standing in the water behind the bank. Trunks only
+   * — everything in this biome is a light shape against black water, and the
+   * three tallest are the only ones that clear the bank at all.
+   */
+  backdrop: {
+    cell: 66,
+    y: -6,
+    gap: 0.2,
+    haze: PALETTE.bogHaze,
+    hazeA: 0.34,
+    scatter: [
+      { name: 'cypress', weight: 22 },
+      { name: 'deadSnag', weight: 14 },
+      { name: 'bogStump', weight: 6 },
+    ],
+  },
 
   groundFill: PALETTE.bogDeep,
 

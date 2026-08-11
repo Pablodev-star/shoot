@@ -239,6 +239,35 @@ export const SNOW_PROPS = {
     '..443333344.',
   ],
 
+  // --- clutter -------------------------------------------------------------
+  // The litter band, and it is deliberately the thinnest in the game: snow
+  // buries things. What is left on top is a lump of it, a chip of ice off a
+  // spike, and the last inch of something that was standing here in autumn.
+
+  /** A lump of settled powder, lit on top, blue underneath. */
+  snowLump: [
+    '..1111...',
+    '.1222221.',
+    '.4322234.',
+    '..44333..',
+  ],
+
+  /** A chip off an ice spike, lying where it fell. */
+  iceChip: [
+    '...66....',
+    '..6778...',
+    '.67788...',
+    '..43334..',
+  ],
+
+  /** The tip of a buried branch. */
+  buriedTwig: [
+    '.....x2..',
+    '..x2xX...',
+    'xXx......',
+    '.4433....',
+  ],
+
   /** Somebody's horse, two winters ago. Half buried, and going nowhere. */
   skullFrost: [
     '.b.......b.',
@@ -557,6 +586,58 @@ function makeSnowGround({ seed, height }) {
   return canvas;
 }
 
+/**
+ * The near drift at the bottom of the frame: the bank of snow the traveller is
+ * walking past, a pace closer than he is and moving faster than the camera.
+ *
+ * It is the coldest thing in the biome rather than the brightest, which is the
+ * opposite of what every other layer does up here. Everything behind it runs
+ * blue to white as it comes forward; this one turns back to blue, because it
+ * is in the traveller's own shadow — and that reversal is what stops it
+ * reading as one more white band in a stack of them.
+ */
+function makeSnowFringe({ seed, height }) {
+  return makeRidgeLayer({
+    seed,
+    height,
+    baseline: Math.round(height * 0.58),
+    amplitude: 5,
+    roughness: 1,
+    crest: 3,
+    colors: { body: PALETTE.snowShade, light: PALETTE.snowMid, dark: PALETTE.snowDeep },
+    decorate: (ctx, heights, rng, h) => {
+      for (let x = 0; x < LAYER_TILE_W; x++) {
+        const top = h - heights[x];
+        // A wind lip along the crest, bright over a blue pocket.
+        if (rng.chance(0.4)) {
+          ctx.fillStyle = PALETTE.snowLight;
+          ctx.fillRect(x, top - 1, 1, 2);
+        }
+        // Stems and stones the wind has scoured back out of the drift.
+        if (rng.chance(0.05)) {
+          ctx.fillStyle = rng.chance(0.5) ? PALETTE.pineDeep : PALETTE.greyDark;
+          ctx.fillRect(x, top - rng.int(2, 6), 1, 7);
+        }
+      }
+      // Sastrugi across the face of it, the same pass the open snow gets.
+      for (let i = 0; i < 70; i++) {
+        const x0 = rng.int(0, LAYER_TILE_W - 1);
+        const y0 = rng.int(h - heights[x0] + 2, h - 1);
+        const len = rng.int(6, 18);
+        for (let t = 0; t < len; t++) {
+          const x = wrapX(x0 + t);
+          const y = Math.round(y0 - Math.sin((t / len) * Math.PI) * 1.5);
+          if (y < h - heights[x] || y >= h) continue;
+          ctx.fillStyle = PALETTE.snowMid;
+          ctx.fillRect(x, y, 1, 1);
+          ctx.fillStyle = PALETTE.snowDeep;
+          ctx.fillRect(x, y + 1, 1, 1);
+        }
+      }
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Ambient
 // ---------------------------------------------------------------------------
@@ -754,14 +835,16 @@ export const SNOW_ART = {
       decorate: driftCornice,
     }),
     ground: makeSnowGround({ seed: 6009, height: 72 }),
+    fringe: makeSnowFringe({ seed: 9182, height: 26 }),
   }),
 
   manifest: [
     { name: 'clouds', speed: 0.05, y: -112 },
     { name: 'far', speed: 0.15, y: -92 },
     { name: 'mid', speed: 0.4, y: -62 },
-    { name: 'drifts', speed: 0.7, y: -38 },
+    { name: 'drifts', speed: 0.7, y: -38, near: true },
     { name: 'ground', speed: 1.0, y: 0 },
+    { name: 'fringe', speed: 1.3, y: -15, anchor: 'bottom', front: true },
   ],
 
   /**
@@ -783,8 +866,40 @@ export const SNOW_ART = {
     { name: 'frozenStump', weight: 5 },
     { name: 'fenceBuried', weight: 4 },
     { name: 'skullFrost', weight: 3 },
-    { name: 'passMarker', weight: 3 },
+    { name: 'passMarker', weight: 3, flip: false },
   ],
+
+  /**
+   * What the wind leaves lying: chips of ice, a fallen bough, the tips of
+   * buried scrub. The litter band is thinner up here than anywhere else —
+   * snow buries clutter, which is the whole character of the place.
+   */
+  clutter: [
+    { name: 'snowLump', weight: 14 },
+    { name: 'iceChip', weight: 8 },
+    { name: 'buriedTwig', weight: 6 },
+  ],
+  clutterCell: 26,
+
+  /**
+   * The far band: spruce standing on the slope behind the drift. Nothing pale
+   * goes in it — a white prop hazed white against a white hill is invisible,
+   * and the two conifers are the only silhouettes up here with a colour of
+   * their own.
+   */
+  backdrop: {
+    cell: 62,
+    y: -7,
+    gap: 0.24,
+    shrink: true,
+    haze: PALETTE.snowShade,
+    hazeA: 0.42,
+    scatter: [
+      { name: 'spruceTall', weight: 22 },
+      { name: 'spruceSmall', weight: 18 },
+      { name: 'deadFir', weight: 7 },
+    ],
+  },
 
   scatterCell: 66,
 
