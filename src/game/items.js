@@ -127,27 +127,39 @@ const CATALOGUE = {
   },
 
   // --- Healing -------------------------------------------------------------
+  /**
+   * THE TWO THINGS YOU CAN DRINK IN THE MIDDLE OF A GUNFIGHT
+   * -------------------------------------------------------------------------
+   * Both are `anytime`, which means both are on the bar during a duel, and
+   * that is what they are priced against: a bed is cheaper per life and a bed
+   * is not there when a rider has you on your last diamond.
+   *
+   * They heal twice what they used to because everything that hurts does too
+   * (see `gunDamageAt` in src/game/progression.js). A bandage that patched one
+   * life against a bar of five was a purchase; the same bandage against a bar
+   * of thirteen was a rounding error you carried around for a whole world.
+   */
   bandage: {
     id: 'bandage',
     name: 'Bandage',
     icon: 'bandage',
     rarity: 'common',
-    basePrice: 35,
+    basePrice: 40,
     context: 'anytime',
-    heal: 1,
+    heal: 2,
     stack: 20,
-    desc: 'Patches you up for 1 life.',
+    desc: 'Patches you up for 2 lives.',
   },
   potion: {
     id: 'potion',
     name: 'Potion',
     icon: 'potion',
     rarity: 'rare',
-    basePrice: 90,
+    basePrice: 110,
     context: 'anytime',
-    heal: 3,
+    heal: 5,
     stack: 10,
-    desc: 'Restores 3 lives in one gulp.',
+    desc: 'Restores 5 lives in one gulp.',
   },
 
   /**
@@ -243,11 +255,18 @@ const CATALOGUE = {
     name: 'Horse',
     icon: 'horseToken',
     rarity: 'legendary',
-    basePrice: 650,
+    basePrice: 720,
     context: 'special',
     unlock: 'horse',
     stack: 1,
-    desc: 'Ride instead of walk. Cuts travel time roughly in half.',
+    /**
+     * It burns rations 15% faster per second and it halves the number of
+     * seconds, so a mounted crossing costs about 44% LESS food than a walked
+     * one. That is worth saying out loud on the card, because the travel band
+     * can only show the per-second figure and the per-second figure is the
+     * half of it that looks like a cost.
+     */
+    desc: 'Ride instead of walk. Halves travel time — and the food a crossing costs with it.',
   },
 
   /**

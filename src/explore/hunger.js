@@ -5,9 +5,12 @@
  * pauses it whenever the game state leaves the road (duel, shop, inn, menu), so
  * a long shopping trip is never punished.
  *
- * At zero the player starts starving: one life is lost every
- * STARVATION_INTERVAL_MS — progressive, never instant, so there is always time
- * to open the inventory and eat something.
+ * At zero the player starts starving: half a life a tick, and the tick gets
+ * faster the bigger their life bar is, so an empty gauge is about half a minute
+ * from the end of the run at every stage of it rather than half a minute early
+ * and four minutes late. The curve is `starvationIntervalMs` in
+ * src/game/progression.js, where the reasoning lives. It is still progressive
+ * and never instant, so there is always time to open the bag and eat.
  *
  * WHAT MAKES IT DRAIN FASTER — AND THE ONE THING THAT MAKES IT DRAIN SLOWER
  * ---------------------------------------------------------------------------
@@ -32,7 +35,8 @@ import {
   HUNGER_DRAIN_PER_SEC,
   HUNGER_DRAIN_HORSE_MUL,
   HUNGER_DRAIN_CANTEEN_MUL,
-  STARVATION_INTERVAL_MS,
+  STARVATION_LIFE_PER_TICK,
+  starvationIntervalMs,
 } from '../game/progression.js';
 import { getState, setHunger, loseLife, hasCanteen } from '../game/player.js';
 import { getWeatherState } from './weather.js';
@@ -93,17 +97,19 @@ export function update(dt) {
     return;
   }
 
-  // Starving.
+  // Starving. The interval is read every frame rather than cached, because a
+  // level-up mid-crossing raises the bar and has to shorten the tick with it.
   state.starveTimer += dt;
-  if (state.starveTimer >= STARVATION_INTERVAL_MS) {
-    state.starveTimer -= STARVATION_INTERVAL_MS;
-    loseLife(1);
+  const interval = starvationIntervalMs(player.maxLives);
+  if (state.starveTimer >= interval) {
+    state.starveTimer -= interval;
+    loseLife(STARVATION_LIFE_PER_TICK);
     emit(EVENTS.STARVATION_TICK, { lives: getState().lives });
-    toast('Starving — you lost a life', 'bad', 'hit');
+    toast('Starving', 'bad', 'hit');
   }
 }
 
 /** 0..1 progress towards the next starvation tick (drives the HUD pulse). */
 export function starvationProgress() {
-  return Math.min(1, state.starveTimer / STARVATION_INTERVAL_MS);
+  return Math.min(1, state.starveTimer / starvationIntervalMs(getState().maxLives));
 }

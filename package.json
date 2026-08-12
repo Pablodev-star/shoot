@@ -1,0 +1,19 @@
+{
+  "name": "shoot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A turn-based western duel in pixel art. Plain HTML/CSS/JS modules, no build step, no dependencies.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "sim": "node tools/sim.mjs all",
+    "sim:duels": "node tools/sim.mjs duels",
+    "sim:bosses": "node tools/sim.mjs bosses",
+    "sim:specials": "node tools/sim.mjs specials",
+    "sim:runs": "node tools/sim.mjs runs",
+    "test": "node tools/sim.mjs all"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -60,6 +60,25 @@
  * That is why the strong ones cost five or six rounds of charge. An ability is
  * not extra damage bolted onto a turn — it is a turn taken away from somebody.
  *
+ * WHAT A CHARGE COSTS, AS A RULE INSTEAD OF NINETEEN OPINIONS
+ * ---------------------------------------------------------------------------
+ * `charge` is rounds, and a duel runs six or seven of them, so the number is
+ * really an answer to "how many times a fight is this allowed to happen".
+ * Three is twice a duel, five is once, seven is once and only if the fight
+ * runs long. It used to be set by feel, and feel got two of them badly wrong:
+ * measured against the Stranger, Meteor Strike was worth +44 points of win
+ * rate and Void Mirror +41, against a design budget of thirteen to twenty.
+ *
+ * The rule now, and every entry below obeys it:
+ *
+ *   charge ≈ 3 + 1.5 × (what it takes away, in lives or in turns)
+ *
+ * — where a stolen round counts as a third of a turn, a freeze counts as the
+ * turns it costs, and damage counts as lives. That is why Meteor Strike (three
+ * lives, through a shield) is seven and Dust Snatch (one round) is three, and
+ * why Void Mirror — which is a shot returned, so a two-life swing — went from
+ * four to six.
+ *
  * POISON AND DYNAMITE ARE WORLD ABILITIES, NOT SHOP STAPLES
  * ---------------------------------------------------------------------------
  * They used to be throwables anybody could buy anywhere, which made two of the
@@ -68,7 +87,8 @@
  * nowhere else, they are carried by that world's riders and nobody else's, and
  * both were rewritten to be worth the trip — poison bites every round for three
  * rounds instead of once, dynamite takes three lives at a stroke instead of
- * one. Both cost more charge than anything else in the game, and the enemies
+ * one, which is still the biggest single hit in the game and still the only
+ * one a raised shield stops dead. Both cost more charge than anything else in the game, and the enemies
  * that have them reach for them rarely (`weight`), because a trick that lands
  * every other round at that size is not a signature, it is a tax.
  *
@@ -324,7 +344,7 @@ export const ABILITIES = {
     effect: 'blind',
     world: 3,
     turns: 2,
-    charge: 3,
+    charge: 4,
     label: 'Whiteout',
     tip: 'Their next two shots go wide',
     icon: 'frostbite',
@@ -711,7 +731,7 @@ export const ABILITIES = {
     world: 5,
     amount: 2,
     take: 1,
-    charge: 3,
+    charge: 4,
     label: 'Cinder Snatch',
     tip: 'Takes two rounds out of their gun and loads one into yours',
     icon: 'cinderSnatch',
@@ -791,7 +811,7 @@ export const ABILITIES = {
     effect: 'empty',
     world: 6,
     take: 2,
-    charge: 5,
+    charge: 6,
     label: 'Gravity Pull',
     tip: 'Empties their gun and two of the rounds end up in yours',
     icon: 'gravityPull',
@@ -831,7 +851,7 @@ export const ABILITIES = {
     effect: 'reflect',
     world: 6,
     turns: 1,
-    charge: 4,
+    charge: 6,
     label: 'Void Mirror',
     tip: 'The next shot that would hit you goes back at them instead',
     icon: 'starRot',
@@ -862,7 +882,7 @@ export const ABILITIES = {
     effect: 'pierce',
     world: 6,
     amount: 3,
-    charge: 5,
+    charge: 7,
     label: 'Meteor Strike',
     tip: 'Three lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
@@ -927,11 +947,23 @@ export const ABILITIES = {
  * drawn behind the road, a dormant stretch, a warning, and a window in which it
  * spends `strikes * damage` lives on whoever it was raised against.
  *
- *   cycleMs   quiet time between the end of one eruption and the next warning
+ *   cycleMs      quiet time between the end of one eruption and the next warning
+ *   firstCycleMs the FIRST quiet, from the moment the landmark is raised. A
+ *                third of the others, and it has to be: the landmark goes up
+ *                around round two and a duel is over in twenty to thirty
+ *                seconds, so a first quiet of a full cycle meant the volcano
+ *                erupted in 0% of measured boss fights and the rift in 0%. See
+ *                the long note in src/duel/duel-hazard.js
  *   warnMs    the sky changing, before anything is thrown
  *   activeMs  the window the eruption happens inside
  *   strikes   how many blows the pattern has to spend
- *   damage    lives per blow — so a volcano costs `strikes * damage` a cycle
+ *   damage    lives per blow — so a volcano costs `strikes * damage` a cycle.
+ *             It is on the half-life grid like everything else that hurts, and
+ *             the early two use half-weight blows deliberately: an eruption
+ *             should cost about a fifth of the player's bar in EVERY world,
+ *             and the bar is five diamonds in the flats and fourteen in the
+ *             Galaxy. A flat two lives is a fifth of the Stranger's road and
+ *             two fifths of Big Jed's
  *   pattern   HOW it spends them. See src/duel/duel-hazard.js
  *
  * THE PATTERN IS WHAT MAKES THEM SIX THINGS AND NOT ONE
@@ -975,11 +1007,12 @@ export const SPECIALS = {
     sky: { color: '#c2914d', alpha: 0.42 },
     /** A wall crossing the road: dead even, so you can hear the next one due. */
     pattern: 'sweep',
-    cycleMs: 22000,
+    cycleMs: 18000,
+    firstCycleMs: 7500,
     warnMs: 2200,
     activeMs: 6000,
     strikes: 2,
-    damage: 1,
+    damage: 0.5,
     /** It does not only hit you: it empties the gun you were about to use. */
     steal: 1,
     sfx: 'wind',
@@ -1000,11 +1033,12 @@ export const SPECIALS = {
     sky: { color: '#d9c34b', alpha: 0.36 },
     /** Everything out of the nest at once, and then a long minute of buzzing. */
     pattern: 'swarm',
-    cycleMs: 20000,
+    cycleMs: 17000,
+    firstCycleMs: 7000,
     warnMs: 2000,
     activeMs: 6500,
     strikes: 2,
-    damage: 1,
+    damage: 0.5,
     /** What is left in you after the swarm has gone. */
     poisons: true,
     sfx: 'wind',
@@ -1030,7 +1064,8 @@ export const SPECIALS = {
      * avalanche than two evenly spaced taps ever was.
      */
     pattern: 'volley',
-    cycleMs: 22000,
+    cycleMs: 18000,
+    firstCycleMs: 8000,
     warnMs: 2400,
     activeMs: 5500,
     strikes: 2,
@@ -1053,7 +1088,8 @@ export const SPECIALS = {
     sky: { color: '#4e8a3a', alpha: 0.44 },
     /** Gas does not hit, it accumulates: still arriving when you think it is over. */
     pattern: 'lingering',
-    cycleMs: 20000,
+    cycleMs: 17000,
+    firstCycleMs: 7000,
     warnMs: 2200,
     activeMs: 7000,
     strikes: 2,
@@ -1092,7 +1128,8 @@ export const SPECIALS = {
     sky: { color: '#c2451c', alpha: 0.52 },
     /** The reference rhythm: rock thrown out over the window, one at a time. */
     pattern: 'barrage',
-    cycleMs: 20000,
+    cycleMs: 18000,
+    firstCycleMs: 7500,
     warnMs: 2400,
     activeMs: 8000,
     strikes: 3,
@@ -1145,7 +1182,8 @@ export const SPECIALS = {
      * over six seconds, which is long enough to be a real decision — press the
      * fight, or spend the round shielding something a shield cannot stop.
      */
-    cycleMs: 20000,
+    cycleMs: 19000,
+    firstCycleMs: 8500,
     warnMs: 2600,
     activeMs: 4600,
     strikes: 3,
@@ -1258,7 +1296,7 @@ export function specialDamage(spec) {
  */
 
 /** Shop base prices. The world curve in progression.js does the rest. */
-export const ABILITY_PRICE = { basic: 130, special: 260 };
+export const ABILITY_PRICE = { basic: 150, special: 300 };
 
 /**
  * The player's version of one ability: exactly the entry above, plus the

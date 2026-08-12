@@ -67,7 +67,7 @@ export const ShopScreen = {
       spendGold(entry.price);
       addItem(entry.item.id, 1);
       getState().stats.itemsBought += 1;
-      entry.soldOut = true;
+      entry.units -= 1;
       play('coin');
       toast(`Bought ${entry.item.name}`, 'gold');
       renderStock();
@@ -105,6 +105,15 @@ export const ShopScreen = {
 
             el('div.shop-name', { text: entry.item.name }),
             rarityChip(entry.item.rarity),
+            // How many are left, and only when there was ever more than one:
+            // a counter with four bandages on it should say so, and a vest
+            // does not need to announce that it is the only vest.
+            entry.stocked > 1
+              ? el('div.shop-units', {
+                  class: blocked ? 'is-out' : '',
+                  text: blocked ? 'Sold out' : `${entry.units} left`,
+                })
+              : null,
             el('p.shop-desc', { text: entry.item.desc }),
 
             el('div.card-foot', {}, [
@@ -115,7 +124,7 @@ export const ShopScreen = {
               ]),
 
               entry.soldOut
-                ? el('button.btn.btn--sm', { disabled: true }, ['Bought'])
+                ? el('button.btn.btn--sm', { disabled: true }, [entry.stocked > 1 ? 'Sold out' : 'Bought'])
                 : !room
                   ? el('button.btn.btn--sm', { disabled: true }, ['Bag full'])
                   : el('button.btn.btn--sm.btn--gold', {

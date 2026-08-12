@@ -33,7 +33,10 @@ The rule set has not changed since the first prototype:
 | **Shoot**  | −1        | vulnerable | rival vulnerable → rival loses a life; rival shielded → nothing   |
 
 Both duellists shoot in the same turn → both lose a life. First to zero lives
-loses. Lives are red diamonds, and always will be.
+loses. Lives are red diamonds, and always will be — and because they are, every
+damage figure in the game is a whole diamond or a half of one. At the trail
+iron a shot costs exactly one life, which is what the rule table has always
+said it does.
 
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
@@ -59,14 +62,28 @@ is thrown, it lands, and it lies there with the fuse burning until the round
 resolves, because that is exactly what the rule always said: the biggest hit in
 the game, and the one you get a whole round to raise a shield against.
 
-**The opponent does not look at your gun.** It has a habit model — what you have
-actually done this duel — and it plays the counter to a *sample* from it a
-minority of the time; the rest of the time it plays its own game off its own
-cylinder. It used to read your cylinder as well, which is where "every time I
-reload, they fire" came from, and it used to take the argmax of that model,
-which is how an even fifty-fifty habit came back as a certainty. Both are gone,
-the shield is capped and can never come out twice in a row, and the share of
-your shots that get eaten by one has halved.
+**The opponent does not look at your gun. You look at theirs.**
+
+It has a habit model — what you have actually done this duel — and it plays the
+counter to a *sample* from it a minority of the time; the rest of the time it
+plays its own game off its own cylinder. It never reads yours, which is where
+"every time I reload, they fire" used to come from.
+
+**Its own cylinder is drawn on its card, and it tells the truth.** An empty gun
+reloads better than nineteen times in twenty; a stocked one fires nine times in
+ten. That picture is the only real tell in the game and it is the whole of the
+skill in a duel: spend their dry turns freely, and put a shield up on the turns
+the chambers say a round is coming. Measured over five hundred duels, a player
+who watches it takes about a fifth less damage per fight than one who does not.
+
+**It will also notice you repeating yourself.** Three identical moves in a row
+and the fourth is likely to meet an answer — not because it saw the move, but
+because you told it. Vary and it never happens.
+
+There was a version of this opponent that shielded a tenth of its turns and
+never twice running, and it was so reliably open that mashing SHOOT beat playing
+properly by nine points. The shield is a real move again: a quarter of its
+turns, never three in a row.
 
 ### Abilities
 
@@ -126,12 +143,16 @@ raises something behind the road that is there for the rest of the fight:
 
 | World | Special | What it does |
 | ----- | ------- | ------------ |
-| Dust Flats | **Dust Devil** | A wall crossing the road every 22s on a dead-even beat. 2 lives, and it empties a chamber |
-| Wildgrass Prairie | **Hornet Tree** | The nest empties in one flurry every 20s. 2 lives, and it leaves you poisoned |
-| Whitecrown Pass | **Hanging Cornice** | The slab comes off every 22s — all of it inside half a second. 2 lives |
-| Blackwater Bayou | **Blackdamp** | The bog breathes out every 20s, slowly, still arriving when you think it is over. 2 lives, and it leaves you poisoned |
-| Brimstone Basin | **Volcano** | Throws rock across an eight-second eruption every 20s. 3 lives, and the lava stays on the road |
-| Galaxy | **The Rift** | **Charges** for five seconds every 20s and then fires **once**: 3 lives in a single shot, and it takes a round with it |
+| Dust Flats | **Dust Devil** | A wall crossing the road on a dead-even beat. 1 life, and it empties a chamber |
+| Wildgrass Prairie | **Hornet Tree** | The nest empties in one flurry. 1 life, and it leaves you poisoned |
+| Whitecrown Pass | **Hanging Cornice** | The slab comes off — all of it inside half a second. 2 lives |
+| Blackwater Bayou | **Blackdamp** | The bog breathes out slowly, still arriving when you think it is over. 2 lives, and it leaves you poisoned |
+| Brimstone Basin | **Volcano** | Throws rock across an eight-second eruption. 3 lives, and the lava stays on the road |
+| Galaxy | **The Rift** | **Charges** for five seconds and then fires **once**: 3 lives in a single shot, and it takes a round with it |
+
+An eruption costs about a fifth of your life bar wherever you are, which is why
+the first two throw half-weight blows: two lives is a fifth of the Stranger's
+road and two fifths of Big Jed's.
 
 That clock is real time. Every other rule in this game waits for you to press
 something; a volcano does not. It stands on the horizon doing nothing, the sky
@@ -140,6 +161,16 @@ countdown on the chip above the fight is the one number in a duel worth
 hurrying for. A shield is no use under any of it (it is the ground, not a shot),
 the vest still stops a fatal one, and the diadem does not touch it: the diadem
 blocks things aimed at you, and a mountain is not aiming.
+
+**The first quiet is shorter than the ones after it, and that is what makes any
+of this true.** A landmark goes up around round two and a duel is over in twenty
+to thirty seconds; with a full cycle of quiet in front of the first eruption,
+the volcano erupted in 0% of measured boss fights and the rift in 0% — six
+landmarks, six eruption patterns, an art file each, and five of the six were
+scenery. `firstCycleMs` is about a third of `cycleMs`, and the six of them now
+go off in four fights out of five. It also means hiding is not defence: a shield
+buys one round and costs one, and a fight dragged out four rounds longer walks
+into another eruption, which nothing blocks.
 
 **They do not all erupt the same way.** They used to: every special spread the
 same number of hits evenly across its window, so six landmarks were one
@@ -206,11 +237,19 @@ glance.
    most of it. Nothing new was invented for pricing.
 2. Power is rationed by **time**. A duel runs six or seven rounds; a three-round
    charge is two uses, a six-round charge is one.
-3. **The cost is the size of what it takes away** — turns, not damage. Anything
-   that hands its caster free turns costs five. Poison and dynamite cost six.
-4. It is meant to decide **bosses**, not drifters. A full charge is worth about
-   a third of Big Jed and two thirds of Old Scratch by the time the basin's kit
-   is affordable.
+3. **The cost is the size of what it takes away** — turns, not damage, written
+   as one rule rather than nineteen opinions:
+
+   ```
+   charge ≈ 3 + 1.5 × (what it takes away, in lives or in turns)
+   ```
+
+   A stolen round counts as a third of a turn, a freeze as the turns it costs,
+   damage as lives. That is why Meteor Strike is seven and Dust Snatch is three.
+   Set by feel, two of them had come out badly wrong: measured against the
+   Stranger, Meteor Strike was worth +44 points of win rate and Void Mirror +41
+   against a budget of thirteen to twenty.
+4. It is meant to decide **bosses**, not drifters.
 
 Measured over six hundred simulated duels a world, one equipped ability is worth
 roughly thirteen to twenty points of win rate — a real purchase, and not a
@@ -238,17 +277,42 @@ There is no level select. You walk, and the road decides what you meet.
   rare high red, will-o'-the-wisps over the bayou, embers rising through falling
   ash in the basin, dust that falls upward in the void.
 - **Guided randomness**: a world's difficulty is a number of duels, and its
-  shops and inns are rolled around them. One or two shops and — separately — one
-  or two inns, usually two of each, shuffled into the road with at least a
-  couple of fights between any two of them. So a stretch can offer a shop, three
-  duels and another shop with no bed anywhere in between, or two inns and a
-  single store. Nothing is ever adjacent to anything of its own kind, and no
-  building is ever stumbled into: they are always approached — and you stop at
-  the door. The building is drawn so its doorway lands on the traveller at the
-  moment the stop is reached, and it is still standing there behind you when
-  you walk on.
-- **Hunger** drains while you travel. At zero you lose a life every 12 seconds,
-  so food is a real purchase, not a nicety. The gauge is notched into ten
+  shops, inns and forge are rolled around them. One or two shops and —
+  separately — one or two inns, usually two of each, shuffled into the road with
+  fights between any two of them. Nothing is ever adjacent to anything of its
+  own kind, and no building is ever stumbled into: they are always approached —
+  and you stop at the door. The building is drawn so its doorway lands on the
+  traveller at the moment the stop is reached, and it is still standing there
+  behind you when you walk on.
+- **You can see five stops ahead, and the rest of the road is still deciding.**
+  The map used to print the whole world the moment you walked into it, which
+  meant a run's difficulty was settled by one shuffle before you had taken a
+  step: a road that dealt both its beds into its opening third and then asked
+  for nine fights had been lost to the generator, not to anybody's play.
+
+  A world now deals five stops face up and holds the rest face down — they are
+  question marks on the trail map, and each one turns over as you clear an
+  encounter. What is held back is only the **order**. The multiset is fixed at
+  generation and never changes: no run gets a fourth inn, and none gets one
+  fewer. Which of the remaining kinds a card turns out to be is read off the
+  state of the run — bleeding and the road finds you a bed, carrying a purse you
+  have not spent and it finds you a counter, doing fine and it finds you a
+  fight.
+
+  Two promises inside that. **The road never changes how hard a fight is** — a
+  duel is as hard as its world says, always; only the shape of the road adapts.
+  And **the last bed a world has left is saved for the door of the boss**: while
+  a world still holds one inn and you are carrying any damage at all, that inn
+  will not be dealt into the middle of the road. Seven deaths in ten used to be
+  a boss fought at half strength. You can see the bed coming, which means the
+  gold in your hand can go on the counter instead of being held back for it.
+- **Hunger** drains while you travel. At zero you lose **half a life a tick, and
+  the tick gets faster the bigger your life bar is** — about half a minute from
+  the end of the run whoever you are. It used to be a flat life every twelve
+  seconds, which is a real threat at three lives and nothing at all at eleven:
+  the one system whose whole job is to make food a purchase stopped being one
+  exactly when food got hardest to find. Food is a real purchase now, at both
+  ends of the road. The gauge is notched into ten
   rations, so how much is left is something you see rather than read. Two
   things burn them faster — the horse, and harsh weather, a sandstorm half
   again as fast with snow and ashfall close behind — and the gauge says so: the
@@ -268,7 +332,11 @@ There is no level select. You walk, and the road decides what you meet.
   carry. Bought once and kept, like the map: a third off the drain for the rest
   of the run. It is the only multiplier in the game that pulls the other way,
   and the gauge's badge goes cool instead of hot to say so.
-- **A horse** roughly halves travel time.
+- **A horse** roughly halves travel time — and the food a crossing costs with
+  it. It burns rations 15% faster per second and it halves the number of
+  seconds, so a mounted world costs about 44% less food than a walked one. The
+  travel band can only show the per-second figure, which is the half of it that
+  looks like a cost, so the card says the rest out loud.
 - **Day and night** run on a continuous clock, and the **weather** turns —
   overcast, rain, sandstorm, fog, snow, ashfall, and a meteor shower out past
   the last horizon. All of it reaches into combat: rain misfires, and sand,
@@ -284,12 +352,23 @@ There is no level select. You walk, and the road decides what you meet.
   one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
+  **One slot is always something that heals, and anything stackable is stocked
+  five deep.** Both of those exist for the same reason: a counter that held one
+  bandage, offered only if the dice felt like it, made lives something you could
+  be refused after playing correctly — and by the basin a shop rolls common less
+  than a third of the time. Gold can always be turned into lives now, and how
+  much of the purse goes that way instead of into the gun is the decision.
+  Permanent kit — the map, a vest, an ability — is still one apiece, because a
+  second one does nothing.
   A shop is a **stall**, not a list: a striped canvas awning with a scalloped
   valance, the store's sign hanging off it on two ropes, two posts, and a plank
   counter with the goods standing on it — inside a trading post whose shelves,
   barrels, sacks and overhead rail of pans and hats are drawn behind them.
-- **Inns** sell a basic bed (heals more in later worlds) or a premium bed (heals
-  everything), and **the two beds are two beds**. Both offers used to show the
+- **Inns** sell a basic bed — a bit under half your bar, wherever you are — or a
+  premium bed (heals everything), and **the two beds are two beds**. The cheap
+  bed is written as a fraction rather than a number of lives, because as a
+  number it fell behind the thing it was healing at exactly the rate the bar
+  grew. Both offers used to show the
   same 16 x 16 icon at 3x, so the choice was made by reading two prices under
   one picture. Each now stands in a little room of its own: a plank cot with a
   sacking mattress, the straw coming out of it and an army blanket over the
@@ -297,8 +376,8 @@ There is no level select. You walk, and the road decides what you meet.
   rug. The room they are in is drawn too — a stone hearth with a live fire in
   it, a window with the night behind it, a rug, a chair pulled up to the heat.
 - **The forge** sells the only thing in the game you keep forever: the gun. Six
-  improvements, each worth half a life a shot, and each one a **different
-  revolver** — the trail iron you rode in with, tempered steel, a brass
+  improvements, each worth half a life a shot on top of the whole life the trail
+  iron already does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
   longbarrel, the silvered Ivory Hand, the Emberbore that never cooled, the
   Starfall, and the Nova, which has a nebula burning inside the frame and three
   stars in orbit around it. What you bought is visible in the fight: the shape
@@ -307,9 +386,20 @@ There is no level select. You walk, and the road decides what you meet.
   every shot.
 
   It is priced like nothing else on the road, and deliberately: 40 gold for the
-  first rung and 27,845 for the last, on a curve that gets steeper as it climbs
-  (see `gunUpgradeCost` in `src/game/progression.js`). The Nova is a whole run
-  spent on one gun.
+  first rung and 16,605 for the last, on a curve that gets steeper as it climbs
+  (see `gunUpgradeCost` in `src/game/progression.js`). The whole ladder costs
+  about 24,000 against a full clear that pays out around 21,000, so the Nova
+  needs a run that sells its finds and skips its beds. It used to cost more than
+  the road pays out at all, which is not an expensive decision, it is a locked
+  door with a price painted on it.
+
+  **The gun is no longer the whole difficulty slider.** It used to run from half
+  a life a shot to three and a half — seven times — while nothing else in the
+  shop moved a fight by more than a fifth, so a player who spent their gold on
+  food and a vest was not playing a different strategy, they were playing an
+  unwinnable game and nothing ever told them. One to four now. The Nova is still
+  the best gun in the game; it is no longer the only thing that decided whether
+  the run was possible.
 
   The counter is a **smithy**, not a panel: an iron hood over a scorched bench,
   the sign on two chains, the gun turning on a plate under it and the ladder
@@ -328,6 +418,12 @@ There is no level select. You walk, and the road decides what you meet.
   duel, shop, inn and boss marked on it, with your own position as a blue
   circle. Drag it, zoom it, and open it as often as you like — it is bought
   once and kept, not spent per look. It still shows no numbers.
+
+  **It shows five stops and then a row of question marks.** The road past the
+  horizon has not been decided yet — see the adaptive road above — so the map
+  draws what it honestly knows: the country, the road through it, the five
+  stops that are settled, the boss at the end, and a blank signpost for every
+  one that is still being chosen.
 
   **The ground on it has a shape now.** Every sheet is painted off a height
   field: the elevation picks a step of the biome's own five-colour ramp and is
@@ -360,8 +456,8 @@ There is no level select. You walk, and the road decides what you meet.
   names, and each world drawing from its own roster. The name always describes
   the sprite, because the names were written from the art.
 - **Levelling is the slow reward.** Roughly 1.4 levels per world, so a run that
-  reaches the Galaxy is around level 9. A level grants **one life** — one more
-  maximum, and one more in the bar to go with it. It is not a refill: if you
+  reaches the Galaxy is around level 9 and around fourteen lives. A level grants
+  **one life** — one more maximum, and one more in the bar to go with it. It is not a refill: if you
   arrive at a level-up on your last life you leave it on your second, and the
   bed at the inn is still the only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
@@ -383,9 +479,12 @@ There is no level select. You walk, and the road decides what you meet.
   pooled at his feet, up his sides, around the crown, with sparks coming off
   it — and taking the cowl off doubles it and adds arcs of white light. The
   phase change is a crash zoom, a shockwave and the frame coming apart.
-- **Bosses hit harder than they last.** Every world's boss carries about three
-  fifths of the lives it used to. A boss fight was a long exchange you could
-  grind down; it is a short one you can lose.
+- **Bosses hit harder than they last.** A boss is three or four shots deep with
+  the revolver you should be carrying by then — long enough for its landmark to
+  erupt once or twice, short enough that it is a fight rather than a siege. That
+  window is narrow on purpose: measured at a full bar the six of them sit
+  between two thirds and nine tenths winnable, and every point of the difference
+  is whether you walked up to the door with a full life bar.
 
 Speech is a general system, not part of that one scene: a portrait, a name
 plate and a line typing itself out, for anybody on either side of the road.
@@ -433,6 +532,8 @@ typed as a character.
 
 ```
 index.html              boot page: one canvas, one screen root, one overlay
+package.json            no dependencies; the scripts are the server and the sim
+tools/sim.mjs           the balance harness — see Tuning
 styles/                 materials & tokens · UI kit · menu screens · game screens
 src/
   main.js               boot order + screen registry
@@ -523,14 +624,52 @@ finishes; the last one asked for wins.
 
 ## Tuning
 
+### Measuring first
+
+```bash
+npm run sim          # everything, and it fails the build if a band has drifted
+node tools/sim.mjs duels     # win rates and attrition per world, per skill
+node tools/sim.mjs bosses    # the six bosses
+node tools/sim.mjs specials  # how often a landmark actually erupts
+node tools/sim.mjs runs      # full runs, permadeath on
+```
+
+`tools/sim.mjs` imports the **real** duel engine, the real opponent, the real
+road generator and the real progression curves and reimplements none of them.
+What it substitutes is the person: three synthetic players, from someone mashing
+one button and spending their gold on the shiniest thing to someone who reads
+the rival's cylinder and buys their bandages before they need them.
+
+It exists because every number in this game lives in a data file, which makes it
+easy to change and impossible to review by eye. Reading the tables had produced
+a volcano that erupted in 0% of measured fights, an opponent so open that
+mashing SHOOT beat playing properly by nine points, and a road that no simulated
+player ever finished. None of that is visible in a diff.
+
+The design target is a skill ladder rather than a difficulty, and the harness
+fails if the game leaves it:
+
+| | reaches the Galaxy |
+| --- | --- |
+| mashes one button, spends badly | ~10% |
+| plays reasonably | ~30% |
+| reads the cylinder, buys correctly | ~60% |
+
+Almost all of that spread is the **ledger**, not the trigger finger. Reading the
+opponent's chambers is worth about a fifth of the damage you take; buying food
+before you are hungry and bandages before you are hurt is worth the run.
+
+### Where the numbers are
+
 Balance lives in data, not in code:
 
 - `src/game/worlds.js` — per-world difficulty, rarity tables, price and reward
   multipliers, how many duels the road holds, bosses, and which biome each world
   is in.
 - `src/explore/encounters.js` — how the road is laid out: how many shops and
-  inns a world rolls, how far apart they have to be, and the spacing between
-  everything on it.
+  inns a world rolls, how far apart they have to be, the spacing between
+  everything on it, how far ahead the player can see (`REVEAL_AHEAD`) and the
+  `APPETITE` table that decides what a face-down stop turns out to be.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
 - `src/game/world-abilities.js` — the fourteen mechanics, the nineteen
@@ -541,14 +680,19 @@ Balance lives in data, not in code:
   `worlds.js`. Player and enemy fire the same numbers — the asymmetry is the
   turn rule, not the tuning.
 - `src/game/progression.js` — every curve: exp and the level ladder (tuned
-  together to hit ~1.4 levels per world), gold, prices, inn healing, the gun's
-  damage and its deliberately super-exponential upgrade cost, hunger drain,
-  walking speed, the horse discount.
+  together to hit ~1.4 levels per world), gold, prices, inn healing as a
+  fraction of the bar, the gun's damage and its deliberately super-exponential
+  upgrade cost, what a rider's bullet costs by world, hunger drain, how fast
+  starving ticks against the size of your life bar, walking speed, the horse
+  discount. Everything that hurts is a multiple of half a life, because half a
+  diamond is a shape the interface can draw and 0.15 of one is not.
 - `src/game/gun-tiers.js` — the seven revolvers: what each rung is called, which
   silhouette it is cut from, what it is made of, what it throws when it fires,
   and which ritual the forge performs to make it. Nothing in it is a mechanic —
   the damage is one line in `progression.js` — so the art can get as loud as it
   likes without the balance moving.
+- `src/shops/shop.js` — what a counter holds: `STOCK_DEPTH` for anything
+  stackable, and the guaranteed heal in slot zero.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up. The twenty-four ability
   entries are generated into it from the catalogue above rather than written
@@ -747,4 +891,4 @@ SHOOT.run.beginWorld(6);        // jump to the Galaxy
 
 ## Keyboard
 
-`1` reload · `2` shield · `3` shoot · `I` saddlebag.
+`1` reload · `2` shield · `3` shoot · `I` saddlebag · `M` trail map.

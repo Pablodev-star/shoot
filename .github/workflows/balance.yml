@@ -1,0 +1,27 @@
+# The game has no build and no dependencies, so there is nothing here to
+# compile. What there is to check is the BALANCE: every number in this game
+# lives in a data file, and a data file is the easiest thing in a codebase to
+# change by accident and the hardest to review by eye.
+#
+# `tools/sim.mjs` plays the real duel engine, the real opponent and the real
+# road generator against three synthetic players and fails the build if the
+# game has drifted out of its design bands — see the header of that file.
+name: Balance
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 250 runs a skill level is enough to place each band to about ±3 points
+      # and finishes well inside a minute.
+      - name: Simulate the road
+        run: RUNS=250 DUELS=200 node tools/sim.mjs all
