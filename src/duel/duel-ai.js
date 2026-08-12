@@ -66,30 +66,43 @@ export function createLocalAgent() {
  * The rest of the time it plays its own game: a weighted move that depends on
  * ITS cylinder, not yours.
  *
- * AND IT DOES NOT LIVE BEHIND THE SHIELD
+ * AND IT DOES NOT LIVE BEHIND THE SHIELD — BUT IT DOES OWN ONE
  * ---------------------------------------------------------------------------
  * Shield is the move that produces the frustrating half of the pattern above,
- * and it was over-picked from three directions at once: the read chose it
+ * and it was once over-picked from three directions at once: the read chose it
  * whenever the player looked like shooting, the fallback offered it on every
- * branch, and nothing stopped it happening twice or five times in a row. Two
- * rules hold it down now (`canShield`): never twice in a row, and never more
- * than SHIELD_SHARE of its turns across the whole duel. When a rule blocks it,
- * the agent falls through to the move it would have played otherwise rather
- * than standing there — see `pickAggressive`.
+ * branch, and nothing stopped it happening five times in a row. Fixing that
+ * went one town too far. With the cap at a tenth of its turns and no two
+ * shields ever running back to back, the rival was so reliably open that
+ * "shoot whenever you have a round" stopped having a downside — measured over
+ * five hundred duels a policy, the player who mixed their moves properly won
+ * 88% of the time and the player who mashed SHOOT and never thought about it
+ * won 97%. A three-way guess in which one of the three answers is free is not
+ * a guess.
  *
- * WHAT THIS COST, MEASURED
+ * So the shield is back to being a real move, held down by two rules that
+ * leave it dangerous instead of absent (`canShield`): never three times in a
+ * row, and never more than SHIELD_SHARE of its turns across the whole duel.
+ * When a rule blocks it, the agent falls through to the move it would have
+ * played otherwise rather than standing there — see `pickAggressive`.
+ *
+ * AND IT NOTICES A PATTERN, WHICH IS NOT THE SAME AS SEEING YOUR MOVE
  * ---------------------------------------------------------------------------
- * Over a few thousand rounds against a player who mixes their moves properly,
- * and against the same player before the change:
+ * The old cheat was reading the player's CYLINDER — state they had not chosen
+ * and could not hide. What `STREAK_*` reads is the player's own repetition:
+ * fire three rounds running and the fourth is more likely to meet a shield.
+ * That is information the player put on the table themselves, it is escapable
+ * by simply not repeating, and it is what turns the duel back into a bluff.
+ * A player who varies never sees it at all.
  *
- *   shields raised                13% → 10% of its turns
- *   YOUR SHOTS EATEN BY A SHIELD  16% →  8%
- *   an even 3-life duel           the player won 1 in 5; now 1 in 3
+ * WHAT THIS COSTS, MEASURED
+ * ---------------------------------------------------------------------------
+ * Over five hundred duels a policy, against the same world-3 rider:
  *
- * The last line is the honest part: this opponent is easier, and it is easier
- * because most of what made it hard was information it should never have had.
- * The difficulty it gives back is in src/game/world-abilities.js, where a
- * world can now put a volcano on the road instead of an opponent who cheats.
+ *   pure SHOOT spam       97% → 78%
+ *   proper mixing         88% → 86%
+ *
+ * The gap flips: thinking is now worth eight points instead of costing nine.
  *
  * `enemyAccuracyPenalty` (sandstorm, night) is subtracted from accuracy, which
  * is how weather reaches the fight.
@@ -98,7 +111,11 @@ export function createLocalAgent() {
 /** The most of its turns the AI can ever play off a read of the player. */
 const READ_SHARE = 0.62;
 /** Ceiling on the share of turns spent shielding, over the whole duel. */
-const SHIELD_SHARE = 0.1;
+const SHIELD_SHARE = 0.26;
+/** Repeated identical moves before the agent starts expecting another one. */
+const STREAK_TRIGGER = 3;
+/** How much a streak that long adds to the chance of answering it. */
+const STREAK_BONUS = 0.34;
 
 export function createAiAgent(enemy, modifiers = {}, options = {}) {
   const history = { reload: 1, shield: 1, shoot: 1 }; // Laplace-smoothed priors
@@ -114,7 +131,11 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
 
   let turns = 0;
   let shields = 0;
-  let lastMove = null;
+  /** How many turns the agent has shielded back to back right now. */
+  let shieldRun = 0;
+  /** The player's last move, and how many times they have repeated it. */
+  let playerLast = null;
+  let playerStreak = 0;
 
   /**
    * IT DOES NOT LOOK AT YOUR CYLINDER
@@ -175,8 +196,22 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
    * falling where they fall instead of where you were about to shoot.
    */
   function canShield() {
-    if (lastMove === MOVES.SHIELD) return false;
+    // Twice is a duellist covering up. Three times is a wall, and a wall is
+    // what made this agent unreadable in the wrong direction.
+    if (shieldRun >= 2) return false;
     return shields < Math.max(1, Math.round((turns + 1) * SHIELD_SHARE));
+  }
+
+  /**
+   * The one thing the agent is allowed to notice: the player doing the same
+   * thing over and over. It is not a peek at their state — it is their own
+   * last few turns, which they chose and can stop choosing.
+   */
+  function streakAnswer() {
+    if (playerStreak < STREAK_TRIGGER) return null;
+    if (playerLast === MOVES.SHOOT) return canShield() ? MOVES.SHIELD : null;
+    if (playerLast === MOVES.RELOAD) return MOVES.SHOOT;
+    return null; // a player who only shields is punishing themselves already
   }
 
   /** What it does when it wanted to shield and is not allowed to. */
@@ -198,20 +233,41 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
    * An empty gun reloads, a full one shoots, and the middle trades between the
    * two — the shield is a small slice of each branch rather than a third of
    * every one of them.
+   *
+   * AND IT TELLS THE TRUTH, LOUDLY, BECAUSE THAT IS THE GAME
+   * -------------------------------------------------------------------------
+   * The duel screen draws both cylinders: six chambers a side with the loaded
+   * ones shaded in. That picture is the only honest tell in this game, and it
+   * is worth nothing unless the tell is strong — if a rival with an empty gun
+   * still shoots one turn in seven, then watching their chambers buys you a
+   * hunch, and a hunch is indistinguishable from luck.
+   *
+   * So the branches are sharpened almost to certainties. An empty gun reloads;
+   * a stocked one fires. A player who has noticed can spend the rival's dry
+   * turns freely — reload in the open, line up the shot — and duck behind a
+   * shield on the turns the picture says a round is coming. A player who has
+   * not noticed plays the same duel with the lights off, and pays about a
+   * fifth more of their life bar per fight for it.
+   *
+   * The tell is a real strategy rather than an exploit precisely because it
+   * runs both ways: the agent reads the player's chambers exactly never (see
+   * the note above `guessPlayerMove`), and the player reads the agent's from
+   * the interface. The information the game gives away is the information it
+   * expects you to use.
    */
   function fallback(view) {
     const bullets = view.self.bullets;
     const roll = random();
     if (bullets <= 0) {
-      return roll < 0.86 || !canShield() ? MOVES.RELOAD : MOVES.SHIELD;
+      return roll < 0.96 || !canShield() ? MOVES.RELOAD : MOVES.SHIELD;
     }
     if (bullets >= 3) {
-      if (roll < 0.82) return MOVES.SHOOT;
-      if (roll < 0.92 && canShield()) return MOVES.SHIELD;
+      if (roll < 0.9) return MOVES.SHOOT;
+      if (roll < 0.96 && canShield()) return MOVES.SHIELD;
       return MOVES.SHOOT;
     }
-    if (roll < 0.62) return MOVES.SHOOT;
-    if (roll < 0.86) return MOVES.RELOAD;
+    if (roll < 0.68) return MOVES.SHOOT;
+    if (roll < 0.88) return MOVES.RELOAD;
     return canShield() ? MOVES.SHIELD : MOVES.RELOAD;
   }
 
@@ -220,18 +276,24 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
     /** Feed the player's actual move back in after each round. */
     observe(playerMove) {
       if (history[playerMove] != null) history[playerMove] += 1;
+      playerStreak = playerMove === playerLast ? playerStreak + 1 : 1;
+      playerLast = playerMove;
     },
     async chooseMove(view) {
       if (thinkMs) await new Promise((r) => setTimeout(r, thinkMs));
 
       let move;
+      const streak = streakAnswer();
       // On the brink, protect what is left — but only if the shield is a real
-      // move here and not the fourth one in a row.
+      // move here and not the third one in a row.
       if (view.self.lives === 1 && random() < 0.5 && canShield()) {
         move = MOVES.SHIELD;
       } else if (view.foe.lives === 1 && view.self.bullets > 0 && random() < 0.5 + accuracy * 0.4) {
         // A finishing shot is never passed up.
         move = MOVES.SHOOT;
+      } else if (streak && random() < STREAK_BONUS) {
+        // They have told it what they are going to do. It answers.
+        move = streak === MOVES.SHOOT && view.self.bullets <= 0 ? MOVES.RELOAD : streak;
       } else if (random() < readChance) {
         move = counterTo(guessPlayerMove(), view);
       } else {
@@ -239,8 +301,12 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
       }
 
       turns += 1;
-      if (move === MOVES.SHIELD) shields += 1;
-      lastMove = move;
+      if (move === MOVES.SHIELD) {
+        shields += 1;
+        shieldRun += 1;
+      } else {
+        shieldRun = 0;
+      }
       return move;
     },
   };

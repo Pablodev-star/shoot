@@ -54,7 +54,33 @@ export function expForNextLevel(level) {
  * src/game/player.js.
  */
 export const LIVES_PER_LEVEL = 1;
-export const STARTING_LIVES = 3;
+/**
+ * Six, not three.
+ *
+ * Every damage figure in the game doubled when the trail iron went from half a
+ * life a shot to a whole one (see `gunDamageAt`), so a three-life bar would be
+ * three hits deep in world one and two hits deep in the basin. Six is a little
+ * more than the old three was worth, and the extra is deliberate: the Dust
+ * Flats were measured killing two runs in five, which is a tutorial that eats
+ * the people it is teaching.
+ */
+export const STARTING_LIVES = 6;
+
+/**
+ * What a rider's bullet costs you, by world.
+ *
+ * A table rather than `worldId * 0.5`, which is what it used to be and which
+ * had the Stranger's riders taking three lives a shot off an eleven-life bar —
+ * four hits and a run that had lasted an hour was over. Written out, on the
+ * half-life grid, and deliberately flat across pairs of worlds: the road gets
+ * harder because there is more of it and because the landmarks now erupt, not
+ * because every bullet is bigger than the last one.
+ */
+export const ENEMY_GUN_DAMAGE = { 1: 0.5, 2: 0.5, 3: 1, 4: 1, 5: 1.5, 6: 1.5 };
+
+export function enemyGunDamage(worldId) {
+  return ENEMY_GUN_DAMAGE[worldId] ?? 1;
+}
 
 /**
  * exp awarded for beating an enemy.
@@ -106,9 +132,25 @@ export function sellPrice(item, worldId) {
 export const INN_BASIC_BASE = 45;
 export const INN_PREMIUM_BASE = 130;
 
-/** Lives a basic bed restores — grows with the world. */
-export function innBasicHeal(worldId) {
-  return 1 + Math.floor((worldId - 1) / 1.5); // W1:1  W2:1  W3:2  W4:3  W5:3  W6:4
+/**
+ * Lives a basic bed restores — grows with the world.
+ *
+ * It used to be 1/1/2/3/3/4 against a bar that ran 3 to 11, so the cheap bed
+ * was a third of your lives in the Dust Flats and a quarter of them in the
+ * Galaxy: it fell behind the thing it was healing at exactly the rate the
+ * thing grew. It is written as a FRACTION of the bar now, rounded to the
+ * half-diamond grid, so "the cheap bed" means the same thing all the way down
+ * the road — a bit under half of you, wherever you are.
+ *
+ * That matters more than it sounds. Measured over three hundred full runs, the
+ * thing that ended a run was almost never one bad duel; it was nine duels
+ * costing half a life each against a world holding two beds.
+ */
+export const INN_BASIC_FRACTION = 0.45;
+
+export function innBasicHeal(worldId, maxLives = STARTING_LIVES) {
+  const scaled = maxLives * INN_BASIC_FRACTION + (worldId - 1) * 0.15;
+  return Math.max(1, Math.round(scaled * 2) / 2);
 }
 
 export function innBasicPrice(worldId) {
@@ -142,9 +184,50 @@ export function innPremiumPrice(worldId) {
  */
 export const GUN_MAX_LEVEL = 6;
 
-/** Lives taken per shot at a given gun level. Half a life per rung. */
+/**
+ * Lives taken per shot at a given gun level.
+ *
+ * THE GUN USED TO BE THE WHOLE DIFFICULTY SLIDER
+ * ---------------------------------------------------------------------------
+ * It was `0.5 + level * 0.5`, which reads like a gentle ladder and is not one.
+ * The trail iron did half a life and the Nova did three and a half — seven
+ * times as much — while nothing else in the shop moves a fight by more than a
+ * fifth. Measured over two hundred duels a cell, in the Galaxy:
+ *
+ *   gun 0   0% of duels won        gun 3   56%
+ *   gun 1  16%                     gun 5   73%
+ *
+ * A player who spent their gold on food, a map and a vest was not playing a
+ * different strategy, they were playing an unwinnable game, and nothing on the
+ * road ever told them. That is the opposite of a build.
+ *
+ * So the iron you ride in with is worth twice what it was and the ladder above
+ * it is unchanged: 1.0 at the bottom, 4.0 at the top — four times rather than
+ * seven. The Nova is still the best gun in the game and still a whole run's
+ * savings; it is no longer the only thing that decides whether the run was
+ * possible. Everything the gun shoots at grew to match (see `lives` in
+ * src/game/worlds.js), so a fight is the same length it always was.
+ *
+ * AND IT HAS TO LAND ON A HALF
+ * ---------------------------------------------------------------------------
+ * Lives are red diamonds and half a diamond is a shape the interface can draw;
+ * 0.15 of one is not (see `livesRow` in src/ui/widgets.js). So every damage
+ * figure in this game — the gun, the riders, the abilities, the mountains —
+ * is a multiple of 0.5, and flattening the curve had to be done by moving the
+ * bottom of the ladder up rather than by making the steps smaller. A player
+ * hit for a quarter of a diamond is a player watching a bar that does not
+ * move.
+ *
+ * The pleasant side effect is that the rule book is true again: at the trail
+ * iron a shot costs exactly one life, which is what the how-to-play panel has
+ * always said it does.
+ */
+export const GUN_DAMAGE_BASE = 1;
+export const GUN_DAMAGE_PER_RUNG = 0.5;
+
 export function gunDamageAt(level) {
-  return 0.5 + Math.min(GUN_MAX_LEVEL, Math.max(0, level)) * 0.5;
+  const rungs = Math.min(GUN_MAX_LEVEL, Math.max(0, level));
+  return GUN_DAMAGE_BASE + rungs * GUN_DAMAGE_PER_RUNG;
 }
 
 /**
@@ -152,25 +235,36 @@ export function gunDamageAt(level) {
  *
  * Two things compound here rather than one. The base is exponential, as it
  * always was; on top of it sits an ESCALATION term that grows with the level,
- * so the ratio between one rung and the next widens as you climb — 3.8x for
- * the first, better than 4.4x by the last. That is the difference between a
- * curve that is steep and a curve that keeps getting steeper, and it is what
- * stops a player who found one good boss purse from buying two tiers with it.
+ * so the ratio between one rung and the next widens as you climb. That is the
+ * difference between a curve that is steep and a curve that keeps getting
+ * steeper, and it is what stops a player who found one good boss purse from
+ * buying two tiers with it.
  *
  *   level 0 → 1 |      40   pocket change after a duel or two
- *   level 1 → 2 |     150   a world-1 purse
- *   level 2 → 3 |     565   most of a world-2 run's takings
- *   level 3 → 4 |   2,090   a world-3/4 project
- *   level 4 → 5 |   7,655   you are saving instead of buying food
- *   level 5 → 6 |  27,845   the Nova. A whole run spent on one gun
+ *   level 1 → 2 |     135   a world-1 purse
+ *   level 2 → 3 |     455   most of a world-2 run's takings
+ *   level 3 → 4 |   1,515   a world-3/4 project
+ *   level 4 → 5 |   5,025   you are saving instead of buying food
+ *   level 5 → 6 |  16,605   the Nova. A whole run spent on one gun
  *
- * The old curve was `25 * 3.25^level` — 25 / 81 / 264 / 858 / 2,789 / 9,065 —
- * so every rung above the first is between two and three times dearer than it
- * was, and the top one is three times dearer again.
+ * THE TOP RUNG HAS TO BE REACHABLE OR IT IS NOT A CHOICE
+ * ---------------------------------------------------------------------------
+ * It was 27,845, against a full clear that pays out about 21,000 counting
+ * every purse in the game — so the Nova was not an expensive decision, it was
+ * a locked door with a price painted on it, and the seventh revolver, its
+ * ritual and its starfield were art nobody would ever see. Now the whole
+ * ladder costs 23,775 of a ~21,000 run: still more than the road pays, so it
+ * needs a run that sells its finds and skips its beds, and no longer a number
+ * that exists to be looked at.
+ *
+ * The rungs matter less than they did in any case — a rung is worth half a
+ * life a shot against a ladder that now starts at a whole one (`gunDamageAt`),
+ * so this is a curve for the player who wants the gun, not the toll every
+ * player pays to stay in the game.
  */
 export const GUN_COST_BASE = 40;
-export const GUN_COST_GROWTH = 3.35;
-export const GUN_COST_ESCALATION = 0.13;
+export const GUN_COST_GROWTH = 3.1;
+export const GUN_COST_ESCALATION = 0.09;
 
 export function gunUpgradeCost(level) {
   if (level >= GUN_MAX_LEVEL) return Infinity;
@@ -212,8 +306,46 @@ export const HUNGER_DRAIN_ASH_MUL = 1.3;
  * being stacked with it, and 1.15 x 0.67 is still comfortably under one.
  */
 export const HUNGER_DRAIN_CANTEEN_MUL = 0.67;
-/** Once hunger hits zero, one life is lost every this many milliseconds. */
-export const STARVATION_INTERVAL_MS = 12000;
+/**
+ * STARVING, AND WHY IT SPEEDS UP AS YOU GROW
+ * ---------------------------------------------------------------------------
+ * It used to be a whole life every twelve seconds, flat. That is a real threat
+ * at three lives — thirty-six seconds and the run is over — and it is nothing
+ * at all by the Galaxy, where the same rule takes better than two minutes to
+ * empty a fourteen-life bar. So the one system in the game whose whole job is
+ * to make food a purchase quietly stopped being one exactly when food became
+ * hardest to find. Runs did not starve; they walked the last two worlds on an
+ * empty gauge and paid a rounding error for it.
+ *
+ * The rule now is one sentence: **an empty gauge empties a full life bar in
+ * STARVATION_BAR_MS, whatever the bar is.** It comes off half a diamond at a
+ * time — the smallest thing the interface can draw, so the first tick is
+ * visible instead of a whole heart arriving out of nowhere — and the interval
+ * between ticks is simply that budget divided by the number of halves in the
+ * bar. A longer bar does not buy you time, it buys you warnings.
+ *
+ *    6 lives → a tick every 2.5s  ┐
+ *    9 lives → a tick every 1.7s  ├ thirty seconds, all of them
+ *   14 lives → a tick every 1.1s  ┘
+ *
+ * Half a minute from the end of the run at every stage of the road is what
+ * makes a carrot worth buying in the Dust Flats and a Trail Stew worth carrying
+ * out of the basin.
+ */
+export const STARVATION_LIFE_PER_TICK = 0.5;
+/** How long an empty gauge takes to empty a full bar, whatever size it is. */
+export const STARVATION_BAR_MS = 30000;
+/** However long the bar gets, a tick is never quicker than this. */
+export const STARVATION_MIN_MS = 600;
+
+/**
+ * How long between starvation ticks for a given maximum life bar.
+ * @param {number} maxLives
+ */
+export function starvationIntervalMs(maxLives = STARTING_LIVES) {
+  const ticks = Math.max(1, maxLives / STARVATION_LIFE_PER_TICK);
+  return Math.max(STARVATION_MIN_MS, STARVATION_BAR_MS / ticks);
+}
 
 // ---------------------------------------------------------------------------
 // The Dusk Totem
@@ -222,13 +354,15 @@ export const STARVATION_INTERVAL_MS = 12000;
 /**
  * What you come back on.
  *
- * Half the bar, never fewer than two. Half rather than all of it because the
+ * Half the bar, never fewer than three. Half rather than all of it because the
  * totem is meant to buy a run its next shop, not to hand back the fight that
- * was lost; two as a floor because a revival that puts you on one life in a
- * world where every rider carries three is a cut-scene, not a rescue.
+ * was lost; three as a floor because a revival that puts you on one life in a
+ * world where a rider's bullet costs two and a half is a cut-scene, not a
+ * rescue. The floor moved with every other damage figure in the game — see
+ * `gunDamageAt`.
  */
 export function totemReviveLives(maxLives) {
-  return Math.max(2, Math.ceil(maxLives / 2));
+  return Math.max(3, Math.ceil(maxLives / 2));
 }
 
 // ---------------------------------------------------------------------------

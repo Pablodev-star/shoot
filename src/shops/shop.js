@@ -5,7 +5,8 @@
  * multipliers), the player's accumulated shop perks, a seed, and the item
  * catalogue. Nothing is hard-coded per world.
  *
- *   slots      = BASE_SLOTS + perks.extraSlots        (items may repeat)
+ *   slot 0     = always something that heals — see the note in `generateStock`
+ *   slots      = BASE_SLOTS + perks.extraSlots
  *   rarity     = weighted roll from world.rarity
  *   price      = itemPrice(item, world)               (exponential curve)
  *   discount   = 50% off, with probability
@@ -24,6 +25,28 @@ import { getState } from '../game/player.js';
 export const BASE_SLOTS = 3;
 export const BASE_DISCOUNT_CHANCE = 0.2;
 export const DISCOUNT_RATE = 0.5;
+
+/**
+ * HOW MANY OF A THING A COUNTER ACTUALLY HAS
+ * ---------------------------------------------------------------------------
+ * Every slot used to hold exactly one of whatever it was, permanent or not,
+ * which quietly made a shop the wrong shape. A vest and a horse are singular —
+ * there is one of each in the world and buying it is the event. A bandage is
+ * not: a store that has ONE bandage is not a store, it is a curiosity, and a
+ * world with two such stores offered a total of four lives for sale against
+ * nine duels' worth of damage.
+ *
+ * That was the single biggest reason a run ended. Not a fight lost — a fight
+ * won nine times with nowhere to buy the difference back. So anything the
+ * catalogue lets you stack is stocked in DEPTH, and the decision at the
+ * counter goes from "is this the one thing I get" to "how much of my purse do
+ * I turn into lives, and how much do I keep for the gun". That is a decision
+ * the player can be good at, which is the whole point.
+ *
+ * Permanent kit — the map, the canteen, the vest, an ability — stays at one,
+ * because a second one does nothing.
+ */
+export const STOCK_DEPTH = 5;
 
 /**
  * Build the stock for one visit.
@@ -53,9 +76,53 @@ export function generateStock(worldId, seed) {
     legendary: [...SHOP_POOL.legendary, ...abilities.legendary],
   };
 
+  /**
+   * ONE THING THAT PUTS LIVES BACK, ALWAYS
+   * -------------------------------------------------------------------------
+   * The counter used to be three rolls off the world's rarity table and
+   * nothing else, which quietly made the single most important resource in the
+   * game — lives — something you could only buy if the dice offered it. By the
+   * basin a shop rolls common less than a third of the time, so a player who
+   * had done everything right, arrived with a full purse and needed a bandage
+   * could be told no by a shuffle. That is the definition of a run decided by
+   * luck rather than by play: the decision was made correctly and the game
+   * refused to honour it.
+   *
+   * So slot zero is a heal. Which heal still depends on the world's table (a
+   * bandage in the flats, a potion where potions are what the table offers),
+   * the price is the ordinary price, and the discount roll is the ordinary
+   * roll — the guarantee is only that gold can always be turned into lives.
+   * Everything else on the counter is still whatever the road felt like.
+   */
+  const HEALS = ['potion', 'bandage'];
+
+  /** One counter entry, with as many of the thing on it as it can hold. */
+  const entry = (item, slot) => {
+    const fullPrice = itemPrice(item, worldId);
+    const discounted = rng.chance(discountChance);
+    const units = item.stack > 1 ? STOCK_DEPTH : 1;
+    return {
+      slot,
+      item,
+      fullPrice,
+      discounted,
+      price: discounted ? Math.max(1, Math.round((fullPrice * (1 - DISCOUNT_RATE)) / 5) * 5) : fullPrice,
+      /** How many are left on the counter. */
+      units,
+      stocked: units,
+      get soldOut() {
+        return this.units <= 0;
+      },
+    };
+  };
+
   const stock = [];
   const taken = new Set();
-  for (let i = 0; i < slots; i++) {
+  const guaranteed = rng.weighted(world.rarity) === 'common' ? 'bandage' : rng.pick(HEALS);
+  taken.add(guaranteed);
+  stock.push(entry(getItem(guaranteed), 0));
+
+  for (let i = stock.length; i < slots; i++) {
     // Never put the same item on the counter twice. A visit offering "Bandage,
     // Carrot, Bandage" reads as a bug, and it wastes one of only three slots.
     const item = pickUnused(rng, rng.weighted(world.rarity), taken, pool);
@@ -65,17 +132,7 @@ export function generateStock(worldId, seed) {
     // spin: there is genuinely nothing left to sell.
     if (!item) break;
     taken.add(item.id);
-
-    const fullPrice = itemPrice(item, worldId);
-    const discounted = rng.chance(discountChance);
-    stock.push({
-      slot: i,
-      item,
-      fullPrice,
-      discounted,
-      price: discounted ? Math.max(1, Math.round((fullPrice * (1 - DISCOUNT_RATE)) / 5) * 5) : fullPrice,
-      soldOut: false,
-    });
+    stock.push(entry(item, i));
   }
   return stock;
 }

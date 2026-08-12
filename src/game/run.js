@@ -109,6 +109,14 @@ export async function loadRun(slot, data) {
     travelled: data.travelled ?? 0,
     cameraX: data.travelled ?? 0,
     encounterIndex: getState().encounterIndex,
+    /**
+     * Which kind each stop on this road turned out to be. The seed rebuilds
+     * what the world was holding; the order it was dealt in was decided by how
+     * the run was going, so it can only come back off the save. A file written
+     * before the road adapted has none, and everything past the horizon is
+     * simply dealt fresh — see `applyReveals`.
+     */
+    types: data.segmentTypes,
   });
   run.started = true;
   resetStack();
@@ -309,6 +317,7 @@ export async function save(extra = {}) {
     weather: weather.serialize(),
     travelled: engineState.travelled ?? 0,
     segmentSeed: engineState.seed,
+    segmentTypes: engineState.types ?? [],
     savedAt: Date.now(),
     ...extra,
   });

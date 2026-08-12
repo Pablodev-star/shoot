@@ -20,9 +20,24 @@
  */
 
 import { EVENTS, emit } from '../core/events.js';
-import { WALK_SPEED, HORSE_SPEED_MUL, HORSE_TIME_MUL } from '../game/progression.js';
+import {
+  WALK_SPEED,
+  HORSE_SPEED_MUL,
+  HORSE_TIME_MUL,
+  HUNGER_MAX,
+  innPremiumPrice,
+  gunUpgradeCost,
+  GUN_MAX_LEVEL,
+} from '../game/progression.js';
 import { getState, addDistance } from '../game/player.js';
-import { generateSegment, effectiveDistance } from './encounters.js';
+import { getItem } from '../game/items.js';
+import {
+  generateSegment,
+  effectiveDistance,
+  revealToHorizon,
+  applyReveals,
+  roadReading,
+} from './encounters.js';
 import * as hunger from './hunger.js';
 import * as daynight from './daynight.js';
 import * as weather from './weather.js';
@@ -36,6 +51,25 @@ export function createWalkEngine() {
   /** Screen-space camera position (equals travelled, kept separate for clarity). */
   let cameraX = 0;
 
+  /**
+   * How the run is going, in the five numbers the road reads when it decides
+   * what the next face-down stop turns out to be. See `roadReading`.
+   */
+  function reading() {
+    const player = getState();
+    const worldId = segment?.worldId ?? player.world;
+    return roadReading({
+      lives: player.lives,
+      maxLives: player.maxLives,
+      hunger: player.hunger,
+      hungerMax: HUNGER_MAX,
+      gold: player.gold,
+      bedPrice: innPremiumPrice(worldId),
+      gunCost: player.gunLevel >= GUN_MAX_LEVEL ? Infinity : gunUpgradeCost(player.gunLevel),
+      hasFood: (player.inventory || []).some((slot) => getItem(slot.id)?.food),
+    });
+  }
+
   function loadSegment(worldId, seed, resumeState = null) {
     segment = generateSegment(worldId, seed);
     travelled = resumeState?.travelled ?? 0;
@@ -46,6 +80,11 @@ export function createWalkEngine() {
     segment.events.forEach((e, i) => {
       e.resolved = i < resolvedUpTo;
     });
+    // The order the road actually took is a property of the run, not of the
+    // seed, so it comes back off the save; anything the save did not cover is
+    // still face down and gets turned over here.
+    applyReveals(segment, resumeState?.types);
+    revealToHorizon(segment, reading());
     return segment;
   }
 
@@ -104,6 +143,14 @@ export function createWalkEngine() {
        * settled position; only the road ahead is still being measured.
        */
       event.placedAt = effectiveDistance(event, getState().hasHorse, HORSE_TIME_MUL);
+      /**
+       * A stop cleared is a card turned over. The reading is taken HERE, at
+       * the moment the player arrives — before the duel is fought or the shop
+       * is spent in — because what the road is answering is the state they
+       * walked up in. Taking it after the encounter would let a bad fight
+       * conjure the inn that the bad fight caused.
+       */
+      revealToHorizon(segment, reading());
       pause();
       /**
        * THE ENCOUNTER CARRIES ITS OWN WORLD, AND THE TICK ENDS HERE
@@ -219,6 +266,16 @@ export function createWalkEngine() {
     distanceToNext,
     visibleStructures,
     /** Save payload for this engine's slice of state. */
-    serialize: () => ({ travelled, cameraX, seed: segment?.seed, worldId: segment?.worldId }),
+    serialize: () => ({
+      travelled,
+      cameraX,
+      seed: segment?.seed,
+      worldId: segment?.worldId,
+      /**
+       * Which kind each stop turned out to be. The seed rebuilds the road's
+       * hand; only the run knows the order it was played in.
+       */
+      types: segment ? segment.events.map((e) => (e.hidden ? null : e.type)) : [],
+    }),
   };
 }

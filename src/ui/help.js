@@ -54,10 +54,21 @@ const OUTCOMES = [
   ['Shoot', 'Shoot', 'You both lose a life.'],
 ];
 
+/**
+ * The three things a player cannot work out by watching, plus the two the
+ * interface is already telling them and they have not noticed yet.
+ *
+ * The cylinder line is the important one. Both fighters' chambers are drawn on
+ * their cards and the opponent decides off its own — an empty gun reloads, a
+ * full one fires — so it is the only genuine tell in the game and it is the
+ * whole of the skill in a duel. Left unsaid, most players never look at it.
+ */
 const ROAD_RULES = [
   'You and your rival choose at the same time. Nobody sees the other move first.',
   'The first one out of lives loses the duel.',
-  'On the road, hunger drains as you walk. At zero it starts costing lives, so keep food in your bag.',
+  'Watch their cylinder. An empty gun cannot shoot you; a full one usually will.',
+  'On the road, hunger drains as you walk. At zero it costs lives fast — faster the longer your life bar is.',
+  'The map shows the next five stops. The road past them is decided as you walk it.',
 ];
 
 /**

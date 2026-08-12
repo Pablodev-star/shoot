@@ -1,15 +1,19 @@
 /**
  * SHOOT! — Inn logic (Block 4).
  *
- * Inns always appear immediately after a shop (enforced by the encounter
- * generator, which emits shop/inn as an inseparable pair), so you can spend
- * your gold and then decide whether what is left is better in lives or in
- * bullets.
+ * A bed is the cheapest life on the road, and both of them are on the counter
+ * at once so the choice is always the same one: patch up, or sleep it off and
+ * walk out with nothing left to spend.
  *
- *   Basic Bed    heals innBasicHeal(world) lives — more in later worlds
+ *   Basic Bed    heals innBasicHeal(world, maxLives) — a bit under half of you
  *   Premium Bed  heals everything
  *   Both prices follow the same exponential curve as shop items, and both are
  *   eligible for the same random 50% discount (boosted by shop perks).
+ *
+ * Inns used to be generated as an inseparable pair with a shop, and this note
+ * used to say so. They have been rolled independently since — see the header
+ * of src/explore/encounters.js — so a stretch can hold two beds and one store,
+ * or a store, three fights and another store with nowhere to sleep in between.
  */
 
 import { makeRng } from '../core/rng.js';
@@ -46,7 +50,7 @@ export function generateOffers(worldId, seed) {
     };
   };
 
-  const basicHeal = innBasicHeal(worldId);
+  const basicHeal = innBasicHeal(worldId, getState().maxLives);
   return [
     build(
       'basic',

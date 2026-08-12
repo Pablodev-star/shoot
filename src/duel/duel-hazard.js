@@ -171,15 +171,34 @@ export function createHazard(spec, random = Math.random) {
   /**
    * A ONE-SHOT HAZARD STARTS AWAKE
    * -------------------------------------------------------------------------
-   * The enemy's landmark is permanent and opens with twenty seconds of quiet,
+   * The enemy's landmark is permanent and opens with a stretch of quiet,
    * because it was raised at a moment the player did not choose and the quiet
    * is the warning. The player's is the same machine with `cycleMs: 0` and
    * `oneShot`: it was raised by somebody pressing a button they had spent six
    * rounds charging, so it goes straight to the sky changing and it does not
    * come back. Same clock, both ends of the road.
+   *
+   * THE FIRST QUIET IS SHORTER THAN THE ONES AFTER IT
+   * -------------------------------------------------------------------------
+   * And it has to be, or the whole system is scenery. The enemy raises its
+   * landmark around round two or three — about ten seconds in — and the first
+   * quiet used to be a full `cycleMs` on top of that, so the first rock landed
+   * somewhere past the thirty-five second mark. A duel lasts twenty to thirty
+   * seconds. Measured over four hundred boss fights a world, at a normal pace:
+   * the volcano erupted in 0% of them, the rift in 0%, the hornet tree in 1%.
+   * Six landmarks, six eruption patterns, an art file each, and five of the
+   * six were a picture on the horizon that never did anything.
+   *
+   * `firstCycleMs` is the fix and it is the whole fix: the opening quiet is
+   * long enough to be a warning and short enough to be a threat, and every
+   * cycle after it runs at the full `cycleMs`. A special is now something the
+   * fight has to be finished around rather than something you outrun.
    */
-  let phase = spec.cycleMs > 0 ? HAZARD_PHASES.DORMANT : HAZARD_PHASES.WARNING;
+  const firstCycle = spec.cycleMs > 0 ? (spec.firstCycleMs ?? spec.cycleMs) : 0;
+  let phase = firstCycle > 0 ? HAZARD_PHASES.DORMANT : HAZARD_PHASES.WARNING;
   let t = 0;
+  /** False until the first quiet has been served: `cycleMs` applies after it. */
+  let opened = false;
   /** False until the first eruption, so the sky is clean when it is summoned. */
   let erupted = false;
   /** The blows left in the window that is currently running. */
@@ -219,8 +238,9 @@ export function createHazard(spec, random = Math.random) {
     t += dt;
 
     if (phase === HAZARD_PHASES.DORMANT) {
-      if (t >= spec.cycleMs) {
+      if (t >= (opened ? spec.cycleMs : firstCycle)) {
         phase = HAZARD_PHASES.WARNING;
+        opened = true;
         t = 0;
         events.push({ type: 'warn' });
       }
@@ -310,9 +330,17 @@ export function createHazard(spec, random = Math.random) {
     isActive: () => phase === HAZARD_PHASES.ACTIVE,
     /** True once a one-shot has been and gone; permanent ones never are. */
     isSpent: () => !!spec.oneShot && erupted && phase === HAZARD_PHASES.DORMANT,
-    /** Seconds until the next eruption starts. For the countdown on the card. */
+    /**
+     * Seconds until the next eruption starts. For the countdown on the card,
+     * which is why it reads the quiet the hazard is ACTUALLY serving rather
+     * than `cycleMs`: the first one is shorter, and a chip that counts down
+     * from twenty while the sky turns at six is a chip that lies once per
+     * fight, at the only moment anybody is reading it.
+     */
     secondsToNext: () =>
-      phase === HAZARD_PHASES.DORMANT ? Math.max(0, Math.ceil((spec.cycleMs - t) / 1000)) : 0,
+      phase === HAZARD_PHASES.DORMANT
+        ? Math.max(0, Math.ceil(((opened ? spec.cycleMs : firstCycle) - t) / 1000))
+        : 0,
     getState: () => ({
       id: spec.id,
       phase,

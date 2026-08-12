@@ -65,10 +65,10 @@ export const WORLDS = [
     priceMul: 1,
     goldMul: 1,
     expMul: 1,
-    encounters: { duels: 9 },
+    encounters: { duels: 7 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
-      lives: { 1: 80, 2: 18, 3: 2 },
+      lives: { 2: 80, 3: 18, 4: 2 },
       abilityChance: 0.05,
       /**
        * Two tricks and both of them are weather: a gust that takes a round off
@@ -77,7 +77,7 @@ export const WORLDS = [
        * see the note on it in src/game/world-abilities.js.
        */
       abilities: ['dustSnatch', 'sandBlind'],
-      accuracy: 0.42,       // how often the AI reads your move correctly
+      accuracy: 0.38,       // how often the AI reads your move correctly
       /** Who rides this stretch — see src/art/sprites-enemies.js. */
       roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
       /** The world's special, and how many of its riders are carrying it. */
@@ -87,9 +87,9 @@ export const WORLDS = [
     boss: {
       name: 'Big Jed',
       archetype: 'bossJed',
-      lives: 3,
+      lives: 4,
       abilities: ['dustSnatch', 'sandBlind'],
-      accuracy: 0.55,
+      accuracy: 0.5,
       special: 'duststorm',
     },
   },
@@ -102,13 +102,13 @@ export const WORLDS = [
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
-    encounters: { duels: 10 },
+    encounters: { duels: 8 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
-      lives: { 1: 66, 2: 26, 3: 8 },
+      lives: { 2: 60, 3: 30, 4: 10 },
       abilityChance: 0.14,
       abilities: ['lassoPull', 'hornetSwarm'],
-      accuracy: 0.48,
+      accuracy: 0.42,
       roster: ['sombrero', 'scarecrow', 'gambler', 'strawhat', 'bandana'],
       special: 'hornetTree',
       specialChance: 0.12,
@@ -116,9 +116,9 @@ export const WORLDS = [
     boss: {
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
-      lives: 4,
+      lives: 6,
       abilities: ['hornetSwarm', 'lassoPull'],
-      accuracy: 0.6,
+      accuracy: 0.55,
       special: 'hornetTree',
     },
   },
@@ -131,13 +131,13 @@ export const WORLDS = [
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
-    encounters: { duels: 12 },
+    encounters: { duels: 8 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
-      lives: { 1: 50, 2: 32, 3: 14, 4: 4 },
-      abilityChance: 0.24,
+      lives: { 3: 46, 4: 34, 5: 16, 6: 4 },
+      abilityChance: 0.2,
       abilities: ['coldGrip', 'whiteout', 'deepFreeze'],
-      accuracy: 0.54,
+      accuracy: 0.46,
       roster: ['goggles', 'furhood', 'bonemarshal', 'drifter'],
       special: 'cornice',
       specialChance: 0.14,
@@ -145,9 +145,9 @@ export const WORLDS = [
     boss: {
       name: 'Whiteout Kate',
       archetype: 'bossWhiteout',
-      lives: 4,
+      lives: 6,
       abilities: ['deepFreeze', 'whiteout'],
-      accuracy: 0.64,
+      accuracy: 0.58,
       special: 'cornice',
     },
   },
@@ -161,13 +161,13 @@ export const WORLDS = [
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { duels: 13 },
+    encounters: { duels: 9 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
-      lives: { 1: 36, 2: 34, 3: 22, 4: 8 },
-      abilityChance: 0.34,
+      lives: { 3: 36, 4: 34, 5: 22, 6: 8 },
+      abilityChance: 0.28,
       abilities: ['poison', 'mireGrasp', 'willOWisp', 'swampFever'],
-      accuracy: 0.6,
+      accuracy: 0.5,
       roster: ['preacher', 'wraith', 'skeleton', 'gambler'],
       special: 'blackdamp',
       specialChance: 0.16,
@@ -175,9 +175,9 @@ export const WORLDS = [
     boss: {
       name: 'Colonel Sable',
       archetype: 'bossSable',
-      lives: 5,
+      lives: 10,
       abilities: ['willOWisp', 'swampFever', 'poison'],
-      accuracy: 0.68,
+      accuracy: 0.62,
       special: 'blackdamp',
     },
   },
@@ -195,13 +195,13 @@ export const WORLDS = [
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
-    encounters: { duels: 14 },
+    encounters: { duels: 10 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
-      lives: { 1: 24, 2: 32, 3: 28, 4: 12, 5: 4 },
-      abilityChance: 0.45,
+      lives: { 4: 26, 5: 32, 6: 26, 7: 12, 8: 4 },
+      abilityChance: 0.36,
       abilities: ['dynamite', 'magmaSpout', 'cinderSnatch', 'hellWhisper'],
-      accuracy: 0.66,
+      accuracy: 0.55,
       roster: ['emberrider', 'ashwidow', 'ironkiln', 'horned', 'bonemarshal'],
       /** The volcano. See src/game/world-abilities.js. */
       special: 'volcano',
@@ -210,9 +210,9 @@ export const WORLDS = [
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
-      lives: 6,
+      lives: 11,
       abilities: ['magmaSpout', 'hellWhisper', 'dynamite'],
-      accuracy: 0.72,
+      accuracy: 0.66,
       special: 'volcano',
     },
   },
@@ -233,13 +233,13 @@ export const WORLDS = [
     goldMul: 5,
     expMul: 4.5,
     /** The Galaxy is short and brutal: a corridor straight to the boss. */
-    encounters: { duels: 7 },
+    encounters: { duels: 6 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
-      lives: { 2: 30, 3: 34, 4: 24, 5: 12 },
-      abilityChance: 0.6,
+      lives: { 5: 34, 6: 34, 7: 20, 8: 12 },
+      abilityChance: 0.48,
       abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
-      accuracy: 0.72,
+      accuracy: 0.6,
       roster: ['starhelm', 'voidsheriff', 'nameless', 'ironkiln'],
       special: 'rift',
       specialChance: 0.22,
@@ -247,9 +247,9 @@ export const WORLDS = [
     /** Two phases — see src/duel/duel-engine.js `phases`. */
     boss: {
       name: 'THE STRANGER',
-      lives: 5,
+      lives: 7,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
-      accuracy: 0.78,
+      accuracy: 0.72,
       archetype: 'bossStranger',
       /** He opens the rift himself. The phase change does not close it. */
       special: 'rift',
@@ -288,8 +288,8 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 5,
-          accuracy: 0.78,
+          lives: 7,
+          accuracy: 0.72,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
         },
@@ -297,13 +297,13 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 7,
-          accuracy: 0.88,
+          lives: 8,
+          accuracy: 0.74,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',
           /** Phase two starts with a bullet already chambered and fires faster. */
           startBullets: 2,
-          abilityChanceMul: 1.6,
+          abilityChanceMul: 1.3,
         },
       ],
     },

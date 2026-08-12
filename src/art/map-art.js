@@ -211,6 +211,35 @@ const MARKERS = {
     'kkkkkkkkkkkkkkkk',
   ],
 
+  /**
+   * A stop nobody has reached yet: the trailhead's own signboard, blank except
+   * for a question mark burned into it.
+   *
+   * It is deliberately the SAME board the road starts on rather than a symbol
+   * of its own. Every other marker on this map is a picture of a place, and
+   * the one thing this cannot be a picture of is the place — so it is a
+   * picture of the sign that would be telling you, standing there with nothing
+   * written on it yet.
+   */
+  unknown: [
+    '................',
+    '...kkkkkkkkkk...',
+    '...kWWWWWWWWk...',
+    '...kWX1111XWk...',
+    '...kW11..11Wk...',
+    '...kWXX..11Wk...',
+    '...kWXX111XWk...',
+    '...kWXX11XXWk...',
+    '...kWXXXXXXWk...',
+    '...kWXX11XXWk...',
+    '...kWWWWWWWWk...',
+    '...kkkkWWkkkk...',
+    '......kWWk......',
+    '......kWWk......',
+    '.....zrRRrz.....',
+    '.....zkkkkz.....',
+  ],
+
   /** The boss: a skull wearing the hat, with the band and a jaw under it. */
   boss: [
     '................',

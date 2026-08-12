@@ -53,7 +53,7 @@ function blankState() {
 
     hasHorse: false,
     /** [{ id, qty }] — order is preserved so the grid does not jump around. */
-    inventory: [{ id: 'carrot', qty: 2 }],
+    inventory: [{ id: 'carrot', qty: 2 }, { id: 'bandage', qty: 1 }],
     /** Permanent upgrades applied to every future shop visit. */
     shopPerks: { extraSlots: 0, discountBonus: 0 },
     /**

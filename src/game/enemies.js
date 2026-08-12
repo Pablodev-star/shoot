@@ -15,17 +15,18 @@
  * hat, and never a man in a green poncho who happens to have drawn that card.
  *
  * ABILITIES
- *   bulletSteal  takes one bullet from the player
- *   poison       1 damage after 3 rounds, ignores shields
- *   dynamite     1 immediate damage, ignores shields
- *   mindControl  scrambles the player's chosen move for one round
+ * ---------------------------------------------------------------------------
+ * A rider carries ids, not rules. `abilityChance` is the odds that this one is
+ * carrying anything at all — how often a rider who HAS a trick reaches for it
+ * is a flat roll in the duel engine, and how often it picks that particular
+ * trick out of its hand is `weight` on the ability.
  *
- * All four are blocked outright by the Anti-Effect Diadem.
- *
- * Those are the four *effects*. What an enemy actually carries is its world's
- * themed version of one of them — swamp rot rather than poison, an ice fall
- * rather than dynamite — which is a name, an icon and an animation over the
- * same rule. See src/game/world-abilities.js.
+ * What the id resolves to is one of the fourteen mechanics in
+ * src/game/world-abilities.js, wearing that world's name, icon and animation.
+ * There is no separate enemy vocabulary: the swamp rot a preacher throws at
+ * you is the poison you can buy in the bayou's shop, firing the same numbers.
+ * Everything aimed AT the player is blocked outright by the Anti-Effect
+ * Diadem; the landmarks are not, because a mountain is not aiming.
  *
  * THE SPECIAL
  * ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
+import { enemyGunDamage } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
 
@@ -92,7 +94,7 @@ export function generateEnemy(worldId, seed) {
     maxLives: lives,
     bullets: 0,
     accuracy: profile.accuracy,
-    gunDamage: worldId * 0.5,
+    gunDamage: enemyGunDamage(worldId),
     abilities,
     /** The world's landmark ability, if this one happens to be carrying it. */
     special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
@@ -115,7 +117,7 @@ export function generateBoss(worldId) {
     maxLives: phase.lives,
     bullets: phase.startBullets || 0,
     accuracy: phase.accuracy ?? cfg.accuracy,
-    gunDamage: worldId * 0.5,
+    gunDamage: enemyGunDamage(worldId),
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: phase.abilityChanceMul || 1,
     /** A boss always has its world's special. It is the fight's centrepiece. */

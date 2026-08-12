@@ -89,7 +89,15 @@ const DUEL_LABEL_ZOOM = 1.35;
  */
 const MARKER_LABELS = { start: 'Trailhead', ...ENCOUNTER_LABELS };
 
-/** Encounter type → marker art. */
+/**
+ * Encounter type → marker art.
+ *
+ * `unknown` is not an encounter type the game ever routes to — it is what the
+ * map calls a stop the run has not been told about yet. See REVEAL_AHEAD in
+ * src/explore/encounters.js: a world deals five stops face up and holds the
+ * rest face down, so the sheet is a real map of the road you can see and an
+ * honest row of blank signposts for the road you cannot.
+ */
 const MARKER_ART = {
   start: 'start',
   enemy: 'duel',
@@ -97,6 +105,7 @@ const MARKER_ART = {
   inn: 'inn',
   forge: 'forge',
   boss: 'boss',
+  unknown: 'unknown',
 };
 
 // ---------------------------------------------------------------------------
@@ -159,7 +168,9 @@ function buildModel(segment, mounted, cols) {
     const event = k === 0 ? null : events[k - 1];
     nodes.push({
       index: k,
-      type: k === 0 ? 'start' : event.type,
+      // A hidden stop has no type yet — the map is the one place in the game
+      // that has to draw the absence of one rather than fall over on it.
+      type: k === 0 ? 'start' : event.hidden ? 'unknown' : event.type,
       resolved: k === 0 ? true : event.resolved,
       distance: k === 0 ? 0 : effectiveDistance(event, mounted, HORSE_TIME_MUL),
       x: Math.round(MARGIN + col * CELL_W + CELL_W / 2 + rng.range(-20, 20)),
@@ -297,6 +308,7 @@ export function openTrailMap(opts = {}) {
       legendChip(markers.inn, 'Inn'),
       legendChip(markers.forge, 'Forge'),
       legendChip(markers.boss, 'Boss'),
+      legendChip(markers.unknown, 'Unknown'),
       el('span.chip.map-legend-you', {}, [el('span.map-you-dot'), 'You']),
     ]),
   ]);
@@ -608,7 +620,9 @@ function drawMarker(ctx, markers, node, sx, sy, { isNext, time, zoom }) {
   }
 
   const label = MARKER_LABELS[node.type];
-  const crowded = node.type === 'enemy' || node.type === 'start';
+  // Unknown stops come in runs of five or more and their label is the longest
+  // on the sheet, so they crowd exactly the way the duels do.
+  const crowded = node.type === 'enemy' || node.type === 'start' || node.type === 'unknown';
   if (!label || (crowded && zoom < DUEL_LABEL_ZOOM)) return;
   drawLabel(ctx, label, sx, sy + 6, node.resolved ? 0.5 : 1);
 }

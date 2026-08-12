@@ -198,14 +198,38 @@ export function createDuel(config) {
    */
   let playerCastPending = false;
 
-  /** What agents are allowed to see. Both sides get the same shape. */
+  /**
+   * What agents are allowed to see. Both sides get the same shape.
+   *
+   * `bullets` is in here because the duel screen draws both cylinders — six
+   * chambers a side, rounds shaded in — so an agent that reads the rival's
+   * ammunition is reading exactly what the player is looking at. It is the
+   * only genuine tell in the game: an empty gun cannot shoot you, and a full
+   * one usually will.
+   *
+   * `gunDamage` is in here for the same reason, one hit later. A player knows
+   * what their own revolver does because they paid for it, and they know what
+   * the rival's does the moment it lands on them once. Handing both to the
+   * agents keeps the two sides of the road symmetrical: neither can see the
+   * move, both can see the gun.
+   */
   function publicView(selfId) {
     const self = sides[selfId];
     const foe = sides[selfId === 'player' ? 'enemy' : 'player'];
     return {
       round,
-      self: { lives: self.lives, bullets: self.bullets, status: { ...self.status } },
-      foe: { lives: foe.lives, bullets: foe.bullets, status: { ...foe.status } },
+      self: {
+        lives: self.lives,
+        bullets: self.bullets,
+        gunDamage: self.gunDamage,
+        status: { ...self.status },
+      },
+      foe: {
+        lives: foe.lives,
+        bullets: foe.bullets,
+        gunDamage: foe.gunDamage,
+        status: { ...foe.status },
+      },
       modifiers,
     };
   }
@@ -252,11 +276,27 @@ export function createDuel(config) {
    * `pickWeighted` is what keeps poison and dynamite rare in the hands that
    * have them: both carry a weight of about a third, so a bayou rider with
    * four tricks plays poison one time in ten rather than one in four.
+   *
+   * A CHANCE PER ROUND IS A TAX ON BEING BAD AT THE GAME
+   * -------------------------------------------------------------------------
+   * This is rolled every round, so what it really measures out is casts per
+   * FIGHT — and a fight is as long as the player makes it. A duellist who
+   * finishes in six rounds meets one trick; one who takes fourteen meets three,
+   * on top of the extra bullets and the extra eruption that fourteen rounds
+   * also buys. The player already losing is the player it lands on hardest,
+   * which is the wrong way round for a game that wants to teach.
+   *
+   * It came down from 0.18 to 0.14 for that reason, and the difference is
+   * almost invisible in a fight that goes well. A frozen turn is worth more
+   * than a bullet; being frozen three times in a fight you were already losing
+   * is not difficulty, it is a pile-on.
    */
+  const ABILITY_CHANCE_PER_ROUND = 0.14;
+
   function rollEnemyAbility() {
     const enemy = sides.enemy;
     if (!enemy.abilities || enemy.abilities.length === 0) return null;
-    const chance = 0.18 * enemy.abilityChanceMul;
+    const chance = ABILITY_CHANCE_PER_ROUND * enemy.abilityChanceMul;
     if (random() >= chance) return null;
     return pickWeighted(enemy.abilities, random());
   }
