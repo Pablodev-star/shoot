@@ -16,7 +16,10 @@
  *                 'utility'  consumed for information (Map)
  *                 'special'  one-off unlocks (Horse)
  *                 'ability'  equipped into a duel slot, never consumed
- *   stack       max copies held (Infinity for consumables that stack freely)
+ *   stack       max copies held
+ *   depth       how many a shop counter carries at once, when it is not the
+ *               default (see STOCK_DEPTH in src/shops/shop.js). Food is the
+ *               only thing that sets it, and the note on the carrot says why
  *   shopPerk    if set, buying it permanently upgrades future shop visits
  *   boon        if set, using it leaves something on the player for the next
  *               few DUELS rather than for right now — see `grantBoon` in
@@ -50,6 +53,22 @@ import {
 
 const CATALOGUE = {
   // --- Food (hunger) -------------------------------------------------------
+  /**
+   * YOU CANNOT BUY YOUR WAY OUT OF HUNGER IN THE FIRST WORLD
+   * -------------------------------------------------------------------------
+   * You could. A stack of 99 and five of everything on the counter meant one
+   * visit to the Dust Flats sold **310 hunger** for 150 gold, against a world
+   * that costs about 120 to walk across — so a single shopping trip in the
+   * cheapest world in the game covered two and a half worlds of food, and the
+   * gauge never had to be thought about again. A survival system you can
+   * pre-pay in its entirety on the first counter you meet is a loading screen.
+   *
+   * Two numbers hold it now, and they are different numbers on purpose.
+   * `depth` is how many the counter has (three), and `stack` is how many you
+   * can carry (a few days' worth). Together they mean a shop sells you about
+   * one world's crossing and no more, so food is a line on the ledger in every
+   * world rather than a chore you clear once.
+   */
   carrot: {
     id: 'carrot',
     name: 'Carrot',
@@ -58,7 +77,8 @@ const CATALOGUE = {
     basePrice: 12,
     context: 'anytime',
     food: 22,
-    stack: 99,
+    stack: 6,
+    depth: 3,
     desc: 'Restores 22% hunger. Cheap and always in stock.',
   },
   apple: {
@@ -69,7 +89,8 @@ const CATALOGUE = {
     basePrice: 20,
     context: 'anytime',
     food: 40,
-    stack: 99,
+    stack: 5,
+    depth: 3,
     desc: 'Restores 40% hunger.',
   },
   /**
@@ -99,7 +120,8 @@ const CATALOGUE = {
     basePrice: 45,
     context: 'anytime',
     food: 100,
-    stack: 10,
+    stack: 3,
+    depth: 2,
     desc: 'A full pot. Fills the hunger gauge to the top, whatever was left in it.',
   },
   /**
@@ -122,7 +144,8 @@ const CATALOGUE = {
     context: 'anytime',
     food: 100,
     boon: { id: 'wellFed', label: 'Well fed', duels: 3, bullets: 2 },
-    stack: 3,
+    stack: 2,
+    depth: 1,
     desc: 'Fills the gauge, and you ride out of it well fed: the next three duels start with two rounds already loaded.',
   },
 
@@ -134,32 +157,33 @@ const CATALOGUE = {
    * that is what they are priced against: a bed is cheaper per life and a bed
    * is not there when a rider has you on your last diamond.
    *
-   * They heal twice what they used to because everything that hurts does too
-   * (see `gunDamageAt` in src/game/progression.js). A bandage that patched one
-   * life against a bar of five was a purchase; the same bandage against a bar
-   * of thirteen was a rounding error you carried around for a whole world.
+   * A bandage is a third of the bar in the Dust Flats and a seventh of it in
+   * the Galaxy, which is the right shape for the cheapest thing on the counter:
+   * early it is a rescue, late it is a top-up and you want the potion. Both are
+   * sized against the three-to-seven life bar in `progression.js` — they were
+   * briefly doubled for a bar that ran to fourteen, and that bar is gone.
    */
   bandage: {
     id: 'bandage',
     name: 'Bandage',
     icon: 'bandage',
     rarity: 'common',
-    basePrice: 40,
+    basePrice: 35,
     context: 'anytime',
-    heal: 2,
-    stack: 20,
-    desc: 'Patches you up for 2 lives.',
+    heal: 1,
+    stack: 8,
+    desc: 'Patches you up for 1 life.',
   },
   potion: {
     id: 'potion',
     name: 'Potion',
     icon: 'potion',
     rarity: 'rare',
-    basePrice: 110,
+    basePrice: 90,
     context: 'anytime',
-    heal: 5,
-    stack: 10,
-    desc: 'Restores 5 lives in one gulp.',
+    heal: 3,
+    stack: 5,
+    desc: 'Restores 3 lives in one gulp.',
   },
 
   /**

@@ -72,6 +72,23 @@ export const MOVES = {
 export const MAX_BULLETS = 6;
 
 /**
+ * WHAT "ONE EXTRA LIFE OF DAMAGE" IS WORTH, WHEN AN ABILITY SAYS SO
+ * ---------------------------------------------------------------------------
+ * Three effects add damage without naming a number: a venom tick, a mark on the
+ * target, and the whisper on the shooter. All three used to be a flat whole
+ * life, which was a third of a bar when the bar was eleven and is a third of it
+ * again now that the bar is three — except there are three of them and they
+ * stack with the shot itself.
+ *
+ * Half a diamond, like everything else that hurts. It is the smallest thing the
+ * interface can draw, it is still worth more than a rung of the revolver, and
+ * it means a poison over three rounds costs about a quarter of a bar rather
+ * than all of it. See the note on `gunDamageAt` in src/game/progression.js for
+ * why every damage figure in this game is a multiple of a half.
+ */
+export const EFFECT_LIFE = 0.5;
+
+/**
  * @param {object} config
  * @param {object} config.player   { lives, maxLives, bullets, hasVest, hasTotem,
  *                                  totemLives, immune, abilities }
@@ -456,7 +473,7 @@ export function createDuel(config) {
     // it is three lives, which is what it says on the tin.
     if (st.venom > 0) {
       st.venom -= 1;
-      damage(sideId, 1, { ignoreShield: true, source: 'venom' });
+      damage(sideId, EFFECT_LIFE, { ignoreShield: true, source: 'venom' });
     }
   }
 
@@ -866,7 +883,7 @@ export function createDuel(config) {
     if (target.status.reflect > 0) {
       target.status.reflect -= 1;
       log('reflect', { side: toId, back: fromId });
-      const back = shooter.gunDamage + (shooter.status.mark > 0 ? 1 : 0);
+      const back = shooter.gunDamage + (shooter.status.mark > 0 ? EFFECT_LIFE : 0);
       const bouncedHit = damage(fromId, back, { ignoreShield: true, source: 'reflect' });
       return { hit: false, bounced: true, bouncedHit };
     }
@@ -874,10 +891,10 @@ export function createDuel(config) {
     let amount = shooter.gunDamage;
     if (shooter.status.doubleTap > 0) {
       shooter.status.doubleTap -= 1;
-      amount += 1;
+      amount += EFFECT_LIFE;
       log('doubleTap', { side: fromId });
     }
-    if (target.status.mark > 0) amount += 1;
+    if (target.status.mark > 0) amount += EFFECT_LIFE;
 
     const hit = damage(toId, amount, { protectedNow: targetProtected, source: 'shot' });
     return { hit, bounced: false, bouncedHit: false, amount };

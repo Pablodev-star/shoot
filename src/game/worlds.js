@@ -65,10 +65,10 @@ export const WORLDS = [
     priceMul: 1,
     goldMul: 1,
     expMul: 1,
-    encounters: { duels: 7 },
+    encounters: { duels: 5 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
-      lives: { 2: 80, 3: 18, 4: 2 },
+      lives: { 1: 88, 2: 12 },
       abilityChance: 0.05,
       /**
        * Two tricks and both of them are weather: a gust that takes a round off
@@ -87,7 +87,7 @@ export const WORLDS = [
     boss: {
       name: 'Big Jed',
       archetype: 'bossJed',
-      lives: 4,
+      lives: 2,
       abilities: ['dustSnatch', 'sandBlind'],
       accuracy: 0.5,
       special: 'duststorm',
@@ -102,10 +102,10 @@ export const WORLDS = [
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
-    encounters: { duels: 8 },
+    encounters: { duels: 6 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
-      lives: { 2: 60, 3: 30, 4: 10 },
+      lives: { 2: 62, 3: 30, 4: 8 },
       abilityChance: 0.14,
       abilities: ['lassoPull', 'hornetSwarm'],
       accuracy: 0.42,
@@ -116,7 +116,7 @@ export const WORLDS = [
     boss: {
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
-      lives: 6,
+      lives: 4.5,
       abilities: ['hornetSwarm', 'lassoPull'],
       accuracy: 0.55,
       special: 'hornetTree',
@@ -126,16 +126,27 @@ export const WORLDS = [
     id: 3,
     name: 'Whitecrown Pass',
     subtitle: 'Above the trees, under the storm',
+    /**
+     * The short world, and it is short because of a rounding.
+     *
+     * Every world's rider damage is the player's expected bar over six (see
+     * `enemyGunDamage`), and the pass lands on 5/6 of a life — which the
+     * half-diamond grid rounds up to a whole one. So a bullet up here takes a
+     * fifth of the bar instead of a sixth and the pass is the one stretch where
+     * a rider needs five hits rather than six or seven. Measured, that was
+     * worth 40% of every run that reached it. One fewer fight is the change
+     * that pays it back without pretending the rounding is not there.
+     */
     biome: 'snow',
     tint: null,
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
-    encounters: { duels: 8 },
+    encounters: { duels: 5 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
-      lives: { 3: 46, 4: 34, 5: 16, 6: 4 },
-      abilityChance: 0.2,
+      lives: { 2: 30, 3: 46, 4: 20, 5: 4 },
+      abilityChance: 0.13,
       abilities: ['coldGrip', 'whiteout', 'deepFreeze'],
       accuracy: 0.46,
       roster: ['goggles', 'furhood', 'bonemarshal', 'drifter'],
@@ -161,10 +172,10 @@ export const WORLDS = [
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { duels: 9 },
+    encounters: { duels: 7 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
-      lives: { 3: 36, 4: 34, 5: 22, 6: 8 },
+      lives: { 3: 32, 4: 44, 5: 20, 6: 4 },
       abilityChance: 0.28,
       abilities: ['poison', 'mireGrasp', 'willOWisp', 'swampFever'],
       accuracy: 0.5,
@@ -175,7 +186,7 @@ export const WORLDS = [
     boss: {
       name: 'Colonel Sable',
       archetype: 'bossSable',
-      lives: 10,
+      lives: 7.5,
       abilities: ['willOWisp', 'swampFever', 'poison'],
       accuracy: 0.62,
       special: 'blackdamp',
@@ -195,10 +206,10 @@ export const WORLDS = [
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
-    encounters: { duels: 10 },
+    encounters: { duels: 7 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
-      lives: { 4: 26, 5: 32, 6: 26, 7: 12, 8: 4 },
+      lives: { 3: 32, 4: 44, 5: 20, 6: 4 },
       abilityChance: 0.36,
       abilities: ['dynamite', 'magmaSpout', 'cinderSnatch', 'hellWhisper'],
       accuracy: 0.55,
@@ -210,7 +221,7 @@ export const WORLDS = [
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
-      lives: 11,
+      lives: 7.5,
       abilities: ['magmaSpout', 'hellWhisper', 'dynamite'],
       accuracy: 0.66,
       special: 'volcano',
@@ -233,10 +244,10 @@ export const WORLDS = [
     goldMul: 5,
     expMul: 4.5,
     /** The Galaxy is short and brutal: a corridor straight to the boss. */
-    encounters: { duels: 6 },
+    encounters: { duels: 5 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
-      lives: { 5: 34, 6: 34, 7: 20, 8: 12 },
+      lives: { 3: 20, 4: 40, 5: 28, 6: 12 },
       abilityChance: 0.48,
       abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
       accuracy: 0.6,
@@ -247,7 +258,7 @@ export const WORLDS = [
     /** Two phases — see src/duel/duel-engine.js `phases`. */
     boss: {
       name: 'THE STRANGER',
-      lives: 7,
+      lives: 5,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
       accuracy: 0.72,
       archetype: 'bossStranger',
@@ -288,7 +299,7 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 7,
+          lives: 5,
           accuracy: 0.72,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
@@ -297,7 +308,7 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 8,
+          lives: 5,
           accuracy: 0.74,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',

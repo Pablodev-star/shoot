@@ -18,6 +18,7 @@
  *
  * WHAT TO RUN
  * ---------------------------------------------------------------------------
+ *   node tools/sim.mjs asymmetry how many shots it takes to kill each of you
  *   node tools/sim.mjs duels     win rates per world, per skill, per gun rung
  *   node tools/sim.mjs bosses    the same for the six bosses
  *   node tools/sim.mjs specials  how often a world's landmark actually erupts
@@ -32,9 +33,9 @@
  * The design target is a skill ladder, not a difficulty. Measured over three
  * hundred runs a skill level, the road as it stands sends
  *
- *   about one novice run in ten to the Galaxy
- *   about three average runs in ten
- *   about six expert runs in ten
+ *   about one novice run in sixteen to the Galaxy
+ *   about one average run in five
+ *   about one expert run in two
  *
  * — and what separates them is almost entirely the ledger rather than the
  * trigger finger. `all` prints those three against their bands and exits
@@ -47,6 +48,7 @@ import { createDuel, MOVES } from '../src/duel/duel-engine.js';
 import { createAiAgent } from '../src/duel/duel-ai.js';
 import { WORLDS, getWorld, FINAL_WORLD } from '../src/game/worlds.js';
 import { generateSegment, revealToHorizon, roadReading } from '../src/explore/encounters.js';
+import { ITEMS } from '../src/game/items.js';
 import { makeRng } from '../src/core/rng.js';
 import { STOCK_DEPTH } from '../src/shops/shop.js';
 import * as P from '../src/game/progression.js';
@@ -78,12 +80,18 @@ export const POLICIES = {
    */
   novice: (view) => (view.self.bullets <= 0 ? MOVES.RELOAD : MOVES.SHOOT),
 
-  /** Aggressive but not blind: mostly shoots, breaks the pattern by accident. */
+  /**
+   * Somebody a few duels in. They have worked out that a shield thrown up at
+   * random loses — it costs a round and buys one back — so they mostly shoot
+   * and keep the shield for when they are low. What they have NOT worked out is
+   * the rival's cylinder, so they raise it on the wrong turns.
+   */
   average: (view, rng) => {
     if (view.self.bullets <= 0) return MOVES.RELOAD;
+    if (view.self.lives <= view.foe.gunDamage && rng.chance(0.4)) return MOVES.SHIELD;
     const r = rng();
-    if (r < 0.66) return MOVES.SHOOT;
-    if (r < 0.86) return MOVES.RELOAD;
+    if (r < 0.78) return MOVES.SHOOT;
+    if (r < 0.94) return MOVES.RELOAD;
     return MOVES.SHIELD;
   },
 
@@ -174,21 +182,26 @@ const SPENDING = {
   novice: {
     /** Spends down to nothing on the shiny thing, every time. */
     reserve: () => 0,
+    /** Anything it can pay for outright, it pays for. */
+    impulseRung: 1,
     /** Eats when the gauge warns them, which is later than it should be. */
-    foodTarget: 80,
-    /** Buys a couple of bandages because they are cheap, then forgets. */
-    healBudget: 0.25,
+    foodTarget: 60,
+    /** Buys a bandage when one is staring at them, then forgets. */
+    healBudget: 0.18,
     /** Only when the next hit would be the last one — never as maintenance. */
     healBeforeFight: 'panic',
+    healAt: 0.3,
     /** Takes the good bed only once the bar is visibly nearly gone. */
-    premiumAt: 0.6,
+    premiumAt: 0.65,
   },
   /** Keeps a bed's worth back and remembers to patch up. */
   average: {
     reserve: (worldId) => P.innBasicPrice(worldId),
+    impulseRung: 0.9,
     foodTarget: 110,
     healBudget: 0.4,
     healBeforeFight: true,
+    healAt: 0.5,
     premiumAt: 0.5,
   },
   /**
@@ -198,10 +211,19 @@ const SPENDING = {
    * never spending down past the price of a night's sleep.
    */
   expert: {
-    reserve: (worldId) => P.innBasicPrice(worldId) + 2 * P.itemPrice({ basePrice: 40 }, worldId),
+    reserve: (worldId) => P.innBasicPrice(worldId) + 2 * P.itemPrice(ITEMS.bandage, worldId),
+    /**
+     * Buys the rung the moment it is affordable, same as anybody — measured,
+     * that IS the right play: a rung shortens every fight of the world and a
+     * shorter fight is the cheapest damage reduction on the road. What makes
+     * this player good is that the gun does not eat the food and the bandages
+     * as well.
+     */
+    impulseRung: 1,
     foodTarget: 160,
     healBudget: 0.6,
     healBeforeFight: true,
+    healAt: 0.7,
     premiumAt: 0.3,
   },
 };
@@ -455,9 +477,103 @@ async function reportSpecials() {
   return out;
 }
 
+/**
+ * THE REPORT THAT WOULD HAVE CAUGHT THE WORST BUG THIS GAME HAS HAD
+ * ---------------------------------------------------------------------------
+ * A shipped version of this game took **twelve** connected shots to kill the
+ * player in world one and **fourteen** in world two, against two or three to
+ * kill the rider across the road. Nothing was broken: the player's life bar and
+ * the enemy's damage were two numbers in two files, both individually sensible,
+ * growing at different rates. Nobody can see that in a diff, and no win-rate
+ * table shows it either — the runs still looked winnable.
+ *
+ * So this report puts the two sides of the road on the same page. It checks
+ * three things and fails the build on any of them:
+ *
+ *   1. the power curve `progression.js` CLAIMS matches what the economy
+ *      actually delivers, world by world;
+ *   2. the riders in `worlds.js` carry the life `enemyLives()` says they should;
+ *   3. the ratio between "shots to kill you" and "shots to kill them" stays in
+ *      a band. That ratio is the whole feel of a duel.
+ */
+async function reportAsymmetry() {
+  const delivered = powerCurve();
+  const rows = [];
+  const problems = [];
+
+  for (const w of WORLDS) {
+    const claim = P.EXPECTED_POWER[w.id];
+    const real = delivered[w.id - 1];
+    const dist = w.enemy.lives;
+    const riderMean = Object.entries(dist).reduce((sum, [k, v]) => sum + Number(k) * v, 0) /
+      Object.values(dist).reduce((sum, v) => sum + v, 0);
+    const bossTotal = w.boss.phases
+      ? w.boss.phases.reduce((sum, ph) => sum + ph.lives, 0)
+      : w.boss.lives;
+
+    const onPlayer = claim.lives / P.enemyGunDamage(w.id);
+    const onEnemy = riderMean / claim.damage;
+    rows.push({
+      world: w.id,
+      claimBar: claim.lives, realBar: real.maxLives,
+      claimDmg: claim.damage, realDmg: real.gunDmg,
+      riderLives: +riderMean.toFixed(2), wanted: P.enemyLives(w.id),
+      boss: bossTotal, wantedBoss: P.bossLives(w.id),
+      hitsOnPlayer: +onPlayer.toFixed(1),
+      hitsOnEnemy: +onEnemy.toFixed(1),
+      ratio: +(onPlayer / onEnemy).toFixed(1),
+    });
+
+    if (Math.abs(claim.lives - real.maxLives) > 1) {
+      problems.push(`world ${w.id}: bar claimed ${claim.lives}, economy delivers ${real.maxLives}`);
+    }
+    if (Math.abs(claim.damage - real.gunDmg) > 0.75) {
+      problems.push(`world ${w.id}: gun claimed ${claim.damage}, economy delivers ${real.gunDmg}`);
+    }
+    if (Math.abs(riderMean - P.enemyLives(w.id)) > 0.6) {
+      problems.push(`world ${w.id}: riders carry ${riderMean.toFixed(2)}, want ${P.enemyLives(w.id)}`);
+    }
+    // A two-phase boss is one fight in two halves and is allowed to be bigger.
+    const bossSlack = w.boss.phases ? 0.5 : 0.25;
+    if (Math.abs(bossTotal - P.bossLives(w.id)) > P.bossLives(w.id) * bossSlack) {
+      problems.push(`world ${w.id}: boss carries ${bossTotal}, want about ${P.bossLives(w.id)}`);
+    }
+    /**
+     * THE ONE ABSOLUTE THAT MUST NOT DRIFT
+     * -----------------------------------------------------------------------
+     * Not the ratio — the ratio is the two numbers divided, and on a
+     * half-diamond grid with a bar of three to seven it jumps around by half a
+     * point every time anything moves. What has to hold is how many connected
+     * shots a rider needs to kill you, because that is the whole feel of a
+     * duel and it is the thing that went wrong: it drifted to twelve in the
+     * Dust Flats and fourteen in the Wildgrass Prairie, which is a rival who
+     * cannot hurt you inside a single fight however long it lasts.
+     *
+     * Six is the target and four to eight is the band. The ratio stays in the
+     * table because it is worth looking at; it is not what fails the build.
+     */
+    if (onPlayer < 4 || onPlayer > 8) {
+      problems.push(`world ${w.id}: a rider needs ${onPlayer.toFixed(1)} hits to kill the player (want 4-8)`);
+    }
+  }
+
+  console.log('\n=== THE ASYMMETRY: WHAT IT TAKES TO KILL EACH OF YOU ===');
+  console.table(rows);
+  if (problems.length) {
+    console.error('\nThe two sides of the road have drifted apart:');
+    for (const line of problems) console.error(`  ${line}`);
+    process.exitCode = 1;
+  } else {
+    console.log('Both sides of the road agree.');
+  }
+  return { rows, problems };
+}
+
 // ---------------------------------------------------------------------------
 // Full runs
 // ---------------------------------------------------------------------------
+
+const TRACE = process.env.TRACE === '1';
 
 async function runOnce(seed, policy) {
   const rng = makeRng(seed >>> 0);
@@ -465,7 +581,7 @@ async function runOnce(seed, policy) {
   const player = {
     level: 1, exp: 0, gold: 60, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
-    hunger: P.HUNGER_MAX, food: 44, heals: 1, healSize: 2,
+    hunger: P.HUNGER_MAX, food: 44, heals: 1, healSize: ITEMS.bandage.heal,
   };
 
   const levelUp = () => {
@@ -511,14 +627,20 @@ async function runOnce(seed, policy) {
 
       ev.resolved = true;
       revealToHorizon(seg, reading(worldId));
+      if (TRACE) {
+        console.log(`  W${worldId} ${String(ev.type).padEnd(6)} lives ${player.lives}/${player.maxLives}` +
+          ` gold ${Math.round(player.gold)} gun ${player.gun} food ${Math.round(player.food)}` +
+          ` heals ${player.heals} hunger ${Math.round(player.hunger)}`);
+      }
 
       // --- what is standing there ------------------------------------------
       if (ev.type === 'enemy' || ev.type === 'boss') {
-        // Somebody who patches up between fights heals to the top; somebody
-        // who only reaches for a bandage when the bar is nearly gone does not.
-        const floor = buy.healBeforeFight === 'panic'
-          ? player.maxLives * 0.3
-          : player.maxLives - player.healSize;
+        // Somebody who patches up between fights tops off before stepping onto
+        // the road; somebody who only reaches for a bandage when the bar is
+        // nearly gone waits until it nearly is. Expressed as a fraction of the
+        // bar rather than as "a whole bandage fits", because a player with a
+        // bag full of bandages and two thirds of a life bar uses one.
+        const floor = player.maxLives * buy.healAt;
         if (buy.healBeforeFight) {
           while (player.heals > 0 && player.lives <= floor) {
             player.heals -= 1;
@@ -548,11 +670,16 @@ async function runOnce(seed, policy) {
         levelUp();
       } else if (ev.type === 'forge') {
         const keep = buy.reserve(worldId);
-        while (
-          player.gun < P.GUN_MAX_LEVEL &&
-          player.gold - P.gunUpgradeCost(player.gun) >= keep
-        ) {
-          player.gold -= P.gunUpgradeCost(player.gun);
+        // A cheap rung is always right — the first two cost less than a night
+        // at the inn and halve how long every fight of the world takes. It is
+        // the expensive ones a careful player holds off on, and modelling the
+        // reserve as an absolute floor made the "expert" ride the whole game on
+        // the trail iron, which is the opposite of expertise.
+        while (player.gun < P.GUN_MAX_LEVEL) {
+          const cost = P.gunUpgradeCost(player.gun);
+          const cheap = cost <= player.gold * buy.impulseRung;
+          if (!cheap && player.gold - cost < keep) break;
+          player.gold -= cost;
           player.gun += 1;
         }
       } else if (ev.type === 'inn') {
@@ -570,16 +697,20 @@ async function runOnce(seed, policy) {
       } else if (ev.type === 'shop') {
         // A counter holds STOCK_DEPTH of anything stackable and one of
         // everything else, so this is bounded the way the real screen is.
-        const apple = P.itemPrice({ basePrice: 20 }, worldId);
-        let units = STOCK_DEPTH;
         // Food first — starving is the one thing on the road you cannot fight.
-        while (units > 0 && player.food < buy.foodTarget && player.gold >= apple * 2) {
-          player.gold -= apple;
-          player.food += 40;
-          units -= 1;
+        // A counter carries both kinds, each to its own depth.
+        for (const id of ['apple', 'carrot']) {
+          const food = ITEMS[id];
+          const price = P.itemPrice(food, worldId);
+          let units = food.depth ?? STOCK_DEPTH;
+          while (units > 0 && player.food < buy.foodTarget && player.gold >= price * 2) {
+            player.gold -= price;
+            player.food += food.food;
+            units -= 1;
+          }
         }
         // Then lives in a bottle. Slot zero of every shop is one of these.
-        const bandage = P.itemPrice({ basePrice: 40 }, worldId);
+        const bandage = P.itemPrice(ITEMS.bandage, worldId);
         let budget = player.gold * buy.healBudget;
         let heals = STOCK_DEPTH;
         while (heals > 0 && budget >= bandage && player.heals < 16) {
@@ -640,15 +771,16 @@ async function reportRuns() {
  * out of any of them.
  */
 const TARGETS = [
-  { what: 'novice reaches the Galaxy', min: 4, max: 18 },
-  { what: 'average reaches the Galaxy', min: 20, max: 42 },
-  { what: 'expert reaches the Galaxy', min: 46, max: 72 },
+  { what: 'novice reaches the Galaxy', min: 3, max: 14 },
+  { what: 'average reaches the Galaxy', min: 12, max: 30 },
+  { what: 'expert reaches the Galaxy', min: 42, max: 68 },
 ];
 
 async function reportAll() {
   const power = powerCurve();
   console.log('=== WHERE THE ECONOMY PUTS A PLAYER ===');
   console.table(power);
+  await reportAsymmetry();
   await reportDuels();
   await reportBosses();
   await reportSpecials();
@@ -671,6 +803,7 @@ async function reportAll() {
 }
 
 const MODES = {
+  asymmetry: reportAsymmetry,
   duels: reportDuels,
   bosses: reportBosses,
   specials: reportSpecials,

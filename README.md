@@ -34,9 +34,17 @@ The rule set has not changed since the first prototype:
 
 Both duellists shoot in the same turn → both lose a life. First to zero lives
 loses. Lives are red diamonds, and always will be — and because they are, every
-damage figure in the game is a whole diamond or a half of one. At the trail
-iron a shot costs exactly one life, which is what the rule table has always
-said it does.
+damage figure in the game is a whole diamond or a half of one.
+
+**You start on three diamonds and the trail iron takes half of one a shot, so a
+rider needs six clean hits to finish you.** That number is the feel of this
+game, and it is the one thing the balance harness refuses to let drift: a
+version of this once shipped where it had quietly grown to *twelve* in the Dust
+Flats and *fourteen* by the second world, because the player's life bar and the
+rider's bullet were two numbers in two files growing at different rates. The
+rider's bullet is derived from the bar now — see `enemyGunDamage` in
+`src/game/progression.js` — so a player standing on ten lives is shot at for a
+life and a half and is still six hits from the end of the run.
 
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
@@ -115,8 +123,8 @@ Bayou and dynamite to Brimstone Basin — sold in that world's shop and nowhere
 else, carried by that world's riders and nobody else's — and both were rewritten
 to be worth the trip:
 
-- **Poison** — one life a round for three rounds. Nothing stops it.
-- **Dynamite** — three lives at a stroke, the biggest single hit in the game,
+- **Poison** — half a life a round for three rounds. Nothing stops it.
+- **Dynamite** — a life and a half at a stroke, the biggest single hit in the game,
   and the only ability of the fourteen a **shield** will stop. It is the hardest
   thing to be hit by and the easiest to be ready for.
 
@@ -353,13 +361,29 @@ There is no level select. You walk, and the road decides what you meet.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
   **One slot is always something that heals, and anything stackable is stocked
-  five deep.** Both of those exist for the same reason: a counter that held one
-  bandage, offered only if the dice felt like it, made lives something you could
-  be refused after playing correctly — and by the basin a shop rolls common less
+  in depth.** Both exist for the same reason: a counter that held one bandage,
+  offered only if the dice felt like it, made lives something you could be
+  refused after playing correctly — and by the basin a shop rolls common less
   than a third of the time. Gold can always be turned into lives now, and how
   much of the purse goes that way instead of into the gun is the decision.
-  Permanent kit — the map, a vest, an ability — is still one apiece, because a
-  second one does nothing.
+  Permanent kit — the map, a vest, an ability — is one apiece, because a second
+  one does nothing.
+
+  **Food sets its own, shallower depth, and that number is load-bearing.** At
+  five apiece and a stack of ninety-nine, one visit to the cheapest shop in the
+  game sold 310 hunger against a world that costs about 120 to cross — so a
+  single trip in the Dust Flats covered two and a half worlds and the gauge
+  never had to be thought about again. A survival system you can pre-pay in its
+  entirety at the first counter you meet is a loading screen. Three apiece, and
+  a few days' worth in the bag.
+
+  **And nothing you carry is worth more in the next world than it was in this
+  one.** Selling used to pay half of the *local* asking price, and prices
+  inflate about 42% a world on top of each world's own multiplier — so a carrot
+  bought for 10 gold in the Dust Flats sold for 85 in the Galaxy and a potion
+  bought for 110 sold for 765. The correct play was to buy out the first shop
+  and run a caravan. A sale is a fraction of what the thing *is* now, wherever
+  you are standing, which makes carrying goods forward strictly a loss.
   A shop is a **stall**, not a list: a striped canvas awning with a scalloped
   valance, the store's sign hanging off it on two ropes, two posts, and a plank
   counter with the goods standing on it — inside a trading post whose shelves,
@@ -393,13 +417,12 @@ There is no level select. You walk, and the road decides what you meet.
   the road pays out at all, which is not an expensive decision, it is a locked
   door with a price painted on it.
 
-  **The gun is no longer the whole difficulty slider.** It used to run from half
-  a life a shot to three and a half — seven times — while nothing else in the
-  shop moved a fight by more than a fifth, so a player who spent their gold on
-  food and a vest was not playing a different strategy, they were playing an
-  unwinnable game and nothing ever told them. One to four now. The Nova is still
-  the best gun in the game; it is no longer the only thing that decided whether
-  the run was possible.
+  **A rung is the best gold you can spend, and that is on purpose.** It
+  shortens every fight of the world, and a shorter fight is the cheapest damage
+  reduction on the road — measured, the first two rungs are worth more than
+  anything else on any counter. What separates a good run from a bad one is not
+  whether you buy them; it is whether buying them ate the food and the bandages
+  as well.
 
   The counter is a **smithy**, not a panel: an iron hood over a scorched bench,
   the sign on two chains, the gun turning on a plate under it and the ladder
@@ -456,8 +479,11 @@ There is no level select. You walk, and the road decides what you meet.
   names, and each world drawing from its own roster. The name always describes
   the sprite, because the names were written from the art.
 - **Levelling is the slow reward.** Roughly 1.4 levels per world, so a run that
-  reaches the Galaxy is around level 9 and around fourteen lives. A level grants
-  **one life** — one more maximum, and one more in the bar to go with it. It is not a refill: if you
+  reaches the Galaxy is around level 9 and around ten lives. A level grants
+  **one life** — one more maximum, and one more in the bar to go with it. It
+  does not make you safer: a rider's bullet is a sixth of whatever the bar has
+  grown to, so ten lives is the same six hits deep that three was. What the
+  growth buys is room to absorb a bad duel, not immunity from one. It is not a refill: if you
   arrive at a level-up on your last life you leave it on your second, and the
   bed at the inn is still the only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
@@ -651,13 +677,20 @@ fails if the game leaves it:
 
 | | reaches the Galaxy |
 | --- | --- |
-| mashes one button, spends badly | ~10% |
-| plays reasonably | ~30% |
-| reads the cylinder, buys correctly | ~60% |
+| mashes one button, spends badly | ~6% |
+| plays reasonably | ~19% |
+| reads the cylinder, buys correctly | ~54% |
 
 Almost all of that spread is the **ledger**, not the trigger finger. Reading the
 opponent's chambers is worth about a fifth of the damage you take; buying food
 before you are hungry and bandages before you are hurt is worth the run.
+
+`node tools/sim.mjs asymmetry` is the other half of the harness and the one that
+would have caught the worst bug this game has had. It puts the two sides of the
+road on one page — what the progression curve *claims* the player will have,
+what the economy actually delivers, what the riders carry, and how many
+connected shots it takes to kill each of you — and fails the build if a rider
+needs fewer than four or more than eight hits to finish the player.
 
 ### Where the numbers are
 
@@ -679,13 +712,16 @@ Balance lives in data, not in code:
   `damage`; how many enemies carry a special at all is `specialChance` in
   `worlds.js`. Player and enemy fire the same numbers — the asymmetry is the
   turn rule, not the tuning.
-- `src/game/progression.js` — every curve: exp and the level ladder (tuned
-  together to hit ~1.4 levels per world), gold, prices, inn healing as a
-  fraction of the bar, the gun's damage and its deliberately super-exponential
-  upgrade cost, what a rider's bullet costs by world, hunger drain, how fast
-  starving ticks against the size of your life bar, walking speed, the horse
-  discount. Everything that hurts is a multiple of half a life, because half a
-  diamond is a shape the interface can draw and 0.15 of one is not.
+- `src/game/progression.js` — every curve, and the spine of the difficulty:
+  `EXPECTED_POWER` (what the player's bar and revolver look like in each world)
+  plus `HITS_TO_KILL_PLAYER`, `HITS_TO_KILL_ENEMY` and `HITS_TO_KILL_BOSS`, from
+  which every rider's damage and every rider's life total is **derived** rather
+  than written down separately. Also exp and the level ladder, gold, prices, inn
+  healing as a fraction of the bar, the gun's damage and its deliberately
+  super-exponential upgrade cost, hunger drain, how fast starving ticks against
+  the size of your bar, walking speed, the horse discount. Everything that hurts
+  is a multiple of half a life, because half a diamond is a shape the interface
+  can draw and 0.15 of one is not.
 - `src/game/gun-tiers.js` — the seven revolvers: what each rung is called, which
   silhouette it is cut from, what it is made of, what it throws when it fires,
   and which ritual the forge performs to make it. Nothing in it is a mechanic —
