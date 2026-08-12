@@ -25,6 +25,8 @@
  *   venom    1 damage EVERY round for `turns` rounds (the poison)
  *   drain    a life off them and onto you
  *   freeze   they lose their next `turns` turns entirely — they stand there
+ *            (one turn: it deletes a turn AND hands one over, so it is worth
+ *            double what it says and two of them ended fights on their own)
  *   jam      they cannot shoot for `turns` rounds
  *   panic    their shield does not protect for `turns` rounds
  *   blind    their next `turns` shots miss
@@ -74,10 +76,18 @@
  *   charge ≈ 3 + 1.5 × (what it takes away, in lives or in turns)
  *
  * — where a stolen round counts as a third of a turn, a freeze counts as the
- * turns it costs, and damage counts as lives. That is why Meteor Strike (three
- * lives, through a shield) is seven and Dust Snatch (one round) is three, and
- * why Void Mirror — which is a shot returned, so a two-life swing — went from
- * four to six.
+ * turns it costs, and damage counts as lives. That is why Dust Snatch (one
+ * round) is three and Meteor Strike (a life and a half, through a shield) is
+ * five.
+ *
+ * AND EVERY DAMAGE FIGURE HERE IS SIZED AGAINST A THREE-TO-TEN LIFE BAR
+ * ---------------------------------------------------------------------------
+ * They were briefly written for a bar that ran to fourteen, and when the bar
+ * went back to what it had always been the same numbers became half a run in a
+ * button: a three-life blast against a three-diamond bar is the whole fight.
+ * Everything that hurts was halved to match, including the three effects the
+ * engine used to add a flat whole life for — a venom tick, a mark, the whisper
+ * — which are `EFFECT_LIFE` in src/duel/duel-engine.js now.
  *
  * POISON AND DYNAMITE ARE WORLD ABILITIES, NOT SHOP STAPLES
  * ---------------------------------------------------------------------------
@@ -86,11 +96,11 @@
  * Bayou and dynamite to Brimstone Basin: they are sold in that world's shop and
  * nowhere else, they are carried by that world's riders and nobody else's, and
  * both were rewritten to be worth the trip — poison bites every round for three
- * rounds instead of once, dynamite takes three lives at a stroke instead of
- * one, which is still the biggest single hit in the game and still the only
- * one a raised shield stops dead. Both cost more charge than anything else in the game, and the enemies
- * that have them reach for them rarely (`weight`), because a trick that lands
- * every other round at that size is not a signature, it is a tax.
+ * rounds instead of once, and dynamite takes a life and a half at a stroke,
+ * which is still the biggest single hit in the game and still the only one a
+ * raised shield stops dead. Both are near the top of the charge table, and the
+ * enemies that have them reach for them rarely (`weight`), because a trick that
+ * lands every other round at that size is not a signature, it is a tax.
  *
  * THE PLAYER BUYS ALL OF IT
  * ---------------------------------------------------------------------------
@@ -419,8 +429,8 @@ export const ABILITIES = {
   deepFreeze: {
     effect: 'freeze',
     world: 3,
-    turns: 2,
-    charge: 5,
+    turns: 1,
+    charge: 4,
     label: 'Deep Freeze',
     tip: 'They are frozen solid: two rounds in which they do nothing at all',
     icon: 'iceFall',
@@ -527,7 +537,7 @@ export const ABILITIES = {
   mireGrasp: {
     effect: 'drain',
     world: 4,
-    amount: 1,
+    amount: 0.5,
     charge: 5,
     label: 'Mire Grasp',
     tip: 'Takes a life off them and gives it to you',
@@ -652,8 +662,8 @@ export const ABILITIES = {
   dynamite: {
     effect: 'blast',
     world: 5,
-    amount: 3,
-    charge: 6,
+    amount: 1.5,
+    charge: 5,
     weight: 0.35,
     label: 'Dynamite',
     tip: 'Three lives at once — but a raised shield stops it dead',
@@ -694,8 +704,8 @@ export const ABILITIES = {
   magmaSpout: {
     effect: 'pierce',
     world: 5,
-    amount: 2,
-    charge: 5,
+    amount: 1,
+    charge: 4,
     label: 'Magma Spout',
     tip: 'Two lives from underneath. A shield is no use over it',
     icon: 'magmaSpout',
@@ -851,7 +861,7 @@ export const ABILITIES = {
     effect: 'reflect',
     world: 6,
     turns: 1,
-    charge: 6,
+    charge: 5,
     label: 'Void Mirror',
     tip: 'The next shot that would hit you goes back at them instead',
     icon: 'starRot',
@@ -881,8 +891,8 @@ export const ABILITIES = {
   meteorStrike: {
     effect: 'pierce',
     world: 6,
-    amount: 3,
-    charge: 7,
+    amount: 1.5,
+    charge: 5,
     label: 'Meteor Strike',
     tip: 'Three lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
@@ -914,8 +924,8 @@ export const ABILITIES = {
   mindRift: {
     effect: 'freeze',
     world: 6,
-    turns: 2,
-    charge: 5,
+    turns: 1,
+    charge: 4,
     label: 'Mind Rift',
     tip: 'Two rounds in which they can do nothing at all',
     icon: 'mindRift',
@@ -1011,7 +1021,7 @@ export const SPECIALS = {
     firstCycleMs: 7500,
     warnMs: 2200,
     activeMs: 6000,
-    strikes: 2,
+    strikes: 1,
     damage: 0.5,
     /** It does not only hit you: it empties the gun you were about to use. */
     steal: 1,
@@ -1037,7 +1047,7 @@ export const SPECIALS = {
     firstCycleMs: 7000,
     warnMs: 2000,
     activeMs: 6500,
-    strikes: 2,
+    strikes: 1,
     damage: 0.5,
     /** What is left in you after the swarm has gone. */
     poisons: true,
@@ -1069,7 +1079,7 @@ export const SPECIALS = {
     warnMs: 2400,
     activeMs: 5500,
     strikes: 2,
-    damage: 1,
+    damage: 0.5,
     sfx: 'rumble',
   },
 
@@ -1093,7 +1103,7 @@ export const SPECIALS = {
     warnMs: 2200,
     activeMs: 7000,
     strikes: 2,
-    damage: 1,
+    damage: 0.5,
     poisons: true,
     sfx: 'wind',
   },
@@ -1132,8 +1142,8 @@ export const SPECIALS = {
     firstCycleMs: 7500,
     warnMs: 2400,
     activeMs: 8000,
-    strikes: 3,
-    damage: 1,
+    strikes: 2,
+    damage: 0.5,
     /** Rock that lands stays lit on the road. See `drawHazardGround`. */
     lava: true,
     sfx: 'rumble',
@@ -1187,7 +1197,7 @@ export const SPECIALS = {
     warnMs: 2600,
     activeMs: 4600,
     strikes: 3,
-    damage: 1,
+    damage: 0.5,
     steal: 1,
     sfx: 'rumble',
   },

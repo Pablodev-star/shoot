@@ -139,9 +139,13 @@ const APPETITE = {
    */
   inn: ({ health, purse, lastCall }) =>
     0.35 + Math.pow(1 - health, 1.6) * 3.4 + purse * 0.5 + (lastCall ? (1 - health) * 6 : 0),
-  /** A counter. Wanted when there is gold to spend or nothing left to eat. */
+  /**
+   * A counter. Wanted when there is gold to spend — and wanted urgently when
+   * there is nothing left in the bag to eat, because an empty gauge is the one
+   * thing on this road that cannot be fought, only bought off.
+   */
   shop: ({ purse, belly, stocked, lastCall }) =>
-    0.4 + purse * 2 + (1 - belly) * 1.2 + (stocked ? 0 : 0.8) + (lastCall ? purse * 1.4 : 0),
+    0.4 + purse * 2 + (1 - belly) * 1.6 + (stocked ? 0 : 2.5) + (lastCall ? purse * 1.4 : 0),
   /** A smithy. Wanted when the purse could actually pay for the next rung. */
   forge: ({ canAffordRung, purse }) => 0.3 + (canAffordRung ? 2.2 : 0) + purse * 0.6,
 };
@@ -229,24 +233,32 @@ export function generateSegment(worldId, seed) {
 
   const events = [];
   let distance = 0;
-  order.forEach((type, i) => {
-    const known = i < REVEAL_AHEAD;
+  order.forEach(() => {
+    // Every stop is dealt face down, including the ones the player will see
+    // first: the opening five are turned over by `revealToHorizon` the moment
+    // the world is entered, off the state the player walked in with.
+    //
+    // They used to be baked here, and that was a hole in the whole idea. A
+    // player crossing into a new world with an empty bag would get whatever
+    // opening the shuffle had already decided — and if that opening was five
+    // fights, they starved with a full purse in front of a shop they never
+    // reached. The road cannot answer the run if the first third of it was
+    // written before the run existed.
+    //
     // A stop still face down might turn out to be a building, and a building
-    // has to be walked towards rather than appear — so an unknown slot is
-    // always given a building's run-up. A duel that lands on one is simply a
-    // slightly longer stretch of road, which costs nothing but a few rations.
-    const gapPx = known && type === 'enemy'
-      ? rng.int(MIN_GAP, MAX_GAP)
-      : rng.int(SERVICE_MIN_GAP, MAX_GAP);
+    // has to be walked towards rather than appear, so every slot is given a
+    // building's run-up. A duel that lands on one is simply a slightly longer
+    // stretch of road, which costs nothing but a few rations.
+    const gapPx = rng.int(SERVICE_MIN_GAP, MAX_GAP);
     distance += gapPx;
     events.push({
       index: events.length,
-      type: known ? type : null,
+      type: null,
       distance,
       gap: gapPx,
       resolved: false,
       /** True while the map still shows a question mark here. */
-      hidden: !known,
+      hidden: true,
     });
   });
 
@@ -266,8 +278,8 @@ export function generateSegment(worldId, seed) {
     seed,
     events,
     totalDistance: distance,
-    /** The kinds still face down, in no particular order. */
-    hand: order.slice(REVEAL_AHEAD),
+    /** Everything the world is holding. Nothing is face up until it is dealt. */
+    hand: order,
   };
 }
 

@@ -111,7 +111,7 @@ export function createLocalAgent() {
 /** The most of its turns the AI can ever play off a read of the player. */
 const READ_SHARE = 0.62;
 /** Ceiling on the share of turns spent shielding, over the whole duel. */
-const SHIELD_SHARE = 0.26;
+const SHIELD_SHARE = 0.2;
 /** Repeated identical moves before the agent starts expecting another one. */
 const STREAK_TRIGGER = 3;
 /** How much a streak that long adds to the chance of answering it. */
@@ -259,15 +259,15 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
     const bullets = view.self.bullets;
     const roll = random();
     if (bullets <= 0) {
-      return roll < 0.96 || !canShield() ? MOVES.RELOAD : MOVES.SHIELD;
+      return roll < 0.92 || !canShield() ? MOVES.RELOAD : MOVES.SHIELD;
     }
     if (bullets >= 3) {
-      if (roll < 0.9) return MOVES.SHOOT;
-      if (roll < 0.96 && canShield()) return MOVES.SHIELD;
+      if (roll < 0.72) return MOVES.SHOOT;
+      if (roll < 0.86 && canShield()) return MOVES.SHIELD;
       return MOVES.SHOOT;
     }
-    if (roll < 0.68) return MOVES.SHOOT;
-    if (roll < 0.88) return MOVES.RELOAD;
+    if (roll < 0.5) return MOVES.SHOOT;
+    if (roll < 0.84) return MOVES.RELOAD;
     return canShield() ? MOVES.SHIELD : MOVES.RELOAD;
   }
 

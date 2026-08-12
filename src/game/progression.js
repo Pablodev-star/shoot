@@ -49,37 +49,127 @@ export function expForNextLevel(level) {
 }
 
 /**
- * Lives granted per level-up. The level-up itself hands you exactly this many
- * lives as well as the room to hold them — it is not a refill. See `addExp` in
- * src/game/player.js.
+ * Lives granted per level-up, and the bar you start on.
+ *
+ * THESE TWO CURVES HAVE TO BE WRITTEN TOGETHER OR THEY COME APART
+ * ---------------------------------------------------------------------------
+ * This is the number that broke the game once already. At a whole life per
+ * level on a bar starting at six, the player doubles by level six — while a
+ * rider's bullet was a constant written in another file. Measured on the
+ * version that shipped: **twelve** connected shots to kill the player in the
+ * Dust Flats and **fourteen** by the Wildgrass Prairie, against two or three to
+ * kill the rider across the road. That is not a duel, it is an errand.
+ *
+ * The bar starts at THREE, which is where it started for the first three years
+ * of this game and which was right — three diamonds against half a life a shot
+ * is six hits deep, and six hits deep is a fight you can afford to misplay
+ * twice.
+ *
+ * It still grows a whole life a level. The inflation was never the problem: the
+ * problem was that ONLY the player's side inflated. A rider's bullet is derived
+ * from the bar now (`enemyGunDamage`), so a player standing on nine lives is
+ * shot at for a life and a half and is still six hits from the end of the run,
+ * exactly as they were in the Dust Flats. The growth is what gives the late
+ * game room to absorb a bad duel; the derivation is what stops that room from
+ * turning into immunity.
+ *
+ * Everything the player fights is now DERIVED from where this curve puts them:
+ * `enemyGunDamage`, `enemyLives` and `bossLives` read the bar rather than
+ * guessing at it, and `node tools/sim.mjs asymmetry` fails the build if the two
+ * sides of the road drift apart again.
  */
 export const LIVES_PER_LEVEL = 1;
-/**
- * Six, not three.
- *
- * Every damage figure in the game doubled when the trail iron went from half a
- * life a shot to a whole one (see `gunDamageAt`), so a three-life bar would be
- * three hits deep in world one and two hits deep in the basin. Six is a little
- * more than the old three was worth, and the extra is deliberate: the Dust
- * Flats were measured killing two runs in five, which is a tutorial that eats
- * the people it is teaching.
- */
-export const STARTING_LIVES = 6;
+export const STARTING_LIVES = 3;
 
 /**
- * What a rider's bullet costs you, by world.
+ * Roughly what the player's bar and revolver look like walking into each world.
  *
- * A table rather than `worldId * 0.5`, which is what it used to be and which
- * had the Stranger's riders taking three lives a shot off an eleven-life bar —
- * four hits and a run that had lasted an hour was over. Written out, on the
- * half-life grid, and deliberately flat across pairs of worlds: the road gets
- * harder because there is more of it and because the landmarks now erupt, not
- * because every bullet is bigger than the last one.
+ * A table rather than a simulation because it has to be readable: these six
+ * rows are the spine of the game's difficulty and every enemy number hangs off
+ * them. They are checked against a real economy model — `tools/sim.mjs
+ * asymmetry` prints what the road actually delivers beside what is claimed
+ * here, and fails if the gap gets wide enough to matter.
  */
-export const ENEMY_GUN_DAMAGE = { 1: 0.5, 2: 0.5, 3: 1, 4: 1, 5: 1.5, 6: 1.5 };
+export const EXPECTED_POWER = {
+  1: { lives: 3, damage: 0.5 },
+  2: { lives: 4, damage: 1.5 },
+  3: { lives: 5, damage: 2 },
+  4: { lives: 7, damage: 2.5 },
+  5: { lives: 8, damage: 2.5 },
+  6: { lives: 10, damage: 3 },
+};
 
+/** Rounded to the half-diamond grid the whole game lives on. */
+const toHalf = (n) => Math.max(0.5, Math.round(n * 2) / 2);
+
+/**
+ * HOW MANY CONNECTED SHOTS IT SHOULD TAKE TO KILL EACH OF YOU
+ * ---------------------------------------------------------------------------
+ * The two numbers this file exists to hold steady, in every world. A rival
+ * needs about six clean hits to finish you and you need two to finish them:
+ * enough cushion that a duel is winnable from behind, tight enough that a rider
+ * is a threat rather than a toll booth.
+ *
+ * The small one is doing more work than it looks, because it sets the LENGTH of
+ * a fight and length is what a fight costs. Every extra round is another chance
+ * for their gun to be loaded when yours is not, and the bar only holds six hits
+ * — it cannot pay for long fights. Measured, at the same everything else:
+ *
+ *   2.5 hits to kill a rider → 7 rounds → nearly half your bar per duel
+ *   2.0                      → 6        → about a third
+ *   1.5                      → 4-5      → about a fifth
+ *
+ * One and a half, and the arithmetic is what forces it. A three-diamond bar
+ * that takes six hits dies in THREE duels at a third of a bar each, and a world
+ * is five to seven duels — no amount of shopping covers that, and no amount of
+ * skill either. At a fifth of a bar a duel, a world costs a bar and a half,
+ * which two beds and a counter's worth of bandages can carry with something
+ * left over for the gun. That "something left over" is the decision the game is
+ * actually made of.
+ *
+ * The number that must NOT move is the other one. Six hits to kill the player
+ * is the feel of this game and always was — three diamonds and half a life a
+ * shot — and the version that let it drift to twelve, and to fourteen by the
+ * second world, was a game where the rider across the road could not hurt you
+ * inside a single fight. `tools/sim.mjs asymmetry` gates that absolute.
+ *
+ * A boss is the same fight with more of it — three of your shots. Not
+ * more, and the reason is the landmark rather than the boss: every boss carries
+ * its world's special, a boss fight is the longest fight in the world it
+ * belongs to, and a long fight eats eruptions. At four and a half shots the
+ * Dust Flats boss ran nearly forty seconds, took three eruptions and killed
+ * half of all runs that reached it — the fight was lost to the weather, not to
+ * Big Jed.
+ *
+ * ONE HONEST LIMIT: THE HALF-DIAMOND GRID IS COARSE DOWN HERE
+ * ---------------------------------------------------------------------------
+ * A bullet has to cost a half or a whole life, and the bar is three diamonds to
+ * seven — so `bar / 6` can only ever land on 0.5, 1.0 or 1.5, and "six hits,
+ * always" is not a number the grid can express. What comes out is four and a
+ * half to seven hits depending on the world, and what stays steady is the thing
+ * that actually matters: the RATIO between the two sides, which sits between
+ * 1.8 and 2.8 across all six worlds where it used to run from 4 to 7.
+ */
+export const HITS_TO_KILL_PLAYER = 6;
+export const HITS_TO_KILL_ENEMY = 1.5;
+export const HITS_TO_KILL_BOSS = 3;
+
+/** What a rider's bullet costs you in a given world. */
 export function enemyGunDamage(worldId) {
-  return ENEMY_GUN_DAMAGE[worldId] ?? 1;
+  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
+  return toHalf(power.lives / HITS_TO_KILL_PLAYER);
+}
+
+/** How much life a rider of a given world carries, before its own spread. */
+export function enemyLives(worldId) {
+  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
+  return toHalf(power.damage * HITS_TO_KILL_ENEMY);
+}
+
+/** How much life that world's boss carries. */
+export function bossLives(worldId) {
+  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
+  return Math.max(2, Math.round(power.damage * HITS_TO_KILL_BOSS * 2) / 2);
 }
 
 /**
@@ -100,9 +190,19 @@ export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
 // Gold
 // ---------------------------------------------------------------------------
 
+/**
+ * What a body is worth.
+ *
+ * Raised by about half, and the reason is the ledger rather than generosity: a
+ * duel costs roughly a fifth of the life bar, a bandage restores a third of it,
+ * and at the old rate a rider paid for almost exactly the bandage that fighting
+ * it cost. A world's whole income went on standing still. The purse has to
+ * cover the damage AND leave enough over that the gun, the food and the bed are
+ * three real choices competing for it — that competition is the game.
+ */
 export function goldForEnemy({ worldId, lives = 1, isBoss = false }) {
   const world = getWorld(worldId);
-  const base = 24 + lives * 14;
+  const base = 36 + lives * 20;
   return Math.round(base * world.goldMul * (isBoss ? 4 : 1));
 }
 
@@ -123,8 +223,32 @@ export function itemPrice(item, worldId) {
   return Math.max(1, Math.round(raw / 5) * 5); // round to a tidy 5
 }
 
+/**
+ * What a shopkeeper hands over for something out of your bag.
+ *
+ * IT IS A FRACTION OF WHAT THE THING IS, NOT OF WHAT THE ROAD CHARGES FOR IT
+ * ---------------------------------------------------------------------------
+ * This used to be `itemPrice(item, worldId) * SELL_RATIO`, which quietly made
+ * the saddlebag the best investment vehicle in the game. Prices inflate about
+ * 42% per world on top of each world's own multiplier, so a carrot bought for
+ * 10 gold in the Dust Flats sold for **85** in the Galaxy, and a potion bought
+ * for 110 sold for 765. With five of anything stackable on every counter, the
+ * correct play was to walk into world one, buy out the shop, carry it five
+ * worlds and cash out for more than the road pays for actually fighting.
+ *
+ * A run should be funded by the fights. So the sale price is a fraction of the
+ * item's own base value and knows nothing about where you are standing: buy
+ * anywhere at the local asking price, sell anywhere for the same modest sum.
+ * Since `itemPrice` is never below `basePrice`, this guarantees the only
+ * property that matters — **you can never make money by moving goods between
+ * worlds.**
+ *
+ * `worldId` is still in the signature because every caller has one to hand and
+ * a future rule (a world that pays over the odds for its own kit, say) would
+ * want it.
+ */
 export function sellPrice(item, worldId) {
-  return Math.max(1, Math.round((itemPrice(item, worldId) * SELL_RATIO) / 5) * 5);
+  return Math.max(1, Math.round((item.basePrice * SELL_RATIO) / 5) * 5);
 }
 
 // --- Inn pricing -----------------------------------------------------------
@@ -222,7 +346,7 @@ export const GUN_MAX_LEVEL = 6;
  * iron a shot costs exactly one life, which is what the how-to-play panel has
  * always said it does.
  */
-export const GUN_DAMAGE_BASE = 1;
+export const GUN_DAMAGE_BASE = 0.5;
 export const GUN_DAMAGE_PER_RUNG = 0.5;
 
 export function gunDamageAt(level) {
@@ -362,7 +486,7 @@ export function starvationIntervalMs(maxLives = STARTING_LIVES) {
  * `gunDamageAt`.
  */
 export function totemReviveLives(maxLives) {
-  return Math.max(3, Math.ceil(maxLives / 2));
+  return Math.max(2, Math.round(maxLives) / 2);
 }
 
 // ---------------------------------------------------------------------------

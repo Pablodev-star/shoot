@@ -100,7 +100,9 @@ export function generateStock(worldId, seed) {
   const entry = (item, slot) => {
     const fullPrice = itemPrice(item, worldId);
     const discounted = rng.chance(discountChance);
-    const units = item.stack > 1 ? STOCK_DEPTH : 1;
+    // Food says how deep its own counter is; everything stackable else takes
+    // the house default; permanent kit is one apiece.
+    const units = item.depth ?? (item.stack > 1 ? STOCK_DEPTH : 1);
     return {
       slot,
       item,
