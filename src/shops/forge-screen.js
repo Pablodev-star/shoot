@@ -44,6 +44,7 @@ import { openInventory } from '../ui/inventory-panel.js';
 import { openTrailMapForRun } from '../ui/map-panel.js';
 import { icon } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
+import { EVENTS, on } from '../core/events.js';
 import { toast } from '../ui/toast.js';
 import { createForgeScene } from './forge-scene.js';
 
@@ -269,10 +270,22 @@ export const ForgeScreen = {
     root.append(screen);
     attachButtonSounds(screen);
 
+    /**
+     * The price and the button follow the purse in real time.
+     *
+     * The counter used to be painted once on arrival, so a player who sold
+     * something out of the saddlebag while standing at the bench — which is
+     * exactly what you do when you are short — came back to a button still
+     * greyed out at the price they could now afford, and had to leave the
+     * forge and walk back in to be told otherwise.
+     */
+    const unsubGold = on(EVENTS.GOLD_CHANGED, () => { if (!disposed) render(); });
+
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
       for (const id of timers) clearTimeout(id);
+      unsubGold();
       band.dispose();
       setRenderer(null);
     };

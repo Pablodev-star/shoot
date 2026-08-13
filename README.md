@@ -43,26 +43,27 @@ version of this once shipped where it had quietly grown to *twelve* in the Dust
 Flats and *fourteen* by the second world, because the player's life bar and the
 rider's bullet were two numbers in two files growing at different rates.
 
-The road has two ladders and they are written down by hand — a rider hits for
-half a life more every world, and carries two diamonds more every world. Your
-side is what the game is tuned to hold up against them: a bar that starts at
-three and grows four a level, one level a world, and a forge ladder worth half
-a life a rung. See `EXPECTED_POWER` in `src/game/progression.js`.
+A rider carries two diamonds more every world — that ladder is written down by
+hand. Everything else is tuned around it: a bar that starts at three and grows
+one life a level at about three levels every two worlds, a forge ladder worth
+half a life a rung, and a rider's bullet derived from the bar so that six hits
+still kill you. See `EXPECTED_POWER` in `src/game/progression.js`.
 
 | World | You have | A rider hits for | A rider carries | So a rider is |
 | --- | --- | --- | --- | --- |
 | Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 | 2 shots |
-| Wildgrass Prairie | 7 lives, 1.5 | 1 | 3 | 2 shots |
-| Whitecrown Pass | 11 lives, 2.5 | 1.5 | 5 | 2 shots |
-| Blackwater Bayou | 15 lives, 3.5 | 2 | 7 | 2 shots |
-| Brimstone Basin | 19 lives, 3.5 | 2.5 | 9 | 2.6 shots |
-| Galaxy | 23 lives, 3.5 | 3 | 11 | 3.2 shots |
+| Wildgrass Prairie | 4 lives, 1.5 | 0.5 | 3 | 2 shots |
+| Whitecrown Pass | 6 lives, 2.5 | 0.5 | 5 | 2 shots |
+| Blackwater Bayou | 7 lives, 3.5 | 1 | 7 | 2 shots |
+| Brimstone Basin | 9 lives, 3.5 | 1 | 9 | 2.6 shots |
+| Galaxy | 10 lives, 3.5 | 1 | 11 | 3.2 shots |
 
-Six to eight hits to kill you and two to three to kill them, everywhere. **The
-last two worlds are where the forge ladder runs out** — the gun stops at three
-and a half and the riders keep climbing — so out there a fight takes a third
-shot, you cannot out-buy the road any more, and the two worlds are shorter to
-pay for it.
+Six to twelve hits to kill you and two to three to kill them. The headroom
+grows on purpose: **the last two worlds are where the forge ladder runs out** —
+the gun stops at three and a half and the riders keep climbing — so a fight out
+there takes a third shot and runs half again as long, which needs a deeper bar
+to cost the same third of itself. You cannot out-buy the road any more, and the
+Galaxy is shorter to pay for it.
 
 **And the road gets worse as you walk it.** From the halfway point of a world,
 half the riders carry the next rung of the ladder: the Dust Flats open on
@@ -340,7 +341,15 @@ There is no level select. You walk, and the road decides what you meet.
   have not spent and it finds you a counter, doing fine and it finds you a
   fight.
 
-  Two promises inside that. **The road never changes how hard a fight is** — a
+  **A world opens with fights.** The first two stops are always riders, and the
+  reason is the purse rather than the pacing: you cross a border having spent
+  the last world's money on the last world's problems, so a counter in the
+  opening stretch is a building you walk past. A forge dealt into slot one —
+  which is what the shuffle used to do, because nothing told it otherwise — is
+  the most expensive thing on the road offered at the exact moment nobody can
+  afford it, and then not offered again for a world.
+
+  Two more promises inside that. **The road never changes how hard a fight is** — a
   duel is as hard as its world says, always; only the shape of the road adapts.
   And **the last bed a world has left is saved for the door of the boss**: while
   a world still holds one inn and you are carrying any damage at all, that inn
@@ -485,7 +494,21 @@ There is no level select. You walk, and the road decides what you meet.
   with something happening in it: the furnace burns in the doorway as you walk
   past and the chimney smokes.
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
-  for half its value.
+  for half its value. The bag carries its own purse and it is live — sell three
+  things and the number under your thumb is right each time, and the coins fly
+  across to it.
+- **Using something is something you SEE.** A bandage or a med kit washes the
+  player green with a dark green plus rising out of his chest; anything eaten
+  does the same in orange, with the food's own icon instead of the plus. Both
+  play on the road and in the middle of a duel, because the saddlebag opens in
+  both and a life quietly appearing on a card behind an animation already in
+  motion is the easiest thing in the game to miss.
+- **Gold travels.** Win a fight, sell a saddle, and a handful of coins crosses
+  the screen to whichever purse is on it — the travel band's, the shop's, the
+  saddlebag's — and the number counts up as they land rather than before they
+  set off. Every counter in the game follows the purse live too: sell something
+  while standing at the forge and the rung you could not afford a moment ago
+  goes buyable without leaving the building.
 - **The Bulletproof Vest is armour you keep.** It stops the first thing that
   hits you in a duel — a bullet, a stick of dynamite, a rock off an erupting
   mountain, a tick of venom — comes apart doing it, and you have it patched up
@@ -545,12 +568,13 @@ There is no level select. You walk, and the road decides what you meet.
   Kiln, the Star Reaver — each with its own head, torso, palette and set of
   names, and each world drawing from its own roster. The name always describes
   the sprite, because the names were written from the art.
-- **Levelling is the spine.** Exactly one level per world, and it lands in the
-  MIDDLE of one: three diamonds against half-life bullets for the first two
-  fights of the Dust Flats, then seven diamonds against riders who hit for a
-  whole one. A level grants **four lives**, so the bar reads 3, 7, 11, 15, 19,
-  23 at the six borders — the bar the whole difficulty table is solved
-  against. It does not make you safer: a rider's bullet is a sixth of
+- **Levelling is the slow reward again.** About **three levels every two
+  worlds**, each worth **one life** — one more maximum and one more in the bar
+  to go with it — so the whole climb is three diamonds to ten. The first one is
+  deliberately cheap and lands on the very first fight, because the Dust Flats
+  is the one stretch where the bar is at its shallowest exactly as the road
+  starts ramping. And it **performs**: the level chip goes gold and flares, so
+  the slowest reward in the game is the one thing on the band you cannot miss. It does not make you safer: a rider's bullet is a sixth of
   whatever the bar has grown to, so eighteen lives is the same six hits deep
   that three was. What the growth buys is room to absorb a bad duel, not
   immunity from one. It is not a refill: if you arrive at a level-up on your

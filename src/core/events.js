@@ -36,6 +36,17 @@ export const EVENTS = {
   EXP_CHANGED: 'player:exp',
   LEVEL_UP: 'player:levelup',
   INVENTORY_CHANGED: 'inventory:changed',
+  /**
+   * Something out of the bag was used and it did something to the player —
+   * a bandage, a med kit, an apple. Carries `{ id, effect, amount, icon }`,
+   * where `effect` is 'heal' or 'food'.
+   *
+   * It exists so the two places that DRAW the player — the road and the duel —
+   * can show it happening without either of them knowing which screen the bag
+   * was opened from. See `useItem` in src/game/player.js and the pops in
+   * src/art/vital-pop.js.
+   */
+  ITEM_USED: 'inventory:used',
   HORSE_ACQUIRED: 'player:horse',
   /** A meal's after-effect was granted, spent down a duel, or ran out. */
   BOON_CHANGED: 'player:boon',

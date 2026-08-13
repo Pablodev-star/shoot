@@ -157,6 +157,12 @@ const APPETITE = {
  */
 const LAST_CALL = 2;
 
+/**
+ * How many fights a world opens with before it will deal a building. See the
+ * note in `revealNext`.
+ */
+export const OPENING_FIGHTS = 2;
+
 /** One or two, weighted towards two. */
 function rollServiceCount(rng) {
   return rng.chance(SERVICE_PAIR_CHANCE) ? 2 : 1;
@@ -312,6 +318,30 @@ export function revealNext(segment, state) {
 
   const rng = makeRng((segment.seed ^ (event.index * 2654435761)) >>> 0);
   const kinds = [...new Set(segment.hand)];
+
+  /**
+   * A WORLD OPENS WITH FIGHTS
+   * -------------------------------------------------------------------------
+   * The first two stops of every world are riders while the hand still has
+   * one, and the reason is the purse rather than the pacing: you cross a
+   * border having spent the last world's money on the last world's problems,
+   * so a counter in the opening stretch is a building you walk past. A forge
+   * dealt into slot one — which is what used to happen, because nothing in the
+   * shuffle said otherwise — is the single most expensive thing on the road
+   * offered at the exact moment nobody can afford it, and then not offered
+   * again for a world.
+   *
+   * The old pre-baked order had this rule (`buckets[0] = 1`) and it was lost
+   * when the road became adaptive: the buckets only fix the multiset now, and
+   * the sequence is whatever `revealNext` chooses. So it lives here, where the
+   * choosing happens.
+   */
+  if (event.index < OPENING_FIGHTS && segment.hand.includes('enemy')) {
+    segment.hand.splice(segment.hand.indexOf('enemy'), 1);
+    event.type = 'enemy';
+    event.hidden = false;
+    return event;
+  }
   /** True when the boss is close enough that this is the last chance to prepare. */
   const lastCall = segment.hand.length <= LAST_CALL;
   const reading = { ...state, lastCall };

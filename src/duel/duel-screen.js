@@ -29,6 +29,7 @@
 import { el, clearNode, wait } from '../core/dom.js';
 import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
+import { EVENTS, on } from '../core/events.js';
 import {
   getState,
   setLives,
@@ -765,6 +766,16 @@ export const DuelScreen = {
       if (e.key === 'e' || e.key === 'E') castFromKey(1);
     };
     window.addEventListener('keydown', onKey);
+
+    /**
+     * Anything used out of the bag mid-fight shows on the fighter: green for a
+     * bandage, orange with the food's own icon for a meal. It is driven by the
+     * bag's event rather than by `onUse` below, so it covers every path into
+     * the saddlebag and not just this screen's.
+     */
+    const unsubItemUsed = on(EVENTS.ITEM_USED, ({ effect, icon: iconName }) => {
+      if (!finished) scene.vitalPop('player', effect, iconName);
+    });
 
     // --- engine events -----------------------------------------------------
     function handleEngineEvent(event) {
@@ -1505,6 +1516,7 @@ export const DuelScreen = {
       closeBag();
       intro?.skip();
       localAgent.cancel();
+      unsubItemUsed();
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', syncHud);
     };

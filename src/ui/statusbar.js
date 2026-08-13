@@ -60,6 +60,19 @@ export function trailBand(opts = {}) {
    */
   const levelValue = el('span', { text: `Lv ${player.level}` });
   const levelChip = el('span.chip.chip--level', {}, [levelValue]);
+  /**
+   * A level-up is the slowest reward in the game — three of them every two
+   * worlds — and it used to happen entirely inside a toast that was already
+   * competing with the gold one. The chip performs it instead: it goes GOLD,
+   * flares, and settles back into its ordinary self. The exp track underneath
+   * empties and starts again in the same movement, which is the part that says
+   * what actually happened.
+   */
+  const flare = () => {
+    levelChip.classList.remove('is-levelling');
+    void levelChip.offsetWidth;
+    levelChip.classList.add('is-levelling');
+  };
   const syncLevel = (level) => {
     const p = expProgress();
     levelValue.textContent = `Lv ${level}`;
@@ -117,8 +130,14 @@ export function trailBand(opts = {}) {
 
   const unsubs = [
     on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => updateLivesRow(lives, l, maxLives)),
-    on(EVENTS.GOLD_CHANGED, ({ gold: g }) => gold.setValue(g)),
+    // Gold is not bound here: `goldChip` registers itself as a purse and
+    // src/ui/gold-fly.js drives every one of them, so money coming in flies
+    // across the screen and lands on this pill instead of appearing in it.
     on(EVENTS.EXP_CHANGED, ({ level }) => syncLevel(level)),
+    on(EVENTS.LEVEL_UP, ({ level }) => {
+      syncLevel(level);
+      flare();
+    }),
     on(EVENTS.WORLD_CHANGED, ({ world: id }) => {
       worldLabel.textContent = getWorld(id).name;
       worldLabel.dataset.tip = `World ${id} of ${FINAL_WORLD}`;
@@ -183,7 +202,10 @@ export function trailBand(opts = {}) {
   syncLevel(player.level);
   worldLabel.dataset.tip = `World ${player.world} of ${FINAL_WORLD}`;
 
-  node.dispose = () => unsubs.forEach((fn) => fn());
+  node.dispose = () => {
+    unsubs.forEach((fn) => fn());
+    gold.dispose?.();
+  };
   return node;
 }
 

@@ -65,6 +65,10 @@ export const InnScreen = {
       updateLivesRow(lives, l, maxLives);
       livesNote.textContent = livesText();
     });
+    // …and the beds follow the purse, the same way the stall and the forge do:
+    // sell something from the saddlebag and the good bed goes affordable while
+    // you are standing in front of it.
+    const unsubGold = on(EVENTS.GOLD_CHANGED, renderBeds);
 
     function livesText() {
       const s = getState();
@@ -187,6 +191,7 @@ export const InnScreen = {
 
     return () => {
       unsub();
+      unsubGold();
       band.dispose();
     };
   },

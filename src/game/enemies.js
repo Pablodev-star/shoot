@@ -40,7 +40,7 @@
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
-import { enemyGunDamageAt } from './progression.js';
+import { enemyGunDamage, enemyGunDamageAt, ENEMY_DAMAGE_RAMP_CHANCE } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
 
@@ -85,7 +85,7 @@ export function generateEnemy(worldId, seed, progress = 0) {
   const lives = Number(rng.weighted(profile.lives));
   // Rolled whether or not it can be used, so that a rider's whole hand comes
   // off one seed in one order and the road stays reproducible.
-  const heavier = rng.chance(0.5);
+  const heavier = rng.chance(ENEMY_DAMAGE_RAMP_CHANCE);
   const abilities = [];
   if (rng.chance(profile.abilityChance)) abilities.push(rng.pick(profile.abilities));
   // Late worlds can roll a second ability.
@@ -127,9 +127,19 @@ export function generateBoss(worldId) {
     maxLives: phase.lives,
     bullets: phase.startBullets || 0,
     accuracy: phase.accuracy ?? cfg.accuracy,
-    // A boss stands at the end of the road, so it is always on the far side of
-    // the ramp: the world's heavier bullet, never the opening one.
-    gunDamage: enemyGunDamageAt(worldId, 1, true),
+    /**
+     * A boss carries its world's ORDINARY bullet, not the ramped one.
+     *
+     * It had the heavy one for a while, on the reasoning that a boss stands at
+     * the end of the road and everything else out there is ramped. That
+     * reasoning is fine and the arithmetic is not: the ramp is a flat half a
+     * life, so what it costs depends entirely on how deep the bar is, and a
+     * boss fight is the longest fight in its world. On the Dust Flats bar it
+     * took Big Jed from six hits to three and turned the tutorial boss into a
+     * quarter of all deaths in the game. The rider ramp is a spike inside a
+     * five-round fight; the same spike inside a ten-round one is a wall.
+     */
+    gunDamage: enemyGunDamage(worldId),
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: phase.abilityChanceMul || 1,
     /** A boss always has its world's special. It is the fight's centrepiece. */

@@ -106,6 +106,7 @@ import {
 import { getHazardArt, HAZARD_W, HAZARD_H } from '../art/sprites-hazards.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
 import { createCastFx } from './duel-cast.js';
+import { createVitalPops } from '../art/vital-pop.js';
 import { createParallax } from '../explore/parallax.js';
 import * as weather from '../explore/weather.js';
 import { PALETTE } from '../art/palette.js';
@@ -384,6 +385,14 @@ export function createDuelScene({
    * goes where the player is already looking — off the body, onto the road, and
    * out with the light.
    */
+  /**
+   * Eating and patching up, drawn on the fighter it happened to. The bag can
+   * be opened in the middle of a round, and a life quietly appearing on a card
+   * behind an animation in progress is the easiest thing in the game to miss —
+   * see src/art/vital-pop.js.
+   */
+  const pops = { player: createVitalPops(), enemy: createVitalPops() };
+
   const vestArt = getVestSprites();
   const vestOn = { player: false, enemy: false };
   const vestFalls = [];
@@ -757,6 +766,14 @@ export function createDuelScene({
     impact,
 
     /**
+     * Somebody just ate or patched up. `kind` is 'heal' or 'food'; `icon` is
+     * the item's own icon, which is what a food pop throws up.
+     */
+    vitalPop(side, kind, iconName = null) {
+      pops[side]?.spawn(kind, iconName);
+    },
+
+    /**
      * Put a vest on somebody, or take it off them.
      *
      * The screen calls this every frame from what the engine says each side is
@@ -1050,6 +1067,8 @@ export function createDuelScene({
         if (blasts[i].t >= 1) blasts.splice(i, 1);
       }
 
+      pops.player.update(dt);
+      pops.enemy.update(dt);
       stepVestFalls(dt);
       stepGunGlow(dt);
     },
@@ -1167,6 +1186,13 @@ export function createDuelScene({
       // It is an object, not an effect: it goes down here with the fighters so
       // the hour of the day falls on it like anything else out there.
       drawVestFalls(ctx);
+
+      // The plus or the carrot, rising out of whoever used it.
+      for (const side of ['player', 'enemy']) {
+        if (!pops[side].active) continue;
+        const L = layout[side];
+        pops[side].draw(ctx, L.originX + (FIGHTER_W / 2) * L.fs, L.topY + 13 * L.fs, L.fs);
+      }
 
       // The near side of the road, drawn after the fighters so the two of them
       // are standing IN it rather than on the far side of it.
@@ -2630,6 +2656,15 @@ export function createDuelScene({
     if (tint) {
       ctx.globalAlpha = tint.alpha * (0.75 + Math.sin(elapsed / 260) * 0.25);
       drawSprite(ctx, tintedFrame(frame, tint.color), originX, y, fs, flip);
+      ctx.globalAlpha = 1;
+    }
+
+    // …and the green or orange of something just used out of the bag, over
+    // the top of both, because it is the newest thing that happened.
+    const wash = pops[side].wash();
+    if (wash) {
+      ctx.globalAlpha = wash.alpha;
+      drawSprite(ctx, tintedFrame(frame, wash.color), originX, y, fs, flip);
       ctx.globalAlpha = 1;
     }
 

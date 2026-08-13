@@ -68,7 +68,7 @@ export const WORLDS = [
     encounters: { duels: 5 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
-      lives: { 1: 80, 2: 20 },
+      lives: { 1: 88, 2: 12 },
       abilityChance: 0.05,
       /**
        * Two tricks and both of them are weather: a gust that takes a round off
@@ -77,7 +77,7 @@ export const WORLDS = [
        * see the note on it in src/game/world-abilities.js.
        */
       abilities: ['dustSnatch', 'sandBlind'],
-      accuracy: 0.38,       // how often the AI reads your move correctly
+      accuracy: 0.33,       // how often the AI reads your move correctly
       /** Who rides this stretch — see src/art/sprites-enemies.js. */
       roster: ['drifter', 'brawler', 'bandana', 'strawhat'],
       /** The world's special, and how many of its riders are carrying it. */

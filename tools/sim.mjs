@@ -250,7 +250,7 @@ const SPENDING = {
 function rollEnemy(worldId, rng, progress = 0) {
   const p = getWorld(worldId).enemy;
   const lives = Number(rng.weighted(p.lives));
-  const heavier = rng.chance(0.5);
+  const heavier = rng.chance(P.ENEMY_DAMAGE_RAMP_CHANCE);
   const abilities = [];
   if (rng.chance(p.abilityChance)) abilities.push(rng.pick(p.abilities));
   if (worldId >= 4 && rng.chance(p.abilityChance * 0.5)) {
@@ -280,8 +280,8 @@ function bossPhase(worldId, index = 0) {
     maxLives: ph.lives,
     bullets: ph.startBullets || 0,
     accuracy: ph.accuracy ?? b.accuracy,
-    // A boss stands at the end of the road: always the world's heavier bullet.
-    gunDamage: P.enemyGunDamageAt(worldId, 1, true),
+    // A boss carries its world's ordinary bullet — see `generateBoss`.
+    gunDamage: P.enemyGunDamage(worldId),
     abilities: ph.abilities || b.abilities,
     abilityChanceMul: ph.abilityChanceMul || 1,
     special: ph.special || b.special,
@@ -571,8 +571,32 @@ async function reportAsymmetry() {
      * Six is the target and four to eight is the band. The ratio stays in the
      * table because it is worth looking at; it is not what fails the build.
      */
-    if (onPlayer < 4 || onPlayer > 8) {
-      problems.push(`world ${w.id}: a rider needs ${onPlayer.toFixed(1)} hits to kill the player (want 4-8)`);
+    /**
+     * The band moves with the length of the fight — see `hitsToKillPlayer`.
+     * A six-hit bar in a world where a rider takes three of your shots is not
+     * the same duel as a six-hit bar in a world where he takes two, and the
+     * flat 4-8 this used to check let the Galaxy quietly cost sixty per cent
+     * of the bar a duel while reading as perfectly in band.
+     */
+    const wanted = P.hitsToKillPlayer(w.id);
+    /**
+     * The floor is the one that matters, and it is tight: a world that gives
+     * the player less headroom than its fight length needs is a world that
+     * costs half a bar a duel.
+     *
+     * The ceiling is deliberately loose, because the half-diamond grid cannot
+     * express most of what this curve asks for. On a six-diamond bar the
+     * bullet the pass wants is six sevenths of a life, and the two things the
+     * grid can draw are one (six hits) and a half (twelve). The bullet always
+     * rounds DOWN (see `toHalfDown`), so a world lands on the generous side of
+     * that choice rather than the spike — the pass is the quiet world of the
+     * six, and that is a decision rather than a bug.
+     */
+    if (onPlayer < wanted - 2 || onPlayer > wanted * 2) {
+      problems.push(
+        `world ${w.id}: a rider needs ${onPlayer.toFixed(1)} hits to kill the player ` +
+        `(want about ${wanted.toFixed(1)})`,
+      );
     }
     /**
      * …and the other side of it, which is no longer a constant.

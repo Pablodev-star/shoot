@@ -11,6 +11,7 @@
 import { el } from '../core/dom.js';
 import { iconURL } from '../art/sprites-items.js';
 import { uiIconURL } from '../art/sprites-ui.js';
+import { registerPurse } from './gold-fly.js';
 
 /**
  * Row of red diamonds.
@@ -125,7 +126,16 @@ export function uiIcon(name, scale = 1.25, className = '') {
   });
 }
 
-/** Gold counter chip. Returns the element; call `setValue` to update it. */
+/**
+ * Gold counter chip. Returns the element; call `setValue` to update it.
+ *
+ * It also REGISTERS itself as a purse (src/ui/gold-fly.js) so money earned
+ * anywhere on the screen has something to fly to. Whichever chip was mounted
+ * last catches the coins, which means a shop's own pill takes them while the
+ * counter is open and the travel band takes them on the road — neither of them
+ * has to know the other is there. `dispose()` unregisters; every screen that
+ * mounts one already tears its band down.
+ */
 export function goldChip(gold, tip = 'Gold') {
   const value = el('span', { text: String(gold) });
   const chip = el('span.chip.chip--gold', { 'data-tip': tip }, [icon('coin', 1), value]);
@@ -135,6 +145,12 @@ export function goldChip(gold, tip = 'Gold') {
     void chip.offsetWidth;
     chip.classList.add('is-bumped');
   };
+  const unregister = registerPurse(
+    chip,
+    (next) => chip.setValue(next),
+    () => Number(value.textContent) || 0,
+  );
+  chip.dispose = unregister;
   return chip;
 }
 

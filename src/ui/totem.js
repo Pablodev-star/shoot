@@ -87,6 +87,8 @@ export function playTotemRevival(opts = {}) {
      */
     const st = {
       t: 0,
+      /** Real milliseconds since the black went up. See `frame`. */
+      wall: 0,
       taps: 0,
       art: composeTotem(0),
       /** Eased towards the step above; the overshoot is what makes it land. */
@@ -116,7 +118,7 @@ export function playTotemRevival(opts = {}) {
     // --- input -------------------------------------------------------------
 
     /** True once the totem is up and the prompt has been offered. */
-    const ready = () => st.t >= DARK_MS + RISE_MS + PROMPT_MS && st.taps < 3 && !st.done;
+    const ready = () => st.wall >= DARK_MS + RISE_MS + PROMPT_MS && st.taps < 3 && !st.done;
 
     function tap() {
       if (!ready()) return;
@@ -135,7 +137,7 @@ export function playTotemRevival(opts = {}) {
       }
 
       // The break.
-      st.breakAt = st.t;
+      st.breakAt = st.wall;
       st.flash = 1;
       st.pieces = shatterPieces(4, 7, Math.random);
       prompt.textContent = opts.title || 'IT BREAKS INSTEAD OF YOU';
@@ -156,11 +158,30 @@ export function playTotemRevival(opts = {}) {
 
     let raf = 0;
     let last = performance.now();
+    const startedAt = last;
 
     function frame(now) {
       const dt = Math.min(64, Math.max(0, now - last));
       last = now;
+      /**
+       * TWO CLOCKS, AND THE DIFFERENCE BETWEEN THEM IS A BUG THAT SHIPPED
+       * -------------------------------------------------------------------
+       * `st.t` is animation time: a clamped dt, because a frame that took a
+       * quarter of a second must not teleport the shards across the screen.
+       * `st.wall` is real time since the lights went out, and it is what every
+       * BEAT of the scene is measured against — the dark, the rise, the prompt
+       * and whether a tap counts yet.
+       *
+       * They used to be the same clock, and on a slow frame rate the clamp
+       * meant the scene ran in slow motion against the player's own thumb:
+       * measured on the road, where the parallax and the weather are still
+       * being drawn underneath, the totem accepted its first tap around ten
+       * seconds after it appeared instead of five. The player taps, nothing
+       * happens, and the one screen in the game that exists to say "you are
+       * still alive" reads as a freeze.
+       */
       st.t += dt;
+      st.wall = now - startedAt;
 
       step(dt);
       draw();
@@ -193,7 +214,7 @@ export function playTotemRevival(opts = {}) {
         }
         // The veil fades with the shards rather than after them: the last
         // thing on screen should be the game coming back, not an empty frame.
-        const since = st.t - st.breakAt;
+        const since = st.wall - st.breakAt;
         if (since > BREAK_MS * 0.5) {
           veil.style.opacity = String(Math.max(0, 1 - (since - BREAK_MS * 0.5) / (BREAK_MS * 0.5)));
         }
@@ -206,7 +227,7 @@ export function playTotemRevival(opts = {}) {
       ctx.clearRect(0, 0, view.w, view.h);
       crisp(ctx);
 
-      const appear = clamp01((st.t - DARK_MS) / RISE_MS);
+      const appear = clamp01((st.wall - DARK_MS) / RISE_MS);
       if (appear <= 0) return;
 
       const cx = view.w / 2;

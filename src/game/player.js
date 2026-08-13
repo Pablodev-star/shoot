@@ -446,6 +446,9 @@ export function useItem(id, opts = {}) {
     if (item.boon) grantBoon(item.boon);
     removeItem(id, 1);
     play('eat');
+    // Whoever is drawing the player right now shows it happening — see the
+    // note on ITEM_USED in src/core/events.js.
+    emit(EVENTS.ITEM_USED, { id, effect: 'food', amount: item.food, icon: item.icon });
     return { ok: true, effect: 'food', boon: item.boon ? getBoon() : null };
   }
 
@@ -461,6 +464,7 @@ export function useItem(id, opts = {}) {
     if (opts.context !== 'duel') heal(amount);
     removeItem(id, 1);
     play('coin');
+    emit(EVENTS.ITEM_USED, { id, effect: 'heal', amount: healed, icon: item.icon });
     return { ok: true, effect: 'heal', amount: healed };
   }
 
