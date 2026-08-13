@@ -34,7 +34,6 @@ export function startMenuScene(options = {}) {
   const parallax = createParallax({ seed: 987654, biome });
   if (options.tint) parallax.setTint(options.tint);
   const env = getEnvironmentSprites(biome);
-  const chars = getCharacterSprites();
   const rng = makeRng(4711);
   /** Tumbleweed is desert scenery. Nothing rolls across wet grass. */
   const rollsWeeds = biome === 'desert';
@@ -125,8 +124,16 @@ export function startMenuScene(options = {}) {
       }
       drawWeeds(ctx, view, gy, false);
 
-      // --- the waiting gunslinger, far down the road ---
-      const idle = chars.player.idle;
+      /**
+       * The waiting gunslinger, far down the road.
+       *
+       * The set is fetched per frame rather than held from the top of the
+       * scene: it is a cache lookup, and the wardrobe re-bakes the player the
+       * instant an outfit is saved. Holding it would leave the man behind the
+       * menu wearing last season's hat until the game was reloaded — and this
+       * backdrop is running BEHIND the screen the clothes were bought on.
+       */
+      const idle = getCharacterSprites().player.idle;
       const frame = idle[frameAt(idle, elapsed, CHARACTER_TIMING.idle)];
       const heroX = view.w * 0.8;
       drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s, true);

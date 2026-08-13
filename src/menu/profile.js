@@ -7,13 +7,14 @@
  */
 
 import { el, pixelImg } from '../core/dom.js';
-import { back } from '../core/router.js';
+import { back, go } from '../core/router.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { getProfile, updateProfile } from '../core/settings.js';
 import { getCharacterSprites } from '../art/sprites-character.js';
 import { toast } from '../ui/toast.js';
 import { unlock } from '../game/achievements.js';
-import { backButton, statTile } from '../ui/widgets.js';
+import { backButton, statTile, uiIcon } from '../ui/widgets.js';
+import { OUTFIT_SLOTS, SLOT_LABELS, findItem, getOutfit } from '../game/wardrobe.js';
 
 export const ProfileScreen = {
   id: 'profile',
@@ -40,12 +41,45 @@ export const ProfileScreen = {
 
     async function save() {
       const name = nameInput.value.trim() || 'STRANGER';
+      nameInput.value = name;
       await updateProfile({ name });
       // A name of your own, and not the one everybody starts with.
       if (name !== 'STRANGER') unlock('named');
+      // Everywhere the name is printed is built on mount, so the two on this
+      // screen are the only ones that have to be told.
+      avatarName.textContent = name;
       play('coin');
       toast('Name saved', 'good');
     }
+
+    /**
+     * The avatar is the door to the wardrobe.
+     *
+     * It is a button rather than a picture with a link under it because the
+     * picture IS the thing being edited — and it carries a pencil in its top
+     * right corner so that reads as an invitation rather than as decoration.
+     * (The pencil is a UI sprite like everything else in the chrome: `pencil`
+     * in src/art/sprites-ui.js.)
+     */
+    const avatarName = el('span.avatar-caption-name', { text: profile.name });
+    const avatar = el('button.avatar-plate.avatar-button', {
+      onclick: () => go('wardrobe'),
+      'aria-label': 'Change your outfit',
+      'data-tip': 'Change your outfit',
+    }, [
+      pixelImg(sprites.player.portrait, 4),
+      el('span.avatar-edit', { 'aria-hidden': 'true' }, [uiIcon('pencil', 1.1)]),
+    ]);
+
+    /** What is on, in four lines, straight off the wardrobe. */
+    const outfit = getOutfit();
+    const wearing = el('div.profile-wearing', {}, OUTFIT_SLOTS.map((slot) => {
+      const item = findItem(slot, outfit[slot]);
+      return el('span.chip', {
+        text: item ? item.name : SLOT_LABELS[slot].name,
+        'data-tip': SLOT_LABELS[slot].name,
+      });
+    }));
 
     const s = profile.stats;
     const duels = s.duelsWon + s.duelsLost;
@@ -60,13 +94,24 @@ export const ProfileScreen = {
 
       el('div.screen-body', {}, [
         el('div.panel.panel--braced.profile-card', {}, [
-          el('div.avatar-plate', {}, [pixelImg(sprites.player.portrait, 4)]),
+          el('div.avatar-column', {}, [
+            avatar,
+            el('span.avatar-caption', {}, [avatarName]),
+          ]),
           el('div.col', { style: { gap: 'var(--sp-3)' } }, [
             el('div.field', {}, [
               el('label', { text: 'Gunslinger name' }),
               nameInput,
             ]),
             el('div.row', {}, [saveBtn]),
+            el('div.field', {}, [
+              el('label', { text: 'Wearing' }),
+              wearing,
+              el('button.btn.btn--sm.btn--ghost', { onclick: () => go('wardrobe') }, [
+                uiIcon('pencil', 1),
+                el('span', { text: 'Change outfit' }),
+              ]),
+            ]),
           ]),
         ]),
 

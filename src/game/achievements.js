@@ -30,10 +30,17 @@
  *
  * REWARDS
  * ---------------------------------------------------------------------------
- * Every definition carries a `reward` field and every one of them is `null`
- * today. The wardrobe is not built yet; when it is, a reward becomes
- * `{ kind: 'clothing', id: '...' }` here and the card in the menu fills itself
- * in — the slot is already drawn, waiting, on both locked and unlocked cards.
+ * Twenty-six of these hand over a piece of clothing:
+ * `reward: { kind: 'clothing', slot, id }`, naming a garment in
+ * `src/game/wardrobe.js`. THIS IS THE ONLY PLACE THE LINK IS WRITTEN DOWN. The
+ * wardrobe reads the list backwards to find out what each garment is waiting
+ * for, so a reward can be moved from one line to another here and nothing else
+ * in the game has to be told. The rest of the list pays in bragging rights,
+ * which is the right price for "lose a duel".
+ *
+ * The rewards are spread on purpose: no slot is filled by one category, so a
+ * player who only ever duels and a player who only ever walks are both dressed
+ * by the end, in visibly different clothes.
  */
 
 import { EVENTS, emit, on } from '../core/events.js';
@@ -155,6 +162,13 @@ export const ACHIEVEMENTS = [
     description: 'Give the gunslinger a name of your own.',
     reward: null,
   },
+  {
+    id: 'dressed',
+    category: 'beginnings',
+    name: 'Dressed For It',
+    description: 'Wear something you earned.',
+    reward: null,
+  },
 
   // --- The Road ----------------------------------------------------------
   {
@@ -171,7 +185,7 @@ export const ACHIEVEMENTS = [
     name: 'Wildgrass Prairie',
     description: 'Ride into world 2.',
     test: (p) => p.worldsReached.includes(2),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'sombrero' },
   },
   {
     id: 'world3',
@@ -179,7 +193,7 @@ export const ACHIEVEMENTS = [
     name: 'Whitecrown Pass',
     description: 'Ride into world 3.',
     test: (p) => p.worldsReached.includes(3),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'fur' },
   },
   {
     id: 'world4',
@@ -187,7 +201,7 @@ export const ACHIEVEMENTS = [
     name: 'Blackwater Bayou',
     description: 'Ride into world 4.',
     test: (p) => p.worldsReached.includes(4),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'waders' },
   },
   {
     id: 'world5',
@@ -195,7 +209,7 @@ export const ACHIEVEMENTS = [
     name: 'Brimstone Basin',
     description: 'Ride into world 5.',
     test: (p) => p.worldsReached.includes(5),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'horns' },
   },
   {
     id: 'world6',
@@ -203,7 +217,7 @@ export const ACHIEVEMENTS = [
     name: 'Past The Last Horizon',
     description: 'Reach the Galaxy.',
     test: (p) => p.worldsReached.includes(FINAL_WORLD),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'starcrown' },
   },
   {
     id: 'finished',
@@ -211,7 +225,7 @@ export const ACHIEVEMENTS = [
     name: 'The Stranger Falls',
     description: 'Complete every world and finish the game.',
     test: (p) => p.gamesFinished >= 1,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'voidrobe' },
   },
   {
     id: 'allBosses',
@@ -219,7 +233,7 @@ export const ACHIEVEMENTS = [
     name: 'Six Feet Under',
     description: 'Defeat the boss of all six worlds — across as many runs as it takes.',
     test: (p) => p.bossWorlds.length >= FINAL_WORLD,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'bones' },
   },
   {
     id: 'miles50',
@@ -235,7 +249,7 @@ export const ACHIEVEMENTS = [
     name: 'Long Walk',
     description: 'Cover 250 miles of road.',
     test: (p) => p.miles >= 250,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'duster' },
   },
   {
     id: 'miles1000',
@@ -243,7 +257,7 @@ export const ACHIEVEMENTS = [
     name: 'Saddle Sore',
     description: 'Cover 1,000 miles of road.',
     test: (p) => p.miles >= 1000,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'snow' },
   },
   {
     id: 'nightRider',
@@ -258,7 +272,7 @@ export const ACHIEVEMENTS = [
     name: 'Weather Eye',
     description: 'Travel through rain, snow and a sandstorm.',
     test: (p) => ['rain', 'snow', 'sandstorm'].every((w) => p.weatherSeen.includes(w)),
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'parka' },
   },
   {
     id: 'threeSlots',
@@ -276,7 +290,7 @@ export const ACHIEVEMENTS = [
     name: 'Ten Notches',
     description: 'Win 10 duels.',
     test: (p) => p.duelsWon >= 10,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'spurs' },
   },
   {
     id: 'wins25',
@@ -284,7 +298,7 @@ export const ACHIEVEMENTS = [
     name: 'Hand Of The Road',
     description: 'Win 25 duels.',
     test: (p) => p.duelsWon >= 25,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'sheriffVest' },
   },
   {
     id: 'wins50',
@@ -292,7 +306,7 @@ export const ACHIEVEMENTS = [
     name: 'Fifty Men Down',
     description: 'Win 50 duels.',
     test: (p) => p.duelsWon >= 50,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'sheriff' },
   },
   {
     id: 'wins100',
@@ -300,7 +314,7 @@ export const ACHIEVEMENTS = [
     name: 'Legend Of The Road',
     description: 'Win 100 duels.',
     test: (p) => p.duelsWon >= 100,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'star' },
   },
   {
     id: 'bosses3',
@@ -330,7 +344,7 @@ export const ACHIEVEMENTS = [
     category: 'duelling',
     name: 'Not A Scratch',
     description: 'Beat a world boss without losing a single life.',
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'ember' },
   },
   {
     id: 'quickdraw',
@@ -346,7 +360,7 @@ export const ACHIEVEMENTS = [
      * shield.
      */
     description: 'Win a duel in four rounds or fewer.',
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'bandana' },
   },
   {
     id: 'sharpshooter',
@@ -360,14 +374,14 @@ export const ACHIEVEMENTS = [
     category: 'duelling',
     name: 'Last Stand',
     description: 'Win a duel on your last half a life.',
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'ember' },
   },
   {
     id: 'longFight',
     category: 'duelling',
     name: 'War Of Attrition',
     description: 'Win a duel that ran fifteen rounds or longer.',
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'ash' },
   },
   {
     id: 'firstCast',
@@ -398,7 +412,7 @@ export const ACHIEVEMENTS = [
     name: 'Full Purse',
     description: 'Hold 500 gold at once.',
     test: (p) => p.goldPeak >= 500,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'stripe' },
   },
   {
     id: 'purse1200',
@@ -406,7 +420,7 @@ export const ACHIEVEMENTS = [
     name: 'Heavy Pockets',
     description: 'Hold 1,200 gold at once.',
     test: (p) => p.goldPeak >= 1200,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'hat', id: 'tophat' },
   },
   {
     id: 'earned2500',
@@ -414,7 +428,7 @@ export const ACHIEVEMENTS = [
     name: 'Working Wage',
     description: 'Earn 2,500 gold in total.',
     test: (p) => p.goldEarned >= 2500,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'boots', id: 'gilded' },
   },
   {
     id: 'earned10000',
@@ -422,7 +436,7 @@ export const ACHIEVEMENTS = [
     name: 'Gold Rush',
     description: 'Earn 10,000 gold in total.',
     test: (p) => p.goldEarned >= 10000,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'shirt', id: 'gambler' },
   },
   {
     id: 'bought25',
@@ -453,7 +467,7 @@ export const ACHIEVEMENTS = [
     name: 'The Nova',
     description: 'Take a revolver all the way to the top of the ladder.',
     test: (p) => p.gunLevel >= GUN_MAX_LEVEL,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'star' },
   },
   {
     id: 'level5',
@@ -515,7 +529,7 @@ export const ACHIEVEMENTS = [
     name: 'Well Rested',
     description: 'Sleep at an inn 10 times.',
     test: (p) => p.bedsTaken >= 10,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'quilted' },
   },
   {
     id: 'lives8',
@@ -523,7 +537,7 @@ export const ACHIEVEMENTS = [
     name: 'Iron Constitution',
     description: 'Walk the road with a bar of 8 lives or more.',
     test: (p) => p.maxLives >= 8,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'iron' },
   },
 
   // --- The Bag -----------------------------------------------------------
@@ -532,7 +546,7 @@ export const ACHIEVEMENTS = [
     category: 'bag',
     name: 'Hoof It',
     description: 'Buy yourself a horse.',
-    reward: null,
+    reward: { kind: 'clothing', slot: 'pants', id: 'chaps' },
   },
   {
     id: 'legendary',
@@ -811,6 +825,15 @@ export function track(what, detail = {}) {
 
     case 'mapOpened':
       unlock('mapRead');
+      break;
+
+    /**
+     * Reported by the wardrobe when an outfit is saved, and only when it is
+     * something other than the clothes everybody starts in — putting the trail
+     * hat back on is not getting dressed.
+     */
+    case 'outfitSaved':
+      if (detail.dressedUp) unlock('dressed');
       break;
 
     case 'totemBroken':

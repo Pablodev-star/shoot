@@ -16,10 +16,12 @@ import { initToasts } from './ui/toast.js';
 import { initAchievementNotices } from './ui/achievement-notice.js';
 import { loadSettings } from './core/settings.js';
 import { loadAchievements, initAchievements } from './game/achievements.js';
+import { applyOutfit } from './game/wardrobe.js';
 
 import { TitleScreen } from './menu/title.js';
 import { OnlineScreen } from './menu/online.js';
 import { ProfileScreen } from './menu/profile.js';
+import { WardrobeScreen } from './menu/wardrobe.js';
 import { SettingsScreen } from './menu/settings.js';
 import { CreditsScreen } from './menu/credits.js';
 import { AchievementsScreen } from './menu/achievements.js';
@@ -35,6 +37,7 @@ const SCREENS = [
   TitleScreen,
   OnlineScreen,
   ProfileScreen,
+  WardrobeScreen,
   SettingsScreen,
   /**
    * Still registered, deliberately, with no way in from the menu — see the
@@ -65,6 +68,13 @@ async function boot() {
    */
   await loadAchievements();
   initAchievements();
+  /**
+   * Dress the gunslinger before anything draws one. It goes here rather than
+   * inside the rig because a garment is locked behind an achievement, so the
+   * ledger has to be on the device first — and because the FIRST thing the
+   * title screen does is put the player at the end of the road behind the menu.
+   */
+  applyOutfit();
 
   initScene(document.getElementById('scene-canvas'));
   initToasts(document.getElementById('toasts'));
@@ -85,14 +95,15 @@ async function boot() {
  * writes the same modules the game uses — there is no separate debug path.
  */
 async function exposeDevHook() {
-  const [player, run, worlds, items, achievements] = await Promise.all([
+  const [player, run, worlds, items, achievements, wardrobe] = await Promise.all([
     import('./game/player.js'),
     import('./game/run.js'),
     import('./game/worlds.js'),
     import('./game/items.js'),
     import('./game/achievements.js'),
+    import('./game/wardrobe.js'),
   ]);
-  window.SHOOT = { go, player, run, worlds, items, achievements };
+  window.SHOOT = { go, player, run, worlds, items, achievements, wardrobe };
 }
 
 boot().catch((err) => {

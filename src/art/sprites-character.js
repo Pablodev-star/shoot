@@ -61,6 +61,10 @@
  * whole animation set. The player is what you get when you pass nothing; the
  * enemies in src/art/sprites-enemies.js are what you get when you pass their
  * parts. Nobody re-implements a walk cycle to put a different hat on a man.
+ *
+ * That is also the whole of the wardrobe: an outfit is a set of parts, handed
+ * in through `setPlayerParts` by src/game/wardrobe.js, and this file never
+ * learns what a "hat" is. See `getCharacterSprites` at the bottom.
  */
 
 import { PALETTE } from './palette.js';
@@ -98,6 +102,23 @@ const KEY = {
   n: PALETTE.boneDark,
   N: PALETTE.sandDark,     // hair in shadow
   u: PALETTE.redDark,      // saddle blanket
+  /**
+   * WARDROBE ACCENTS
+   * -----------------------------------------------------------------------
+   * Four garment slots, two characters each, and no slot is allowed to touch
+   * another's pair. A hatband's brass and a boot's brass are then free to be
+   * different brass, and a shirt that wants a glowing seam cannot accidentally
+   * set fire to the trousers. The values here are only the fallbacks — every
+   * garment in src/art/sprites-wardrobe.js states its own.
+   */
+  a: PALETTE.gold,         // hat accent
+  A: PALETTE.goldDark,
+  f: PALETTE.bone,         // shirt accent
+  F: PALETTE.boneDark,
+  c: PALETTE.woodLight,    // trouser accent
+  C: PALETTE.wood,
+  v: PALETTE.leatherDark,  // boot accent
+  V: PALETTE.leather,
 };
 
 // ---------------------------------------------------------------------------
@@ -153,6 +174,30 @@ export function recolor(rows, map) {
 // head and a torso with a torso. `composeFighter` at the bottom of the file is
 // the only thing that knows how the three stack up.
 // ---------------------------------------------------------------------------
+
+/**
+ * The head with nothing on it: brow, eye, jaw, and eleven rows of empty
+ * everywhere a garment can be.
+ *
+ * Rows 0..6 are headwear, 7..9 the face, 10 the collar. The wardrobe
+ * (src/art/sprites-wardrobe.js) stamps a hat and a collar onto this, which is
+ * how a sombrero is allowed to shade the brow and a kerchief is allowed to be
+ * pulled up over the mouth — a hat that could only own rows 0..6 could never do
+ * either.
+ */
+export const FACE = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '....ksssssk.....',
+  '....ksssksk.....',
+  '....kdssssk.....',
+  '................',
+];
 
 /** Hat, face and neckerchief. Identical in every ground animation. */
 export const HEAD = [
@@ -643,29 +688,42 @@ export const VEST_TRACK = {
 // RIDER — 16 x 21, the seated upper body drawn over the horse.
 // ---------------------------------------------------------------------------
 
-const RIDER_BODY = [
-  ...HEAD,
-  '...kqqqqqqqqk...',
-  '..kqppppppppqk..',
-  '..kpwwwwwwwwpk..',
-  '..kspPPPPPPPpk..',
-  '...kPPPPPPPPsk..',
-  '...kTttllttTkG..',
+/**
+ * Hips, thigh and the leg in the stirrup — four rows where the standing leg
+ * has six, with the boot one row higher. The wardrobe dresses this block the
+ * same way it dresses a walk pose (see the band maps in
+ * src/art/sprites-wardrobe.js) and hands the result back as `parts.riderLegs`.
+ */
+export const RIDER_LEGS = [
   '...kbbbbbbbbk...',
   '....kbbbbbbbk...',
   '......kbbbbk....',
   '.......kBBBk....',
 ];
 
-const RIDER_FRAMES = {
-  ride: [
-    RIDER_BODY,
-    // Half a beat later the rider has posted out of the saddle by a pixel; the
-    // leg in the stirrup stays put, which is what makes it read as posting
-    // rather than as the whole sprite jittering.
-    [...settle(RIDER_BODY.slice(0, 18)), ...RIDER_BODY.slice(18)],
-  ],
-};
+/**
+ * The seated animation, built from the same head and torso the fighter is
+ * standing in.
+ *
+ * A rider is a gunslinger with one row taken out of his middle: the torso loses
+ * the row under the chest, which is the whole of "sitting down" at this size.
+ * Because the parts come in rather than being typed here, whatever the player
+ * is wearing rides with them — a rider in last season's serape while the man on
+ * foot wears a duster is the kind of seam a wardrobe cannot have.
+ */
+function riderFrames(head, torso, legs) {
+  const seated = stamp([...torso.slice(0, 3), ...torso.slice(4)], ['G'], 13, 5);
+  const body = [...head, ...seated, ...(legs || RIDER_LEGS)];
+  return {
+    ride: [
+      body,
+      // Half a beat later the rider has posted out of the saddle by a pixel;
+      // the leg in the stirrup stays put, which is what makes it read as
+      // posting rather than as the whole sprite jittering.
+      [...settle(body.slice(0, 18)), ...body.slice(18)],
+    ],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // HORSE — 32 x 24
@@ -962,6 +1020,30 @@ export function composeFighter(parts = {}) {
 }
 
 /**
+ * One standing frame, holstered, baked on its own — and optionally cropped to a
+ * band of rows.
+ *
+ * The wardrobe is the caller: a card showing one hat wants the head and the
+ * brow under it, not a whole animation set, and baking five animations to throw
+ * away 16 of the 17 frames is what it would otherwise cost. Same parts, same
+ * stamping, same key as `composeFighter` — this is that function's first frame.
+ *
+ * @param {object} [parts] see `composeFighter`
+ * @param {[number, number]|null} [crop] row range, from the top of the head
+ */
+export function fighterStill(parts = {}, crop = null) {
+  const head = parts.head || HEAD;
+  const torso = parts.torso || TORSO;
+  const legs = parts.legs || LEGS;
+  const holsterArt = parts.holster === undefined ? HOLSTER : parts.holster;
+  const key = parts.key ? { ...KEY, ...parts.key } : KEY;
+  let rows = [...head, ...torso, ...legs.stand];
+  if (holsterArt) rows = stamp(rows, holsterArt, 13, 17);
+  if (crop) rows = rows.slice(crop[0], crop[1]);
+  return bake({ key, rows });
+}
+
+/**
  * A single composed still — fighter levelled, revolver in hand — for the parts
  * of the interface that want a picture of someone rather than an animation.
  * The gun lives in its own sprite now, so a portrait has to be assembled; a
@@ -1008,15 +1090,45 @@ export const PLAYER_SIZE = { w: 16, h: 24 };
 export const RIDER_SIZE = { w: 16, h: 21 };
 export const HORSE_SIZE = { w: 32, h: 24 };
 
-let cache = null;
+// ---------------------------------------------------------------------------
+// WHAT THE PLAYER IS WEARING
+//
+// The rig has no opinion about it. `setPlayerParts` is handed a composed set of
+// parts — a head with a hat on it, a torso, a leg set, a palette — by
+// src/game/wardrobe.js, which is the only file that knows what a "hat" is. Pass
+// nothing and you get the gunslinger the game shipped with.
+//
+// Everything that draws the player calls `getCharacterSprites()` and gets
+// whatever is current, so a change of clothes reaches the menu backdrop, the
+// road, the saddle and the duel without any of them subscribing to anything.
+// The horse is cached on its own: a new hat is no reason to re-bake a horse.
+// ---------------------------------------------------------------------------
 
-/** Bake (once) and return every character-side sprite set. */
+let playerParts = null;
+let cache = null;
+let horseCache = null;
+
+/**
+ * Dress the player. Invalidates the baked set; the next draw re-bakes it.
+ * @param {object|null} parts see `composeFighter`
+ */
+export function setPlayerParts(parts) {
+  playerParts = parts || null;
+  cache = null;
+}
+
+/** Bake (once, per outfit) and return every character-side sprite set. */
 export function getCharacterSprites() {
   if (cache) return cache;
+  const parts = playerParts || {};
+  if (!horseCache) horseCache = bakeSet(HORSE_FRAMES);
   cache = {
-    player: composeFighter(),
-    rider: bakeSet(RIDER_FRAMES),
-    horse: bakeSet(HORSE_FRAMES),
+    player: composeFighter(parts),
+    rider: bakeSet(
+      riderFrames(parts.head || HEAD, parts.torso || TORSO, parts.riderLegs),
+      parts.key ? { ...KEY, ...parts.key } : KEY,
+    ),
+    horse: horseCache,
   };
   return cache;
 }

@@ -186,6 +186,35 @@ const ICONS = {
     '......kkkk......',
   ],
 
+  /**
+   * Edit. A carpenter's pencil laid on the diagonal: red rubber at the top,
+   * a brass ferrule, the wood shaft, and the sharpened point with the graphite
+   * showing at the bottom left.
+   *
+   * The diagonal is the whole reason it reads at 16px. Drawn upright it is a
+   * grey stick and could be anything; on the 45 it has a point, and a point is
+   * what says "you can change this". It hangs off the corner of the avatar on
+   * the profile screen — see `.avatar-edit` in styles/menu.css.
+   */
+  pencil: [
+    '................',
+    '..........kkkk..',
+    '.........kRRRk..',
+    '........kRRRkk..',
+    '.......kOOOkk...',
+    '......kOOOkk....',
+    '.....kmMMkk.....',
+    '....kmMMkk......',
+    '...kmMMkk.......',
+    '..kmMMkk........',
+    '..kwMkk.........',
+    '.kwwkk..........',
+    '.kxkk...........',
+    '.kkk............',
+    '................',
+    '................',
+  ],
+
   /** Private room. */
   lock: [
     '................',
