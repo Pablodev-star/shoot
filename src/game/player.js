@@ -28,6 +28,7 @@ import {
 } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
+import { track as trackAchievement } from './achievements.js';
 
 function blankState() {
   return {
@@ -404,6 +405,7 @@ export function sellItem(id) {
     }
   }
   play('coin');
+  trackAchievement('itemSold', { id });
   return value;
 }
 
@@ -633,6 +635,9 @@ export function breakTotem() {
   removeItem('duskTotem', 1);
   setLives(totemReviveLives(state.maxLives));
   setHunger(HUNGER_MAX);
+  // Both roads to a broken totem — the walk's and the duel's — come through
+  // here, so this is the one place the ledger can hear about it.
+  trackAchievement('totemBroken');
   return true;
 }
 

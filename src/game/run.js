@@ -38,6 +38,7 @@ import { goldForEnemy, expForEnemy } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { playTotemRevival } from '../ui/totem.js';
 import { bumpStat } from '../core/settings.js';
+import { track as trackAchievement } from './achievements.js';
 
 const run = {
   engine: null,
@@ -79,6 +80,7 @@ export async function startNewRun(slot) {
   hunger.reset();
   run.engine = createWalkEngine();
   run.started = true;
+  trackAchievement('runStarted', { slot });
   resetStack();
   await beginWorld(1, { intro: true });
 }
@@ -235,6 +237,12 @@ export async function finishEncounter() {
  * `worldId` comes from the encounter that opened the fight rather than from the
  * player's current world, for the same reason the duel screen builds its enemy
  * that way: the segment that offered the fight is what the fight is worth.
+ *
+ * The achievement ledger is NOT told about the duel here. It is told the
+ * moment the last shot lands (`endDuel` in src/duel/duel-screen.js), which is
+ * both where the shape of the fight is known and where the player is still
+ * looking at the fight — this runs when they dismiss the overview, which can
+ * be a minute later.
  */
 export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
   const worldId = from ?? getState().world;

@@ -12,6 +12,7 @@ import { attachButtonSounds, play } from '../core/audio.js';
 import { getProfile, updateProfile } from '../core/settings.js';
 import { getCharacterSprites } from '../art/sprites-character.js';
 import { toast } from '../ui/toast.js';
+import { unlock } from '../game/achievements.js';
 import { backButton, statTile } from '../ui/widgets.js';
 
 export const ProfileScreen = {
@@ -40,6 +41,8 @@ export const ProfileScreen = {
     async function save() {
       const name = nameInput.value.trim() || 'STRANGER';
       await updateProfile({ name });
+      // A name of your own, and not the one everybody starts with.
+      if (name !== 'STRANGER') unlock('named');
       play('coin');
       toast('Name saved', 'good');
     }

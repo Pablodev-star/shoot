@@ -34,6 +34,7 @@ import { openTrailMapForRun } from '../ui/map-panel.js';
 import { livesRow, updateLivesRow, icon } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { toast } from '../ui/toast.js';
+import { track as trackAchievement } from '../game/achievements.js';
 import { createInteriorScene } from './interior-scene.js';
 import { EVENTS, on } from '../core/events.js';
 
@@ -93,6 +94,7 @@ export const InnScreen = {
       spendGold(offer.price);
       const healed = offer.heal === Infinity ? fullHeal() : heal(offer.heal);
       rested.add(offer.id);
+      trackAchievement('bedTaken', { id: offer.id, healed });
       play('coin');
       toast(`Slept well — ${healed} ${healed === 1 ? 'life' : 'lives'} back`, 'good');
       renderBeds();

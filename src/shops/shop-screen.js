@@ -34,6 +34,7 @@ import { icon, rarityChip } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from '../ui/toast.js';
+import { track as trackAchievement } from '../game/achievements.js';
 import { createInteriorScene } from './interior-scene.js';
 
 export const ShopScreen = {
@@ -68,6 +69,7 @@ export const ShopScreen = {
       spendGold(entry.price);
       addItem(entry.item.id, 1);
       getState().stats.itemsBought += 1;
+      trackAchievement('itemBought', { id: entry.item.id, rarity: entry.item.rarity });
       entry.units -= 1;
       play('coin');
       toast(`Bought ${entry.item.name}`, 'gold');

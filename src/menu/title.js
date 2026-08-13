@@ -52,10 +52,20 @@ export const TitleScreen = {
           'Online',
           el('span.stamp', { text: 'Soon' }),
         ]),
+        /**
+         * Achievements took the Credits' place here.
+         *
+         * The credits screen is not gone — src/menu/credits.js is untouched
+         * and still registered with the router, so `SHOOT.go('credits')` still
+         * opens it — it simply has no door on the menu for now. Three slots is
+         * what fits across a phone without the row wrapping, and a list of
+         * things left to do earns one of them more than the project's history
+         * does. It comes back when there is somewhere to put it.
+         */
         el('div.menu-nav-row', {}, [
           secondary('Profile', 'profile'),
           secondary('Settings', 'settings'),
-          secondary('Credits', 'credits'),
+          secondary('Achievements', 'achievements'),
         ]),
         el('button.btn.btn--quiet', { onclick: () => openHowToPlay() }, ['How to play']),
       ]),
