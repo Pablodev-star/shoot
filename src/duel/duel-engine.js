@@ -705,6 +705,7 @@ export function createDuel(config) {
       playerFires: false,
       enemyFires: false,
       hits: { player: false, enemy: false },
+      shotHits: { player: false, enemy: false },
       lives: { player: sides.player.lives, enemy: sides.enemy.lives },
       bullets: { player: sides.player.bullets, enemy: sides.enemy.bullets },
       ended,
@@ -820,14 +821,33 @@ export function createDuel(config) {
 
     const hits = { player: false, enemy: false };
     const bounced = { player: false, enemy: false };
+    /**
+     * WHOSE BULLET, AS OPPOSED TO WHO GOT HURT
+     * -------------------------------------------------------------------------
+     * `hits` answers "was this side damaged this round", by ANYTHING — a shot,
+     * a stick of dynamite going off, their own round coming back off a mirror.
+     * That is the right question for the screen, which shakes a fighter that
+     * took a hit however it arrived.
+     *
+     * It is the wrong question for "did my shot land", and the difference is
+     * not academic: a player whose round is stopped by a shield in the same
+     * turn as their dynamite lands reads as a hit on `hits.enemy` alone.
+     * `shotHits[side]` is that side's own bullet arriving in the other man and
+     * nothing else — false when it was blocked, and false when it was
+     * reflected, because a reflected round never reaches the man it was aimed
+     * at (see `landShot`).
+     */
+    const shotHits = { player: false, enemy: false };
     if (playerFires && !playerWide) {
       const shot = landShot('player', 'enemy', enemyProtected);
       hits.enemy = shot.hit;
+      shotHits.player = shot.hit;
       if (shot.bounced) { hits.player = hits.player || shot.bouncedHit; bounced.player = true; }
     }
     if (enemyFires && !enemyWide) {
       const shot = landShot('enemy', 'player', playerProtected);
       hits.player = hits.player || shot.hit;
+      shotHits.enemy = shot.hit;
       if (shot.bounced) { hits.enemy = hits.enemy || shot.bouncedHit; bounced.enemy = true; }
     }
 
@@ -874,6 +894,7 @@ export function createDuel(config) {
       playerFires: playerFires && !playerWide,
       enemyFires: enemyFires && !enemyWide,
       hits,
+      shotHits,
       bounced,
       status: { player: { ...sides.player.status }, enemy: { ...sides.enemy.status } },
       lives: { player: sides.player.lives, enemy: sides.enemy.lives },

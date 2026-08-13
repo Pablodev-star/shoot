@@ -90,6 +90,14 @@ export async function loadRun(slot, data) {
   run.dead = false;
   run.inBattle = false;
   restorePlayer(data.player);
+  /**
+   * Before a single step is taken. The ledger measures the road in
+   * differences, and a save resumed a world deep would otherwise have its
+   * whole journey counted again on the first frame of the walk — every time it
+   * was loaded. It goes here rather than after the `completed` branch because
+   * a finished run is still a run being picked up.
+   */
+  trackAchievement('runResumed', { distance: getState().distance });
 
   // A finished run has no road left to walk — every encounter of the Galaxy is
   // resolved. Continuing it replays the ending instead of stranding the player

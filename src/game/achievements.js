@@ -352,7 +352,7 @@ export const ACHIEVEMENTS = [
     id: 'sharpshooter',
     category: 'duelling',
     name: 'Sharpshooter',
-    description: 'Win a duel without a single shot going wide.',
+    description: 'Win a duel with every shot you fired landing.',
     reward: null,
   },
   {
@@ -770,9 +770,19 @@ export function track(what, detail = {}) {
   switch (what) {
     // --- the run ---------------------------------------------------------
     case 'runStarted':
+      beginRun(0);
       bump('runs');
       include('slotsUsed', detail.slot);
       unlock('firstRun');
+      break;
+
+    /**
+     * A slot picked back up. It counts as no achievement of its own — it is
+     * here so the run-scoped state starts from where the run actually is
+     * rather than from nothing. See `beginRun`.
+     */
+    case 'runResumed':
+      beginRun(detail.distance);
       break;
 
     case 'gameFinished':
@@ -854,8 +864,14 @@ function recordDuel(d) {
   if (!d.tookDamage) unlock('flawless');
   if (d.rounds > 0 && d.rounds <= 4) unlock('quickdraw');
   if (d.rounds >= 15) unlock('longFight');
-  // Two shots, so a one-shot duel does not hand it over by accident.
-  if (d.shotsFired >= 2 && d.hits >= d.shotsFired) unlock('sharpshooter');
+  /**
+   * Every shot pulled had to land: none blocked by a shield, and none thrown
+   * wide by a blind. Two of them at least, so a duel decided by a single lucky
+   * round does not hand it over.
+   */
+  if (d.shotsFired >= 2 && d.shotsWide === 0 && d.shotsLanded >= d.shotsFired) {
+    unlock('sharpshooter');
+  }
   if (d.livesLeft > 0 && d.livesLeft <= 0.5) unlock('lastStand');
   if (d.abilitiesCast >= 2) unlock('castWin');
 }
@@ -866,8 +882,34 @@ function recordDuel(d) {
 
 let wired = false;
 
-/** True from a starvation tick until the next thing eaten. */
+/**
+ * WHAT THE LEDGER KNOWS ABOUT THE RUN IN PROGRESS, AND ONLY THAT RUN
+ * ---------------------------------------------------------------------------
+ * Two pieces of state here are about the run rather than about the device, and
+ * both of them were wrong across the seam between one run and the next until
+ * `beginRun` existed to wipe them.
+ *
+ * `starved` is armed by a starvation tick and collected by the next meal. A
+ * tick that KILLS the run leaves it armed with nobody left to feed — so the
+ * first apple of the following run used to collect an achievement earned by a
+ * corpse. The condition is one run's worth of nearly dying and eating your way
+ * back out of it, so it cannot be allowed to outlive the run.
+ *
+ * `lastDistance` is the mark the road's next total is measured against, and it
+ * has to start where the run starts: at zero for a new one, and at whatever
+ * was already walked for a loaded one.
+ */
 let starved = false;
+let lastDistance = 0;
+
+/**
+ * A run just began — either fresh, or picked back up off a slot.
+ * @param {number} distance how far this run has already come
+ */
+function beginRun(distance = 0) {
+  starved = false;
+  lastDistance = Math.max(0, Number(distance) || 0);
+}
 
 /**
  * Subscribe to the game. Called once at boot, after `loadAchievements`.
@@ -895,10 +937,19 @@ export function initAchievements() {
 
   /**
    * Distance arrives as the RUN's total, several times a second, so the
-   * lifetime figure is built out of the differences. A total that went down is
-   * a new run rather than a walk backwards — the road only goes one way.
+   * lifetime figure is built out of the differences against `lastDistance`.
+   *
+   * WHICH IS WHY A RESUMED RUN HAS TO SET THE MARK FIRST
+   * ---------------------------------------------------------------------
+   * A loaded save comes back mid-road with thousands of pixels already on it,
+   * and against a mark of zero the first step of the walk reads as the entire
+   * saved journey travelled again. Every mileage line in the list could be
+   * unlocked by loading the same run four times — so `runResumed` puts the
+   * mark where the run actually is before a step is taken (see `beginRun`).
+   *
+   * The guard below is the other direction and stays: a total that went DOWN
+   * is a road that started over, because the road only ever goes one way.
    */
-  let lastDistance = 0;
   on(EVENTS.DISTANCE_CHANGED, ({ distance }) => {
     if (distance < lastDistance) lastDistance = 0;
     const delta = distance - lastDistance;
