@@ -89,9 +89,11 @@ import {
   getCharacterSprites,
   getRevolverSprites,
   getTieredRevolver,
+  getVestSprites,
   CHARACTER_TIMING,
   FIRE_FRAME_MS,
   GUN_TRACK,
+  VEST_TRACK,
 } from '../art/sprites-character.js';
 import {
   getCombatFx,
@@ -219,6 +221,9 @@ function drawShockwave(ctx, cx, cy, r, flat, s, color, hot, k) {
  *   revolver is on — an entry of GUN_TIERS in src/game/gun-tiers.js. It decides
  *   which gun is in the player's hand, what colour the shot is, and everything
  *   the barrel carries between shots. Omitted, the player fires the trail iron.
+ * @param {object} [o.enemyGun] what the man across the road is holding — an
+ *   entry of ENEMY_GUNS, chosen by what his bullet costs you. Omitted, he gets
+ *   the sixgun in whatever metal his archetype carries.
  */
 export function createDuelScene({
   worldId,
@@ -229,6 +234,7 @@ export function createDuelScene({
   enemyScale = 1,
   shakeEnabled = true,
   playerGun = null,
+  enemyGun = null,
 }) {
   const parallax = createParallax({
     seed: (seed ^ (worldId * 31337)) >>> 0,
@@ -241,9 +247,19 @@ export function createDuelScene({
   const shield = getShieldSprites();
   const combat = getCombatFx();
 
+  /**
+   * A rider's gun is a readout: the shape and the metal are picked by what his
+   * bullet costs you, not by his poncho, so the man who hits for a whole life
+   * in the back half of world one is visibly holding something heavier than the
+   * one who opened it. `enemyGunLook` in src/game/gun-tiers.js is the mapping;
+   * the archetype's own finish is the fallback for anything that arrives here
+   * without a bullet to speak of.
+   */
+  const enemyShape = enemyGun?.shape || 'sixgun';
+  const enemyFinish = enemyGun?.finish || enemySet.finish;
   const guns = {
     player: playerGun ? getTieredRevolver(playerGun) : getRevolverSprites(playerSet.finish),
-    enemy: getRevolverSprites(enemySet.finish),
+    enemy: getRevolverSprites(enemyFinish, enemyShape),
   };
   const sprites = { player: playerSet, enemy: enemySet };
 
@@ -357,6 +373,23 @@ export function createDuelScene({
    * engine says is on that fighter; see `hold` in src/game/world-abilities.js.
    */
   const statusTint = { player: null, enemy: null };
+
+  /**
+   * Who is wearing a Bulletproof Vest, and every vest that has been shot off
+   * somebody and is still falling.
+   *
+   * The item used to be invisible: you bought it, it sat in the saddlebag, and
+   * the only sign it had ever existed was a line of text after it was gone.
+   * Now it is on the man's chest for as long as he has it, and when it goes it
+   * goes where the player is already looking — off the body, onto the road, and
+   * out with the light.
+   */
+  const vestArt = getVestSprites();
+  const vestOn = { player: false, enemy: false };
+  const vestFalls = [];
+
+  /** How long a shot-off vest tumbles, lies there, and fades out. */
+  const VEST_FALL_MS = 1500;
 
   /**
    * Tinted copies, cached. `tinted()` allocates a canvas, and a fighter is
@@ -647,11 +680,102 @@ export function createDuelScene({
     );
   }
 
+  /**
+   * The vest coming off.
+   *
+   * It is torn off the chest by whatever hit him — a bullet, a rock, a blast,
+   * it makes no difference to the vest — so it leaves in the direction he is
+   * knocked: away from the man he is facing. It tumbles (the plate flips end
+   * over end on a fast clock while it is in the air), lands on the road at his
+   * boots, settles there, and then goes out on an alpha ramp.
+   *
+   * Spawned from the `vest` engine event, never from a shot, which is what
+   * makes it fire for a hazard strike and an ability as readily as for a round.
+   */
+  function spawnVestFall(side) {
+    if (!layout) return;
+    const { originX, topY, fs, flip } = layout[side];
+    // Away from the fight: the player is knocked left, the enemy right.
+    const dir = flip ? 1 : -1;
+    vestFalls.push({
+      t: 0,
+      fs,
+      dir,
+      x: originX + (FIGHTER_W / 2 - vestArt.broken.width / 2) * fs + dir * fs,
+      y: topY + 11 * fs,
+      vx: dir * fs * 0.022,
+      vy: -fs * 0.05,
+      g: fs * 0.00042,
+      /** Where it comes to rest: lying at the fighter's feet. */
+      floor: topY + (FIGHTER_H - vestArt.broken.height - 1) * fs,
+      landed: false,
+    });
+  }
+
+  function stepVestFalls(dt) {
+    for (let i = vestFalls.length - 1; i >= 0; i--) {
+      const v = vestFalls[i];
+      v.t += dt;
+      if (v.t >= VEST_FALL_MS) {
+        vestFalls.splice(i, 1);
+        continue;
+      }
+      if (v.landed) continue;
+      v.x += v.vx * dt;
+      v.y += v.vy * dt;
+      v.vy += v.g * dt;
+      if (v.y >= v.floor) {
+        v.y = v.floor;
+        // One short bounce off the road, then it stays down.
+        if (v.vy > v.fs * 0.03) {
+          v.vy = -v.vy * 0.32;
+          v.vx *= 0.4;
+        } else {
+          v.landed = true;
+        }
+      }
+    }
+  }
+
+  function drawVestFalls(ctx) {
+    for (const v of vestFalls) {
+      const k = v.t / VEST_FALL_MS;
+      // Solid for the first half of its life — the player has to SEE the thing
+      // that saved them hit the ground — then a straight ramp out.
+      ctx.globalAlpha = k < 0.45 ? 1 : 1 - (k - 0.45) / 0.55;
+      // End over end while it is falling; still once it is down.
+      const tumble = !v.landed && Math.floor(v.t / 70) % 2 === 1;
+      drawSprite(ctx, vestArt.broken, Math.round(v.x), Math.round(v.y), v.fs, tumble);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   const renderer = {
     fx,
     setPose,
     fire,
     impact,
+
+    /**
+     * Put a vest on somebody, or take it off them.
+     *
+     * The screen calls this every frame from what the engine says each side is
+     * carrying, so a vest bought between fights is on the chest at the draw and
+     * an absorbed hit strips it on the frame the engine says it broke.
+     *
+     * @param {'player'|'enemy'} side
+     * @param {boolean} on
+     */
+    setVest(side, on) {
+      vestOn[side] = !!on;
+    },
+
+    /** The vest is gone: take it off the body and throw it on the road. */
+    breakVest(side) {
+      if (!vestOn[side]) return;
+      vestOn[side] = false;
+      spawnVestFall(side);
+    },
 
     /**
      * Swap the enemy's art mid-duel. A boss phase that changes what the boss
@@ -661,7 +785,7 @@ export function createDuelScene({
     setEnemySprites(set) {
       if (!set) return;
       sprites.enemy = set;
-      guns.enemy = getRevolverSprites(set.finish);
+      guns.enemy = getRevolverSprites(enemyGun?.finish || set.finish, enemyShape);
     },
 
     /** A phase that is bigger than the last one. See `drawFighter`. */
@@ -926,6 +1050,7 @@ export function createDuelScene({
         if (blasts[i].t >= 1) blasts.splice(i, 1);
       }
 
+      stepVestFalls(dt);
       stepGunGlow(dt);
     },
 
@@ -1037,6 +1162,11 @@ export function createDuelScene({
       // --- shields ---
       if (actors.player.pose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
       if (actors.enemy.pose === 'shield') drawShield(ctx, shield, enemyX, gy, efs, elapsed, true);
+
+      // A vest that has just been shot off somebody, on its way to the road.
+      // It is an object, not an effect: it goes down here with the fighters so
+      // the hour of the day falls on it like anything else out there.
+      drawVestFalls(ctx);
 
       // The near side of the road, drawn after the fighters so the two of them
       // are standing IN it rather than on the far side of it.
@@ -2476,9 +2606,21 @@ export function createDuelScene({
     const actor = actors[side];
     const set = sprites[side];
     const frames = poseFrames(set, actor.pose);
-    const frame = frames[poseFrame(actor, frames.length)];
+    const index = poseFrame(actor, frames.length);
+    const frame = frames[index];
     const y = topY + (FIGHTER_H - frame.height) * fs;
     drawSprite(ctx, frame, originX, y, fs, flip);
+
+    // The vest, while he still has one. Drawn at the body's own offset for the
+    // frame that is up, so it rides the breath and takes the stagger with him
+    // — see VEST_TRACK in src/art/sprites-character.js. The mirrored fighter
+    // gets a mirrored offset, or a knocked-back enemy would shove his vest the
+    // wrong way across his chest.
+    if (vestOn[side]) {
+      const worn = VEST_TRACK[actor.pose]?.[index] || { x: 0, y: 0 };
+      const wx = originX + (flip ? -worn.x : worn.x) * fs;
+      drawSprite(ctx, vestArt.worn, wx, topY + worn.y * fs, fs, flip);
+    }
 
     // Whatever they are wearing, laid over their own silhouette so it takes
     // the shape of the man rather than boxing him in. It breathes, because a

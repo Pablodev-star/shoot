@@ -32,21 +32,53 @@ export const DISCOUNT_RATE = 0.5;
  * Every slot used to hold exactly one of whatever it was, permanent or not,
  * which quietly made a shop the wrong shape. A vest and a horse are singular —
  * there is one of each in the world and buying it is the event. A bandage is
- * not: a store that has ONE bandage is not a store, it is a curiosity, and a
- * world with two such stores offered a total of four lives for sale against
- * nine duels' worth of damage.
+ * not: a store that has ONE bandage is not a store, it is a curiosity.
  *
- * That was the single biggest reason a run ended. Not a fight lost — a fight
- * won nine times with nowhere to buy the difference back. So anything the
- * catalogue lets you stack is stocked in DEPTH, and the decision at the
- * counter goes from "is this the one thing I get" to "how much of my purse do
- * I turn into lives, and how much do I keep for the gun". That is a decision
- * the player can be good at, which is the whole point.
+ * Then it was five of everything stackable, which was the same mistake from
+ * the other end: five bandages and five of each food on one counter is a run's
+ * worth of supplies bought in one transaction, in world one, at world-one
+ * prices. Both versions took the same decision away — the first by never
+ * offering enough, the second by offering everything.
  *
- * Permanent kit — the map, the canteen, the vest, an ability — stays at one,
- * because a second one does nothing.
+ * WHAT A COUNTER HAS IS ROLLED, AND RARITY DECIDES THE ODDS
+ * ---------------------------------------------------------------------------
+ *   common      one 20% of the time, two 70%, three 10%
+ *   rare        one 80% of the time, two 20%
+ *   legendary   one. There is one of those in the world
+ *
+ * So the ordinary answer is TWO — enough that a shop is worth stopping at,
+ * few enough that no single counter solves the world — and the player who
+ * walks past a store because they are flush finds out later that the next one
+ * had one bandage on it. A stock roll is a thing the road does to you, like
+ * the weather; what you do about it is the game.
+ *
+ * `depth` on an item is a CAP on top of the roll, not a replacement for it:
+ * the Traveller's Feast is one per counter wherever it lands, and the stew is
+ * never more than two, because those two are sized against the hunger gauge
+ * rather than against the shelf (see src/game/items.js).
+ *
+ * Anything you cannot stack is one apiece regardless — a second map does
+ * nothing.
  */
-export const STOCK_DEPTH = 5;
+export const STOCK_ODDS = {
+  common: { 1: 20, 2: 70, 3: 10 },
+  rare: { 1: 80, 2: 20 },
+  legendary: { 1: 100 },
+};
+
+/** The average number of a rarity a counter carries. Used by the harness. */
+export function averageStock(rarity) {
+  const odds = STOCK_ODDS[rarity] || STOCK_ODDS.legendary;
+  const total = Object.values(odds).reduce((a, b) => a + b, 0);
+  return Object.entries(odds).reduce((sum, [n, w]) => sum + Number(n) * w, 0) / total;
+}
+
+/** How many of one item this counter got in. */
+function rollUnits(item, rng) {
+  if (!item.stack || item.stack <= 1) return 1;
+  const rolled = Number(rng.weighted(STOCK_ODDS[item.rarity] || STOCK_ODDS.legendary));
+  return Math.max(1, Math.min(item.depth ?? Infinity, rolled));
+}
 
 /**
  * Build the stock for one visit.
@@ -100,9 +132,9 @@ export function generateStock(worldId, seed) {
   const entry = (item, slot) => {
     const fullPrice = itemPrice(item, worldId);
     const discounted = rng.chance(discountChance);
-    // Food says how deep its own counter is; everything stackable else takes
-    // the house default; permanent kit is one apiece.
-    const units = item.depth ?? (item.stack > 1 ? STOCK_DEPTH : 1);
+    // Rolled off the item's rarity, capped by anything the item says about
+    // itself. See STOCK_ODDS above.
+    const units = rollUnits(item, rng);
     return {
       slot,
       item,

@@ -40,7 +40,7 @@
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
-import { enemyGunDamage } from './progression.js';
+import { enemyGunDamageAt } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
 
@@ -67,15 +67,25 @@ function appearance(archetypeId, rng) {
 
 /**
  * Roll a regular enemy for a world.
+ *
+ * `progress` is how far along that world's road this one is standing, 0 at the
+ * border and 1 at the boss's door. It decides one thing: whether this rider is
+ * allowed to be carrying the heavier gun (see `enemyGunDamageAt`). Half of the
+ * ones past the halfway mark are, and the gun in their hand shows it.
+ *
  * @param {number} worldId
  * @param {number} seed
+ * @param {number} [progress] 0..1 along the world's road
  */
-export function generateEnemy(worldId, seed) {
+export function generateEnemy(worldId, seed, progress = 0) {
   const world = getWorld(worldId);
   const rng = makeRng(seed >>> 0);
   const profile = world.enemy;
 
   const lives = Number(rng.weighted(profile.lives));
+  // Rolled whether or not it can be used, so that a rider's whole hand comes
+  // off one seed in one order and the road stays reproducible.
+  const heavier = rng.chance(0.5);
   const abilities = [];
   if (rng.chance(profile.abilityChance)) abilities.push(rng.pick(profile.abilities));
   // Late worlds can roll a second ability.
@@ -94,7 +104,7 @@ export function generateEnemy(worldId, seed) {
     maxLives: lives,
     bullets: 0,
     accuracy: profile.accuracy,
-    gunDamage: enemyGunDamage(worldId),
+    gunDamage: enemyGunDamageAt(worldId, progress, heavier),
     abilities,
     /** The world's landmark ability, if this one happens to be carrying it. */
     special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
@@ -117,7 +127,9 @@ export function generateBoss(worldId) {
     maxLives: phase.lives,
     bullets: phase.startBullets || 0,
     accuracy: phase.accuracy ?? cfg.accuracy,
-    gunDamage: enemyGunDamage(worldId),
+    // A boss stands at the end of the road, so it is always on the far side of
+    // the ramp: the world's heavier bullet, never the opening one.
+    gunDamage: enemyGunDamageAt(worldId, 1, true),
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: phase.abilityChanceMul || 1,
     /** A boss always has its world's special. It is the fight's centrepiece. */

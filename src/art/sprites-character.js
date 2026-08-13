@@ -485,17 +485,24 @@ const GUN_KEY = { ...KEY, o: PALETTE.goldLight };
 const gunCache = new Map();
 
 /**
- * Baked revolver art for one finish.
+ * Baked revolver art for one finish, in one of the three silhouettes.
+ *
+ * The shape is a parameter because an enemy's gun says what its bullet costs
+ * you now (see ENEMY_GUNS in src/game/gun-tiers.js): the same four metals, cut
+ * from a short sixgun, a longbarrel or a Nova frame depending on how hard the
+ * man holding it hits.
+ *
  * @returns {Record<'level'|'raised', {sprite: HTMLCanvasElement, hand: {x,y}, muzzle: {x,y}}>}
  */
-export function getRevolverSprites(finish = 'steel') {
-  if (gunCache.has(finish)) return gunCache.get(finish);
+export function getRevolverSprites(finish = 'steel', shape = 'sixgun') {
+  const cacheKey = `${finish}|${shape}`;
+  if (gunCache.has(cacheKey)) return gunCache.get(cacheKey);
   const key = { ...GUN_KEY, ...(GUN_FINISHES[finish] || {}) };
   const out = {};
-  for (const [name, def] of Object.entries(REVOLVERS)) {
+  for (const [name, def] of Object.entries(GUN_SHAPES[shape] || REVOLVERS)) {
     out[name] = { sprite: bake({ key, rows: def.rows }), hand: def.hand, muzzle: def.muzzle };
   }
-  gunCache.set(finish, out);
+  gunCache.set(cacheKey, out);
   return out;
 }
 
@@ -536,6 +543,100 @@ export const GUN_TRACK = {
   hit: [null, null],
   aim: AIM_SEQUENCE.map((name) => DRAW_POSES[name].gun),
   fire: FIRE_SEQUENCE.map((name) => DRAW_POSES[name].gun),
+};
+
+// ---------------------------------------------------------------------------
+// THE VEST
+//
+// A bought Bulletproof Vest is a thing a man is WEARING, so it is drawn on
+// him: a steel plate on two leather shoulder straps, laid over the torso rows
+// of whatever fighter is carrying it. It is not part of any pose, because it
+// has to survive every pose — the rig would need five more frame lists for one
+// piece of kit, and an enemy in a vest would need five more again.
+//
+// The torso does move between frames, though. `settle()` drops the upper body
+// a pixel on the loose half of the idle and walk cycles, and the first hit
+// frame is knocked back one pixel, so the plate is drawn at the body's own
+// offset for the frame that is up — VEST_TRACK below. Without that the vest
+// floats over a breathing man like a sticker.
+// ---------------------------------------------------------------------------
+
+/**
+ * The plate as it is worn: rows 11..16 of the 16 x 24 fighter, which is the
+ * chest between the neckerchief and the gun belt. The buckle row is left
+ * uncovered so the belt still reads.
+ */
+const VEST_WORN = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '....kkkkkkkk....',
+  '...kTggggggTk...',
+  '...kTgGGGGgTk...',
+  '...kTgGllGgTk...',
+  '....kgGGGGgk....',
+  '.....kGGGGk.....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+];
+
+/**
+ * The same plate off the body and falling, with the round through the middle
+ * of it. Cropped to its own 10 x 6 so it can tumble without dragging an empty
+ * fighter-sized canvas around with it.
+ */
+const VEST_BROKEN = [
+  '.kkkkkkkk.',
+  'kTggggggTk',
+  'kTgGkkGgTk',
+  'kTgkKKkgTk',
+  '.kgGkkGgk.',
+  '..kGkkGk..',
+];
+
+let vestCache = null;
+
+/**
+ * The vest, worn and broken.
+ * @returns {{worn: HTMLCanvasElement, broken: HTMLCanvasElement}}
+ */
+export function getVestSprites() {
+  if (!vestCache) {
+    vestCache = {
+      worn: bake({ key: KEY, rows: VEST_WORN }),
+      broken: bake({ key: KEY, rows: VEST_BROKEN }),
+    };
+  }
+  return vestCache;
+}
+
+/**
+ * How far the torso has moved from its standing position, per pose frame, in
+ * source pixels. `null` means the vest is not drawn for that frame at all.
+ *
+ * These are read straight off `composeFighter`: the loose frames are the ones
+ * built from `settle()` (one pixel down) and the first hit frame is the one
+ * put through `shiftX(-1)`.
+ */
+export const VEST_TRACK = {
+  idle: [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 1 }],
+  walk: [{ x: 0, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 0 }],
+  aim: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
+  fire: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
+  hit: [{ x: -1, y: 0 }, { x: 0, y: 1 }],
 };
 
 // ---------------------------------------------------------------------------

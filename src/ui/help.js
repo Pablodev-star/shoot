@@ -44,14 +44,23 @@ const MOVES = [
   },
 ];
 
-/** Every pairing, and what comes of it. Rows are you, columns are them. */
+/**
+ * Every pairing, and what comes of it. Rows are you, columns are them.
+ *
+ * A hit is not "a life" and the table no longer says it is: what a round costs
+ * is whatever the gun that fired it does, half a diamond out of the trail iron
+ * and ten and a half out of the Nova (see `gunDamageAt` in
+ * src/game/progression.js). The rule the table is teaching is who gets hit,
+ * which never changes; the number is on the two life bars, where the player
+ * can watch it happen.
+ */
 const OUTCOMES = [
   ['Reload', 'Reload', 'Nothing happens. You both gain a round.'],
-  ['Reload', 'Shoot', 'You lose a life.'],
+  ['Reload', 'Shoot', 'Their shot lands on you.'],
   ['Shield', 'Shoot', 'Blocked. Their round is wasted.'],
-  ['Shoot', 'Reload', 'They lose a life.'],
+  ['Shoot', 'Reload', 'Your shot lands on them.'],
   ['Shoot', 'Shield', 'Blocked. Your round is wasted.'],
-  ['Shoot', 'Shoot', 'You both lose a life.'],
+  ['Shoot', 'Shoot', 'You both take a hit.'],
 ];
 
 /**

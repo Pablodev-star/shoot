@@ -259,9 +259,28 @@ export function createDuel(config) {
   function damage(sideId, amount, { ignoreShield = false, protectedNow = false, source = 'shot' } = {}) {
     const side = sides[sideId];
     if (!ignoreShield && protectedNow) return false;
-    if (side.hasVest && side.lives - amount <= 0) {
+    /**
+     * THE VEST EATS THE FIRST THING THAT HITS YOU, NOT THE FIRST THING THAT
+     * WOULD KILL YOU
+     * -----------------------------------------------------------------------
+     * It used to be gated on `side.lives - amount <= 0`, which is defensible on
+     * paper — "absorbs the first fatal shot" — and is indistinguishable from a
+     * broken item in the hand. You buy the most expensive common thing on the
+     * counter, you walk into a duel, you get shot, you lose a life, and the
+     * vest sits in your bag doing nothing. It only ever announced itself on the
+     * one blow that would have ended the run, which in practice is a handful of
+     * duels across a whole game; the rest of the time the honest player report
+     * is "sometimes it does not work".
+     *
+     * So it is armour now: the first blow of the duel, whatever it is and
+     * wherever it came from, lands on the vest instead of on you, and the vest
+     * is gone. `damage` is the one path everything travels — a bullet, a stick
+     * of dynamite, a rock off the mountain, a poison tick — so "whatever it is"
+     * is free here and cannot be forgotten by a new effect later.
+     */
+    if (side.hasVest) {
       side.hasVest = false;
-      log('vest', { side: sideId });
+      log('vest', { side: sideId, source, amount });
       return false;
     }
     /**

@@ -194,6 +194,14 @@ const fx = (motion, colors, extra = {}) => ({ motion, colors, count: 26, ...extr
  * Fields, beyond the obvious: `effect` is the mechanic, `amount`/`turns`/`take`
  * are its numbers, `charge` is how many rounds the player waits to spend it,
  * and `weight` is how often an enemy holding it reaches for it (1 is normal).
+ *
+ * EVERY CHARGE IN HERE IS DOUBLE WHAT IT WAS
+ * ---------------------------------------------------------------------------
+ * Six to twelve rounds against duels that run four to six. That is deliberate
+ * and it is a nerf: a trick is no longer something both sides get to use in
+ * every fight, it is something one of you gets to use in a LONG fight. See the
+ * note over PLAYER_SPECIAL at the bottom of this file for the whole argument —
+ * it applies to all nineteen of these.
  */
 export const ABILITIES = {
   // --- 1 · Dust Flats -------------------------------------------------------
@@ -203,7 +211,7 @@ export const ABILITIES = {
     world: 1,
     amount: 1,
     take: 0,
-    charge: 3,
+    charge: 6,
     label: 'Dust Snatch',
     tip: 'A gust off the flats takes a round out of the gun',
     icon: 'dustSnatch',
@@ -242,7 +250,7 @@ export const ABILITIES = {
     effect: 'blind',
     world: 1,
     turns: 1,
-    charge: 3,
+    charge: 6,
     label: 'Sand in the Eyes',
     tip: 'Their next shot goes wide',
     icon: 'sandBlind',
@@ -281,7 +289,7 @@ export const ABILITIES = {
     effect: 'jam',
     world: 2,
     turns: 2,
-    charge: 4,
+    charge: 8,
     label: 'Lasso',
     tip: 'A rope on the gun arm — they cannot shoot for two rounds',
     icon: 'lassoPull',
@@ -313,7 +321,7 @@ export const ABILITIES = {
     effect: 'panic',
     world: 2,
     turns: 2,
-    charge: 4,
+    charge: 8,
     label: 'Hornet Swarm',
     tip: 'Their shield stops nothing for two rounds',
     icon: 'hornetSting',
@@ -354,7 +362,7 @@ export const ABILITIES = {
     effect: 'blind',
     world: 3,
     turns: 2,
-    charge: 4,
+    charge: 8,
     label: 'Whiteout',
     tip: 'Their next two shots go wide',
     icon: 'frostbite',
@@ -384,7 +392,7 @@ export const ABILITIES = {
     effect: 'empty',
     world: 3,
     take: 0,
-    charge: 5,
+    charge: 10,
     label: 'Cold Grip',
     tip: 'Their cylinder freezes solid — every round in it is gone',
     icon: 'coldGrip',
@@ -430,7 +438,7 @@ export const ABILITIES = {
     effect: 'freeze',
     world: 3,
     turns: 1,
-    charge: 4,
+    charge: 8,
     label: 'Deep Freeze',
     tip: 'They are frozen solid: two rounds in which they do nothing at all',
     icon: 'iceFall',
@@ -490,7 +498,7 @@ export const ABILITIES = {
     effect: 'venom',
     world: 4,
     turns: 3,
-    charge: 6,
+    charge: 12,
     weight: 0.35,
     label: 'Poison',
     tip: 'One life a round for three rounds. No shield stops it',
@@ -538,7 +546,7 @@ export const ABILITIES = {
     effect: 'drain',
     world: 4,
     amount: 0.5,
-    charge: 5,
+    charge: 10,
     label: 'Mire Grasp',
     tip: 'Takes a life off them and gives it to you',
     icon: 'mireGrasp',
@@ -580,7 +588,7 @@ export const ABILITIES = {
   willOWisp: {
     effect: 'swap',
     world: 4,
-    charge: 4,
+    charge: 8,
     label: "Will-o'-Wisp",
     tip: 'Trades cylinders with them, whatever is in each',
     icon: 'willOWisp',
@@ -623,7 +631,7 @@ export const ABILITIES = {
     effect: 'mark',
     world: 4,
     turns: 3,
-    charge: 4,
+    charge: 8,
     label: 'Swamp Fever',
     tip: 'For three rounds, every shot that hits them costs one extra life',
     icon: 'swampRot',
@@ -663,7 +671,7 @@ export const ABILITIES = {
     effect: 'blast',
     world: 5,
     amount: 1.5,
-    charge: 5,
+    charge: 10,
     weight: 0.35,
     label: 'Dynamite',
     tip: 'Three lives at once — but a raised shield stops it dead',
@@ -705,7 +713,7 @@ export const ABILITIES = {
     effect: 'pierce',
     world: 5,
     amount: 1,
-    charge: 4,
+    charge: 8,
     label: 'Magma Spout',
     tip: 'Two lives from underneath. A shield is no use over it',
     icon: 'magmaSpout',
@@ -741,7 +749,7 @@ export const ABILITIES = {
     world: 5,
     amount: 2,
     take: 1,
-    charge: 4,
+    charge: 8,
     label: 'Cinder Snatch',
     tip: 'Takes two rounds out of their gun and loads one into yours',
     icon: 'cinderSnatch',
@@ -787,7 +795,7 @@ export const ABILITIES = {
      * it landed in nearly every duel — measured, it was worth twenty points of
      * win rate on its own, which is more than the volcano.
      */
-    charge: 5,
+    charge: 10,
     label: 'Hell Whisper',
     tip: 'Your next two shots cost them an extra life each',
     icon: 'hellWhisper',
@@ -821,7 +829,7 @@ export const ABILITIES = {
     effect: 'empty',
     world: 6,
     take: 2,
-    charge: 6,
+    charge: 12,
     label: 'Gravity Pull',
     tip: 'Empties their gun and two of the rounds end up in yours',
     icon: 'gravityPull',
@@ -861,7 +869,7 @@ export const ABILITIES = {
     effect: 'reflect',
     world: 6,
     turns: 1,
-    charge: 5,
+    charge: 10,
     label: 'Void Mirror',
     tip: 'The next shot that would hit you goes back at them instead',
     icon: 'starRot',
@@ -892,7 +900,7 @@ export const ABILITIES = {
     effect: 'pierce',
     world: 6,
     amount: 1.5,
-    charge: 5,
+    charge: 10,
     label: 'Meteor Strike',
     tip: 'Three lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
@@ -925,7 +933,7 @@ export const ABILITIES = {
     effect: 'freeze',
     world: 6,
     turns: 1,
-    charge: 4,
+    charge: 8,
     label: 'Mind Rift',
     tip: 'Two rounds in which they can do nothing at all',
     icon: 'mindRift',
@@ -1372,18 +1380,27 @@ export function describeAbility(a) {
  * a full charge buys is one eruption on the rival — `strikes` rocks, a life
  * each, over a couple of seconds.
  *
- *   worlds 1-2  6 rounds → 2 lives
- *   worlds 3-4  5 rounds → 3 lives
- *   worlds 5-6  5 rounds → 4 lives
+ *   worlds 1-2  12 rounds → 2 lives
+ *   worlds 3-4  10 rounds → 3 lives
+ *   worlds 5-6  10 rounds → 4 lives
  *
- * Four lives is two thirds of Old Scratch and it arrives at round five of a
- * fight that averages six and a half — so it lands in about half the duels you
- * carry it into, and in the ones where it matters.
+ * TEN ROUNDS IS LONGER THAN A DUEL, AND THAT IS THE POINT
+ * ---------------------------------------------------------------------------
+ * Every charge cost in this file was DOUBLED, including these. A rider fight
+ * runs four to six rounds, so a full charge no longer arrives in one: what an
+ * ability is for now is the fight that goes long, which is the boss — the one
+ * fight in a world where a landmark going off is the difference and the one
+ * fight the player picked their loadout for.
+ *
+ * The reason is the complaint that abilities were the only thing in the game
+ * doing real damage. They were: at five or six rounds a trick landed in most
+ * duels, on top of a gun, and the whole fight was two people waiting for their
+ * icons to light up. The gun is the fight; a trick is what you save.
  */
 export const PLAYER_SPECIAL = [
-  { charge: 6, strikes: 2 },
-  { charge: 5, strikes: 3 },
-  { charge: 5, strikes: 4 },
+  { charge: 12, strikes: 2 },
+  { charge: 10, strikes: 3 },
+  { charge: 10, strikes: 4 },
 ];
 
 const specialBand = (worldId) => (worldId <= 2 ? 0 : worldId <= 4 ? 1 : 2);
