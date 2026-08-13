@@ -1409,13 +1409,15 @@ export const DuelScreen = {
          *   it. `playerWide` is the half that was missing.
          *
          *   `hits.enemy` is "the rival was hurt this round" by ANYTHING — a
-         *   stick of dynamite landing, a shot bounced back off a mirror — so
-         *   on its own it would credit an ability's damage to the revolver.
-         *   Pairing it with `playerFires` keeps it to shots.
+         *   stick of dynamite landing, a round coming back off a mirror — and
+         *   pairing it with `playerFires` is not enough to fix that, because a
+         *   shot stopped by a shield in the same turn as your dynamite lands
+         *   satisfies both halves. `shotHits.player` is the engine's answer to
+         *   the only question this is asking: did YOUR bullet arrive.
          */
         shotsFired: roundLog.filter((r) => r.playerFires || r.playerWide).length,
         shotsWide: roundLog.filter((r) => r.playerWide).length,
-        shotsLanded: roundLog.filter((r) => r.playerFires && r.hits.enemy).length,
+        shotsLanded: roundLog.filter((r) => r.shotHits.player).length,
         livesLeft: sides.player.lives,
         tookDamage,
         abilitiesCast,
