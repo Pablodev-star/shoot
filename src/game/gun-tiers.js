@@ -200,3 +200,48 @@ export function gunTier(level = 0) {
   const index = Math.max(0, Math.min(GUN_TIERS.length - 1, Math.round(level) || 0));
   return GUN_TIERS[index];
 }
+
+// ---------------------------------------------------------------------------
+// THE OTHER SIDE OF THE ROAD
+// ---------------------------------------------------------------------------
+
+/**
+ * WHAT A RIDER IS CARRYING, AND WHY YOU CAN SEE IT
+ * ---------------------------------------------------------------------------
+ * A rider's bullet is worth half a life in the Dust Flats and three and a half
+ * in the Galaxy, and it steps up twice inside every world (see
+ * `enemyGunDamageAt` in src/game/progression.js). That is the single most
+ * important number in any fight and it used to be completely invisible: every
+ * enemy in the game held the same blued sixgun, and the only way to learn that
+ * this one hits twice as hard as the last one was to be hit by it.
+ *
+ * So the gun is the tell. Seven rungs, one per half-life, and no two next to
+ * each other look alike — the silhouette changes twice on the way up and the
+ * metal changes on every rung that the silhouette does not. A player who has
+ * played two worlds can read "that one is carrying a longbarrel" from across
+ * the road and knows to shield instead of trade.
+ *
+ * These are deliberately NOT the player's tiers. The forge ladder is the thing
+ * the run's money is spent on and it earns its fireworks; a rider's gun is a
+ * threat readout. Same shapes and the same four metals, no glow, no orbit, no
+ * nebula.
+ */
+export const ENEMY_GUNS = [
+  { damage: 0.5, shape: 'sixgun', finish: 'steel' },
+  { damage: 1, shape: 'sixgun', finish: 'brass' },
+  { damage: 1.5, shape: 'longbarrel', finish: 'steel' },
+  { damage: 2, shape: 'longbarrel', finish: 'brass' },
+  { damage: 2.5, shape: 'longbarrel', finish: 'bone' },
+  { damage: 3, shape: 'nova', finish: 'bone' },
+  { damage: 3.5, shape: 'nova', finish: 'void' },
+];
+
+/**
+ * The gun that goes with a rider's bullet.
+ * @param {number} damage what one of their shots costs you
+ * @returns {{damage:number, shape:string, finish:string}}
+ */
+export function enemyGunLook(damage = 0.5) {
+  const rung = Math.round((Number(damage) || 0.5) / 0.5) - 1;
+  return ENEMY_GUNS[Math.max(0, Math.min(ENEMY_GUNS.length - 1, rung))];
+}

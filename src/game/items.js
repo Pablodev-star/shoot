@@ -17,9 +17,9 @@
  *                 'special'  one-off unlocks (Horse)
  *                 'ability'  equipped into a duel slot, never consumed
  *   stack       max copies held
- *   depth       how many a shop counter carries at once, when it is not the
- *               default (see STOCK_DEPTH in src/shops/shop.js). Food is the
- *               only thing that sets it, and the note on the carrot says why
+ *   depth       a CAP on how many a counter can carry, on top of the rarity
+ *               roll (see STOCK_ODDS in src/shops/shop.js). Food is the only
+ *               thing that sets it, and the note on the carrot says why
  *   shopPerk    if set, buying it permanently upgrades future shop visits
  *   boon        if set, using it leaves something on the player for the next
  *               few DUELS rather than for right now — see `grantBoon` in
@@ -64,10 +64,12 @@ const CATALOGUE = {
    * pre-pay in its entirety on the first counter you meet is a loading screen.
    *
    * Two numbers hold it now, and they are different numbers on purpose.
-   * `depth` is how many the counter has (three), and `stack` is how many you
-   * can carry (a few days' worth). Together they mean a shop sells you about
-   * one world's crossing and no more, so food is a line on the ledger in every
-   * world rather than a chore you clear once.
+   * `depth` caps how many the counter can have (three), and `stack` is how
+   * many you can carry (a few days' worth). Together with the rarity roll that
+   * decides the actual number on the shelf — two of a common, most visits —
+   * they mean a shop sells you about one world's crossing and no more, so food
+   * is a line on the ledger in every world rather than a chore you clear
+   * once.
    */
   carrot: {
     id: 'carrot',
@@ -157,11 +159,21 @@ const CATALOGUE = {
    * that is what they are priced against: a bed is cheaper per life and a bed
    * is not there when a rider has you on your last diamond.
    *
-   * A bandage is a third of the bar in the Dust Flats and a seventh of it in
-   * the Galaxy, which is the right shape for the cheapest thing on the counter:
-   * early it is a rescue, late it is a top-up and you want the potion. Both are
-   * sized against the three-to-seven life bar in `progression.js` — they were
-   * briefly doubled for a bar that ran to fourteen, and that bar is gone.
+   * THEY HEAL A FRACTION OF YOU, NOT A NUMBER OF DIAMONDS
+   * -------------------------------------------------------------------------
+   * A bandage used to be worth exactly one life, which was a third of the bar
+   * on the road out of the Dust Flats and a seventeenth of it by the Galaxy —
+   * the same object, quietly turning into litter as the run went on. The bed
+   * has been a fraction of the bar for a while (`innBasicHeal`); this is the
+   * same rule applied to the two things you can drink standing up.
+   *
+   * A bandage is a third of you and a potion is three quarters, wherever you
+   * are standing. What still changes with the world is the PRICE — both inflate
+   * on the usual curve — so the cheap one stays the rescue you can always
+   * afford and the expensive one stays the decision.
+   *
+   * `heal` is kept alongside as what the fraction comes to on the starting bar,
+   * because a shop card with "1" on it is worth more to a player than "0.33".
    */
   bandage: {
     id: 'bandage',
@@ -171,8 +183,9 @@ const CATALOGUE = {
     basePrice: 35,
     context: 'anytime',
     heal: 1,
+    healFraction: 1 / 3,
     stack: 8,
-    desc: 'Patches you up for 1 life.',
+    desc: 'Patches up about a third of your lives.',
   },
   potion: {
     id: 'potion',
@@ -181,9 +194,10 @@ const CATALOGUE = {
     rarity: 'rare',
     basePrice: 90,
     context: 'anytime',
-    heal: 3,
+    heal: 2.5,
+    healFraction: 0.75,
     stack: 5,
-    desc: 'Restores 3 lives in one gulp.',
+    desc: 'Puts three quarters of you back together in one gulp.',
   },
 
   /**
@@ -210,7 +224,7 @@ const CATALOGUE = {
     context: 'passive',
     passive: 'survive',
     stack: 3,
-    desc: 'Absorbs the first fatal shot of every duel. Consumed on use.',
+    desc: 'Worn over the shirt. Stops the first thing that hits you in a duel — a bullet, a blast, a rock — and breaks doing it.',
   },
   diadem: {
     id: 'diadem',
@@ -296,7 +310,7 @@ const CATALOGUE = {
   /**
    * THE DUSK TOTEM — THE ONE ITEM THAT SPENDS ITSELF ON THE END OF THE RUN
    * -------------------------------------------------------------------------
-   * A vest stops one fatal shot inside one duel. This stops the run ending,
+   * A vest stops one blow inside one duel. This stops the run ending,
    * wherever the run was about to end: the last life to a rider's bullet, to a
    * rock off an erupting mountain, or to an empty gauge on a road with nothing
    * left to eat on it. It breaks, you come back on half your maximum lives with

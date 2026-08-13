@@ -30,9 +30,9 @@ The rule set has not changed since the first prototype:
 | ---------- | --------- | ---------- | --------------------------------------------------------------- |
 | **Reload** | +1        | vulnerable | —                                                                |
 | **Shield** | unchanged | protected  | —                                                                |
-| **Shoot**  | −1        | vulnerable | rival vulnerable → rival loses a life; rival shielded → nothing   |
+| **Shoot**  | −1        | vulnerable | rival vulnerable → your shot lands; rival shielded → nothing      |
 
-Both duellists shoot in the same turn → both lose a life. First to zero lives
+Both duellists shoot in the same turn → both take a hit. First to zero lives
 loses. Lives are red diamonds, and always will be — and because they are, every
 damage figure in the game is a whole diamond or a half of one.
 
@@ -41,10 +41,35 @@ rider needs six clean hits to finish you.** That number is the feel of this
 game, and it is the one thing the balance harness refuses to let drift: a
 version of this once shipped where it had quietly grown to *twelve* in the Dust
 Flats and *fourteen* by the second world, because the player's life bar and the
-rider's bullet were two numbers in two files growing at different rates. The
-rider's bullet is derived from the bar now — see `enemyGunDamage` in
-`src/game/progression.js` — so a player standing on ten lives is shot at for a
-life and a half and is still six hits from the end of the run.
+rider's bullet were two numbers in two files growing at different rates.
+
+Everything on the other side of the road is derived from where you are now —
+see `EXPECTED_POWER` in `src/game/progression.js`. The whole game is two
+columns:
+
+| World | You have | A rider hits for | A rider carries |
+| --- | --- | --- | --- |
+| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 |
+| Wildgrass Prairie | 6 lives, 2.5 | 1 | 4 |
+| Whitecrown Pass | 9 lives, 4.5 | 1.5 | 7 |
+| Blackwater Bayou | 12 lives, 6.5 | 2 | 10 |
+| Brimstone Basin | 15 lives, 8.5 | 2.5 | 13 |
+| Galaxy | 18 lives, 10.5 | 3 | 16 |
+
+Six hits to kill you and a hit and a half to kill them, in every world in the
+game. The fights LOOK three times bigger by the pass — a rider in the Dust
+Flats carries one diamond and a rider in the Galaxy carries sixteen — and take
+the same four or five rounds, because the gun grew with them.
+
+**And the road gets worse as you walk it.** From the halfway point of a world,
+half the riders carry the next rung of the ladder: the Dust Flats open on
+half-life bullets and close on riders who hit for half or a whole one, the
+Prairie opens on one and closes on one or one and a half, and so on up. Six
+hits deep becomes four. You can see it coming — the heavier bullet comes with a
+heavier gun in the man's hand (`ENEMY_GUNS` in `src/game/gun-tiers.js`), so a
+longbarrel on the road ahead is a warning. Your own level-up lands in the same
+stretch, which is the other half of the deal: the world gets meaner and you get
+bigger, once per world, six times.
 
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
@@ -167,7 +192,7 @@ something; a volcano does not. It stands on the horizon doing nothing, the sky
 goes red, it throws, and it goes quiet and starts counting again — so the
 countdown on the chip above the fight is the one number in a duel worth
 hurrying for. A shield is no use under any of it (it is the ground, not a shot),
-the vest still stops a fatal one, and the diadem does not touch it: the diadem
+the vest still eats one of them, and the diadem does not touch it: the diadem
 blocks things aimed at you, and a mountain is not aiming.
 
 **The first quiet is shorter than the ones after it, and that is what makes any
@@ -243,17 +268,22 @@ glance.
 1. A basic is priced as a rare and a special as a legendary, so the existing
    curve puts one at about a third of what a world pays out and the other at
    most of it. Nothing new was invented for pricing.
-2. Power is rationed by **time**. A duel runs six or seven rounds; a three-round
-   charge is two uses, a six-round charge is one.
+2. Power is rationed by **time**, and the ration was halved. A rider fight runs
+   four to six rounds and the cheapest charge in the game is six, so a trick is
+   no longer something both sides get to use in every fight — it is something
+   one of you gets to use in a LONG fight, which is the boss. That is the
+   answer to the oldest complaint about this game: that abilities were the only
+   thing doing real damage and the gun was decoration.
 3. **The cost is the size of what it takes away** — turns, not damage, written
    as one rule rather than nineteen opinions:
 
    ```
-   charge ≈ 3 + 1.5 × (what it takes away, in lives or in turns)
+   charge ≈ 2 × (3 + 1.5 × what it takes away, in lives or in turns)
    ```
 
    A stolen round counts as a third of a turn, a freeze as the turns it costs,
-   damage as lives. That is why Meteor Strike is seven and Dust Snatch is three.
+   damage as lives. That is why Meteor Strike is fourteen and Dust Snatch is
+   six.
    Set by feel, two of them had come out badly wrong: measured against the
    Stranger, Meteor Strike was worth +44 points of win rate and Void Mirror +41
    against a budget of thirteen to twenty.
@@ -360,12 +390,16 @@ There is no level select. You walk, and the road decides what you meet.
   one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
-  **One slot is always something that heals, and anything stackable is stocked
-  in depth.** Both exist for the same reason: a counter that held one bandage,
-  offered only if the dice felt like it, made lives something you could be
-  refused after playing correctly — and by the basin a shop rolls common less
-  than a third of the time. Gold can always be turned into lives now, and how
-  much of the purse goes that way instead of into the gun is the decision.
+  **One slot is always something that heals**, because a counter that held one
+  bandage offered only if the dice felt like it made lives something you could
+  be refused after playing correctly — and by the basin a shop rolls common
+  less than a third of the time. Gold can always be turned into lives; how much
+  of the purse goes that way instead of into the gun is the decision.
+  **How many of a thing is on the shelf is rolled from its rarity** — a common
+  is two most visits (one in five, three in ten), a rare is one four times in
+  five, a legendary is one. The ordinary answer being two is what stops a
+  single counter from solving a world, which is what five of everything used to
+  do: a run's worth of supplies bought in world one at world-one prices.
   Permanent kit — the map, a vest, an ability — is one apiece, because a second
   one does nothing.
 
@@ -400,8 +434,8 @@ There is no level select. You walk, and the road decides what you meet.
   rug. The room they are in is drawn too — a stone hearth with a live fire in
   it, a window with the night behind it, a rug, a chair pulled up to the heat.
 - **The forge** sells the only thing in the game you keep forever: the gun. Six
-  improvements, each worth half a life a shot on top of the whole life the trail
-  iron already does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
+  improvements, each worth **two whole lives a shot** on top of the half the
+  trail iron does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
   longbarrel, the silvered Ivory Hand, the Emberbore that never cooled, the
   Starfall, and the Nova, which has a nebula burning inside the frame and three
   stars in orbit around it. What you bought is visible in the fight: the shape
@@ -409,11 +443,16 @@ There is no level select. You walk, and the road decides what you meet.
   barrel sheds between rounds, and — from the Emberbore up — a shockwave off
   every shot.
 
-  It is priced like nothing else on the road, and deliberately: 40 gold for the
-  first rung and 16,605 for the last, on a curve that gets steeper as it climbs
-  (see `gunUpgradeCost` in `src/game/progression.js`). The whole ladder costs
-  about 24,000 against a full clear that pays out around 21,000, so the Nova
-  needs a run that sells its finds and skips its beds. It used to cost more than
+  It is priced for **one rung a world**, and the curve is solved for it: 120
+  gold for the first and 4,905 for the last, against the gold each world
+  actually pays out (see `gunUpgradeCost` in `src/game/progression.js`, and
+  `tools/sim.mjs asymmetry`, which prints both columns side by side). That is
+  not a luxury you can skip any more — an enemy's life total is derived from
+  where the ladder should have you, so falling a rung behind means every fight
+  of the next world runs long. What is still a choice is WHEN to pay: buy the
+  rung the moment the forge appears and you eat worse for a world; eat first and
+  you fight a world at a rung down. The whole ladder is 9,310 against a full
+  clear that pays about 17,000. It used to cost more than
   the road pays out at all, which is not an expensive decision, it is a locked
   door with a price painted on it.
 
@@ -436,6 +475,16 @@ There is no level select. You walk, and the road decides what you meet.
   past and the chimney smokes.
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
+- **The Bulletproof Vest is armour, and you can see it.** It stops the first
+  thing that hits you in a duel — a bullet, a stick of dynamite, a rock off an
+  erupting mountain, a tick of venom — and breaks doing it. It used to be gated
+  on the blow being FATAL, which is defensible on paper and indistinguishable
+  from a broken item in the hand: you bought the most expensive thing on the
+  counter, got shot, lost a life, and the vest sat in your bag doing nothing.
+  Now it is on your character's chest for as long as you have one, and when it
+  goes it is torn off, tumbles onto the road at your boots and fades out
+  there — so the most expensive purchase in the Dust Flats announces itself
+  twice: once every round it is still on you, and once when it saves you.
 - **The trail map** is a drawn map of the road you are on, not a list: the
   ground of the biome you are walking, the road winding through it, and every
   duel, shop, inn and boss marked on it, with your own position as a blue
@@ -478,14 +527,17 @@ There is no level select. You walk, and the road decides what you meet.
   Kiln, the Star Reaver — each with its own head, torso, palette and set of
   names, and each world drawing from its own roster. The name always describes
   the sprite, because the names were written from the art.
-- **Levelling is the slow reward.** Roughly 1.4 levels per world, so a run that
-  reaches the Galaxy is around level 9 and around ten lives. A level grants
-  **one life** — one more maximum, and one more in the bar to go with it. It
-  does not make you safer: a rider's bullet is a sixth of whatever the bar has
-  grown to, so ten lives is the same six hits deep that three was. What the
-  growth buys is room to absorb a bad duel, not immunity from one. It is not a refill: if you
-  arrive at a level-up on your last life you leave it on your second, and the
-  bed at the inn is still the only way back to the top.
+- **Levelling is the spine.** Exactly one level per world, and it lands in the
+  MIDDLE of one: three diamonds against half-life bullets for the first two
+  fights of the Dust Flats, then six diamonds against riders who hit for a
+  whole one. A level grants **three lives**, so the bar reads 3, 6, 9, 12, 15,
+  18 at the six borders — and every enemy number in the game is derived from
+  that table. It does not make you safer: a rider's bullet is a sixth of
+  whatever the bar has grown to, so eighteen lives is the same six hits deep
+  that three was. What the growth buys is room to absorb a bad duel, not
+  immunity from one. It is not a refill: if you arrive at a level-up on your
+  last life you leave it on your fourth, and the bed at the inn is still the
+  only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
   phase two is a different sprite, not a refilled bar.
 - **The last fight has an entrance, and it is the fight.** The duel scene has a

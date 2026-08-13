@@ -273,6 +273,19 @@ export function generateSegment(worldId, seed) {
     hidden: false,
   });
 
+  /**
+   * How far along the world each stop is, 0 at the border and 1 at the boss's
+   * door. Stamped here rather than worked out by whoever is asking, because
+   * the thing that reads it is the enemy generator — a rider past the halfway
+   * mark of a world can be carrying the heavier gun (`enemyGunDamageAt` in
+   * src/game/progression.js) — and "halfway" has to mean the same thing on the
+   * road, on the map and in the balance harness.
+   */
+  const last = Math.max(1, events.length - 1);
+  events.forEach((e) => {
+    e.progress = e.index / last;
+  });
+
   return {
     worldId,
     seed,

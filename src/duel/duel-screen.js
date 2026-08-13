@@ -43,7 +43,7 @@ import {
   gunDamage,
 } from '../game/player.js';
 import { totemReviveLives } from '../game/progression.js';
-import { gunTier } from '../game/gun-tiers.js';
+import { gunTier, enemyGunLook } from '../game/gun-tiers.js';
 import { playTotemRevival } from '../ui/totem.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
 import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
@@ -130,7 +130,13 @@ export const DuelScreen = {
 
     let enemy = isBoss
       ? generateBoss(worldId)
-      : generateEnemy(worldId, (player.seed ^ ((params.encounter?.index ?? 0) * 2246822519)) >>> 0);
+      : generateEnemy(
+          worldId,
+          (player.seed ^ ((params.encounter?.index ?? 0) * 2246822519)) >>> 0,
+          // How deep into the world this fight is. Past halfway, riders start
+          // carrying the next rung of the ladder — and the gun to show it.
+          params.encounter?.progress ?? 0,
+        );
 
     playMusic(worldId === FINAL_WORLD ? 'themeGalaxy' : 'themeDuel');
 
@@ -149,6 +155,12 @@ export const DuelScreen = {
        * throws all come off this one number.
        */
       playerGun: gunTier(player.gunLevel),
+      /**
+       * …and what the man across the road brought. Picked off his bullet, so
+       * the player can read the threat before the first draw instead of after
+       * the first hit.
+       */
+      enemyGun: enemyGunLook(enemy.gunDamage),
     });
 
     const localAgent = createLocalAgent();
@@ -318,7 +330,7 @@ export const DuelScreen = {
         );
       }
       if (side.hasVest) {
-        row.append(effectBadge('vest', { label: 'Vest — stops one fatal shot', tone: 'is-good' }));
+        row.append(effectBadge('vest', { label: 'Vest — stops the next hit', tone: 'is-good' }));
       }
       // It stays on the card until it is spent, and it disappears the moment
       // it is: the badge going is how the player learns the totem was used on
@@ -358,7 +370,34 @@ export const DuelScreen = {
         const st = s[id].status || {};
         const found = STATUS_TINTS.find(([key]) => (st[key] || 0) > 0);
         scene.setStatusTint(id, found ? found[1] : null);
+        // A vest is a thing you are wearing, so the sprite wears it. The scene
+        // is told what the engine currently holds rather than being toggled at
+        // the moment of purchase: one source of truth, and it survives a fight
+        // that starts with the vest already gone.
+        if (!vestBreaking) scene.setVest(id, !!s[id].hasVest);
       }
+    }
+
+    /**
+     * The vest leaves the body when the blow LANDS, not when the engine works
+     * the round out.
+     *
+     * The engine resolves a whole round in one go and the screen then plays it
+     * out over a second and a half, so throwing the vest on the road inside the
+     * event handler would have it falling before the gun had even come up. The
+     * break is parked here instead and flushed by `syncBars`, which every path
+     * that can hurt anybody — a bullet, a hazard strike, an ability, a venom
+     * tick — calls once the damage has actually arrived on screen.
+     */
+    let vestBreaking = null;
+    function flushVestBreak() {
+      if (!vestBreaking) return;
+      const side = vestBreaking;
+      vestBreaking = null;
+      scene.breakVest(side);
+      scene.fx.banner = 'VEST HOLDS!';
+      scene.fx.bannerTimer = 900;
+      play('hit');
     }
 
     // --- centre ------------------------------------------------------------
@@ -579,6 +618,7 @@ export const DuelScreen = {
       // disabled button still says why it is disabled.
       buttons[MOVES.SHOOT].renderCost();
       syncAbilityBar();
+      flushVestBreak();
     }
 
     function setControlsEnabled(enabled) {
@@ -732,9 +772,11 @@ export const DuelScreen = {
       if (event.type === 'vest' && !vestConsumed) {
         vestConsumed = true;
         consumeVest();
-        toast('Your vest stopped the bullet', 'good');
-        scene.fx.banner = 'VEST HOLDS!';
-        scene.fx.bannerTimer = 900;
+        // Whatever it stopped — a round, a rock off a volcano, a stick of
+        // dynamite — the vest stopped one thing and is now scrap. The words
+        // and the fall both wait for the blow to land: see `flushVestBreak`.
+        vestBreaking = event.side || 'player';
+        toast('Your vest took the hit', 'good');
       }
       // An ability going off lights its own icon rather than printing its name
       // over the fight: the picture is already on screen, and the player has

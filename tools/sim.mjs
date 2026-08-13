@@ -50,7 +50,7 @@ import { WORLDS, getWorld, FINAL_WORLD } from '../src/game/worlds.js';
 import { generateSegment, revealToHorizon, roadReading } from '../src/explore/encounters.js';
 import { ITEMS } from '../src/game/items.js';
 import { makeRng } from '../src/core/rng.js';
-import { STOCK_DEPTH } from '../src/shops/shop.js';
+import { averageStock } from '../src/shops/shop.js';
 import * as P from '../src/game/progression.js';
 
 /**
@@ -232,9 +232,16 @@ const SPENDING = {
 // Fighting
 // ---------------------------------------------------------------------------
 
-function rollEnemy(worldId, rng) {
+/**
+ * @param {number} [progress] how far along the world's road this rider stands.
+ *   Past halfway, half of them carry the next rung of the ladder — the ramp in
+ *   `enemyGunDamageAt`. The harness has to model it or it measures a road that
+ *   is a good deal gentler than the one the player walks.
+ */
+function rollEnemy(worldId, rng, progress = 0) {
   const p = getWorld(worldId).enemy;
   const lives = Number(rng.weighted(p.lives));
+  const heavier = rng.chance(0.5);
   const abilities = [];
   if (rng.chance(p.abilityChance)) abilities.push(rng.pick(p.abilities));
   if (worldId >= 4 && rng.chance(p.abilityChance * 0.5)) {
@@ -247,7 +254,7 @@ function rollEnemy(worldId, rng) {
     maxLives: lives,
     bullets: 0,
     accuracy: p.accuracy,
-    gunDamage: P.enemyGunDamage(worldId),
+    gunDamage: P.enemyGunDamageAt(worldId, progress, heavier),
     abilities,
     special: rng.chance(p.specialChance || 0) ? p.special : null,
     isBoss: false,
@@ -264,7 +271,8 @@ function bossPhase(worldId, index = 0) {
     maxLives: ph.lives,
     bullets: ph.startBullets || 0,
     accuracy: ph.accuracy ?? b.accuracy,
-    gunDamage: P.enemyGunDamage(worldId),
+    // A boss stands at the end of the road: always the world's heavier bullet.
+    gunDamage: P.enemyGunDamageAt(worldId, 1, true),
     abilities: ph.abilities || b.abilities,
     abilityChanceMul: ph.abilityChanceMul || 1,
     special: ph.special || b.special,
@@ -367,7 +375,8 @@ async function reportDuels() {
     for (const policy of ['novice', 'average', 'expert']) {
       let wins = 0, rounds = 0, lost = 0, fired = 0, blocked = 0;
       for (let i = 0; i < DUELS; i++) {
-        const enemy = rollEnemy(w.id, makeRng(w.id * 1013 + i));
+        // Spread the sample evenly along the road so the ramp is represented.
+        const enemy = rollEnemy(w.id, makeRng(w.id * 1013 + i), i / DUELS);
         const r = await fight({
           enemy,
           player: {
@@ -581,7 +590,7 @@ async function runOnce(seed, policy) {
   const player = {
     level: 1, exp: 0, gold: 60, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
-    hunger: P.HUNGER_MAX, food: 44, heals: 1, healSize: ITEMS.bandage.heal,
+    hunger: P.HUNGER_MAX, food: 44, heals: 1,
   };
 
   const levelUp = () => {
@@ -642,13 +651,16 @@ async function runOnce(seed, policy) {
         // bag full of bandages and two thirds of a life bar uses one.
         const floor = player.maxLives * buy.healAt;
         if (buy.healBeforeFight) {
+          // A bandage is a fraction of the bar rather than a diamond, so how
+          // much one is worth is read off the bar the player is standing on.
+          const healSize = P.itemHeal(ITEMS.bandage, player.maxLives);
           while (player.heals > 0 && player.lives <= floor) {
             player.heals -= 1;
-            player.lives = Math.min(player.maxLives, player.lives + player.healSize);
+            player.lives = Math.min(player.maxLives, player.lives + healSize);
           }
         }
         const phases = ev.type === 'boss' ? (world.boss.phases ? world.boss.phases.length : 1) : 1;
-        let enemy = ev.type === 'boss' ? bossPhase(worldId) : rollEnemy(worldId, rng);
+        let enemy = ev.type === 'boss' ? bossPhase(worldId) : rollEnemy(worldId, rng, ev.progress ?? 0);
         for (let phase = 0; phase < phases; phase++) {
           if (phase > 0) enemy = bossPhase(worldId, phase);
           const r = await fight({
@@ -695,14 +707,16 @@ async function runOnce(seed, policy) {
           player.lives = Math.min(player.maxLives, player.lives + heal);
         }
       } else if (ev.type === 'shop') {
-        // A counter holds STOCK_DEPTH of anything stackable and one of
-        // everything else, so this is bounded the way the real screen is.
+        // What a counter carries is rolled off the item's rarity now (see
+        // STOCK_ODDS in src/shops/shop.js): two of a common on average, one of
+        // a rare. The model buys against the average rather than re-rolling,
+        // which is what makes a hundred runs comparable to the last hundred.
         // Food first — starving is the one thing on the road you cannot fight.
         // A counter carries both kinds, each to its own depth.
         for (const id of ['apple', 'carrot']) {
           const food = ITEMS[id];
           const price = P.itemPrice(food, worldId);
-          let units = food.depth ?? STOCK_DEPTH;
+          let units = Math.min(food.depth ?? Infinity, averageStock(food.rarity));
           while (units > 0 && player.food < buy.foodTarget && player.gold >= price * 2) {
             player.gold -= price;
             player.food += food.food;
@@ -712,7 +726,7 @@ async function runOnce(seed, policy) {
         // Then lives in a bottle. Slot zero of every shop is one of these.
         const bandage = P.itemPrice(ITEMS.bandage, worldId);
         let budget = player.gold * buy.healBudget;
-        let heals = STOCK_DEPTH;
+        let heals = averageStock(ITEMS.bandage.rarity);
         while (heals > 0 && budget >= bandage && player.heals < 16) {
           player.gold -= bandage;
           budget -= bandage;

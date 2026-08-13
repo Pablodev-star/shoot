@@ -24,6 +24,7 @@ import {
   GUN_MAX_LEVEL,
   gunDamageAt,
   gunUpgradeCost as gunUpgradeCostAt,
+  itemHeal,
 } from './progression.js';
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
@@ -411,8 +412,10 @@ export function useItem(id, opts = {}) {
     const current = opts.lives ?? state.lives;
     const max = opts.maxLives ?? state.maxLives;
     if (current >= max) return { ok: false, reason: 'Already at full lives.' };
-    const healed = Math.min(item.heal, max - current);
-    if (opts.context !== 'duel') heal(item.heal);
+    // A bandage is a third of you, not one diamond — see `itemHeal`.
+    const amount = itemHeal(item, max);
+    const healed = Math.min(amount, max - current);
+    if (opts.context !== 'duel') heal(amount);
     removeItem(id, 1);
     play('coin');
     return { ok: true, effect: 'heal', amount: healed };
@@ -538,7 +541,7 @@ export function spendBoonDuel() {
 // Carried gear the rest of the game asks about by name
 // ---------------------------------------------------------------------------
 
-/** True while a Bulletproof Vest is available to absorb a fatal shot. */
+/** True while a Bulletproof Vest is there to eat the next hit of a duel. */
 export function hasVest() {
   return countOf('vest') > 0;
 }
