@@ -636,7 +636,7 @@ does.
 
 ## Achievements
 
-Sixty-three of them, in six sections, on the main menu where the credits used
+Sixty-four of them, in six sections, on the main menu where the credits used
 to be. They live **outside the save slots** — next to the profile and the
 settings, through the same storage driver — because a run can die and take its
 file with it, and the whole point of an achievement is that it survives that.
@@ -648,10 +648,14 @@ card is drained of its colour and shows a padlock where the medal goes, but it
 still says what it wants, because the list is meant to be usable as a set of
 things to go and do rather than a set of surprises.
 
-Every card carries a **reward slot**, and today every one of them is an empty
-hanger. The wardrobe is not built yet; when it is, the reward moves into the
-definition in `src/game/achievements.js` and the row on the card fills itself
-in — the layout is already keeping room for it.
+Every card carries a **reward slot**, and twenty-six of them now have clothes
+on the hanger: a picture of the garment, its slot and its name, on the locked
+cards as well as the earned ones. The link is written down in exactly one place
+— `reward: { kind: 'clothing', slot, id }` on the achievement itself — and the
+wardrobe reads the list backwards to find out what each garment is waiting for.
+Move a reward from one line to another and nothing else has to be told. The
+rest of the list pays in bragging rights, and says so; "coming soon" on sixty
+cards was worse than an honest blank.
 
 **What one is allowed to ask for.** Every line on the list is something an
 ordinary player does by playing. There is nothing that needs a trick, a guide
@@ -686,6 +690,51 @@ than they started with.
 
 The credits screen is not gone: `src/menu/credits.js` is untouched and still
 registered with the router — it simply has no door on the menu for now.
+
+## The wardrobe
+
+Thirty garments across four slots — hat, shirt, trousers, boots — of which four
+are the clothes you start in and **twenty-six are paid for by an achievement**.
+The door is the avatar on the Profile screen: it is a button, with a pixel
+pencil hanging off its corner, and it opens a screen with the clothes on the
+left and the gunslinger himself on the right, breathing in the same idle loop
+the game uses everywhere else, wearing whatever is currently selected. Nothing
+is committed until Save.
+
+**A garment is not a palette swap.** The cheap version of a wardrobe is one hat
+in nine colours, and it is cheap for a reason: at sixteen pixels the silhouette
+is nearly all the information a sprite carries, so nine colours of one shape is
+one hat the player stops looking at after the second. Everything here changes
+shape. The sombrero is wider than the man and puts his eyes in shadow; the
+stovepipe is tall and narrow; the ushanka hangs flaps beside the jaw; the Basin
+helm has horns off the top corners of the sprite; the kerchief comes up over the
+mouth. You can tell what somebody is wearing from across the road.
+
+**It is the same rig.** `composeFighter` in `src/art/sprites-character.js`
+already builds a fighter out of a head, a torso and a set of legs — it is how
+every enemy in the game is drawn — so an outfit is just another set of parts.
+A hat is stamped over the bare face (all eleven rows, which is what lets one
+shade the brow and another cover the mouth), a shirt owns its collar, its torso
+and its own belt, and trousers and boots are a palette plus a transform over the
+leg poses. The transforms are why the legs are not colour swaps either: a leg
+moves between poses, so a garment cannot type pixels at fixed coordinates — the
+helpers in `src/art/sprites-wardrobe.js` *find* the legs in whatever pose they
+are in and hang fringe, seams, studs, cuffs and spurs off them. One description,
+five poses.
+
+**One outfit, everywhere.** Saving writes four ids to the profile — device-side,
+outside the save slots, so a run dying cannot cost you a hat you beat the Basin
+for — and re-bakes the player. Everything that draws a gunslinger asks the rig
+for the current set, so the change reaches the profile portrait, the man waiting
+at the end of the road behind the menu, the walk, the saddle and the duel
+without any of them subscribing to anything. The mannequin on the wardrobe
+screen is composed off to one side and never touches that cache, which is why
+the road behind the screen keeps wearing the saved outfit while you try things
+on in front of it.
+
+An equipped outfit is **validated on every read**: a profile that arrives from
+somewhere else claiming a Starcrown, with the ledger saying otherwise, walks out
+in the hat it started in.
 
 ## Online
 
@@ -725,6 +774,10 @@ src/
                           chiselled and extruded, on a shot-up plank
     sprites-character.js  the fighter rig: player, rider, horse, the draw and
                           the revolver that comes out of it (Block 2a)
+    sprites-wardrobe.js   every garment the player can earn: hats stamped over
+                          the bare face, shirts with their own collar and belt,
+                          and the trouser/boot transforms that find the legs in
+                          whatever pose they are in (Block 2f)
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact,
@@ -755,7 +808,8 @@ src/
   ui/                    shared widgets, saddlebag, trail map, toasts, dialogs,
                          speech, and the achievement notice that outranks all
                          of them
-  menu/                  title, online, profile, settings, achievements, credits
+  menu/                  title, online, profile, wardrobe, settings,
+                         achievements, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop, inn and forge logic + screens, and the workshop
                          scene the six upgrade rituals are performed in
@@ -765,7 +819,8 @@ src/
   game/                  items, worlds, progression maths, player state,
                          enemies, world abilities, the seven-rung revolver
                          ladder, save slots, run controller, interstitials,
-                         and the achievement ledger
+                         the achievement ledger, and the wardrobe the ledger
+                         pays out in
 ```
 
 `docs/ui-audit.md` records what was wrong with the previous interface and why

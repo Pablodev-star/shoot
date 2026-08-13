@@ -23,21 +23,30 @@
  * meant to be a set of things to go and do. Locked ones are simply drained of
  * colour, with a padlock where the medal goes.
  *
- * THE REWARD SLOT IS DRAWN EMPTY ON PURPOSE
+ * THE REWARD ROW IS FULL NOW
  * ---------------------------------------------------------------------------
- * Every card carries a Reward row and every one of them currently reads as an
- * empty hanger. The wardrobe is not built yet; when it is, the reward moves
- * into the definition in src/game/achievements.js and the row here fills
- * itself in. Drawing the slot now is a promise the layout is already keeping
- * room for — nothing about this screen has to move when the clothes arrive.
+ * It used to read "Clothing — coming soon" on every card in the game. The
+ * wardrobe exists (src/game/wardrobe.js), so twenty-six of these lines now show
+ * the garment they hand over — a picture of the thing, its slot and its name —
+ * and the row is a picture of what is behind the lock rather than a promise.
+ *
+ * The picture is a CROP of a gunslinger wearing it, not an icon drawn twice:
+ * the same art the wardrobe screen dresses the mannequin in, sliced to the rows
+ * that garment lives on. There is no second version of a hat to keep in step.
+ *
+ * The lines that pay nothing say so plainly. An achievement whose reward is the
+ * fact you did it is not a broken one, and "coming soon" on sixty of them was
+ * worse than an honest blank.
  */
 
-import { el } from '../core/dom.js';
-import { back } from '../core/router.js';
+import { el, pixelImg } from '../core/dom.js';
+import { back, go } from '../core/router.js';
 import { attachButtonSounds } from '../core/audio.js';
 import { startMenuScene } from './menu-scene.js';
 import { backButton, uiIcon } from '../ui/widgets.js';
 import { CATEGORIES, getAchievementState } from '../game/achievements.js';
+import { SLOT_LABELS, rewardOf } from '../game/wardrobe.js';
+import { pieceThumb } from '../art/sprites-wardrobe.js';
 
 export const AchievementsScreen = {
   id: 'achievements',
@@ -90,6 +99,15 @@ function summary(percent, unlockedCount, total) {
       el('p.field-hint', {
         text: 'Kept on this device, alongside your profile — a run can end, these do not.',
       }),
+      /**
+       * Twenty-six of these hand over clothes, and the place to put them on is
+       * one screen away. A reward you have earned and never seen on yourself is
+       * a reward you did not get.
+       */
+      el('button.btn.btn--sm.btn--ghost', { onclick: () => go('wardrobe') }, [
+        uiIcon('pencil', 1),
+        el('span', { text: 'Open wardrobe' }),
+      ]),
     ]),
   ]);
 }
@@ -108,11 +126,13 @@ function section(category, list) {
 }
 
 function card(achievement) {
-  const { unlocked, name, description, reward } = achievement;
+  const { unlocked, name, description } = achievement;
+  const reward = rewardOf(achievement);
 
   return el('div.ach-card', {
     class: unlocked ? 'is-unlocked' : 'is-locked',
-    'aria-label': `${name}. ${description} ${unlocked ? 'Unlocked.' : 'Locked.'}`,
+    'aria-label': `${name}. ${description} ${unlocked ? 'Unlocked.' : 'Locked.'}`
+      + (reward ? ` Reward: ${reward.name}.` : ''),
   }, [
     el('div.ach-card-top', {}, [
       el('div.ach-medal', {}, [uiIcon(unlocked ? 'star' : 'lock', 1.3)]),
@@ -123,13 +143,18 @@ function card(achievement) {
       unlocked ? el('span.ach-tick', {}, [uiIcon('check', 1)]) : null,
     ]),
 
-    // The wardrobe hook. Empty for every achievement in the game today — see
-    // the note at the top of this file.
-    el('div.ach-reward', {}, [
+    // The wardrobe hook. See the note at the top of this file.
+    el('div.ach-reward', { class: reward ? 'has-reward' : '' }, [
       el('span.ach-reward-label', { text: 'Reward' }),
       reward
-        ? el('span.ach-reward-value', { text: reward.name || reward.id })
-        : el('span.ach-reward-empty', { text: 'Clothing — coming soon' }),
+        ? el('span.ach-reward-value', {}, [
+          el('span.ach-reward-art', {}, [pixelImg(pieceThumb(reward.slot, reward.id), 2)]),
+          el('span.ach-reward-text', {}, [
+            el('span.ach-reward-name', { text: reward.name }),
+            el('span.ach-reward-slot', { text: SLOT_LABELS[reward.slot].name }),
+          ]),
+        ])
+        : el('span.ach-reward-empty', { text: 'Bragging rights' }),
     ]),
   ]);
 }

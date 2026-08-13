@@ -440,6 +440,52 @@
   box-shadow: inset 0 0 0 2px var(--edge-highlight);
 }
 
+.avatar-column { display: grid; justify-items: center; gap: var(--sp-2); }
+
+.avatar-caption {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* The avatar is the door to the wardrobe, so it has to behave like a control:
+   it lifts on hover, takes a focus ring, and carries the pencil that says the
+   picture is the thing being edited. */
+.avatar-button {
+  position: relative;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.avatar-button:hover,
+.avatar-button:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--gold-dark);
+  box-shadow: inset 0 0 0 2px var(--edge-highlight), 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.avatar-button:active { transform: translateY(0); }
+
+.avatar-edit {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface-raised);
+  border: 2px solid var(--edge-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.avatar-button:hover .avatar-edit { border-color: var(--gold-dark); }
+
+.profile-wearing { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
 /* ==========================================================================
    Settings
    ========================================================================== */
@@ -698,8 +744,8 @@
 
 /* --- the reward slot ---------------------------------------------------- */
 
-/* Drawn on every card, filled on none of them yet. The dashed edge is the
-   point: it reads as a hanger with nothing on it rather than as a bug. */
+/* Drawn on every card. The dashed edge is a hanger: empty on the lines that
+   pay in bragging rights, and solid the moment there is a garment on it. */
 .ach-reward {
   display: flex;
   align-items: center;
@@ -722,13 +768,52 @@
   color: var(--text-dim);
 }
 
+.ach-reward.has-reward {
+  border-style: solid;
+  border-color: var(--gold-dark);
+  background: linear-gradient(180deg, rgba(232, 177, 44, 0.1), rgba(0, 0, 0, 0.2)), var(--surface-sunken);
+}
+
 .ach-reward-empty { font-size: var(--text-xs); color: var(--text-dim); opacity: 0.75; }
 
 .ach-reward-value {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
   font-family: var(--font-display);
   font-size: var(--text-xs);
   color: var(--gold-light);
+  text-align: right;
 }
+
+/* The garment itself, cropped to the rows it lives on. Held in a plate so a
+   four-row pair of boots and a nine-row hat still line up down a column. */
+.ach-reward-art {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 38px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.ach-reward-text { display: flex; flex-direction: column; min-width: 0; }
+.ach-reward-name { color: var(--gold-light); }
+
+.ach-reward-slot {
+  font-family: var(--font-body);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Locked cards keep the reward legible — it is the reason to go and earn it —
+   but drain the colour, same as the medal. */
+.ach-card.is-locked .ach-reward-art { filter: grayscale(0.7) brightness(0.85); }
 
 @media (max-width: 520px) {
   .ach-summary { flex-direction: column; gap: var(--sp-3); }
@@ -739,4 +824,200 @@
     padding-right: 0;
     border-right: 0;
   }
+}
+
+/* ==========================================================================
+   Wardrobe
+
+   Two columns: what you can put on, and the man wearing it. The mannequin is
+   sticky on the way down a long list of hats, because the whole reason it is
+   there is to answer "what does that look like on me" without scrolling back.
+   ========================================================================== */
+
+.wardrobe-screen { --screen-max: 980px; }
+
+.wardrobe-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: var(--sp-4);
+  align-items: start;
+  width: 100%;
+}
+
+.wardrobe-picker { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+
+.wardrobe-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.wardrobe-tab { gap: var(--sp-2); }
+
+.wardrobe-tab.is-active {
+  border-color: var(--gold-dark);
+  color: var(--gold-light);
+  background: linear-gradient(180deg, rgba(232, 177, 44, 0.16), rgba(0, 0, 0, 0.2)), var(--surface-raised);
+}
+
+.wardrobe-tab-count {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.wardrobe-tab.is-active .wardrobe-tab-count { color: var(--gold); }
+
+.wardrobe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-2);
+}
+
+.wardrobe-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2);
+  text-align: left;
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.wardrobe-card:hover,
+.wardrobe-card:focus-visible { transform: translateY(-2px); border-color: var(--wood-light); }
+
+.wardrobe-card.is-equipped {
+  border-color: var(--gold-dark);
+  background: linear-gradient(180deg, rgba(232, 177, 44, 0.14), rgba(0, 0, 0, 0.1)), var(--surface);
+}
+
+/* Locked is quiet, not invisible — the same rule the achievement cards follow.
+   The requirement stays at full contrast: it is the only useful thing on the
+   card until the garment is earned. */
+.wardrobe-card.is-locked { opacity: 0.78; cursor: not-allowed; }
+.wardrobe-card.is-locked:hover { transform: none; border-color: var(--edge); }
+
+.wardrobe-card-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 60px;
+  overflow: hidden;
+  background: var(--surface-sunken);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.wardrobe-card-lock,
+.wardrobe-card-tick {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  padding: 1px;
+  background: rgba(9, 5, 2, 0.8);
+  border-radius: var(--radius);
+}
+
+.wardrobe-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.wardrobe-card-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-tight);
+  text-transform: uppercase;
+  color: var(--sand-light);
+}
+
+.wardrobe-card.is-equipped .wardrobe-card-name { color: var(--gold-light); }
+
+.wardrobe-card-blurb { font-size: var(--text-xs); color: var(--text-dim); line-height: 1.4; }
+
+.wardrobe-card-req {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* --- the mannequin ------------------------------------------------------- */
+
+.wardrobe-stage {
+  position: sticky;
+  top: var(--sp-3);
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-3);
+}
+
+.wardrobe-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+.wardrobe-plate {
+  display: grid;
+  place-items: center;
+  padding: var(--sp-2);
+  background:
+    radial-gradient(ellipse at 50% 78%, rgba(232, 177, 44, 0.14), transparent 62%),
+    var(--surface-sunken);
+  border: var(--border-thick) solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 2px var(--edge-highlight);
+}
+
+.wardrobe-figure { display: block; }
+
+.wardrobe-worn { display: grid; gap: 2px; width: 100%; margin: 0; }
+
+.wardrobe-worn-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: baseline;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius);
+}
+
+.wardrobe-worn-row dt {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.wardrobe-worn-row dd {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text);
+  text-align: right;
+}
+
+/* A line that is not saved yet says so, so Save never has to be guessed at. */
+.wardrobe-worn-row.is-changed { background: rgba(232, 177, 44, 0.12); }
+.wardrobe-worn-row.is-changed dd { color: var(--gold-light); }
+
+.wardrobe-actions { display: flex; align-items: center; gap: var(--sp-2); }
+
+/* `.btn` sets its own display, so it wins over the browser's [hidden] rule —
+   the same trap `.chip` and `.speech` fell into. Undo only exists while there
+   is something to undo. */
+.wardrobe-actions .btn[hidden] { display: none; }
+
+@media (max-width: 720px) {
+  /* The mannequin goes on top on a phone: the answer to "what does this look
+     like" has to be above the thing that changes it, not a scroll below it. */
+  .wardrobe-layout { grid-template-columns: minmax(0, 1fr); }
+  .wardrobe-layout .wardrobe-stage { order: -1; position: static; width: 100%; }
+  .wardrobe-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 }

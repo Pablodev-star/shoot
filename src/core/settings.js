@@ -26,6 +26,13 @@ const DEFAULT_PROFILE = {
   name: 'STRANGER',
   createdAt: null,
   stats: { duelsWon: 0, duelsLost: 0, worldsCleared: 0, goldEarned: 0, milesWalked: 0 },
+  /**
+   * What the gunslinger is wearing: four garment ids, one per slot. The
+   * catalogue and the lock on each piece live in `src/game/wardrobe.js` — this
+   * file only keeps the four strings, and what it keeps is never trusted: an
+   * outfit is validated against the achievement ledger every time it is read.
+   */
+  outfit: { hat: 'trail', shirt: 'serape', pants: 'trail', boots: 'trail' },
 };
 
 /** Only English is functional; the others are listed but disabled in the UI. */
@@ -47,6 +54,7 @@ export async function loadSettings() {
     ...DEFAULT_PROFILE,
     ...(storedProfile || {}),
     stats: { ...DEFAULT_PROFILE.stats, ...((storedProfile && storedProfile.stats) || {}) },
+    outfit: { ...DEFAULT_PROFILE.outfit, ...((storedProfile && storedProfile.outfit) || {}) },
   };
   if (!profile.createdAt) profile.createdAt = Date.now();
   applyAudio();
@@ -70,11 +78,16 @@ export async function updateSettings(patch) {
 }
 
 export function getProfile() {
-  return { ...profile, stats: { ...profile.stats } };
+  return { ...profile, stats: { ...profile.stats }, outfit: { ...profile.outfit } };
 }
 
 export async function updateProfile(patch) {
-  profile = { ...profile, ...patch, stats: { ...profile.stats, ...(patch.stats || {}) } };
+  profile = {
+    ...profile,
+    ...patch,
+    stats: { ...profile.stats, ...(patch.stats || {}) },
+    outfit: { ...profile.outfit, ...(patch.outfit || {}) },
+  };
   await write(PROFILE_KEY, profile);
   return profile;
 }
