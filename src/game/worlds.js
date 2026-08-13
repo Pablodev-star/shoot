@@ -102,7 +102,17 @@ export const WORLDS = [
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
-    encounters: { duels: 5 },
+    /**
+     * Six, and it stayed six while the Basin and the Galaxy came down.
+     *
+     * A Prairie duel is still two shots and about a quarter of the bar — the
+     * gun keeps pace out here — so the world is not one of the ones whose
+     * fights got longer. It is also where the money for the pass comes from,
+     * and the harness is blunt about that: cutting it to five measurably cost
+     * runs in world three, because a fight skipped in a world you can afford is
+     * a rung of gun you do not have in the world you cannot.
+     */
+    encounters: { duels: 6 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
       lives: { 2: 25, 3: 50, 4: 25 },
@@ -293,10 +303,16 @@ export const WORLDS = [
       special: 'rift',
       specialChance: 0.22,
     },
-    /** Two phases — see src/duel/duel-engine.js `phases`. */
+    /**
+     * Two phases — see src/duel/duel-engine.js `phases` — nine diamonds each,
+     * a shade over the eight and a half his world's riders derive. Eighteen
+     * across the pair is the largest bar in the game and it is the last fight
+     * in it; ten each was tried and took the completion rate of everybody but
+     * an expert to almost nothing, which is a wall rather than an ending.
+     */
     boss: {
       name: 'THE STRANGER',
-      lives: 8.5,
+      lives: 9,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
       accuracy: 0.72,
       archetype: 'bossStranger',
@@ -337,7 +353,7 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 8.5,
+          lives: 9,
           accuracy: 0.72,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
@@ -346,7 +362,7 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 8.5,
+          lives: 9,
           accuracy: 0.74,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',

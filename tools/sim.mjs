@@ -50,7 +50,7 @@ import { WORLDS, getWorld, FINAL_WORLD } from '../src/game/worlds.js';
 import { generateSegment, revealToHorizon, roadReading } from '../src/explore/encounters.js';
 import { ITEMS } from '../src/game/items.js';
 import { makeRng } from '../src/core/rng.js';
-import { averageStock } from '../src/shops/shop.js';
+import { generateStock } from '../src/shops/shop.js';
 import * as P from '../src/game/progression.js';
 
 /**
@@ -194,15 +194,24 @@ const SPENDING = {
     /** Takes the good bed only once the bar is visibly nearly gone. */
     premiumAt: 0.65,
   },
-  /** Keeps a bed's worth back and remembers to patch up. */
+  /**
+   * Keeps a bed's worth back and remembers to patch up — most of the time.
+   *
+   * Sat almost on top of the expert for a long while, which made "average"
+   * a second good player rather than the middle of the road: the two
+   * archetypes differed by a tenth of a heal budget while the novice was a
+   * different game entirely. The gaps are even now — a third of the purse into
+   * healing against the expert's three fifths and the novice's sixth, and a
+   * bar low enough to be worth patching that sits between the two.
+   */
   average: {
     reserve: (worldId) => P.innBasicPrice(worldId),
     impulseRung: 0.9,
-    foodTarget: 110,
-    healBudget: 0.4,
+    foodTarget: 95,
+    healBudget: 0.3,
     healBeforeFight: true,
-    healAt: 0.5,
-    premiumAt: 0.5,
+    healAt: 0.42,
+    premiumAt: 0.55,
   },
   /**
    * Knows what a life costs and buys it before it is needed: food first,
@@ -607,7 +616,7 @@ async function runOnce(seed, policy) {
   const player = {
     level: 1, exp: 0, gold: 60, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
-    hunger: P.HUNGER_MAX, food: 44, heals: [ITEMS.bandage.heal],
+    hunger: P.HUNGER_MAX, food: 44, heals: ['bandage', 'bandage'],
   };
 
   const levelUp = () => {
@@ -668,18 +677,26 @@ async function runOnce(seed, policy) {
         // bag full of bandages and two thirds of a life bar uses one.
         const floor = player.maxLives * buy.healAt;
         if (buy.healBeforeFight) {
-          // The bag holds different sizes now — a flat two out of a bandage, a
-          // share of the bar out of a med kit or a potion — so the model spends
-          // the SMALLEST thing that gets it back over the line, and only reaches
-          // for the big one when the small ones have run out. That is what a
-          // player does, and it is the difference between arriving at the Basin
-          // with three med kits and arriving with none.
-          player.heals.sort((a, b) => a - b);
+          /**
+           * The bag holds ITEM IDS, not amounts, exactly as the real one does.
+           * That matters for the two heals written as a fraction of the bar: a
+           * med kit bought in the Prairie on seven lives is worth four there
+           * and six by the pass, because `useItem` sizes it against the bar it
+           * is opened on and not the bar it was bought on.
+           *
+           * What the model spends is the SMALLEST thing that gets it back over
+           * the line, reaching for the big one only when the small ones have
+           * run out. That is what a player does, and it is the difference
+           * between arriving at the Basin with three med kits and arriving with
+           * none.
+           */
+          const sizeOf = (id) => P.itemHeal(ITEMS[id], player.maxLives);
+          player.heals.sort((a, b) => sizeOf(a) - sizeOf(b));
           while (player.heals.length && player.lives <= floor) {
             const missing = player.maxLives - player.lives;
-            let pick = player.heals.findIndex((size) => size >= missing);
+            let pick = player.heals.findIndex((id) => sizeOf(id) >= missing);
             if (pick < 0) pick = player.heals.length - 1;
-            player.lives = Math.min(player.maxLives, player.lives + player.heals[pick]);
+            player.lives = Math.min(player.maxLives, player.lives + sizeOf(player.heals[pick]));
             player.heals.splice(pick, 1);
           }
         }
@@ -731,54 +748,56 @@ async function runOnce(seed, policy) {
           player.lives = Math.min(player.maxLives, player.lives + heal);
         }
       } else if (ev.type === 'shop') {
-        // What a counter carries is rolled off the item's rarity now (see
-        // STOCK_ODDS in src/shops/shop.js): two of a common on average, one of
-        // a rare. The model buys against the average rather than re-rolling,
-        // which is what makes a hundred runs comparable to the last hundred.
+        /**
+         * THE COUNTER IS THE REAL COUNTER
+         * -------------------------------------------------------------------
+         * `generateStock` is what the shop screen calls, so it is what the
+         * model calls: the same three slots, the same guaranteed heal, the
+         * same rarity roll for everything else and the same per-item unit roll
+         * off STOCK_ODDS. It used to be a hand-written list of "everything a
+         * shop might have, to its average depth", which is a materially more
+         * generous shop than the game ships — the model could buy a med kit in
+         * the Dust Flats, where the real counter offers one about twice in a
+         * hundred visits, and the balance targets were being passed against an
+         * economy nobody plays.
+         *
+         * The seed is the run's, so two runs with the same seed still meet the
+         * same shops.
+         */
+        const stock = generateStock(worldId, (seed * 2654435761 + worldId * 7919 + ev.index) >>> 0);
+
         // Food first — starving is the one thing on the road you cannot fight.
-        // A counter carries both kinds, each to its own depth.
-        for (const id of ['apple', 'carrot']) {
-          const food = ITEMS[id];
-          const price = P.itemPrice(food, worldId);
-          let units = Math.min(food.depth ?? Infinity, averageStock(food.rarity));
-          while (units > 0 && player.food < buy.foodTarget && player.gold >= price * 2) {
-            player.gold -= price;
-            player.food += food.food;
-            units -= 1;
+        for (const line of stock) {
+          if (!line.item.food) continue;
+          while (line.units > 0 && player.food < buy.foodTarget && player.gold >= line.price * 2) {
+            player.gold -= line.price;
+            player.food += line.item.food;
+            line.units -= 1;
           }
         }
+
         /**
-         * Then lives in a box. Slot zero of every shop is one of these.
+         * Then lives in a box, by VALUE — lives per gold, best first — down to
+         * whatever this counter happens to have and whatever the profile is
+         * willing to put into healing.
          *
-         * There are three of them now and they are not interchangeable: a
-         * bandage is a flat two diamonds, a med kit is half the bar and a
-         * potion three quarters of it, at prices that do not move with the bar.
-         * So the model does what a player does and buys by VALUE — lives per
-         * gold, best first — down to whatever the counter has and whatever the
-         * profile is willing to put into healing. On a three-diamond bar the
+         * The three are not interchangeable: a bandage is a flat two diamonds,
+         * a med kit is half the bar and a potion three quarters of it, at
+         * prices that do not move with the bar. On a three-diamond bar the
          * bandage wins that comparison outright; by the Basin the med kit wins
          * it by a factor of three, and a run that keeps buying bandages out
          * there is a run that dies with a full purse.
          */
         let budget = player.gold * buy.healBudget;
-        const counter = ['bandage', 'medkit', 'potion']
-          .map((id) => ({
-            id,
-            price: P.itemPrice(ITEMS[id], worldId),
-            size: P.itemHeal(ITEMS[id], player.maxLives),
-            units: Math.min(ITEMS[id].stack, averageStock(ITEMS[id].rarity)),
-          }))
-          .sort((a, b) => b.size / b.price - a.size / a.price);
-        // A counter has three slots and one of them is the guaranteed heal, so
-        // three units of healing is the most any single shop can hand over even
-        // when the purse could buy the whole street.
-        let slots = 3;
-        for (const line of counter) {
-          while (slots > 0 && line.units > 0 && budget >= line.price && player.heals.length < 16) {
-            slots -= 1;
+        const heals = stock
+          .filter((line) => line.item.heal && line.units > 0)
+          .sort((a, b) => P.itemHeal(b.item, player.maxLives) / b.price
+            - P.itemHeal(a.item, player.maxLives) / a.price);
+        for (const line of heals) {
+          while (line.units > 0 && budget >= line.price && player.heals.length < 16) {
             player.gold -= line.price;
             budget -= line.price;
-            player.heals.push(line.size);
+            player.heals.push(line.item.id);
             line.units -= 1;
           }
         }

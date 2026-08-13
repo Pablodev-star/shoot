@@ -47,7 +47,7 @@ import { SELL_RATIO } from './items.js';
  * somehow fought its way to twenty-seven would be fighting a boss sized for
  * somebody else. The ladder ends where the road does.
  */
-export const EXP_BASE = 100;
+export const EXP_BASE = 83;
 export const EXP_GROWTH = 2;
 
 export function expForNextLevel(level) {
