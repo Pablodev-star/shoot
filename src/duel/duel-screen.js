@@ -57,6 +57,7 @@ import { CHARACTER_TIMING } from '../art/sprites-character.js';
 import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
 import { resolveDuel } from '../game/run.js';
+import { track as trackAchievement } from '../game/achievements.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import {
   livesRow,
@@ -176,6 +177,14 @@ export const DuelScreen = {
      */
     const boon = getBoon();
 
+    /**
+     * What is in the two hands walking in. Read once here rather than inline,
+     * because the ledger wants to know how many of them there are — going into
+     * a fight with both slots filled is a thing worth having done.
+     */
+    const equippedAbilities = getEquippedAbilities();
+    trackAchievement('abilitiesEquipped', { count: equippedAbilities.length });
+
     const duel = createDuel({
       player: {
         name: 'You',
@@ -191,7 +200,7 @@ export const DuelScreen = {
          * Empty for a player who has not bought any, which is most of world 1
          * and every run that spends its gold on bandages instead.
          */
-        abilities: getEquippedAbilities(),
+        abilities: equippedAbilities,
         gunDamage: gunDamage(),
       },
       enemy,
@@ -202,6 +211,10 @@ export const DuelScreen = {
     });
 
     const roundLog = [];
+    /** Set the first time anything gets through to the player. */
+    let tookDamage = false;
+    /** How many abilities were spent in here — read by the ledger at the end. */
+    let abilitiesCast = 0;
     let vestConsumed = false;
     /**
      * Set the moment the engine refuses a killing blow because of the totem,
@@ -673,6 +686,8 @@ export const DuelScreen = {
         if (result.reason) toast(result.reason, 'bad');
         return;
       }
+      abilitiesCast += 1;
+      trackAchievement('abilityCast', {});
       const spec = result.spec;
       if (spec.kind === 'special') {
         announcePlayerSpecial(spec);
@@ -747,6 +762,7 @@ export const DuelScreen = {
             const sides = duel.getSides();
             sides.player.lives = Math.min(sides.player.maxLives, sides.player.lives + result.amount);
             syncBars();
+            trackAchievement('bandageInDuel', { id });
           }
         },
       });
@@ -779,6 +795,16 @@ export const DuelScreen = {
 
     // --- engine events -----------------------------------------------------
     function handleEngineEvent(event) {
+      /**
+       * Was the player touched at all in this fight?
+       *
+       * Asked of the engine rather than of the life bar, because the bar is not
+       * a record of damage: a bandage in the middle of a fight, or a totem
+       * putting lives back, can leave a player who was shot twice ending on
+       * more than they started with. "Untouched" has to mean untouched.
+       */
+      if (event.type === 'damage' && event.side === 'player') tookDamage = true;
+
       if (event.type === 'vest' && !vestConsumed) {
         // Once per duel, and the vest stays in the bag: what is spent is the
         // fight's charge, not the item. `vestConsumed` is the guard that keeps
@@ -1355,6 +1381,27 @@ export const DuelScreen = {
       const sides = duel.getSides();
       setLives(sides.player.lives);
       setCallout(won ? 'You win the duel' : 'You are down', won ? 'is-good' : 'is-bad');
+
+      /**
+       * The ledger hears about the fight HERE, not from `resolveDuel`.
+       *
+       * This is the only place that holds the whole shape of it at once — the
+       * bar it started on, the bar it ended on, and the engine's round log —
+       * and it is the moment the player is still watching the duel. Waiting
+       * for the overview to be dismissed would put the notice a minute late,
+       * over a screen that has nothing to do with what earned it.
+       */
+      trackAchievement('duelEnded', {
+        won,
+        isBoss,
+        worldId,
+        rounds: roundLog.length,
+        shotsFired: roundLog.filter((r) => r.playerFires).length,
+        hits: roundLog.filter((r) => r.hits.enemy).length,
+        livesLeft: sides.player.lives,
+        tookDamage,
+        abilitiesCast,
+      });
 
       await wait(720);
       showOverview(won, sides);

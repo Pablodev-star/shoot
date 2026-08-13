@@ -68,6 +68,17 @@ export const EVENTS = {
   GAME_OVER: 'game:over',
   SAVE_WRITTEN: 'save:written',
 
+  /**
+   * A line of the ledger was just filled in. Carries
+   * `{ achievement, unlockedCount, total, percent }`.
+   *
+   * It is deliberately not a TOAST: an achievement has to be visible wherever
+   * the player happens to be standing — mid-duel, mid-shop, over the top of the
+   * battle overview — so it gets its own layer and its own notice rather than
+   * queueing behind "+120 gold". See src/ui/achievement-notice.js.
+   */
+  ACHIEVEMENT_UNLOCKED: 'achievement:unlocked',
+
   // UI
   TOAST: 'ui:toast',
 };

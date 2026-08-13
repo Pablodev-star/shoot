@@ -634,6 +634,59 @@ road, before the shooting, which is where a decision belongs.
 The Dusk Totem still refuses the game over, and it is now the only thing that
 does.
 
+## Achievements
+
+Sixty-three of them, in six sections, on the main menu where the credits used
+to be. They live **outside the save slots** — next to the profile and the
+settings, through the same storage driver — because a run can die and take its
+file with it, and the whole point of an achievement is that it survives that.
+
+The screen leads with one number: **the percentage of the game you have
+actually seen**. Under it, the count, and then the six sections, each saying
+how much of itself is done. Nothing is secret and nothing is hidden: a locked
+card is drained of its colour and shows a padlock where the medal goes, but it
+still says what it wants, because the list is meant to be usable as a set of
+things to go and do rather than a set of surprises.
+
+Every card carries a **reward slot**, and today every one of them is an empty
+hanger. The wardrobe is not built yet; when it is, the reward moves into the
+definition in `src/game/achievements.js` and the row on the card fills itself
+in — the layout is already keeping room for it.
+
+**What one is allowed to ask for.** Every line on the list is something an
+ordinary player does by playing. There is nothing that needs a trick, a guide
+or a run set up in advance. What is *not* easy is holding all of them at once:
+the counting ones — a hundred duels, ten thousand gold, the boss of all six
+worlds — are several honest runs, and the road kills most runs a long way short
+of the last horizon (the harness puts a finished run at 3% for an average
+player and 15% for an expert). Generous per line, long as a whole.
+
+**How it is wired.** Nearly all of it listens rather than being told. The game
+already announces everything worth hearing on the event bus — a level, a world,
+a boon, a storm, a totem, a purse — so most of `src/game/achievements.js` is a
+subscription list, and no system in the game had to learn that achievements
+exist. The four or five moments the bus does not carry (a purchase, a bed, a
+rung of gun, the shape of a duel that was just won) come in through `track()`,
+the one function the rest of the game calls.
+
+**The notice.** An unlock drops a card in at the top of the screen *wherever
+the player is standing* — on the road, at a counter, mid-duel, over the top of
+the battle overview. It is not a toast: the toast layer is the running
+commentary, four at a time with the oldest thrown away, and losing an unlock
+behind three gold notices would be losing the moment it exists for. So it has
+its own layer above everything (`#achievement-notices`), a queue rather than a
+stack so two unlocks in the same instant are read one after the other, and the
+percentage on it — the notice is also the nudge towards the screen the rest of
+them live on. Nothing in that layer takes a click.
+
+One thing it does *not* do is measure damage off the life bar. "Untouched" asks
+the duel engine whether anything got through, because a bandage mid-fight or a
+totem putting lives back can leave a player who was shot twice ending on more
+than they started with.
+
+The credits screen is not gone: `src/menu/credits.js` is untouched and still
+registered with the router — it simply has no door on the menu for now.
+
 ## Online
 
 The online lobby is **built but not wired**: room browser, create-room dialog,
@@ -651,7 +704,7 @@ already see, and every icon is drawn in the game's own palette rather than
 typed as a character.
 
 ```
-index.html              boot page: one canvas, one screen root, one overlay
+index.html              boot page: one canvas, one screen root, two overlays
 package.json            no dependencies; the scripts are the server and the sim
 tools/sim.mjs           the balance harness — see Tuning
 styles/                 materials & tokens · UI kit · menu screens · game screens
@@ -700,8 +753,9 @@ src/
                           painted, shaded and contoured off, the water, the
                           cracks, the markers, the cased road and the rose
   ui/                    shared widgets, saddlebag, trail map, toasts, dialogs,
-                         speech
-  menu/                  title, online, profile, settings, credits
+                         speech, and the achievement notice that outranks all
+                         of them
+  menu/                  title, online, profile, settings, achievements, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
   shops/                 shop, inn and forge logic + screens, and the workshop
                          scene the six upgrade rituals are performed in
@@ -710,7 +764,8 @@ src/
                          the real-time clock a world special runs on
   game/                  items, worlds, progression maths, player state,
                          enemies, world abilities, the seven-rung revolver
-                         ladder, save slots, run controller, interstitials
+                         ladder, save slots, run controller, interstitials,
+                         and the achievement ledger
 ```
 
 `docs/ui-audit.md` records what was wrong with the previous interface and why

@@ -491,6 +491,118 @@ textarea {
 }
 
 /* ==========================================================================
+   Achievement notices — the one message that outranks everything on screen
+
+   Above the toasts, above the doors, above the modal backdrop: a duel won
+   under a battle-overview dialog is exactly when one of these arrives, and a
+   notice the player cannot see is a notice that did not happen. Nothing in
+   here takes a click — see src/ui/achievement-notice.js.
+   ========================================================================== */
+
+#achievement-notices {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--sp-3));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  pointer-events: none;
+  width: min(94vw, 480px);
+}
+
+.ach-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  background: linear-gradient(180deg, #2b1a0c 0%, #1c1006 100%);
+  border: var(--border) solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: var(--lift-2), 0 0 26px rgba(232, 177, 44, 0.28);
+  animation: ach-notice-in 520ms var(--ease-spring) both;
+}
+
+.ach-notice.is-leaving { animation: ach-notice-out 400ms var(--ease-in-out) both; }
+
+/* The medal: a gold disc with the star punched into it. */
+.ach-notice-medal {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--gold-light), var(--gold-dark));
+  border: 2px solid #3a2410;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.28);
+  animation: ach-medal-shine 1.6s var(--ease-in-out) 260ms;
+}
+
+.ach-notice-body { min-width: 0; flex: 1 1 auto; }
+
+.ach-notice-eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.ach-notice-name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--sand-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ach-notice-detail {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ach-notice-tally {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  line-height: 1.1;
+}
+
+.ach-notice-percent {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--gold-light);
+}
+
+.ach-notice-count { font-size: var(--text-xs); color: var(--text-dim); }
+
+@keyframes ach-notice-in {
+  0% { opacity: 0; transform: translate3d(0, -60px, 0) scale(0.9); }
+  70% { opacity: 1; transform: translate3d(0, 5px, 0) scale(1.02); }
+  100% { transform: none; }
+}
+
+@keyframes ach-notice-out {
+  to { opacity: 0; transform: translate3d(0, -34px, 0) scale(0.96); }
+}
+
+@keyframes ach-medal-shine {
+  0%, 100% { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.28); }
+  40% { box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.28), 0 0 18px rgba(255, 226, 140, 0.9); }
+}
+
+/* ==========================================================================
    Utilities
    ========================================================================== */
 

@@ -13,13 +13,16 @@
 import { initScene } from './core/scene.js';
 import { initRouter, register, go } from './core/router.js';
 import { initToasts } from './ui/toast.js';
+import { initAchievementNotices } from './ui/achievement-notice.js';
 import { loadSettings } from './core/settings.js';
+import { loadAchievements, initAchievements } from './game/achievements.js';
 
 import { TitleScreen } from './menu/title.js';
 import { OnlineScreen } from './menu/online.js';
 import { ProfileScreen } from './menu/profile.js';
 import { SettingsScreen } from './menu/settings.js';
 import { CreditsScreen } from './menu/credits.js';
+import { AchievementsScreen } from './menu/achievements.js';
 import { SlotsScreen } from './game/slots.js';
 import { ExploreScreen } from './explore/explore-screen.js';
 import { ShopScreen } from './shops/shop-screen.js';
@@ -33,7 +36,14 @@ const SCREENS = [
   OnlineScreen,
   ProfileScreen,
   SettingsScreen,
+  /**
+   * Still registered, deliberately, with no way in from the menu — see the
+   * note over the menu row in src/menu/title.js. Unregistering it would make
+   * the screen unreachable from the console too, and the file is not being
+   * retired, only unlinked.
+   */
   CreditsScreen,
+  AchievementsScreen,
   SlotsScreen,
   ExploreScreen,
   ShopScreen,
@@ -47,9 +57,18 @@ const SCREENS = [
 
 async function boot() {
   await loadSettings();
+  /**
+   * The ledger is read before anything can be earned, and its listeners go up
+   * before the first screen mounts — an unlock that fires during the title
+   * screen (a name saved, a slot picked) has to find both a loaded ledger and
+   * a layer to land on.
+   */
+  await loadAchievements();
+  initAchievements();
 
   initScene(document.getElementById('scene-canvas'));
   initToasts(document.getElementById('toasts'));
+  initAchievementNotices(document.getElementById('achievement-notices'));
   initRouter(document.getElementById('screen-root'), document.getElementById('transition'));
 
   SCREENS.forEach(register);
@@ -66,13 +85,14 @@ async function boot() {
  * writes the same modules the game uses — there is no separate debug path.
  */
 async function exposeDevHook() {
-  const [player, run, worlds, items] = await Promise.all([
+  const [player, run, worlds, items, achievements] = await Promise.all([
     import('./game/player.js'),
     import('./game/run.js'),
     import('./game/worlds.js'),
     import('./game/items.js'),
+    import('./game/achievements.js'),
   ]);
-  window.SHOOT = { go, player, run, worlds, items };
+  window.SHOOT = { go, player, run, worlds, items, achievements };
 }
 
 boot().catch((err) => {

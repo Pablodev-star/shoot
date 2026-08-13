@@ -533,3 +533,210 @@
   text-transform: uppercase;
   color: var(--sand-deep);
 }
+
+/* ==========================================================================
+   Achievements
+
+   A wide screen — wider than the credits it replaced on the menu — because the
+   list is long and two columns of cards is the difference between reading it
+   and scrolling past it. Everything below is legible in both states: a locked
+   card is drained rather than hidden, so the screen doubles as the list of
+   things there are left to do.
+   ========================================================================== */
+
+.achievements-screen { --screen-max: 760px; }
+
+.achievements-screen .screen-body { justify-content: flex-start; }
+
+/* --- the headline ------------------------------------------------------- */
+
+.ach-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+.ach-summary-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding-right: var(--sp-4);
+  border-right: 3px solid var(--edge);
+}
+
+.ach-summary-percent {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 1;
+  color: var(--gold-light);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+.ach-summary-label {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: var(--sp-1);
+}
+
+.ach-summary-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ach-bar {
+  position: relative;
+  height: 16px;
+  background: var(--surface-sunken);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.ach-bar-fill {
+  height: 100%;
+  min-width: 0;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold-dark));
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.ach-summary-note {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-tight);
+  color: var(--sand-light);
+}
+
+/* --- sections ----------------------------------------------------------- */
+
+.ach-section { display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; }
+
+.ach-section-blurb {
+  margin-top: calc(var(--sp-2) * -1);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+/* --- one achievement ---------------------------------------------------- */
+
+.ach-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--surface);
+  border: 2px solid var(--edge);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 var(--edge-highlight);
+}
+
+/* The gold wash goes OVER the plank, never instead of it — `--surface` is a
+   stack of gradients, and dropping it for a single translucent layer put the
+   menu's parallax backdrop straight through the card. */
+.ach-card.is-unlocked {
+  border-color: var(--gold-dark);
+  background: linear-gradient(180deg, rgba(232, 177, 44, 0.12), rgba(0, 0, 0, 0.1)), var(--surface);
+}
+
+/* Locked is quiet, not invisible: the text stays readable so the card can be
+   used as a to-do list, and only the colour is taken away. */
+.ach-card.is-locked { opacity: 0.72; }
+.ach-card.is-locked .ach-medal { filter: grayscale(1) brightness(0.7); }
+
+.ach-card-top { display: flex; align-items: flex-start; gap: var(--sp-3); }
+
+.ach-medal {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--gold-light), var(--gold-dark));
+  border: 2px solid #3a2410;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.ach-card-text { min-width: 0; flex: 1 1 auto; }
+
+.ach-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-tight);
+  text-transform: uppercase;
+  color: var(--sand-light);
+}
+
+.ach-card.is-unlocked .ach-name { color: var(--gold-light); }
+
+.ach-desc {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.ach-tick { flex: 0 0 auto; opacity: 0.9; }
+
+/* --- the reward slot ---------------------------------------------------- */
+
+/* Drawn on every card, filled on none of them yet. The dashed edge is the
+   point: it reads as a hanger with nothing on it rather than as a bug. */
+.ach-reward {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  /* Pinned to the foot of the card, so the reward slots line up across a row
+     however many lines the description above them ran to. */
+  margin-top: auto;
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--surface-sunken);
+  border: 2px dashed var(--edge);
+  border-radius: var(--radius);
+}
+
+.ach-reward-label {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ach-reward-empty { font-size: var(--text-xs); color: var(--text-dim); opacity: 0.75; }
+
+.ach-reward-value {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  color: var(--gold-light);
+}
+
+@media (max-width: 520px) {
+  .ach-summary { flex-direction: column; gap: var(--sp-3); }
+  .ach-summary-figure {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--sp-2);
+    padding-right: 0;
+    border-right: 0;
+  }
+}

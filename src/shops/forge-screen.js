@@ -46,6 +46,7 @@ import { icon } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from '../ui/toast.js';
+import { track as trackAchievement } from '../game/achievements.js';
 import { createForgeScene } from './forge-scene.js';
 
 /**
@@ -195,6 +196,7 @@ export const ForgeScreen = {
       busy = true;
       upgradeGun();
       const tier = gunTier(getState().gunLevel);
+      trackAchievement('gunUpgraded', { level: getState().gunLevel });
       render();
       play('coin');
       // The counter fades back while the workshop performs: what the player

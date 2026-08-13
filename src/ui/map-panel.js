@@ -49,6 +49,7 @@ import { drawTextCentered, measureText, GLYPH_H } from '../art/font.js';
 import { bakeMapBackground, getMapMarkers, MARKER_SIZE } from '../art/map-art.js';
 import { getState } from '../game/player.js';
 import { getEngine } from '../game/run.js';
+import { track as trackAchievement } from '../game/achievements.js';
 import { getWorld } from '../game/worlds.js';
 import { getBiome } from '../game/biomes.js';
 import { HORSE_TIME_MUL } from '../game/progression.js';
@@ -244,6 +245,11 @@ export function openTrailMap(opts = {}) {
   const engine = opts.engine;
   const segment = engine?.getSegment();
   if (!segment || !segment.events.length) return null;
+
+  // Every door into the map — the road, the shop counter, the inn, the forge —
+  // comes through here, so this is where the ledger hears it was read. After
+  // the guard above: a map that could not be drawn was not read.
+  trackAchievement('mapOpened');
 
   const player = getState();
   const world = getWorld(player.world);
