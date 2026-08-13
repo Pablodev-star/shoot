@@ -120,13 +120,16 @@ export function generateStock(worldId, seed) {
    * luck rather than by play: the decision was made correctly and the game
    * refused to honour it.
    *
-   * So slot zero is a heal. Which heal still depends on the world's table (a
-   * bandage in the flats, a potion where potions are what the table offers),
+   * So slot zero is a heal. Which heal still depends on the world's table — a
+   * bandage where it rolls common, a med kit or a potion where it rolls rare,
+   * which is most of the time by the Basin and almost never in the flats, and
+   * is exactly the right shape: the world where two diamonds stops being a
+   * rescue is the world that starts putting the big ones on the counter —
    * the price is the ordinary price, and the discount roll is the ordinary
    * roll — the guarantee is only that gold can always be turned into lives.
    * Everything else on the counter is still whatever the road felt like.
    */
-  const HEALS = ['potion', 'bandage'];
+  const HEALS = { common: 'bandage', rare: ['medkit', 'potion'] };
 
   /** One counter entry, with as many of the thing on it as it can hold. */
   const entry = (item, slot) => {
@@ -152,7 +155,9 @@ export function generateStock(worldId, seed) {
 
   const stock = [];
   const taken = new Set();
-  const guaranteed = rng.weighted(world.rarity) === 'common' ? 'bandage' : rng.pick(HEALS);
+  const guaranteed = rng.weighted(world.rarity) === 'common'
+    ? HEALS.common
+    : rng.pick(HEALS.rare);
   taken.add(guaranteed);
   stock.push(entry(getItem(guaranteed), 0));
 

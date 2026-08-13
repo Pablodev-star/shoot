@@ -17,12 +17,12 @@ import { SELL_RATIO } from './items.js';
  *
  * A LEVEL IS A WORLD
  * ---------------------------------------------------------------------------
- * Exactly one, and it is not a coincidence — it is the whole point. Three lives
+ * Exactly one, and it is not a coincidence — it is the whole point. Four lives
  * a level (see LIVES_PER_LEVEL) and one level a world is what puts the player
- * on 3, 6, 9, 12, 15, 18 lives at the six borders, which is the spine every
- * enemy number in the game is derived from (EXPECTED_POWER below). Levelling
- * used to run at a ragged 1.4 worlds a level and the bar landed wherever it
- * landed; now the curve is solved for the table.
+ * on 3, 7, 11, 15, 19, 23 lives at the six borders, which is the bar the whole
+ * of EXPECTED_POWER below is solved against. Levelling used to run at a ragged
+ * 1.4 worlds a level and the bar landed wherever it landed; now the curve is
+ * solved for the table.
  *
  * AND IT ARRIVES IN THE MIDDLE OF ONE
  * ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ import { SELL_RATIO } from './items.js';
  * a world half the riders carry the next rung of the gun (`enemyGunDamageAt`),
  * so the back half of every crossing is the dangerous half — and the level-up
  * is timed to land in the same stretch. The Dust Flats is the clearest case:
- * three diamonds against half-life bullets for two fights, then six diamonds
+ * three diamonds against half-life bullets for two fights, then seven diamonds
  * against riders who hit for a whole one. The world gets harder and you get
  * bigger, in that order, once per world, six times.
  *
@@ -38,17 +38,17 @@ import { SELL_RATIO } from './items.js';
  * columns are meant to be read together, and `tools/sim.mjs asymmetry` fails
  * the build if they stop agreeing:
  *
- *   level 2 |     95 · middle of world 1   level 5 | 1,592 · middle of world 4
- *   level 3 |    294 · middle of world 2   level 6 | 3,438 · late in world 5
- *   level 4 |    713 · early in world 3    level 7 | 7,315 · out of reach
+ *   level 2 |    100 · middle of world 1   level 5 | 1,500 · middle of world 4
+ *   level 3 |    300 · middle of world 2   level 6 | 3,100 · late in world 5
+ *   level 4 |    700 · middle of world 3   level 7 | 6,300 · out of reach
  *
- * Level seven is past the end of the game on purpose: eighteen lives is where
- * the bar stops, the Stranger is built for eighteen, and a run that somehow
- * fought its way to twenty-one would be fighting a boss sized for somebody
- * else. The ladder ends where the road does.
+ * Level seven is past the end of the game on purpose: twenty-three lives is
+ * where the bar stops, the Stranger is built for twenty-three, and a run that
+ * somehow fought its way to twenty-seven would be fighting a boss sized for
+ * somebody else. The ladder ends where the road does.
  */
-export const EXP_BASE = 95;
-export const EXP_GROWTH = 2.1;
+export const EXP_BASE = 100;
+export const EXP_GROWTH = 2;
 
 export function expForNextLevel(level) {
   return Math.round(EXP_BASE * Math.pow(EXP_GROWTH, level - 1));
@@ -71,21 +71,19 @@ export function expForNextLevel(level) {
  * is six hits deep, and six hits deep is a fight you can afford to misplay
  * twice.
  *
- * It grows THREE lives a level now, on a curve that gives out exactly one level
- * per world, and the ladder in `gunDamageAt` grows with it. The inflation was
- * never the problem: the problem was that ONLY the player's side inflated. Every number on the other side of the road is derived
- * from this one, so a player standing on twelve lives is shot at for two and is
- * still six hits from the end of the run, exactly as they were in the Dust
- * Flats on three. The growth is what gives a duel in the Galaxy room to be a
- * long fight between two people who hit hard; the derivation is what stops that
- * room from turning into immunity.
+ * It grows FOUR lives a level now, on a curve that gives out exactly one level
+ * per world. The inflation was never the problem: the problem was that only the
+ * player's side inflated. A player standing on fifteen lives is shot at for two
+ * and is seven hits from the end of the run, against three on the road out of
+ * the Dust Flats being shot at for a half and six hits from the end of it — the
+ * bar grows a little faster than the bullet does, and that difference is what
+ * pays for the late worlds' fights being longer.
  *
- * Everything the player fights is now DERIVED from where this curve puts them:
- * `enemyGunDamage`, `enemyLives` and `bossLives` read the bar rather than
- * guessing at it, and `node tools/sim.mjs asymmetry` fails the build if the two
- * sides of the road drift apart again.
+ * How much of the bar a duel costs is the number actually being held steady,
+ * about a third of it everywhere, and `node tools/sim.mjs asymmetry` fails the
+ * build if the hits-to-kill behind it leaves four to eight.
  */
-export const LIVES_PER_LEVEL = 3;
+export const LIVES_PER_LEVEL = 4;
 export const STARTING_LIVES = 3;
 
 /**
@@ -97,41 +95,56 @@ export const STARTING_LIVES = 3;
  * asymmetry` prints what the road actually delivers beside what is claimed
  * here, and fails if the gap gets wide enough to matter.
  *
- * THE SPINE IS A STRAIGHT LINE NOW
+ * THE SPINE
  * ---------------------------------------------------------------------------
- * Three lives and half a life a shot in the Dust Flats, and then three more
- * lives and one more rung of the gun per world. Every enemy number in the game
- * falls out of those two columns:
+ * TWO of these columns are ladders written down by hand, and the other two are
+ * what the game is tuned to hold up against them.
  *
- *   world | you have      | so a rider hits for | and carries
- *   ------+---------------+---------------------+-------------
- *     1   |  3 lives  0.5 |        0.5          |   1 life
- *     2   |  6 lives  2.5 |        1            |   4 lives
- *     3   |  9 lives  4.5 |        1.5          |   7 lives
- *     4   | 12 lives  6.5 |        2            |  10 lives
- *     5   | 15 lives  8.5 |        2.5          |  13 lives
- *     6   | 18 lives 10.5 |        3            |  16 lives
+ * The road's two: a rider hits for half a life in the Dust Flats and half a
+ * life more every world (`enemyGunDamage`), and carries one diamond in the Dust
+ * Flats and two more every world (`enemyLives`). Those are the shape of the
+ * journey and they are not derived from anything.
  *
- * Which is six hits to kill you and a hit and a half to kill them, in every
- * world in the game — and a rider in the back half of a world is carrying the
+ * The player's two: a bar that starts at three and grows four a level on a
+ * curve that pays out one level a world, and a forge ladder worth half a life a
+ * rung that a run finishes buying around the Bayou.
+ *
+ *   world | you have      | a rider hits for | and carries | so a rider is
+ *   ------+---------------+------------------+-------------+---------------
+ *     1   |  3 lives  0.5 |       0.5        |   1 life    | 2 shots
+ *     2   |  7 lives  1.5 |       1          |   3 lives   | 2 shots
+ *     3   | 11 lives  2.5 |       1.5        |   5 lives   | 2 shots
+ *     4   | 15 lives  3.5 |       2          |   7 lives   | 2 shots
+ *     5   | 19 lives  3.5 |       2.5        |   9 lives   | 2.6 shots
+ *     6   | 23 lives  3.5 |       3          |  11 lives   | 3.2 shots
+ *
+ * Which comes out at six to eight hits to kill you and two to three to kill
+ * them, everywhere — and a rider in the back half of a world is carrying the
  * NEXT world's bullet half the time (`enemyGunDamageAt`), so the second half of
  * a crossing is where a bar that was six hits deep turns into four.
  *
- * The two columns are not independent. The bar is what the enemy's bullet is
- * derived from and the gun is what the enemy's LIFE is derived from, so moving
- * one of them moves half the game: three more lives a world means a rider hits
- * for half a life more a world, and two more damage a world means a rider
- * carries three more diamonds. That is the whole point of writing it down as a
- * table — there is one place to edit, and the harness checks that the road
- * actually delivers it.
+ * THE LAST TWO WORLDS ARE WHERE THE LADDER RUNS OUT
+ * ---------------------------------------------------------------------------
+ * The gun stops at three and a half — seven revolvers, half a life a rung —
+ * and the riders do not stop at all, so the Basin and the Galaxy are the two
+ * worlds where a fight takes a third shot. That is on purpose and it is the
+ * only difficulty curve left in the late game that is not the bar: out there
+ * you cannot out-buy the road, you can only out-play it, and what your gold
+ * buys instead is what keeps you standing — the med kits, the beds, and the
+ * legendaries the forge is no longer eating your purse for.
+ *
+ * It is also why the last two worlds are SHORTER (see `duels` in
+ * src/game/worlds.js). A world costs the number of fights times the cost of a
+ * fight; when the second number goes up by half, the first has to come down or
+ * the bar cannot pay for it.
  */
 export const EXPECTED_POWER = {
   1: { lives: 3, damage: 0.5 },
-  2: { lives: 6, damage: 2.5 },
-  3: { lives: 9, damage: 4.5 },
-  4: { lives: 12, damage: 6.5 },
-  5: { lives: 15, damage: 8.5 },
-  6: { lives: 18, damage: 10.5 },
+  2: { lives: 7, damage: 1.5 },
+  3: { lives: 11, damage: 2.5 },
+  4: { lives: 15, damage: 3.5 },
+  5: { lives: 19, damage: 3.5 },
+  6: { lives: 23, damage: 3.5 },
 };
 
 /** Rounded to the half-diamond grid the whole game lives on. */
@@ -140,75 +153,101 @@ const toHalf = (n) => Math.max(0.5, Math.round(n * 2) / 2);
 /**
  * HOW MANY CONNECTED SHOTS IT SHOULD TAKE TO KILL EACH OF YOU
  * ---------------------------------------------------------------------------
- * The two numbers this file exists to hold steady, in every world. A rival
- * needs about six clean hits to finish you and you need two to finish them:
- * enough cushion that a duel is winnable from behind, tight enough that a rider
- * is a threat rather than a toll booth.
+ * The number this file exists to hold steady. A rival needs about six clean
+ * hits to finish you: enough cushion that a duel is winnable from behind,
+ * tight enough that a rider is a threat rather than a toll booth.
  *
- * The small one is doing more work than it looks, because it sets the LENGTH of
- * a fight and length is what a fight costs. Every extra round is another chance
- * for their gun to be loaded when yours is not, and the bar only holds six hits
- * — it cannot pay for long fights. Measured, at the same everything else:
+ * IT IS A TARGET, NOT A FORMULA
+ * ---------------------------------------------------------------------------
+ * It used to decide the riders' damage — bullet = bar / six — and that was the
+ * wrong way round once the road's two ladders were written down by hand. What
+ * the bullet costs is `enemyGunDamage` and what a rider carries is
+ * `enemyLives`; this is what the PLAYER'S bar is solved against, and what
+ * `tools/sim.mjs asymmetry` gates: four to eight hits, in every world, or the
+ * build fails.
+ *
+ * It comes out at six in the Dust Flats and drifts up to about seven and a
+ * half by the Galaxy, and that drift is deliberate. A duel out there takes
+ * three of your shots instead of two because the forge ladder has run out, so
+ * the fight is half again as long, so the bar has to be deeper to cost the same
+ * FRACTION of itself. What is actually being held steady is the price of a
+ * duel — about a third of the bar, everywhere — and the hits-to-kill is how
+ * that price is written down.
+ *
+ * THE OTHER SIDE OF IT IS THE LENGTH OF A FIGHT
+ * ---------------------------------------------------------------------------
+ * How many of YOUR shots a rider takes sets how long a duel runs, and length is
+ * what a fight costs. Every extra round is another chance for their gun to be
+ * loaded when yours is not. Measured, at the same everything else:
  *
  *   2.5 hits to kill a rider → 7 rounds → nearly half your bar per duel
- *   2.0                      → 6        → about a third
+ *   2.0                      → 5-6      → about a third
  *   1.5                      → 4-5      → about a fifth
  *
- * One and a half, and the arithmetic is what forces it. A three-diamond bar
- * that takes six hits dies in THREE duels at a third of a bar each, and a world
- * is five to seven duels — no amount of shopping covers that, and no amount of
- * skill either. At a fifth of a bar a duel, a world costs a bar and a half,
- * which two beds and a counter's worth of bandages can carry with something
- * left over for the gun. That "something left over" is the decision the game is
- * actually made of. This was measured, then measured again after every rescale
- * since; two hits was tried and cost the novice the whole Dust Flats.
+ * Two, for the four worlds where the gun can keep up, and then it drifts to
+ * three as the life ladder climbs past the top of the forge. That drift is the
+ * late game's difficulty curve and it is bounded: `tools/sim.mjs asymmetry`
+ * fails the build outside one and a half to three and a half, because under
+ * the floor a rider dies to the opening trade and over the ceiling every duel
+ * is a war of attrition no amount of shopping covers.
  *
- * A RIDER CAN CARRY SEVEN DIAMONDS AND STILL DIE IN A HIT AND A HALF
- * ---------------------------------------------------------------------------
- * Those two facts are not in tension, and keeping them both is what this file
- * is for. Enemy life totals climb hard — one diamond in the Dust Flats, four in
- * the Prairie, seven in the pass, sixteen in the Galaxy — because the ladder in
- * `gunDamageAt` climbs with them, two whole lives a rung. The fight LOOKS three
- * times bigger by world three and takes the same four or five rounds, which is
- * exactly the intent: the numbers on the cards are the journey, the length of
- * the fight is the balance, and they are allowed to be different things.
- *
- * The number that must NOT move is the other one. Six hits to kill the player
- * is the feel of this game and always was — three diamonds and half a life a
- * shot — and the version that let it drift to twelve, and to fourteen by the
- * second world, was a game where the rider across the road could not hurt you
- * inside a single fight. `tools/sim.mjs asymmetry` gates that absolute.
- *
- * A boss is the same fight with more of it — three of your shots. Not
- * more, and the reason is the landmark rather than the boss: every boss carries
- * its world's special, a boss fight is the longest fight in the world it
- * belongs to, and a long fight eats eruptions. At four and a half shots the
- * Dust Flats boss ran nearly forty seconds, took three eruptions and killed
- * half of all runs that reached it — the fight was lost to the weather, not to
- * Big Jed.
- *
- * THE HALF-DIAMOND GRID IS NO LONGER IN THE WAY
- * ---------------------------------------------------------------------------
- * A bullet has to cost a half or a whole life. On a bar that ran three to ten,
- * `bar / 6` could only land on 0.5, 1.0 or 1.5 and "six hits, always" was not a
- * number the grid could express — it came out between four and a half and seven
- * depending on the world. On the straight-line spine above the bar is 3, 6, 9,
- * 12, 15, 18, so `bar / 6` lands exactly on the grid in every world and six is
- * six. The rounding is still there because a hand-edited table should not be
- * able to produce a bullet worth a third of a life.
+ * A boss is the same fight with half again as much of it — see BOSS_LIVES_MUL.
  */
 export const HITS_TO_KILL_PLAYER = 6;
-export const HITS_TO_KILL_ENEMY = 1.5;
-export const HITS_TO_KILL_BOSS = 3;
 
 /**
- * What a rider's bullet costs you in a given world — the FLOOR of it. Riders
- * past the halfway mark of a world can be carrying more; see
- * `enemyGunDamageAt`, which is what actually arms an enemy.
+ * How many riders a boss is worth.
+ *
+ * Half again, and the number is small because a boss fight's danger is its
+ * LENGTH rather than its bar. Every boss carries its world's landmark, the
+ * landmark's clock is real time, and a fight that runs thirteen rounds instead
+ * of eight takes two more eruptions and a dozen more shots at the player. At
+ * twice a rider — which is where this sat while a rider died in a hit and a
+ * half, and which was the same fight — Old Scratch ran fourteen rounds, erupted
+ * in nine fights out of ten and killed three quarters of everybody who reached
+ * him.
  */
+export const BOSS_LIVES_MUL = 1.5;
+
+/**
+ * The riders' own ladder: one diamond in the Dust Flats, two more every world.
+ *
+ * This used to be derived from the player's gun, which kept the shots-to-kill
+ * pinned at exactly a hit and a half everywhere and made the life totals
+ * whatever fell out — four in the Prairie, sixteen in the Galaxy. It is a
+ * ladder in its own right now, because how much life the man across the road is
+ * carrying is the most visible number in a fight and it should be a decision
+ * rather than a remainder.
+ *
+ * What that costs is a shots-to-kill that drifts: two for four worlds, then two
+ * and a half, then three, as the forge ladder runs out under a life total that
+ * does not. `tools/sim.mjs asymmetry` prints the drift and fails the build if
+ * it leaves 1.5–3.5 — a rider that dies to one shot has no fight in it, and one
+ * that takes four turns every duel into a war of attrition the bar cannot pay
+ * for.
+ */
+export const ENEMY_LIVES_BASE = 1;
+export const ENEMY_LIVES_PER_WORLD = 2;
+
+/**
+ * THE RIDERS' BULLET IS A LADDER TOO
+ * ---------------------------------------------------------------------------
+ * Half a life in the Dust Flats and half a life more every world, which is the
+ * other half of the pair with `enemyLives`: what the man across the road hits
+ * for, and how much of him there is to shoot at, are both written down rather
+ * than derived. The player's bar is what moves to keep the two honest —
+ * `HITS_TO_KILL_PLAYER` is a target the level curve is solved against and a
+ * band the harness gates, not a formula that decides anything.
+ *
+ * This is the FLOOR of it. Riders past the halfway mark of a world can be
+ * carrying more; see `enemyGunDamageAt`, which is what actually arms an enemy.
+ */
+export const ENEMY_DAMAGE_BASE = 0.5;
+export const ENEMY_DAMAGE_PER_WORLD = 0.5;
+
 export function enemyGunDamage(worldId) {
-  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
-  return toHalf(power.lives / HITS_TO_KILL_PLAYER);
+  const world = Math.max(1, Math.min(6, worldId || 1));
+  return toHalf(ENEMY_DAMAGE_BASE + (world - 1) * ENEMY_DAMAGE_PER_WORLD);
 }
 
 /**
@@ -247,14 +286,13 @@ export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
 
 /** How much life a rider of a given world carries, before its own spread. */
 export function enemyLives(worldId) {
-  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
-  return toHalf(power.damage * HITS_TO_KILL_ENEMY);
+  const world = Math.max(1, Math.min(6, worldId || 1));
+  return ENEMY_LIVES_BASE + (world - 1) * ENEMY_LIVES_PER_WORLD;
 }
 
-/** How much life that world's boss carries. */
+/** How much life that world's boss carries: half again its riders, always. */
 export function bossLives(worldId) {
-  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
-  return Math.max(2, Math.round(power.damage * HITS_TO_KILL_BOSS * 2) / 2);
+  return Math.max(2, Math.round(enemyLives(worldId) * BOSS_LIVES_MUL * 2) / 2);
 }
 
 /**
@@ -381,7 +419,7 @@ export const INN_PREMIUM_BASE = 130;
  * thing that ended a run was almost never one bad duel; it was nine duels
  * costing half a life each against a world holding two beds.
  */
-export const INN_BASIC_FRACTION = 0.45;
+export const INN_BASIC_FRACTION = 0.5;
 
 export function innBasicHeal(worldId, maxLives = STARTING_LIVES) {
   const scaled = maxLives * INN_BASIC_FRACTION + (worldId - 1) * 0.15;
@@ -389,19 +427,25 @@ export function innBasicHeal(worldId, maxLives = STARTING_LIVES) {
 }
 
 /**
- * What a bandage or a potion is actually worth to you, on the bar you are
- * standing on.
+ * What a healing item is actually worth to you, on the bar you are standing on.
  *
- * See the note over the two of them in src/game/items.js: a healing item is a
- * FRACTION of the player, not a fixed number of diamonds, or it turns into
- * litter three worlds after it was bought. `heal` is still on the item as the
- * number that fraction comes to on the starting bar, which is what the shop
- * card and the tooltip print when there is no bar to measure against.
+ * Two shapes, and the item says which it is (see the note over the three of
+ * them in src/game/items.js). A flat `heal` is a flat number of diamonds — the
+ * bandage's two, worth most of the bar in the Dust Flats and a ninth of it in
+ * the Galaxy, which is the right shape for the cheapest thing on the counter.
+ * A `healFraction` is a share of whatever bar you have grown, so the Med Kit is
+ * half of you and the Potion three quarters wherever you are standing.
+ *
+ * Fractions round UP to a whole diamond. Half of nine is four and a half and
+ * the grid can draw that, but "half your lives" is a promise a player checks
+ * against their own bar, and a promise that lands a half short of what they
+ * counted reads as a bug. Rounding up is also what makes the Med Kit worth
+ * carrying on an odd bar.
  */
 export function itemHeal(item, maxLives = STARTING_LIVES) {
   if (!item) return 0;
   if (!item.healFraction) return item.heal || 0;
-  return Math.max(0.5, Math.round(maxLives * item.healFraction * 2) / 2);
+  return Math.max(1, Math.ceil(maxLives * item.healFraction));
 }
 
 export function innBasicPrice(worldId) {
@@ -480,7 +524,7 @@ export const GUN_MAX_LEVEL = 6;
  * everything you point it at.
  */
 export const GUN_DAMAGE_BASE = 0.5;
-export const GUN_DAMAGE_PER_RUNG = 2;
+export const GUN_DAMAGE_PER_RUNG = 0.5;
 
 export function gunDamageAt(level) {
   const rungs = Math.min(GUN_MAX_LEVEL, Math.max(0, level));
@@ -497,36 +541,36 @@ export function gunDamageAt(level) {
  * steeper, and it is what stops a player who found one good boss purse from
  * buying two tiers with it.
  *
- *   level 0 → 1 |     195   a world-1 road, saved rather than eaten
- *   level 1 → 2 |     390   a world-2 road
- *   level 2 → 3 |     770   a world-3 road
- *   level 3 → 4 |   1,520   a world-4 road
- *   level 4 → 5 |   2,975   a world-5 road
- *   level 5 → 6 |   5,805   the Nova, out of the Galaxy's own takings
+ *   level 0 → 1 |      90   a couple of Dust Flats purses
+ *   level 1 → 2 |     130   the rest of the Dust Flats
+ *   level 2 → 3 |     180   early Prairie
+ *   level 3 → 4 |     255   late Prairie
+ *   level 4 → 5 |     360   the pass
+ *   level 5 → 6 |     505   the pass, and then it is done
  *
- * ONE RUNG PER WORLD, AND IT IS NOT OPTIONAL ANY MORE
+ * TWO RUNGS A WORLD, AND THEN THE FORGE IS FINISHED WITH YOU
  * ---------------------------------------------------------------------------
- * The curve above is SOLVED for that, against the gold the road actually pays
- * (`tools/sim.mjs asymmetry` prints both columns). It used to run 40 → 16,605,
- * which is a different game at each end: the first two rungs were pocket change
- * bought before the first shop and the last one was a locked door. Both of
- * those were symptoms of the same thing — a rung was worth half a life, so it
- * had to be priced as a curiosity early and a monument late.
+ * The curve is SOLVED for that against the gold the road actually pays
+ * (`tools/sim.mjs asymmetry` prints both columns), and the whole ladder is
+ * 1,520 of a full clear that pays about seventeen thousand.
  *
- * A rung is worth a life and a half now (`gunDamageAt`) and the enemy life
- * ladder is derived from it, so the gun is no longer a luxury the run can skip:
- * it is the toll for staying level with the road, and the price is one world's
- * takings, every world, all the way up. What is still a CHOICE is when to pay
- * it — a player who buys the rung the moment the forge appears eats worse for a
- * world, and a player who eats first fights a world at a rung down.
+ * That is a deliberate and fairly drastic reversal. It used to run 40 → 16,605
+ * — the whole run's savings for the last rung — and that made sense while a
+ * rung was worth two whole lives a shot. A rung is worth half a life again now,
+ * which is the size of the step the seven revolvers were designed around, and a
+ * ladder of half-life steps cannot be priced like a monument: at sixteen
+ * thousand for the top rung nobody would ever buy the gun the art was drawn
+ * for.
  *
- * The whole ladder is 11,655 against a full clear that pays about 17,000, which
- * leaves the difference for the food, the beds and the bandages that a run of
- * that length actually needs. Nothing here is bought twice.
+ * So the forge is an EARLY-GAME shop. It is the best gold on the road for three
+ * worlds — a rung shortens every fight of the world it is bought in — and by
+ * the Bayou there is nothing left on the plate. What the money does after that
+ * is what the later worlds are actually about: med kits, beds, and the
+ * legendaries that used to lose the argument with the next rung every time.
  */
-export const GUN_COST_BASE = 120;
-export const GUN_COST_GROWTH = 1.95;
-export const GUN_COST_ESCALATION = 0.09;
+export const GUN_COST_BASE = 90;
+export const GUN_COST_GROWTH = 1.35;
+export const GUN_COST_ESCALATION = 0.05;
 
 export function gunUpgradeCost(level) {
   if (level >= GUN_MAX_LEVEL) return Infinity;

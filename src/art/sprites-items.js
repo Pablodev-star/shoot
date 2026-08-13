@@ -6,7 +6,7 @@
  * one set. Rarity frames are 20 x 20 and drawn *behind* the icon with a 2px
  * inset, giving the icon a 2px border of rarity color.
  *
- * Icon list: bandage, poison, dynamite, potion, vest, diadem (anti-effect),
+ * Icon list: bandage, med kit, poison, dynamite, potion, vest, diadem,
  * map, bullet, life (red diamond), coin, carrot, apple, stew, feast, canteen,
  * dusk totem, horse token, skull (enemy marker), bed (inn), shop tag, hunger,
  * and the two duel abilities that are not also items — bullet steal and mind
@@ -95,6 +95,30 @@ const BASE_ICONS = {
     '..kwwwwwwwwwwk..',
     '...kkkkkkkkkk...',
     '................',
+    '................',
+  ],
+  /**
+   * A tin box with a handle, a lid seam and a red cross: the one icon in the
+   * set that has to read as "more than a bandage" at sixteen pixels, so it is
+   * built out of the two things a bandage does not have — a hard rectangular
+   * silhouette and a piece of metal on top of it.
+   */
+  medkit: [
+    '................',
+    '......kkkk......',
+    '.....ksXXsk.....',
+    '..kkkkkkkkkkkk..',
+    '.kwWWWWWWWWWWwk.',
+    '.kwwwwwwwwwwwwk.',
+    '.kKKKKKKKKKKKKk.',
+    '.kwwwwwwwwwwwwk.',
+    '.kwwwwwrrwwwwwk.',
+    '.kwwwwwrrwwwwwk.',
+    '.kwwwrrrrrrwwwk.',
+    '.kwwwrrrrrrwwwk.',
+    '.kwwwwwrrwwwwwk.',
+    '.kdddddrrdddddk.',
+    '..kkkkkkkkkkkk..',
     '................',
   ],
   poison: [

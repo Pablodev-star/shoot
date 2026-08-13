@@ -502,8 +502,9 @@ async function reportSpecials() {
  *   1. the power curve `progression.js` CLAIMS matches what the economy
  *      actually delivers, world by world;
  *   2. the riders in `worlds.js` carry the life `enemyLives()` says they should;
- *   3. the ratio between "shots to kill you" and "shots to kill them" stays in
- *      a band. That ratio is the whole feel of a duel.
+ *   3. both shots-to-kill stay in their bands — six-ish to kill the player,
+ *      one and a half to three and a half to kill a rider. Those two numbers
+ *      are the whole feel of a duel.
  */
 async function reportAsymmetry() {
   const delivered = powerCurve();
@@ -564,6 +565,22 @@ async function reportAsymmetry() {
     if (onPlayer < 4 || onPlayer > 8) {
       problems.push(`world ${w.id}: a rider needs ${onPlayer.toFixed(1)} hits to kill the player (want 4-8)`);
     }
+    /**
+     * …and the other side of it, which is no longer a constant.
+     *
+     * Enemy life totals are their own ladder now (`enemyLives` — two diamonds a
+     * world) rather than a multiple of the player's gun, so how many shots a
+     * rider takes is a RESULT: two for the first four worlds, and then more as
+     * the forge ladder runs out under a life ladder that does not. That drift
+     * is intended and it is bounded. Below one and a half a rider dies to the
+     * opening trade and nothing that happens after round one matters; above
+     * three and a half every duel is a war of attrition the bar cannot pay for,
+     * which is exactly how the novice lost the whole Dust Flats the last time
+     * this was tried.
+     */
+    if (onEnemy < 1.5 || onEnemy > 3.5) {
+      problems.push(`world ${w.id}: a rider takes ${onEnemy.toFixed(1)} of your shots (want 1.5-3.5)`);
+    }
   }
 
   console.log('\n=== THE ASYMMETRY: WHAT IT TAKES TO KILL EACH OF YOU ===');
@@ -590,7 +607,7 @@ async function runOnce(seed, policy) {
   const player = {
     level: 1, exp: 0, gold: 60, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
-    hunger: P.HUNGER_MAX, food: 44, heals: 1,
+    hunger: P.HUNGER_MAX, food: 44, heals: [ITEMS.bandage.heal],
   };
 
   const levelUp = () => {
@@ -639,7 +656,7 @@ async function runOnce(seed, policy) {
       if (TRACE) {
         console.log(`  W${worldId} ${String(ev.type).padEnd(6)} lives ${player.lives}/${player.maxLives}` +
           ` gold ${Math.round(player.gold)} gun ${player.gun} food ${Math.round(player.food)}` +
-          ` heals ${player.heals} hunger ${Math.round(player.hunger)}`);
+          ` heals ${player.heals.length} hunger ${Math.round(player.hunger)}`);
       }
 
       // --- what is standing there ------------------------------------------
@@ -651,12 +668,19 @@ async function runOnce(seed, policy) {
         // bag full of bandages and two thirds of a life bar uses one.
         const floor = player.maxLives * buy.healAt;
         if (buy.healBeforeFight) {
-          // A bandage is a fraction of the bar rather than a diamond, so how
-          // much one is worth is read off the bar the player is standing on.
-          const healSize = P.itemHeal(ITEMS.bandage, player.maxLives);
-          while (player.heals > 0 && player.lives <= floor) {
-            player.heals -= 1;
-            player.lives = Math.min(player.maxLives, player.lives + healSize);
+          // The bag holds different sizes now — a flat two out of a bandage, a
+          // share of the bar out of a med kit or a potion — so the model spends
+          // the SMALLEST thing that gets it back over the line, and only reaches
+          // for the big one when the small ones have run out. That is what a
+          // player does, and it is the difference between arriving at the Basin
+          // with three med kits and arriving with none.
+          player.heals.sort((a, b) => a - b);
+          while (player.heals.length && player.lives <= floor) {
+            const missing = player.maxLives - player.lives;
+            let pick = player.heals.findIndex((size) => size >= missing);
+            if (pick < 0) pick = player.heals.length - 1;
+            player.lives = Math.min(player.maxLives, player.lives + player.heals[pick]);
+            player.heals.splice(pick, 1);
           }
         }
         const phases = ev.type === 'boss' ? (world.boss.phases ? world.boss.phases.length : 1) : 1;
@@ -723,15 +747,40 @@ async function runOnce(seed, policy) {
             units -= 1;
           }
         }
-        // Then lives in a bottle. Slot zero of every shop is one of these.
-        const bandage = P.itemPrice(ITEMS.bandage, worldId);
+        /**
+         * Then lives in a box. Slot zero of every shop is one of these.
+         *
+         * There are three of them now and they are not interchangeable: a
+         * bandage is a flat two diamonds, a med kit is half the bar and a
+         * potion three quarters of it, at prices that do not move with the bar.
+         * So the model does what a player does and buys by VALUE — lives per
+         * gold, best first — down to whatever the counter has and whatever the
+         * profile is willing to put into healing. On a three-diamond bar the
+         * bandage wins that comparison outright; by the Basin the med kit wins
+         * it by a factor of three, and a run that keeps buying bandages out
+         * there is a run that dies with a full purse.
+         */
         let budget = player.gold * buy.healBudget;
-        let heals = averageStock(ITEMS.bandage.rarity);
-        while (heals > 0 && budget >= bandage && player.heals < 16) {
-          player.gold -= bandage;
-          budget -= bandage;
-          player.heals += 1;
-          heals -= 1;
+        const counter = ['bandage', 'medkit', 'potion']
+          .map((id) => ({
+            id,
+            price: P.itemPrice(ITEMS[id], worldId),
+            size: P.itemHeal(ITEMS[id], player.maxLives),
+            units: Math.min(ITEMS[id].stack, averageStock(ITEMS[id].rarity)),
+          }))
+          .sort((a, b) => b.size / b.price - a.size / a.price);
+        // A counter has three slots and one of them is the guaranteed heal, so
+        // three units of healing is the most any single shop can hand over even
+        // when the purse could buy the whole street.
+        let slots = 3;
+        for (const line of counter) {
+          while (slots > 0 && line.units > 0 && budget >= line.price && player.heals.length < 16) {
+            slots -= 1;
+            player.gold -= line.price;
+            budget -= line.price;
+            player.heals.push(line.size);
+            line.units -= 1;
+          }
         }
       }
     }

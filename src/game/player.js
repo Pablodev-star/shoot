@@ -541,13 +541,18 @@ export function spendBoonDuel() {
 // Carried gear the rest of the game asks about by name
 // ---------------------------------------------------------------------------
 
-/** True while a Bulletproof Vest is there to eat the next hit of a duel. */
+/**
+ * True while a Bulletproof Vest is in the bag — which is the only question
+ * anybody asks about it now.
+ *
+ * The vest is not spent. It stops one blow per DUEL and you patch it up on the
+ * road; the charge lives in the duel engine for the length of a fight (see
+ * `hasVest` on a side in src/duel/duel-engine.js) and this says whether the
+ * next fight gets one. There is deliberately no `consumeVest` any more: the
+ * only way to lose it is to sell it.
+ */
 export function hasVest() {
   return countOf('vest') > 0;
-}
-
-export function consumeVest() {
-  return removeItem('vest', 1);
 }
 
 /** True while the Anti-Effect Diadem is owned. */

@@ -78,10 +78,10 @@ const CATALOGUE = {
     rarity: 'common',
     basePrice: 12,
     context: 'anytime',
-    food: 22,
+    food: 20,
     stack: 6,
     depth: 3,
-    desc: 'Restores 22% hunger. Cheap and always in stock.',
+    desc: 'Restores 20% hunger. Cheap and always in stock.',
   },
   apple: {
     id: 'apple',
@@ -159,21 +159,25 @@ const CATALOGUE = {
    * that is what they are priced against: a bed is cheaper per life and a bed
    * is not there when a rider has you on your last diamond.
    *
-   * THEY HEAL A FRACTION OF YOU, NOT A NUMBER OF DIAMONDS
+   * A FLAT ONE, AND TWO THAT ARE A FRACTION OF YOU
    * -------------------------------------------------------------------------
-   * A bandage used to be worth exactly one life, which was a third of the bar
-   * on the road out of the Dust Flats and a seventeenth of it by the Galaxy —
-   * the same object, quietly turning into litter as the run went on. The bed
-   * has been a fraction of the bar for a while (`innBasicHeal`); this is the
-   * same rule applied to the two things you can drink standing up.
+   * Three things put lives back in the middle of a fight, and they are three
+   * different SHAPES on purpose.
    *
-   * A bandage is a third of you and a potion is three quarters, wherever you
-   * are standing. What still changes with the world is the PRICE — both inflate
-   * on the usual curve — so the cheap one stays the rescue you can always
-   * afford and the expensive one stays the decision.
+   * The bandage is a flat two diamonds. On the road out of the Dust Flats that
+   * is most of the bar and it is the difference between a run and a corpse; by
+   * the Galaxy it is a ninth of it and it is a top-up you carry eight of. That
+   * decay is the point — the cheapest thing on the counter should be a rescue
+   * early and small change late, or the shop has nothing to sell you.
    *
-   * `heal` is kept alongside as what the fraction comes to on the starting bar,
-   * because a shop card with "1" on it is worth more to a player than "0.33".
+   * The Med Kit and the Potion are written as a FRACTION of the bar (see
+   * `itemHeal` in src/game/progression.js), so they mean the same thing in
+   * every world: half of you and three quarters of you. They are what the
+   * later worlds are for, and what the price curve is charging for.
+   *
+   * `heal` sits alongside `healFraction` as what that fraction comes to on the
+   * starting bar, because a shop card reading "2" is worth more to a player
+   * than one reading "0.5 of maxLives".
    */
   bandage: {
     id: 'bandage',
@@ -182,19 +186,36 @@ const CATALOGUE = {
     rarity: 'common',
     basePrice: 35,
     context: 'anytime',
-    heal: 1,
-    healFraction: 1 / 3,
+    heal: 2,
     stack: 8,
-    desc: 'Patches up about a third of your lives.',
+    desc: 'Patches you up for 2 lives.',
+  },
+  /**
+   * The rare that scales. Half of whatever bar you are standing on, rounded
+   * UP, so it is two diamonds on the road out of the flats and nine in the
+   * Galaxy — the one healing item that is worth the same to a player at the
+   * end of the run as at the start of it.
+   */
+  medkit: {
+    id: 'medkit',
+    name: 'Med Kit',
+    icon: 'medkit',
+    rarity: 'rare',
+    basePrice: 80,
+    context: 'anytime',
+    heal: 2,
+    healFraction: 0.5,
+    stack: 4,
+    desc: 'Field surgery in a tin box. Puts half of you back together.',
   },
   potion: {
     id: 'potion',
     name: 'Potion',
     icon: 'potion',
     rarity: 'rare',
-    basePrice: 90,
+    basePrice: 130,
     context: 'anytime',
-    heal: 2.5,
+    heal: 3,
     healFraction: 0.75,
     stack: 5,
     desc: 'Puts three quarters of you back together in one gulp.',
@@ -215,6 +236,24 @@ const CATALOGUE = {
    */
 
   // --- Passives ------------------------------------------------------------
+  /**
+   * THE VEST IS KIT, NOT AMMUNITION
+   * -------------------------------------------------------------------------
+   * It used to be spent: one blow, gone out of the bag, buy another. Which
+   * made the most expensive thing on any counter a single-use item wearing a
+   * legendary's price — you paid four hundred gold for one round of one fight
+   * and then walked the rest of the world in a shirt.
+   *
+   * You KEEP it. It stops the first thing that hits you in a duel and comes
+   * apart doing it, and by the time the next rider is on the road you have
+   * patched it up again: one blow per fight, every fight, for as long as it is
+   * in the bag. That is what a legendary should be — a permanent change to how
+   * the road works, like the horse and the canteen, rather than a very
+   * expensive bandage.
+   *
+   * `stack` is one because a second one does nothing: the charge is per DUEL,
+   * not per vest.
+   */
   vest: {
     id: 'vest',
     name: 'Bulletproof Vest',
@@ -223,8 +262,8 @@ const CATALOGUE = {
     basePrice: 420,
     context: 'passive',
     passive: 'survive',
-    stack: 3,
-    desc: 'Worn over the shirt. Stops the first thing that hits you in a duel — a bullet, a blast, a rock — and breaks doing it.',
+    stack: 1,
+    desc: 'Worn over the shirt. Stops the first thing that hits you in a duel — a bullet, a blast, a rock — and you patch it up before the next one.',
   },
   diadem: {
     id: 'diadem',
@@ -310,11 +349,11 @@ const CATALOGUE = {
   /**
    * THE DUSK TOTEM — THE ONE ITEM THAT SPENDS ITSELF ON THE END OF THE RUN
    * -------------------------------------------------------------------------
-   * A vest stops one blow inside one duel. This stops the run ending,
-   * wherever the run was about to end: the last life to a rider's bullet, to a
-   * rock off an erupting mountain, or to an empty gauge on a road with nothing
-   * left to eat on it. It breaks, you come back on half your maximum lives with
-   * the gauge full, and it is gone.
+   * A vest stops one blow inside one duel and you keep it. This one is spent,
+   * and it stops the run ending wherever the run was about to end: the last
+   * life to a rider's bullet, to a rock off an erupting mountain, or to an
+   * empty gauge on a road with nothing left to eat on it. It breaks, you come
+   * back on half your maximum lives with the gauge full, and it is gone.
    *
    * It is also the only item in the game with a SCENE — see src/ui/totem.js.
    * Everything else that saves you does it in a toast; this one takes the
@@ -414,7 +453,7 @@ export const ITEM_LIST = Object.values(ITEMS);
 /** Items shops may stock, grouped by rarity (perks and food included). */
 export const SHOP_POOL = {
   common: ['carrot', 'apple', 'bandage'],
-  rare: ['potion', 'map', 'ledger', 'stew', 'canteen'],
+  rare: ['potion', 'medkit', 'map', 'ledger', 'stew', 'canteen'],
   legendary: ['vest', 'diadem', 'horse', 'silverTongue', 'feast', 'duskTotem'],
 };
 
