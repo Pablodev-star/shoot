@@ -32,6 +32,7 @@ import { openInventory } from '../ui/inventory-panel.js';
 import { openTrailMapForRun } from '../ui/map-panel.js';
 import { icon, rarityChip } from '../ui/widgets.js';
 import { trailBand } from '../ui/statusbar.js';
+import { EVENTS, on } from '../core/events.js';
 import { toast } from '../ui/toast.js';
 import { createInteriorScene } from './interior-scene.js';
 
@@ -172,6 +173,14 @@ export const ShopScreen = {
     root.append(screen);
     attachButtonSounds(screen);
 
-    return () => band.dispose();
+    // The counter follows the purse: sell something out of the saddlebag while
+    // standing at the stall and the thing you could not afford a moment ago is
+    // buyable without leaving and coming back.
+    const unsubGold = on(EVENTS.GOLD_CHANGED, renderStock);
+
+    return () => {
+      unsubGold();
+      band.dispose();
+    };
   },
 };

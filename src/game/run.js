@@ -18,6 +18,7 @@ import { createWalkEngine } from '../explore/walk-engine.js';
 import * as daynight from '../explore/daynight.js';
 import * as weather from '../explore/weather.js';
 import * as hunger from '../explore/hunger.js';
+import * as scene from '../core/scene.js';
 import {
   getState,
   newRun,
@@ -180,7 +181,20 @@ on(EVENTS.GAME_OVER, async () => {
 on(EVENTS.TOTEM_TRIGGERED, async () => {
   if (!run.started) return;
   run.engine?.pause();
+  /**
+   * And the road stops being DRAWN, not just walked.
+   *
+   * The totem plays over a black veil, so everything underneath it is work
+   * nobody can see — five layers of parallax, the weather and the traveller,
+   * every frame, competing with the one animation the player is being asked to
+   * tap on. The scene reads real time now rather than counting frames (see the
+   * two clocks in src/ui/totem.js), so a slow frame rate no longer stretches
+   * it; this is the other half of the same fix, and it is what makes the taps
+   * land the moment they are offered.
+   */
+  scene.stop();
   await playTotemRevival();
+  scene.start();
   breakTotem();
   toast('The totem broke instead of you', 'gold');
   await save();

@@ -15,42 +15,60 @@ import { SELL_RATIO } from './items.js';
 /**
  * exp needed to go from `level` to `level + 1`. Exponential, tunable.
  *
- * A LEVEL IS A WORLD
+ * THREE LEVELS EVERY TWO WORLDS
  * ---------------------------------------------------------------------------
- * Exactly one, and it is not a coincidence — it is the whole point. Four lives
- * a level (see LIVES_PER_LEVEL) and one level a world is what puts the player
- * on 3, 7, 11, 15, 19, 23 lives at the six borders, which is the bar the whole
- * of EXPECTED_POWER below is solved against. Levelling used to run at a ragged
- * 1.4 worlds a level and the bar landed wherever it landed; now the curve is
- * solved for the table.
+ * A level is worth one life — one more maximum and one more in the bar to go
+ * with it — and the curve pays out about three of them every two worlds, so
+ * the bar reads 3, 4, 6, 7, 9, 10 at the six borders.
  *
- * AND IT ARRIVES IN THE MIDDLE OF ONE
+ * That is a much flatter climb than this game used to have, and it changes
+ * what levelling IS. On four lives a level the bar tripled across a run and
+ * every enemy number had to be derived from it or the two sides came apart; on
+ * one life a level the bar barely doubles, so the road's own ladders — what a
+ * rider hits for and how much of him there is — do the work, and the level-up
+ * is a small steady reward rather than the difficulty curve in disguise.
+ *
+ * AND IT ARRIVES IN THE MIDDLE OF A WORLD
  * ---------------------------------------------------------------------------
  * Deliberately, and it is the other half of the ramp. From the halfway point of
- * a world half the riders carry the next rung of the gun (`enemyGunDamageAt`),
- * so the back half of every crossing is the dangerous half — and the level-up
- * is timed to land in the same stretch. The Dust Flats is the clearest case:
- * three diamonds against half-life bullets for two fights, then seven diamonds
- * against riders who hit for a whole one. The world gets harder and you get
- * bigger, in that order, once per world, six times.
+ * a world some riders carry the next rung of the gun (`enemyGunDamageAt`), so
+ * the back half of every crossing is the dangerous half — and the level-ups are
+ * timed to land in the same stretch. The world gets harder and you get bigger,
+ * in that order, about three times every two worlds.
  *
- * Cumulative exp needed, and where the road actually delivers it — the two
- * columns are meant to be read together, and `tools/sim.mjs asymmetry` fails
- * the build if they stop agreeing:
+ * Cumulative exp, and where the road actually delivers it — the two columns
+ * are meant to be read together, and `tools/sim.mjs asymmetry` fails the build
+ * if they stop agreeing:
  *
- *   level 2 |    100 · middle of world 1   level 5 | 1,500 · middle of world 4
- *   level 3 |    300 · middle of world 2   level 6 | 3,100 · late in world 5
- *   level 4 |    700 · middle of world 3   level 7 | 6,300 · out of reach
+ *   level 2 |     45 · the first fight     level 6 | 1,255 · middle of world 4
+ *   level 3 |    230 · end of world 1      level 7 | 1,851 · world 5
+ *   level 4 |    478 · middle of world 2   level 8 | 2,650 · middle of world 5
+ *   level 5 |    810 · world 3             level 9 | 3,721 · world 6
  *
- * Level seven is past the end of the game on purpose: twenty-three lives is
- * where the bar stops, the Stranger is built for twenty-three, and a run that
- * somehow fought its way to twenty-seven would be fighting a boss sized for
- * somebody else. The ladder ends where the road does.
  */
-export const EXP_BASE = 83;
-export const EXP_GROWTH = 2;
+export const EXP_BASE = 138;
+export const EXP_GROWTH = 1.34;
+
+/**
+ * The first level is cheap, and it is the only one that breaks the curve.
+ *
+ * Three diamonds is the shallowest bar the game ever has, and the Dust Flats
+ * is where the road first starts ramping (`enemyGunDamageAt`) — so world one
+ * is the one stretch where the player is at their most fragile at exactly the
+ * moment the riders get heavier. On the geometric curve alone the second level
+ * lands near the boss's door, which is a level-up arriving after the world it
+ * was needed for. At forty-five it lands on the FIRST fight — a rider out here
+ * is worth about fifty — so the fourth diamond is on the bar before the road
+ * has had a chance to take three off it.
+ *
+ * Everything above level two is the curve. The exception is priced so it does
+ * not shift the ladder: the cumulative totals from level three on are within a
+ * few dozen exp of what they would have been.
+ */
+export const FIRST_LEVEL_EXP = 45;
 
 export function expForNextLevel(level) {
+  if (level <= 1) return FIRST_LEVEL_EXP;
   return Math.round(EXP_BASE * Math.pow(EXP_GROWTH, level - 1));
 }
 
@@ -71,19 +89,20 @@ export function expForNextLevel(level) {
  * is six hits deep, and six hits deep is a fight you can afford to misplay
  * twice.
  *
- * It grows FOUR lives a level now, on a curve that gives out exactly one level
- * per world. The inflation was never the problem: the problem was that only the
- * player's side inflated. A player standing on fifteen lives is shot at for two
- * and is seven hits from the end of the run, against three on the road out of
- * the Dust Flats being shot at for a half and six hits from the end of it — the
- * bar grows a little faster than the bullet does, and that difference is what
- * pays for the late worlds' fights being longer.
+ * It grows ONE life a level, at about three levels every two worlds, so the
+ * whole climb is three diamonds to ten. The inflation was never the problem:
+ * the problem was that only the player's side inflated. What holds the two
+ * sides together now is that the rider's bullet is derived from this bar
+ * (`enemyGunDamage`) — a player on ten lives is shot at for one and is ten
+ * hits from the end of the run, against three lives and half a life a shot in
+ * the Dust Flats, which is six.
  *
- * How much of the bar a duel costs is the number actually being held steady,
- * about a third of it everywhere, and `node tools/sim.mjs asymmetry` fails the
- * build if the hits-to-kill behind it leaves four to eight.
+ * The number actually being held steady is how much of the bar a duel costs —
+ * about a third of it, everywhere — and `node tools/sim.mjs asymmetry` fails
+ * the build if the hits-to-kill behind it drifts out of what the length of
+ * that world's fights needs.
  */
-export const LIVES_PER_LEVEL = 4;
+export const LIVES_PER_LEVEL = 1;
 export const STARTING_LIVES = 3;
 
 /**
@@ -140,15 +159,33 @@ export const STARTING_LIVES = 3;
  */
 export const EXPECTED_POWER = {
   1: { lives: 3, damage: 0.5 },
-  2: { lives: 7, damage: 1.5 },
-  3: { lives: 11, damage: 2.5 },
-  4: { lives: 15, damage: 3.5 },
-  5: { lives: 19, damage: 3.5 },
-  6: { lives: 23, damage: 3.5 },
+  2: { lives: 4, damage: 1.5 },
+  3: { lives: 6, damage: 2.5 },
+  4: { lives: 7, damage: 3.5 },
+  5: { lives: 9, damage: 3.5 },
+  6: { lives: 10, damage: 3.5 },
 };
 
 /** Rounded to the half-diamond grid the whole game lives on. */
 const toHalf = (n) => Math.max(0.5, Math.round(n * 2) / 2);
+
+/**
+ * The same grid, but the error always falls on the player's side.
+ *
+ * Every damage figure in the game has to be a multiple of half a diamond, and
+ * on a bar of three to ten that grid is COARSE: the bullet the Basin wants is
+ * a third of the way between one and one and a half, and the two candidates
+ * are eight hits to kill the player and five and a bit. Rounding to nearest
+ * picks whichever is closer, which means a world's difficulty is decided by a
+ * rounding — and the two times it rounded UP, that world's duels went from a
+ * third of the bar to over half and the harness lit up.
+ *
+ * So the bullet rounds DOWN. A world is at worst slightly gentler than the
+ * curve asks for, never sharply meaner than it, and the shortfall is paid back
+ * by the ramp in the back half of the world (`enemyGunDamageAt`) — which is
+ * exactly the half-step the rounding just gave away.
+ */
+const toHalfDown = (n) => Math.max(0.5, Math.floor(n * 2) / 2);
 
 /**
  * HOW MANY CONNECTED SHOTS IT SHOULD TAKE TO KILL EACH OF YOU
@@ -193,7 +230,34 @@ const toHalf = (n) => Math.max(0.5, Math.round(n * 2) / 2);
  *
  * A boss is the same fight with half again as much of it — see BOSS_LIVES_MUL.
  */
-export const HITS_TO_KILL_PLAYER = 6;
+export const HITS_TO_KILL_PLAYER = 7;
+
+/**
+ * SIX HITS IS SIX HITS IN A FIVE-ROUND FIGHT, AND A DIFFERENT NUMBER IN A TEN
+ * ---------------------------------------------------------------------------
+ * What the game is actually holding steady is the PRICE OF A DUEL — about a
+ * third of the bar, in every world. Hits-to-kill is how that price is written
+ * down, and it only means the same thing while fights are the same length.
+ *
+ * They are not, any more. A rider takes two of your shots for four worlds and
+ * then three, because the forge ladder tops out at three and a half while the
+ * life ladder keeps climbing (see `enemyLives`), and a fight that runs ten
+ * rounds instead of five gives the man across the road twice as many chances
+ * to land one. Measured on a flat six hits: the Dust Flats cost a third of the
+ * bar a duel and the Galaxy cost SIXTY per cent.
+ *
+ * So the target scales with the length of the fight — three hits of headroom
+ * for every shot it takes to put a rider down — and the Galaxy asks for nine
+ * or ten where the Dust Flats asks for six. It is the same duel, priced the
+ * same, written in the only unit the bar can express.
+ */
+export const HITS_PER_SHOT_ON_THEM = 3;
+
+export function hitsToKillPlayer(worldId) {
+  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
+  const shots = enemyLives(worldId) / power.damage;
+  return Math.max(HITS_TO_KILL_PLAYER, HITS_PER_SHOT_ON_THEM * shots);
+}
 
 /**
  * How many riders a boss is worth.
@@ -230,24 +294,28 @@ export const ENEMY_LIVES_BASE = 1;
 export const ENEMY_LIVES_PER_WORLD = 2;
 
 /**
- * THE RIDERS' BULLET IS A LADDER TOO
+ * WHAT A RIDER'S BULLET COSTS YOU: THE BAR, OVER SIX
  * ---------------------------------------------------------------------------
- * Half a life in the Dust Flats and half a life more every world, which is the
- * other half of the pair with `enemyLives`: what the man across the road hits
- * for, and how much of him there is to shoot at, are both written down rather
- * than derived. The player's bar is what moves to keep the two honest —
- * `HITS_TO_KILL_PLAYER` is a target the level curve is solved against and a
- * band the harness gates, not a formula that decides anything.
+ * Derived again, and it went back to being derived the day the level curve
+ * changed. A hand-written ladder (half a life in the Dust Flats and half a
+ * life more every world) is the right shape only while the player's bar grows
+ * at the same rate — and on a bar that now gains ONE life a level at three
+ * levels every two worlds, a bullet climbing by a half every world would have
+ * the Galaxy killing you in three and a half hits where the Dust Flats takes
+ * six. The two cannot both be written down by hand; the bar is the one the
+ * player can see, so the bullet is the one that follows.
+ *
+ * What comes out is a ladder that still climbs, just more slowly — a half in
+ * the flats and the Prairie, a whole one through the pass and the Bayou, a
+ * life and a half out in the Basin and the Galaxy — and six hits to kill you
+ * in every world of the game, which is the number this file exists to hold.
  *
  * This is the FLOOR of it. Riders past the halfway mark of a world can be
  * carrying more; see `enemyGunDamageAt`, which is what actually arms an enemy.
  */
-export const ENEMY_DAMAGE_BASE = 0.5;
-export const ENEMY_DAMAGE_PER_WORLD = 0.5;
-
 export function enemyGunDamage(worldId) {
-  const world = Math.max(1, Math.min(6, worldId || 1));
-  return toHalf(ENEMY_DAMAGE_BASE + (world - 1) * ENEMY_DAMAGE_PER_WORLD);
+  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
+  return toHalfDown(power.lives / hitsToKillPlayer(worldId));
 }
 
 /**
@@ -277,6 +345,19 @@ export function enemyGunDamage(worldId) {
  */
 export const ENEMY_DAMAGE_RAMP_AT = 0.5;
 export const ENEMY_DAMAGE_STEP = 0.5;
+
+/**
+ * How many of the riders past that mark are carrying the heavier gun.
+ *
+ * It was half of them, on a bar that ran to twenty-three, where an extra half
+ * a diamond a shot was a rounding. On the bar this game has now — three at the
+ * start and ten at the end — half a diamond is the whole step between one rung
+ * of the enemy ladder and the next, so a ramped rider does not hit "a little
+ * harder", he hits like the world after this one. At one in two that made the
+ * back half of every world a different game from the front half; at one in
+ * three it is what it was meant to be, which is a warning.
+ */
+export const ENEMY_DAMAGE_RAMP_CHANCE = 1 / 3;
 
 export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
   const base = enemyGunDamage(worldId);

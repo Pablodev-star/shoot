@@ -26,7 +26,7 @@ import { el } from '../core/dom.js';
 import { setRenderer } from '../core/scene.js';
 import { EVENTS, on } from '../core/events.js';
 import { attachButtonSounds, playMusic } from '../core/audio.js';
-import { drawSprite, frameAt } from '../art/pixel.js';
+import { drawSprite, frameAt, tinted } from '../art/pixel.js';
 import {
   getCharacterSprites,
   CHARACTER_TIMING,
@@ -39,6 +39,7 @@ import {
 import { createParallax, heroX as heroAnchorX } from './parallax.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
+import { createVitalPops } from '../art/vital-pop.js';
 import { getEngine, quitToMenu } from '../game/run.js';
 import { getState, getInventory, countOf } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
@@ -187,8 +188,17 @@ export const ExploreScreen = {
     attachButtonSounds(screen);
     syncMapButton();
 
+    /**
+     * Eating and patching up, drawn on the traveller rather than announced in
+     * a toast. The bag can be opened from here, from a counter and from the
+     * middle of a fight, so the pop is driven by the event the bag fires and
+     * not by this screen knowing what was tapped — see src/art/vital-pop.js.
+     */
+    const pops = createVitalPops();
+
     // --- live bindings -----------------------------------------------------
     const unsubs = [
+      on(EVENTS.ITEM_USED, ({ effect, icon: iconName }) => pops.spawn(effect, iconName)),
       on(EVENTS.INVENTORY_CHANGED, () => {
         bagCount.textContent = String(totalItems());
         syncMapButton();
@@ -214,6 +224,7 @@ export const ExploreScreen = {
         // the same rule the weather follows. A world that stops the moment the
         // saddlebag opens is a world the player can tell is a backdrop.
         parallax.updateAmbient(dt, lastView);
+        pops.update(dt);
         parallax.setStructures(engine.visibleStructures());
       },
 
@@ -241,6 +252,21 @@ export const ExploreScreen = {
         const mounted = getState().hasHorse;
         parallax.drawGroundShadow(ctx, view, heroX, (mounted ? HORSE_SIZE.w : PLAYER_SIZE.w) * s, gy);
 
+        /**
+         * A meal or a bandage washes over whoever is on the road — the man on
+         * foot, or the man in the saddle without the horse he is sitting on.
+         * It is laid over the sprite's own silhouette rather than over a
+         * rectangle, so it takes the shape of the figure.
+         */
+        const wash = pops.wash();
+        const washed = (frame, x, y) => {
+          drawSprite(ctx, frame, x, y, s);
+          if (!wash) return;
+          ctx.globalAlpha = wash.alpha;
+          drawSprite(ctx, tinted(frame, wash.color, 1), x, y, s);
+          ctx.globalAlpha = 1;
+        };
+
         if (mounted) {
           const gait = walking ? 'gallop' : 'idle';
           const horseFrames = sprites.horse[gait];
@@ -255,12 +281,20 @@ export const ExploreScreen = {
 
           const riderFrames = sprites.rider.ride;
           const rider = riderFrames[frameAt(riderFrames, elapsed, CHARACTER_TIMING.ride)];
-          drawSprite(ctx, rider, heroX + RIDER_OFFSET.x * s, hy + RIDER_OFFSET.y * s, s);
+          washed(rider, heroX + RIDER_OFFSET.x * s, hy + RIDER_OFFSET.y * s);
         } else {
           const frames = walking ? sprites.player.walk : sprites.player.idle;
           const timing = walking ? CHARACTER_TIMING.walk : CHARACTER_TIMING.idle;
           const frame = frames[frameAt(frames, elapsed, timing)];
-          drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s);
+          washed(frame, heroX, gy - frame.height * s + 2 * s);
+        }
+
+        // …and the plus or the carrot, which starts ON his chest and rises out
+        // of it. Drawn whether he is on foot or in the saddle — the rider sits
+        // higher, so the chest is higher.
+        if (pops.active) {
+          const w = (mounted ? HORSE_SIZE.w : PLAYER_SIZE.w) * s;
+          pops.draw(ctx, heroX + w / 2, gy - (mounted ? 20 : 13) * s, s);
         }
 
         // Footfall dust while travelling — sand in the desert, dry earth off

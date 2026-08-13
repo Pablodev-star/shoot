@@ -24,7 +24,8 @@ import { getInventory, sellItem, useItem, getState, isEquipped } from '../game/p
 import { sellPrice } from '../game/progression.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from './toast.js';
-import { rarityChip, emptyState, icon, closeButton } from './widgets.js';
+import { rarityChip, emptyState, icon, closeButton, goldChip } from './widgets.js';
+import { hintGoldOrigin } from './gold-fly.js';
 
 const FILTERS = [
   { id: 'all', label: 'All', match: () => true },
@@ -65,6 +66,7 @@ export function openInventory(opts = {}) {
 
   function close() {
     unsubInv();
+    purse.dispose?.();
     document.removeEventListener('keydown', onKey);
     backdrop.remove();
     if (opts.onClose) opts.onClose();
@@ -152,7 +154,7 @@ export function openInventory(opts = {}) {
           ? el('button.btn.btn--sm', { disabled: true }, [actionLabel(item)])
           : el('button.btn.btn--sm.btn--gold', { onclick: () => doUse(item.id) }, [actionLabel(item)]),
         el('button.btn.btn--sm.btn--danger', {
-          onclick: () => doSell(item.id),
+          onclick: (e) => doSell(item.id, e.currentTarget),
           'data-tip': 'Sell one for half its shop price',
         }, ['Sell', icon('coin', 0.9), String(value)]),
       ]),
@@ -177,7 +179,9 @@ export function openInventory(opts = {}) {
     else renderAll();
   }
 
-  function doSell(id) {
+  function doSell(id, source) {
+    // The coins leave the card that was sold — see `hintGoldOrigin`.
+    hintGoldOrigin(source || null);
     const value = sellItem(id);
     if (value > 0) toast(`Sold for ${value} gold`, 'gold');
     renderAll();
@@ -233,11 +237,20 @@ export function openInventory(opts = {}) {
     renderDetail();
   }
 
+  /**
+   * The bag's own purse, and it is a real one: `goldChip` registers itself
+   * with src/ui/gold-fly.js, so selling something from in here has the coins
+   * cross to this pill and the number run up under them. It used to be a
+   * hand-built span painted once when the panel opened, which meant the total
+   * in front of you was wrong from the first sale onwards.
+   */
+  const purse = goldChip(getState().gold);
+
   const modal = el('div.panel.modal.inv-modal', { role: 'dialog', 'aria-label': 'Saddlebag' }, [
     el('div.modal-header', {}, [
       el('h2.panel-title', { text: 'Saddlebag' }),
       el('div.row', {}, [
-        el('span.chip.chip--gold', {}, [icon('coin', 1), String(getState().gold)]),
+        purse,
         closeButton(close),
       ]),
     ]),
