@@ -1396,8 +1396,26 @@ export const DuelScreen = {
         isBoss,
         worldId,
         rounds: roundLog.length,
-        shotsFired: roundLog.filter((r) => r.playerFires).length,
-        hits: roundLog.filter((r) => r.hits.enemy).length,
+        /**
+         * THREE NUMBERS, NOT TWO, AND NONE OF THEM IS THE OVERVIEW'S
+         * -------------------------------------------------------------------
+         * The table below counts what a player wants to read after a fight.
+         * The ledger has to count what actually left the barrel, and the
+         * engine's round log says it in a way that is easy to get wrong twice:
+         *
+         *   `playerFires` is already `fired && !wide` — a shot thrown off by a
+         *   blind is not in it at all, so a round that went wide would have
+         *   quietly disappeared from a marksmanship record rather than ruining
+         *   it. `playerWide` is the half that was missing.
+         *
+         *   `hits.enemy` is "the rival was hurt this round" by ANYTHING — a
+         *   stick of dynamite landing, a shot bounced back off a mirror — so
+         *   on its own it would credit an ability's damage to the revolver.
+         *   Pairing it with `playerFires` keeps it to shots.
+         */
+        shotsFired: roundLog.filter((r) => r.playerFires || r.playerWide).length,
+        shotsWide: roundLog.filter((r) => r.playerWide).length,
+        shotsLanded: roundLog.filter((r) => r.playerFires && r.hits.enemy).length,
         livesLeft: sides.player.lives,
         tookDamage,
         abilitiesCast,
