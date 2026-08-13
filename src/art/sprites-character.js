@@ -688,8 +688,13 @@ export const VEST_TRACK = {
 // RIDER — 16 x 21, the seated upper body drawn over the horse.
 // ---------------------------------------------------------------------------
 
-/** Hips, thigh and the leg in the stirrup. Trousers and boot, same as on foot. */
-const RIDER_LEGS = [
+/**
+ * Hips, thigh and the leg in the stirrup — four rows where the standing leg
+ * has six, with the boot one row higher. The wardrobe dresses this block the
+ * same way it dresses a walk pose (see the band maps in
+ * src/art/sprites-wardrobe.js) and hands the result back as `parts.riderLegs`.
+ */
+export const RIDER_LEGS = [
   '...kbbbbbbbbk...',
   '....kbbbbbbbk...',
   '......kbbbbk....',
@@ -706,9 +711,9 @@ const RIDER_LEGS = [
  * is wearing rides with them — a rider in last season's serape while the man on
  * foot wears a duster is the kind of seam a wardrobe cannot have.
  */
-function riderFrames(head, torso) {
+function riderFrames(head, torso, legs) {
   const seated = stamp([...torso.slice(0, 3), ...torso.slice(4)], ['G'], 13, 5);
-  const body = [...head, ...seated, ...RIDER_LEGS];
+  const body = [...head, ...seated, ...(legs || RIDER_LEGS)];
   return {
     ride: [
       body,
@@ -1120,7 +1125,7 @@ export function getCharacterSprites() {
   cache = {
     player: composeFighter(parts),
     rider: bakeSet(
-      riderFrames(parts.head || HEAD, parts.torso || TORSO),
+      riderFrames(parts.head || HEAD, parts.torso || TORSO, parts.riderLegs),
       parts.key ? { ...KEY, ...parts.key } : KEY,
     ),
     horse: horseCache,

@@ -52,7 +52,7 @@
 
 import { PALETTE } from './palette.js';
 import { bake } from './pixel.js';
-import { FACE, LEGS, TORSO, stamp, fighterStill } from './sprites-character.js';
+import { FACE, LEGS, RIDER_LEGS, TORSO, stamp, fighterStill } from './sprites-character.js';
 
 /** What an outfit is, and what you are wearing before you have earned a thing. */
 export const DEFAULT_OUTFIT = { hat: 'trail', shirt: 'serape', pants: 'trail', boots: 'trail' };
@@ -139,11 +139,31 @@ function tint(rows, indexes, from, to) {
 }
 
 /**
- * Raise the boot line. The rig's own boot is the fifth row of a leg; a riding
- * boot takes the fourth as well, and a wader takes the third on top of that.
+ * Raise the boot line: a riding boot swallows the shin the trousers just
+ * painted, and a wader takes the calf above it as well.
  */
-const bootTops = (rows, height = 1) =>
-  tint(rows, height >= 2 ? [2, 3] : [3], 'b', 'B');
+const bootTops = (rows, band, height = 1) =>
+  tint(rows, height >= 2 ? [...band.calf, ...band.shin] : band.shin, 'b', 'B');
+
+/**
+ * WHICH ROW IS A KNEE
+ * ---------------------------------------------------------------------------
+ * A garment says where its fringe hangs by naming a part of the leg, never a
+ * row number, because THE PLAYER HAS TWO SETS OF LEGS. On foot they are the six
+ * rows of a walk pose; in the saddle they are four, seated and foreshortened,
+ * with the boot one row higher. A transform written against row 3 would put a
+ * spur through a horse's ribs.
+ *
+ * So every transform takes a band map, and there is one of these per leg block.
+ * Chaps are fringed down the thigh in both of them, and neither of them had to
+ * be told what a thigh is.
+ */
+const STAND_BANDS = {
+  top: [1], upper: [1, 2], lower: [2, 3], thigh: [1, 2, 3], calf: [2], shin: [3], boot: [4],
+};
+const RIDE_BANDS = {
+  top: [1], upper: [1], lower: [1, 2], thigh: [1, 2], calf: [1], shin: [2], boot: [3],
+};
 
 // ---------------------------------------------------------------------------
 // HATS — 11 rows, stamped over the bare face.
@@ -463,42 +483,42 @@ export const PANTS = {
   chaps: {
     key: { b: PALETTE.leatherDark, c: PALETTE.sandDark, C: PALETTE.leather },
     hip: hip('CbbbbbbC'),
-    transform: (rows) => outside(rows, [1, 2, 3], 'c'),
+    transform: (rows, band) => outside(rows, band.thigh, 'c'),
   },
 
   /** Town trousers with a gold seam up the outside of each leg. */
   stripe: {
     key: { b: PALETTE.charDark, c: PALETTE.gold, C: PALETTE.goldDark },
     hip: hip('bbCccCbb'),
-    transform: (rows) => seam(rows, [1, 2], 'c'),
+    transform: (rows, band) => seam(rows, band.upper, 'c'),
   },
 
   /** Riveted plate over the thighs. Heavy, and it looks it. */
   iron: {
     key: { b: PALETTE.greyDark, c: PALETTE.steelDark, C: PALETTE.steel },
     hip: hip('cbbbbbbc'),
-    transform: (rows) => studs(tint(rows, [1, 2], 'b', 'c'), [2], 'C'),
+    transform: (rows, band) => studs(tint(rows, band.upper, 'b', 'c'), band.calf, 'C'),
   },
 
   /** Scorched Basin leggings with the cracks still glowing through them. */
   ash: {
     key: { b: PALETTE.char, c: PALETTE.magma, C: PALETTE.emberGlow },
     hip: hip('bccccccb'),
-    transform: (rows) => studs(seam(rows, [2], 'c'), [1], 'C'),
+    transform: (rows, band) => studs(seam(rows, band.calf, 'c'), band.top, 'C'),
   },
 
   /** Cloth with a sky in it. The stars sit on the inside of the stride. */
   star: {
     key: { b: PALETTE.cosmic, c: PALETTE.star, C: PALETTE.astral },
     hip: hip('bCcccCbb'),
-    transform: (rows) => studs(studs(rows, [1], 'c'), [3], 'C'),
+    transform: (rows, band) => studs(studs(rows, band.top, 'c'), band.shin, 'C'),
   },
 
   /** Fur-lined for the pass, with the pelt turned out down the sides. */
   quilted: {
     key: { b: PALETTE.snowDeep, c: PALETTE.snow, C: PALETTE.snowMid },
     hip: hip('cbbbbbbc'),
-    transform: (rows) => outside(rows, [2, 3], 'c'),
+    transform: (rows, band) => outside(rows, band.lower, 'c'),
   },
 };
 
@@ -515,37 +535,37 @@ export const BOOTS = {
   /** Riding boots, and a rowel spur behind each heel. */
   spurs: {
     key: { B: PALETTE.leatherDark, v: PALETTE.goldLight },
-    transform: (rows) => outside(bootTops(rows), [4], 'v'),
+    transform: (rows, band) => outside(bootTops(rows, band), band.boot, 'v'),
   },
 
   /** Pass boots: tall, with the fleece turned down over the top. */
   snow: {
     key: { B: PALETTE.snowShade, v: PALETTE.bone },
-    transform: (rows) => tint(bootTops(rows), [3], 'B', 'v'),
+    transform: (rows, band) => tint(bootTops(rows, band), band.shin, 'B', 'v'),
   },
 
   /** Bayou waders. Up past the knee, because down there everything is. */
   waders: {
     key: { B: PALETTE.bogLight, v: PALETTE.rot },
-    transform: (rows) => tint(bootTops(rows, 2), [2], 'B', 'v'),
+    transform: (rows, band) => tint(bootTops(rows, band, 2), band.calf, 'B', 'v'),
   },
 
   /** Basin boots with the melt still running out of the welt. */
   ember: {
     key: { B: PALETTE.charDark, v: PALETTE.magma },
-    transform: (rows) => studs(bootTops(rows), [4], 'v'),
+    transform: (rows, band) => studs(bootTops(rows, band), band.boot, 'v'),
   },
 
   /** They leave light where they land. */
   star: {
     key: { B: PALETTE.voidRock, v: PALETTE.astralLight },
-    transform: (rows) => outside(bootTops(rows), [4], 'v'),
+    transform: (rows, band) => outside(bootTops(rows, band), band.boot, 'v'),
   },
 
   /** Gilt from the toe to the top. Loud, and meant to be. */
   gilded: {
     key: { B: PALETTE.goldDark, v: PALETTE.goldLight },
-    transform: (rows) => seam(bootTops(rows), [3, 4], 'v'),
+    transform: (rows, band) => seam(bootTops(rows, band), [...band.shin, ...band.boot], 'v'),
   },
 };
 
@@ -564,14 +584,18 @@ export function normalizeOutfit(outfit = {}) {
   return out;
 }
 
-/** Trousers first, then boots over the top of them. */
+/** Dress one leg block: trousers first, then boots over the top of them. */
+function dressLegs(rows, pants, boots, band) {
+  let art = pants.hip ? [pants.hip, ...rows.slice(1)] : [...rows];
+  if (pants.transform) art = pants.transform(art, band);
+  if (boots.transform) art = boots.transform(art, band);
+  return art;
+}
+
 function buildLegs(pants, boots) {
   const out = {};
   for (const [pose, rows] of Object.entries(LEGS)) {
-    let art = pants.hip ? [pants.hip, ...rows.slice(1)] : [...rows];
-    if (pants.transform) art = pants.transform(art);
-    if (boots.transform) art = boots.transform(art);
-    out[pose] = art;
+    out[pose] = dressLegs(rows, pants, boots, STAND_BANDS);
   }
   return out;
 }
@@ -596,6 +620,14 @@ export function outfitParts(outfit) {
     torso: shirt.torso,
     flare: shirt.flare,
     legs: buildLegs(pants, boots),
+    /**
+     * The same trousers and the same boots, on the seated leg. Without this the
+     * rig falls back to its own bare RIDER_LEGS: the colours would still be
+     * right (the key is the outfit's) but the fringe, the tall boot and the
+     * spur would all get off the horse — which is exactly the seam the whole
+     * one-rig approach exists to avoid.
+     */
+    riderLegs: dressLegs(RIDER_LEGS, pants, boots, RIDE_BANDS),
     key: { ...hat.key, ...shirt.key, ...pants.key, ...boots.key },
   };
 }
