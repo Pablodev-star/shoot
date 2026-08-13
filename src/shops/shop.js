@@ -73,11 +73,25 @@ export function averageStock(rarity) {
   return Object.entries(odds).reduce((sum, [n, w]) => sum + Number(n) * w, 0) / total;
 }
 
-/** How many of one item this counter got in. */
-function rollUnits(item, rng) {
+/**
+ * How many of one item this counter got in.
+ *
+ * `keepStocked` is the medicine shelf: the guaranteed heal in slot zero rolls
+ * its depth on the COMMON table whatever its own rarity is, so a counter whose
+ * heal came up a med kit has two of them the way a counter whose heal came up
+ * a bandage does. The point of that slot is that gold can always be turned into
+ * lives; a slot that guarantees the item and then puts one of it on the shelf
+ * only half-keeps the promise, and it is the late worlds — where the heal that
+ * gets rolled is nearly always one of the rare ones — that it was quietly
+ * breaking.
+ */
+function rollUnits(item, rng, keepStocked = false) {
   if (!item.stack || item.stack <= 1) return 1;
-  const rolled = Number(rng.weighted(STOCK_ODDS[item.rarity] || STOCK_ODDS.legendary));
-  return Math.max(1, Math.min(item.depth ?? Infinity, rolled));
+  const odds = keepStocked
+    ? STOCK_ODDS.common
+    : STOCK_ODDS[item.rarity] || STOCK_ODDS.legendary;
+  const rolled = Number(rng.weighted(odds));
+  return Math.max(1, Math.min(item.depth ?? Infinity, item.stack, rolled));
 }
 
 /**
@@ -120,21 +134,25 @@ export function generateStock(worldId, seed) {
    * luck rather than by play: the decision was made correctly and the game
    * refused to honour it.
    *
-   * So slot zero is a heal. Which heal still depends on the world's table (a
-   * bandage in the flats, a potion where potions are what the table offers),
+   * So slot zero is a heal. Which heal still depends on the world's table — a
+   * bandage where it rolls common, a med kit or a potion where it rolls rare,
+   * which is most of the time by the Basin and almost never in the flats, and
+   * is exactly the right shape: the world where two diamonds stops being a
+   * rescue is the world that starts putting the big ones on the counter —
    * the price is the ordinary price, and the discount roll is the ordinary
    * roll — the guarantee is only that gold can always be turned into lives.
    * Everything else on the counter is still whatever the road felt like.
    */
-  const HEALS = ['potion', 'bandage'];
+  const HEALS = { common: 'bandage', rare: ['medkit', 'potion'] };
 
   /** One counter entry, with as many of the thing on it as it can hold. */
   const entry = (item, slot) => {
     const fullPrice = itemPrice(item, worldId);
     const discounted = rng.chance(discountChance);
     // Rolled off the item's rarity, capped by anything the item says about
-    // itself. See STOCK_ODDS above.
-    const units = rollUnits(item, rng);
+    // itself — except in the guaranteed heal slot, which is kept stocked. See
+    // STOCK_ODDS above.
+    const units = rollUnits(item, rng, slot === 0 && !!item.heal);
     return {
       slot,
       item,
@@ -152,7 +170,9 @@ export function generateStock(worldId, seed) {
 
   const stock = [];
   const taken = new Set();
-  const guaranteed = rng.weighted(world.rarity) === 'common' ? 'bandage' : rng.pick(HEALS);
+  const guaranteed = rng.weighted(world.rarity) === 'common'
+    ? HEALS.common
+    : rng.pick(HEALS.rare);
   taken.add(guaranteed);
   stock.push(entry(getItem(guaranteed), 0));
 

@@ -33,7 +33,6 @@ import {
   getState,
   setLives,
   hasVest,
-  consumeVest,
   hasTotem,
   breakTotem,
   isImmuneToEffects,
@@ -93,7 +92,7 @@ const BULLET_MS = 260;
  * look, from inside the fight, like a legendary that did nothing — the rounds
  * it loads are loaded when a duel starts, and this one already has.
  */
-const DUEL_ITEMS = ['bandage', 'potion', 'carrot', 'apple', 'stew'];
+const DUEL_ITEMS = ['bandage', 'medkit', 'potion', 'carrot', 'apple', 'stew'];
 
 /** Combine weather and night into the modifier set the engine understands. */
 function buildModifiers() {
@@ -330,7 +329,7 @@ export const DuelScreen = {
         );
       }
       if (side.hasVest) {
-        row.append(effectBadge('vest', { label: 'Vest — stops the next hit', tone: 'is-good' }));
+        row.append(effectBadge('vest', { label: 'Vest — stops one hit a duel', tone: 'is-good' }));
       }
       // It stays on the card until it is spent, and it disappears the moment
       // it is: the badge going is how the player learns the totem was used on
@@ -770,13 +769,17 @@ export const DuelScreen = {
     // --- engine events -----------------------------------------------------
     function handleEngineEvent(event) {
       if (event.type === 'vest' && !vestConsumed) {
+        // Once per duel, and the vest stays in the bag: what is spent is the
+        // fight's charge, not the item. `vestConsumed` is the guard that keeps
+        // one fight to one blow — the engine has already cleared its own flag,
+        // this only stops a second animation if two things land at once.
         vestConsumed = true;
-        consumeVest();
         // Whatever it stopped — a round, a rock off a volcano, a stick of
-        // dynamite — the vest stopped one thing and is now scrap. The words
-        // and the fall both wait for the blow to land: see `flushVestBreak`.
+        // dynamite — the vest stopped one thing and is off you for the rest of
+        // this fight. The words and the fall both wait for the blow to land:
+        // see `flushVestBreak`.
         vestBreaking = event.side || 'player';
-        toast('Your vest took the hit', 'good');
+        toast('Your vest took the hit — you patch it up on the road', 'good');
       }
       // An ability going off lights its own icon rather than printing its name
       // over the fight: the picture is already on screen, and the player has

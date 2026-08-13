@@ -102,10 +102,20 @@ export const WORLDS = [
     priceMul: 1.15,
     goldMul: 1.5,
     expMul: 1.4,
+    /**
+     * Six, and it stayed six while the Basin and the Galaxy came down.
+     *
+     * A Prairie duel is still two shots and about a quarter of the bar — the
+     * gun keeps pace out here — so the world is not one of the ones whose
+     * fights got longer. It is also where the money for the pass comes from,
+     * and the harness is blunt about that: cutting it to five measurably cost
+     * runs in world three, because a fight skipped in a world you can afford is
+     * a rung of gun you do not have in the world you cannot.
+     */
     encounters: { duels: 6 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
-      lives: { 3: 30, 4: 45, 5: 25 },
+      lives: { 2: 25, 3: 50, 4: 25 },
       abilityChance: 0.14,
       abilities: ['lassoPull', 'hornetSwarm'],
       accuracy: 0.42,
@@ -116,7 +126,7 @@ export const WORLDS = [
     boss: {
       name: 'Barbwire Bill',
       archetype: 'bossBarbwire',
-      lives: 7.5,
+      lives: 4.5,
       abilities: ['hornetSwarm', 'lassoPull'],
       accuracy: 0.55,
       special: 'hornetTree',
@@ -145,7 +155,7 @@ export const WORLDS = [
     encounters: { duels: 5 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
-      lives: { 6: 30, 7: 45, 8: 25 },
+      lives: { 4: 25, 5: 50, 6: 25 },
       abilityChance: 0.13,
       abilities: ['coldGrip', 'whiteout', 'deepFreeze'],
       accuracy: 0.46,
@@ -154,30 +164,25 @@ export const WORLDS = [
       specialChance: 0.14,
     },
     /**
-     * THIRTEEN, WHERE THE DERIVED FIGURE IS THIRTEEN AND A HALF
+     * WATCH THIS ONE WHENEVER THE LADDERS MOVE
      * -----------------------------------------------------------------------
-     * Half a diamond, and it is worth a WHOLE SHOT. A player arrives at Kate
-     * with the pass's gun, six and a half a round: thirteen is exactly two
-     * shots and thirteen and a half is three. Every boss total lands somewhere
-     * on that staircase, and hers landed a tick over the step.
-     *
-     * That would be a rounding on anybody else and it is not on her, because
-     * she is the only boss in the game holding a trick that takes a TURN off
-     * the player rather than lives, standing under a landmark that erupts every
-     * few seconds. A frozen turn is a free round for her, a free round is
-     * another eruption, and the third shot she was asking for turned a
-     * seven-round fight into a ten-round one: measured, she killed a third of
+     * Kate is the boss the harness has caught twice, and always the same way:
+     * she is the only one in the game holding a trick that takes a TURN off the
+     * player rather than lives, and she stands under a landmark that erupts
+     * every few seconds. A frozen turn is a free round for her, a free round is
+     * another eruption, and one extra shot on her bar turns a seven-round fight
+     * into a ten-round one — the last time that happened she killed a third of
      * everybody who reached her, more than twice the next worst boss.
      *
-     * Taking the freeze out of her hand was tried and made it worse — with one
+     * Taking the freeze out of her hand was tried and made it WORSE: with one
      * trick left she reaches for the whiteout every time and the fight goes
-     * blind instead. So she keeps her hand and gives back the half diamond, and
-     * the cornice can be the thing that makes the Whitecrown frightening.
+     * blind instead. So the thing to move is her bar, and to move it in whole
+     * shots of whatever gun the pass hands the player.
      */
     boss: {
       name: 'Whiteout Kate',
       archetype: 'bossWhiteout',
-      lives: 13,
+      lives: 7.5,
       abilities: ['deepFreeze', 'whiteout'],
       accuracy: 0.58,
       special: 'cornice',
@@ -193,10 +198,10 @@ export const WORLDS = [
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { duels: 7 },
+    encounters: { duels: 6 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
-      lives: { 9: 25, 10: 40, 11: 25, 12: 10 },
+      lives: { 6: 30, 7: 40, 8: 25, 9: 5 },
       abilityChance: 0.28,
       abilities: ['poison', 'mireGrasp', 'willOWisp', 'swampFever'],
       accuracy: 0.5,
@@ -206,8 +211,15 @@ export const WORLDS = [
     },
     boss: {
       name: 'Colonel Sable',
+      /**
+       * A shade over his derived total (ten and a half), and Old Scratch the
+       * same, because these two are the only bosses in the game the harness
+       * measures at a HUNDRED per cent for every skill band. They are fought
+       * with a maxed gun on the deepest bar the player has ever had, and at the
+       * derived figure they are a formality standing between two hard worlds.
+       */
       archetype: 'bossSable',
-      lives: 19.5,
+      lives: 12.5,
       abilities: ['willOWisp', 'swampFever', 'poison'],
       accuracy: 0.62,
       special: 'blackdamp',
@@ -227,10 +239,20 @@ export const WORLDS = [
     priceMul: 1.9,
     goldMul: 3.8,
     expMul: 3.2,
-    encounters: { duels: 7 },
+    /**
+     * FIVE, BECAUSE A BASIN DUEL IS HALF AGAIN AS LONG AS A BAYOU ONE
+     * -----------------------------------------------------------------------
+     * This is where the forge ladder runs out (`EXPECTED_POWER`): the gun stops
+     * at three and a half and the riders keep climbing, so a fight out here
+     * takes two and a half shots instead of two and runs seven rounds instead
+     * of five. A world costs duels times the cost of a duel, and when the
+     * second number goes up by half the first one has to come down or the bar
+     * cannot pay for it. Seven of these was three whole life bars.
+     */
+    encounters: { duels: 5 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
-      lives: { 12: 25, 13: 40, 14: 25, 15: 10 },
+      lives: { 8: 30, 9: 40, 10: 25, 11: 5 },
       abilityChance: 0.36,
       abilities: ['dynamite', 'magmaSpout', 'cinderSnatch', 'hellWhisper'],
       accuracy: 0.55,
@@ -242,7 +264,7 @@ export const WORLDS = [
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
-      lives: 25.5,
+      lives: 16,
       abilities: ['magmaSpout', 'hellWhisper', 'dynamite'],
       accuracy: 0.66,
       special: 'volcano',
@@ -264,11 +286,16 @@ export const WORLDS = [
     priceMul: 2.4,
     goldMul: 5,
     expMul: 4.5,
-    /** The Galaxy is short and brutal: a corridor straight to the boss. */
-    encounters: { duels: 5 },
+    /**
+     * The Galaxy is short and brutal: a corridor straight to the boss. Four
+     * now rather than five, for the same reason the Basin lost two — out here a
+     * rider carries eleven diamonds against a gun that stopped at three and a
+     * half, and a single duel costs over half the bar.
+     */
+    encounters: { duels: 4 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
-      lives: { 15: 22, 16: 38, 17: 25, 18: 15 },
+      lives: { 10: 30, 11: 40, 12: 22, 13: 8 },
       abilityChance: 0.48,
       abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
       accuracy: 0.6,
@@ -276,10 +303,16 @@ export const WORLDS = [
       special: 'rift',
       specialChance: 0.22,
     },
-    /** Two phases — see src/duel/duel-engine.js `phases`. */
+    /**
+     * Two phases — see src/duel/duel-engine.js `phases` — nine diamonds each,
+     * a shade over the eight and a half his world's riders derive. Eighteen
+     * across the pair is the largest bar in the game and it is the last fight
+     * in it; ten each was tried and took the completion rate of everybody but
+     * an expert to almost nothing, which is a wall rather than an ending.
+     */
     boss: {
       name: 'THE STRANGER',
-      lives: 16,
+      lives: 9,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
       accuracy: 0.72,
       archetype: 'bossStranger',
@@ -320,7 +353,7 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 16,
+          lives: 9,
           accuracy: 0.72,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
@@ -329,7 +362,7 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 16,
+          lives: 9,
           accuracy: 0.74,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',

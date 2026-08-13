@@ -43,23 +43,26 @@ version of this once shipped where it had quietly grown to *twelve* in the Dust
 Flats and *fourteen* by the second world, because the player's life bar and the
 rider's bullet were two numbers in two files growing at different rates.
 
-Everything on the other side of the road is derived from where you are now —
-see `EXPECTED_POWER` in `src/game/progression.js`. The whole game is two
-columns:
+The road has two ladders and they are written down by hand — a rider hits for
+half a life more every world, and carries two diamonds more every world. Your
+side is what the game is tuned to hold up against them: a bar that starts at
+three and grows four a level, one level a world, and a forge ladder worth half
+a life a rung. See `EXPECTED_POWER` in `src/game/progression.js`.
 
-| World | You have | A rider hits for | A rider carries |
-| --- | --- | --- | --- |
-| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 |
-| Wildgrass Prairie | 6 lives, 2.5 | 1 | 4 |
-| Whitecrown Pass | 9 lives, 4.5 | 1.5 | 7 |
-| Blackwater Bayou | 12 lives, 6.5 | 2 | 10 |
-| Brimstone Basin | 15 lives, 8.5 | 2.5 | 13 |
-| Galaxy | 18 lives, 10.5 | 3 | 16 |
+| World | You have | A rider hits for | A rider carries | So a rider is |
+| --- | --- | --- | --- | --- |
+| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 | 2 shots |
+| Wildgrass Prairie | 7 lives, 1.5 | 1 | 3 | 2 shots |
+| Whitecrown Pass | 11 lives, 2.5 | 1.5 | 5 | 2 shots |
+| Blackwater Bayou | 15 lives, 3.5 | 2 | 7 | 2 shots |
+| Brimstone Basin | 19 lives, 3.5 | 2.5 | 9 | 2.6 shots |
+| Galaxy | 23 lives, 3.5 | 3 | 11 | 3.2 shots |
 
-Six hits to kill you and a hit and a half to kill them, in every world in the
-game. The fights LOOK three times bigger by the pass — a rider in the Dust
-Flats carries one diamond and a rider in the Galaxy carries sixteen — and take
-the same four or five rounds, because the gun grew with them.
+Six to eight hits to kill you and two to three to kill them, everywhere. **The
+last two worlds are where the forge ladder runs out** — the gun stops at three
+and a half and the riders keep climbing — so out there a fight takes a third
+shot, you cannot out-buy the road any more, and the two worlds are shorter to
+pay for it.
 
 **And the road gets worse as you walk it.** From the halfway point of a world,
 half the riders carry the next rung of the ladder: the Dust Flats open on
@@ -357,6 +360,15 @@ There is no level select. You walk, and the road decides what you meet.
   combined multiplier rides beside the track, and the track looks scoured
   whenever the sky is the reason, so the change is never something you find out
   by dying.
+- **Three things that put lives back, in three different shapes.** A **Bandage**
+  is a flat two diamonds — most of the bar on the road out of the Dust Flats, a
+  ninth of it by the Galaxy, which is the right decay for the cheapest thing on
+  any counter. A **Med Kit** is half of you, rounded up, wherever you are
+  standing. A **Potion** is three quarters. The two rare ones are written as a
+  fraction of the bar so they mean the same thing in every world, and the heal
+  slot every shop guarantees offers a bandage where the world rolls common and
+  one of the big two where it rolls rare — so the world where two diamonds
+  stops being a rescue is the world that starts stocking the boxes.
 - **Food that keeps up with the road.** A carrot and an apple are fine in the
   Dust Flats, where four shop rolls in five come up common — and useless by the
   Galaxy, where common is eighteen per cent of the table and the counter is
@@ -434,8 +446,8 @@ There is no level select. You walk, and the road decides what you meet.
   rug. The room they are in is drawn too — a stone hearth with a live fire in
   it, a window with the night behind it, a rug, a chair pulled up to the heat.
 - **The forge** sells the only thing in the game you keep forever: the gun. Six
-  improvements, each worth **two whole lives a shot** on top of the half the
-  trail iron does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
+  improvements, each worth **half a life a shot** on top of the half the trail
+  iron does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
   longbarrel, the silvered Ivory Hand, the Emberbore that never cooled, the
   Starfall, and the Nova, which has a nebula burning inside the frame and three
   stars in orbit around it. What you bought is visible in the fight: the shape
@@ -443,18 +455,17 @@ There is no level select. You walk, and the road decides what you meet.
   barrel sheds between rounds, and — from the Emberbore up — a shockwave off
   every shot.
 
-  It is priced for **one rung a world**, and the curve is solved for it: 120
-  gold for the first and 4,905 for the last, against the gold each world
-  actually pays out (see `gunUpgradeCost` in `src/game/progression.js`, and
-  `tools/sim.mjs asymmetry`, which prints both columns side by side). That is
-  not a luxury you can skip any more — an enemy's life total is derived from
-  where the ladder should have you, so falling a rung behind means every fight
-  of the next world runs long. What is still a choice is WHEN to pay: buy the
-  rung the moment the forge appears and you eat worse for a world; eat first and
-  you fight a world at a rung down. The whole ladder is 9,310 against a full
-  clear that pays about 17,000. It used to cost more than
-  the road pays out at all, which is not an expensive decision, it is a locked
-  door with a price painted on it.
+  It is priced for **two rungs a world for three worlds**, and the curve is
+  solved for it: 90 gold for the first and 505 for the last, against the gold
+  each world actually pays out (see `gunUpgradeCost` in
+  `src/game/progression.js`, and `tools/sim.mjs asymmetry`, which prints both
+  columns side by side). The whole ladder is 1,520 of a full clear that pays
+  about 17,000 — the forge is an **early-game** shop, finished with you by the
+  Bayou, and what your gold does after that is what the later worlds are about:
+  med kits, beds, and the legendaries that used to lose the argument with the
+  next rung every time. It used to cost more than the road pays out at all,
+  which is not an expensive decision, it is a locked door with a price painted
+  on it.
 
   **A rung is the best gold you can spend, and that is on purpose.** It
   shortens every fight of the world, and a shorter fight is the cheapest damage
@@ -475,16 +486,23 @@ There is no level select. You walk, and the road decides what you meet.
   past and the chimney smokes.
 - **A real inventory**: eat, heal, throw dynamite mid-duel, or sell anything back
   for half its value.
-- **The Bulletproof Vest is armour, and you can see it.** It stops the first
-  thing that hits you in a duel — a bullet, a stick of dynamite, a rock off an
-  erupting mountain, a tick of venom — and breaks doing it. It used to be gated
-  on the blow being FATAL, which is defensible on paper and indistinguishable
-  from a broken item in the hand: you bought the most expensive thing on the
-  counter, got shot, lost a life, and the vest sat in your bag doing nothing.
-  Now it is on your character's chest for as long as you have one, and when it
-  goes it is torn off, tumbles onto the road at your boots and fades out
-  there — so the most expensive purchase in the Dust Flats announces itself
-  twice: once every round it is still on you, and once when it saves you.
+- **The Bulletproof Vest is armour you keep.** It stops the first thing that
+  hits you in a duel — a bullet, a stick of dynamite, a rock off an erupting
+  mountain, a tick of venom — comes apart doing it, and you have it patched up
+  again by the time the next rider is on the road. **One blow per fight, every
+  fight, for as long as it is in the bag.**
+
+  It has been wrong twice. First it was gated on the blow being FATAL, which is
+  defensible on paper and indistinguishable from a broken item in the hand: you
+  bought the most expensive thing on the counter, got shot, lost a life, and it
+  sat in your bag doing nothing. Then it was spent — one blow and gone — which
+  is a four-hundred-gold legendary that buys you one round of one fight. It is a
+  permanent change to how the road works now, like the horse and the canteen.
+
+  And you can see it: the vest is drawn on your character's chest for as long
+  as you have one, riding the sprite's own breath and stagger, and when it goes
+  it is torn off, tumbles end over end onto the road at your boots and fades out
+  there.
 - **The trail map** is a drawn map of the road you are on, not a list: the
   ground of the biome you are walking, the road winding through it, and every
   duel, shop, inn and boss marked on it, with your own position as a blue
@@ -529,10 +547,10 @@ There is no level select. You walk, and the road decides what you meet.
   the sprite, because the names were written from the art.
 - **Levelling is the spine.** Exactly one level per world, and it lands in the
   MIDDLE of one: three diamonds against half-life bullets for the first two
-  fights of the Dust Flats, then six diamonds against riders who hit for a
-  whole one. A level grants **three lives**, so the bar reads 3, 6, 9, 12, 15,
-  18 at the six borders — and every enemy number in the game is derived from
-  that table. It does not make you safer: a rider's bullet is a sixth of
+  fights of the Dust Flats, then seven diamonds against riders who hit for a
+  whole one. A level grants **four lives**, so the bar reads 3, 7, 11, 15, 19,
+  23 at the six borders — the bar the whole difficulty table is solved
+  against. It does not make you safer: a rider's bullet is a sixth of
   whatever the bar has grown to, so eighteen lives is the same six hits deep
   that three was. What the growth buys is room to absorb a bad duel, not
   immunity from one. It is not a refill: if you arrive at a level-up on your

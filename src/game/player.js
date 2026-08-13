@@ -53,8 +53,15 @@ function blankState() {
     hunger: HUNGER_MAX,
 
     hasHorse: false,
-    /** [{ id, qty }] — order is preserved so the grid does not jump around. */
-    inventory: [{ id: 'carrot', qty: 2 }, { id: 'bandage', qty: 1 }],
+    /**
+     * [{ id, qty }] — order is preserved so the grid does not jump around.
+     *
+     * Two bandages rather than one, and it is the Dust Flats that decides it:
+     * the opening bar is three diamonds, a bandage is two of them, and the
+     * first shop is one to three fights down the road. One bandage is a single
+     * bad opening duel away from a run that is over before it has been played.
+     */
+    inventory: [{ id: 'carrot', qty: 2 }, { id: 'bandage', qty: 2 }],
     /** Permanent upgrades applied to every future shop visit. */
     shopPerks: { extraSlots: 0, discountBonus: 0 },
     /**
@@ -111,8 +118,44 @@ export function restore(data) {
   // A save written before abilities existed has no slots; it gets empty ones
   // rather than `undefined`, which every reader would then have to guard.
   state.equipped = { ...blankState().equipped, ...(data?.equipped || {}) };
+  rebuildLifeBar();
   emitAll();
   return state;
+}
+
+/**
+ * THE LIFE BAR IS DERIVED, SO A SAVE IS NOT ALLOWED TO DISAGREE WITH IT
+ * ---------------------------------------------------------------------------
+ * `maxLives` is a pure function of the level — the starting three plus
+ * LIVES_PER_LEVEL for every level since — and nothing else in the game touches
+ * it. It is stored anyway, because a save should be readable on its own, and
+ * that is exactly what makes it dangerous: every time the curve is retuned,
+ * every save in the wild carries a bar built against the OLD one, and the
+ * player walks back onto a road whose riders were sized for a bar they do not
+ * have. A level-6 save from the last release would arrive in the Galaxy on
+ * eighteen lives against a world balanced for twenty-three.
+ *
+ * So the bar is rebuilt from the level on the way in rather than trusted. This
+ * is not a one-off migration for one release: it is the rule, and it means the
+ * next rescale of LIVES_PER_LEVEL cannot strand anybody either.
+ *
+ * What is CARRIED across is how full the bar was. A run saved at full comes
+ * back full and a run saved on its last legs comes back on its last legs, in
+ * the same proportion, rounded to the half-diamond grid the interface draws —
+ * and never to zero, because a save is by definition a run that was still
+ * alive.
+ */
+function rebuildLifeBar() {
+  const level = Math.max(1, Math.round(state.level) || 1);
+  const stored = Number(state.maxLives) || STARTING_LIVES;
+  const rebuilt = STARTING_LIVES + (level - 1) * LIVES_PER_LEVEL;
+  if (rebuilt === stored) {
+    state.lives = Math.max(0, Math.min(stored, state.lives));
+    return;
+  }
+  const fraction = stored > 0 ? Math.max(0, Math.min(1, state.lives / stored)) : 1;
+  state.maxLives = rebuilt;
+  state.lives = Math.max(0.5, Math.min(rebuilt, Math.round(rebuilt * fraction * 2) / 2));
 }
 
 function emitAll() {
@@ -541,13 +584,18 @@ export function spendBoonDuel() {
 // Carried gear the rest of the game asks about by name
 // ---------------------------------------------------------------------------
 
-/** True while a Bulletproof Vest is there to eat the next hit of a duel. */
+/**
+ * True while a Bulletproof Vest is in the bag — which is the only question
+ * anybody asks about it now.
+ *
+ * The vest is not spent. It stops one blow per DUEL and you patch it up on the
+ * road; the charge lives in the duel engine for the length of a fight (see
+ * `hasVest` on a side in src/duel/duel-engine.js) and this says whether the
+ * next fight gets one. There is deliberately no `consumeVest` any more: the
+ * only way to lose it is to sell it.
+ */
 export function hasVest() {
   return countOf('vest') > 0;
-}
-
-export function consumeVest() {
-  return removeItem('vest', 1);
 }
 
 /** True while the Anti-Effect Diadem is owned. */
