@@ -791,6 +791,8 @@ index.html              boot page: one canvas, one screen root, two overlays
 package.json            no dependencies; the scripts are the server and the sim
 tools/sim.mjs           the balance harness — see Tuning
 styles/                 materials & tokens · UI kit · menu screens · game screens
+                        · the admin panel, which is the one thing here not made
+                          of the five materials
 src/
   main.js               boot order + screen registry
   core/                 engine plumbing, no game rules
@@ -855,6 +857,10 @@ src/
                          ladder, save slots, run controller, interstitials,
                          the achievement ledger, and the wardrobe the ledger
                          pays out in
+  admin/                 the developer panel and the door into it: the stroke
+                         recogniser, the per-slot lock, the one object every
+                         override lives in, the road map that prints the real
+                         odds, and a tab per system
 ```
 
 `docs/ui-audit.md` records what was wrong with the previous interface and why
@@ -1165,6 +1171,109 @@ SHOOT.go('shop', { encounter: { index: 0 } });
 SHOOT.player.addGold(1000);
 SHOOT.run.beginWorld(6);        // jump to the Galaxy
 ```
+
+## The Admin Panel
+
+There is a second interface in this game, and it is not for players. It is for
+whoever is building or testing it: a workbench that reaches into the real
+systems and moves the real numbers, so that a state which would take an hour of
+correct play to reach is one field away.
+
+### The door
+
+It is not in a menu, in the settings or on any screen. **While you are walking
+on the road**, draw three big letters over the top of it, one after another:
+
+```
+P     N     L
+```
+
+Each one has to be a real stroke — better than a third of the shorter edge of
+the window across — and the three have to arrive within a few seconds of each
+other. Anything smaller than that is not even looked at, so panning the trail
+map, dragging on the HUD and mis-swiping at the saddlebag can never trigger it
+or break a sequence half way through. A stroke that is big but is not the
+letter the sequence is waiting for resets it. The recogniser is a cut-down $1
+unistroke matcher with the rotation invariance deliberately taken out (letters
+have an up) — `src/admin/sigil.js`.
+
+Getting the sigil right opens a box with no title on it. What goes in the box
+is a passphrase, and **the passphrase is not written down anywhere** — not in
+this file, not in the source. What the source holds is a fingerprint of it
+(`src/admin/access.js`), which is not cryptography and is not pretending to be:
+it is the same courtesy as not printing the answer at the foot of the page.
+
+**Three tries, per save slot, for ever.** The count is kept against the slot
+number rather than against the run in it, so dying does not give the attempts
+back, erasing the slot does not either, and a fresh run in slot 2 inherits
+whatever slot 2 has left. Get it right and that slot is an admin slot from then
+on — the sigil takes you straight in. Spend all three and that slot never opens
+again: there is no cooldown, no hint and no way back, because a lockout you can
+wait out is a lockout you can brute-force. Case and surrounding spaces are
+ignored, so a capital letter cannot cost you one of the three.
+
+### What is inside
+
+| Tab | What it is for |
+| --- | --- |
+| **Run** | Lives, the bar, gold, level, exp, the gun, hunger, the horse — every number the run holds, editable. Invulnerability, free money, a frozen gauge. |
+| **Road** | Where you are and what is next: jump to any world, rewrite the stop in front of you, walk to it, turn the whole segment face up, set the weather and the hour, walk into a shop, an inn, a forge or the boss on demand. Underneath it, the map. |
+| **Gear** | The whole catalogue with a give and take on every line, abilities included, and both duel slots fillable with anything whether the run owns it or not. |
+| **Looks** | Every garment in the game worn on the spot, locked or not, drawn on the rig so you can see it move. Borrowed for the session only: the ledger is never touched and nothing is written to the profile. |
+| **Odds** | The dials behind everything that is decided by a roll — what the road wants, what a body pays, what a counter stocks and charges. |
+| **Enemy** | What the next rider is made of, and the head behind it: six policies (including a punchbag that only reloads and an oracle that always counters), the read and shield ceilings, and a scripted loop of moves for reproducing one exact fight. |
+| **Battle** | Build a fighter — name, look, lives, bullet, tricks, landmark, boss or not — and fight it now, in any world, with the consequences switched off or on. |
+| **Lab** | Roll a thousand riders, roads or shop visits through the real generators and read what actually came out; fire the events that end runs; unlock or wipe the achievement ledger; dump the state, the road, the reading or the whole device; paste a run back in. |
+
+### The map that says everything
+
+The trail map the player carries has no numbers on it on purpose. The admin's
+map is the opposite document and it is the reason this panel exists at all: it
+lists **every** stop the segment holds — including the ones still face down —
+and for everything that can still go either way it prints the exact probability
+and the arithmetic behind it.
+
+The next card, for instance, is not just "Shop 41%". It is the appetite
+function's value on this run, times how many of that kind are still in the
+world's hand, times the spacing dimmer — and underneath, the five numbers the
+appetite was read off (how hurt you are, how full the gauge is, what the purse
+is worth in beds, whether there is anything to eat, whether the next rung is
+affordable). The same page prints the rider distribution for the world, the
+sky's transition row for the biome you are standing in, and what a counter here
+stocks and charges.
+
+None of it is written down twice. `explainReveal` in
+`src/explore/encounters.js` runs the *same* planner `revealNext` uses, because
+a documented probability that has drifted from the code is worse than no
+documentation at all.
+
+### What it is allowed to do to a run
+
+Everything in the panel is one of three kinds of thing, and the difference
+matters:
+
+- **This run only, never saved.** Every override lives in one object
+  (`src/admin/overrides.js`) that is thrown away when a run is started or
+  loaded. A slot played with the volcano at 100% comes back tomorrow as an
+  ordinary run. The borrowed outfit works the same way.
+- **The run, really.** Setting gold to 9,000 sets gold to 9,000, and the next
+  ordinary save writes it. That is the point.
+- **The device.** Two things reach past the run: unlocking or wiping the
+  achievement ledger, and the per-slot lock itself. Both say so where they are.
+
+A custom battle is the one place with an explicit switch. By default it is a
+sandbox: the same engine, the same agent, the same scene and the same enemy
+shape, with the consequences dropped — no gold, no exp, no lives written back,
+no death, no encounter advanced, nothing told to the ledger, and the Dusk Totem
+kept even if it saves you. Turn the switch off and the fight counts, for when
+the thing being tested *is* the consequence. (Items you spend in there really
+are spent; the Gear tab hands them straight back.)
+
+Every hook the panel needs is a single line in the system that owns the number,
+written so that the untouched value is the identity — a multiplier of 1, a
+replacement of `null`, a flag of `false`. There is no second code path through
+the road, the shop, the walk or the duel. There is the real one, reading one
+extra number.
 
 ## Keyboard
 

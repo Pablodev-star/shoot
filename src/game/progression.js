@@ -7,6 +7,7 @@
 
 import { getWorld } from './worlds.js';
 import { SELL_RATIO } from './items.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 // ---------------------------------------------------------------------------
 // Experience & levels
@@ -413,7 +414,10 @@ function riderWeight(worldId, lives) {
 export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
   const world = getWorld(worldId);
   const base = 15 + riderWeight(worldId, lives) * 7;
-  return Math.round(base * world.expMul * (isBoss ? 3.2 : 1));
+  // The admin multiplier is folded in here rather than at the one caller, so
+  // that anything else which ever pays exp — a future bounty, the harness —
+  // is bent by the same dial. It is 1 unless a tester has moved it.
+  return Math.round(base * world.expMul * (isBoss ? 3.2 : 1) * OVERRIDES.economy.expMul);
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +437,7 @@ export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
 export function goldForEnemy({ worldId, lives = 1, isBoss = false }) {
   const world = getWorld(worldId);
   const base = 36 + riderWeight(worldId, lives) * 20;
-  return Math.round(base * world.goldMul * (isBoss ? 4 : 1));
+  return Math.round(base * world.goldMul * (isBoss ? 4 : 1) * OVERRIDES.economy.goldMul);
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +480,8 @@ export const SHOP_MARKUP = 2;
  */
 export function itemPrice(item, worldId) {
   const world = getWorld(worldId);
-  const raw = item.basePrice * SHOP_MARKUP * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul;
+  const raw = item.basePrice * SHOP_MARKUP * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul
+    * OVERRIDES.economy.priceMul;
   return Math.max(1, Math.round(raw / 5) * 5); // round to a tidy 5
 }
 

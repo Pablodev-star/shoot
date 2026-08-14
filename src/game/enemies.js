@@ -43,6 +43,7 @@ import { getWorld } from './worlds.js';
 import { enemyGunDamage, enemyGunDamageAt, ENEMY_DAMAGE_RAMP_CHANCE } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 /**
  * Everything the rest of the game needs to know about one enemy's look.
@@ -96,7 +97,7 @@ export function generateEnemy(worldId, seed, progress = 0) {
 
   const { name, look, sprites, archetype } = appearance(rng.pick(profile.roster), rng);
 
-  return {
+  return applyOverrides({
     name,
     look,
     archetype,
@@ -110,6 +111,84 @@ export function generateEnemy(worldId, seed, progress = 0) {
     special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
     isBoss: false,
     sprites,
+  });
+}
+
+/**
+ * The admin's hand on the rider, applied after the roll rather than instead of
+ * it.
+ *
+ * That order is the whole design: the world's own distribution still runs, the
+ * seed still produces the road it was going to produce, and what a tester has
+ * changed is a named field on top — so turning one dial does not silently
+ * resequence everything downstream of the rng. Every field defaults to "leave
+ * it alone" (see src/admin/overrides.js), and a bent rider is otherwise an
+ * ordinary rider: nothing else in the game asks where its numbers came from.
+ */
+function applyOverrides(enemy) {
+  const o = OVERRIDES.enemy;
+  const out = { ...enemy };
+  if (o.lives != null) {
+    out.lives = o.lives;
+    out.maxLives = o.lives;
+  }
+  if (o.accuracy != null) out.accuracy = o.accuracy;
+  if (o.gunDamage != null) out.gunDamage = o.gunDamage;
+  if (o.abilities) out.abilities = [...o.abilities];
+  if (o.special !== undefined) out.special = o.special;
+  if (o.abilityChanceMul !== 1) out.abilityChanceMul = (out.abilityChanceMul || 1) * o.abilityChanceMul;
+  if (o.archetype) {
+    const look = appearance(o.archetype);
+    out.archetype = o.archetype;
+    out.look = look.look;
+    out.sprites = look.sprites;
+    out.scale = look.scale;
+    out.portrait = look.portrait;
+    out.aura = look.aura;
+    out.name = look.name;
+  }
+  if (o.name) out.name = o.name;
+  return out;
+}
+
+/**
+ * Build one enemy from a description rather than from a world.
+ *
+ * This is what the Admin Panel's custom battle hands the duel screen: the same
+ * object shape `generateEnemy` produces, assembled from a form instead of from
+ * a seed. It goes through `appearance` like everything else, so a made-up
+ * fighter is drawn, named and scaled by the same rules as a rolled one — a
+ * sandbox opponent that renders differently from a real one is a sandbox that
+ * cannot be used to test rendering.
+ *
+ * @param {object} spec
+ * @returns {object} an enemy the duel engine will accept
+ */
+export function customEnemy(spec = {}) {
+  const archetypeId = ARCHETYPES[spec.archetype] ? spec.archetype : 'drifter';
+  const { look, sprites, scale, portrait, aura, name } = appearance(archetypeId);
+  const lives = Math.max(0.5, Number(spec.lives) || 1);
+  return {
+    name: spec.name || name,
+    look,
+    archetype: archetypeId,
+    lives,
+    maxLives: lives,
+    bullets: Math.max(0, Number(spec.bullets) || 0),
+    accuracy: spec.accuracy ?? 0.5,
+    gunDamage: spec.gunDamage ?? 0.5,
+    abilities: [...(spec.abilities || [])],
+    abilityChanceMul: spec.abilityChanceMul ?? 1,
+    special: spec.special || null,
+    isBoss: !!spec.isBoss,
+    phaseIndex: 0,
+    phases: null,
+    sprites,
+    scale,
+    portrait,
+    aura,
+    intro: null,
+    cardSub: spec.cardSub || null,
   };
 }
 
@@ -119,7 +198,7 @@ export function generateBoss(worldId) {
   const cfg = world.boss;
   const phase = cfg.phases ? cfg.phases[0] : cfg;
   const { look, sprites, scale, portrait, aura } = appearance(phase.archetype || cfg.archetype);
-  return {
+  return applyOverrides({
     name: phase.name || cfg.name,
     look,
     archetype: phase.archetype || cfg.archetype,
@@ -155,7 +234,7 @@ export function generateBoss(worldId) {
     intro: cfg.intro || null,
     /** Second line of the name card the entrance puts up. */
     cardSub: cfg.cardSub || null,
-  };
+  });
 }
 
 /** Advance a multi-phase boss. Returns null when there is no next phase. */

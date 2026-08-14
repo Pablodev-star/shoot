@@ -36,6 +36,7 @@
 
 import { EVENTS, emit } from '../core/events.js';
 import { PALETTE } from '../art/palette.js';
+import { OVERRIDES } from '../admin/overrides.js';
 import { MOON_PHASE_COUNT } from '../art/sprites-environment.js';
 
 /** Full day length in milliseconds of walking. */
@@ -170,6 +171,9 @@ const state = {
 /** Advance the clock. `dt` is milliseconds of *walking* time. */
 export function update(dt) {
   if (state.paused) return;
+  // Pinned from the Admin Panel. `setTime` still moves it, so a tester can
+  // park the sun at dusk and keep it there for as long as the screenshot takes.
+  if (OVERRIDES.walk.freezeClock) return;
   state.elapsed += dt;
   state.time = (state.time + dt / DAY_LENGTH_MS) % 1;
   const next = phaseAt(state.time);

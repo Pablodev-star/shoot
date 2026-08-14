@@ -89,6 +89,27 @@ export const MAX_BULLETS = 6;
 export const EFFECT_LIFE = 0.5;
 
 /**
+ * HOW OFTEN A RIDER WHO IS CARRYING A TRICK REACHES FOR IT, PER ROUND
+ * ---------------------------------------------------------------------------
+ * A CHANCE PER ROUND IS A TAX ON BEING BAD AT THE GAME. This is rolled every
+ * round, so what it really measures out is casts per FIGHT — and a fight is as
+ * long as the player makes it. A duellist who finishes in six rounds meets one
+ * trick; one who takes fourteen meets three, on top of the extra bullets and
+ * the extra eruption that fourteen rounds also buys. The player already losing
+ * is the player it lands on hardest, which is the wrong way round for a game
+ * that wants to teach.
+ *
+ * It came down from 0.18 to 0.14 for that reason, and the difference is almost
+ * invisible in a fight that goes well. A frozen turn is worth more than a
+ * bullet; being frozen three times in a fight you were already losing is not
+ * difficulty, it is a pile-on.
+ *
+ * It is exported so the Admin Panel's road map can print the real figure
+ * instead of a copy that will one day be wrong.
+ */
+export const ABILITY_CHANCE_PER_ROUND = 0.14;
+
+/**
  * @param {object} config
  * @param {object} config.player   { lives, maxLives, bullets, hasVest, hasTotem,
  *                                  totemLives, immune, abilities }
@@ -350,24 +371,9 @@ export function createDuel(config) {
    *
    * `pickWeighted` is what keeps poison and dynamite rare in the hands that
    * have them: both carry a weight of about a third, so a bayou rider with
-   * four tricks plays poison one time in ten rather than one in four.
-   *
-   * A CHANCE PER ROUND IS A TAX ON BEING BAD AT THE GAME
-   * -------------------------------------------------------------------------
-   * This is rolled every round, so what it really measures out is casts per
-   * FIGHT — and a fight is as long as the player makes it. A duellist who
-   * finishes in six rounds meets one trick; one who takes fourteen meets three,
-   * on top of the extra bullets and the extra eruption that fourteen rounds
-   * also buys. The player already losing is the player it lands on hardest,
-   * which is the wrong way round for a game that wants to teach.
-   *
-   * It came down from 0.18 to 0.14 for that reason, and the difference is
-   * almost invisible in a fight that goes well. A frozen turn is worth more
-   * than a bullet; being frozen three times in a fight you were already losing
-   * is not difficulty, it is a pile-on.
+   * four tricks plays poison one time in ten rather than one in four. The
+   * per-round chance itself is ABILITY_CHANCE_PER_ROUND, at the top of the file.
    */
-  const ABILITY_CHANCE_PER_ROUND = 0.14;
-
   function rollEnemyAbility() {
     const enemy = sides.enemy;
     if (!enemy.abilities || enemy.abilities.length === 0) return null;

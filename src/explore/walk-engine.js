@@ -41,6 +41,7 @@ import {
 import * as hunger from './hunger.js';
 import * as daynight from './daynight.js';
 import * as weather from './weather.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 export function createWalkEngine() {
   let segment = null;
@@ -106,7 +107,11 @@ export function createWalkEngine() {
   }
 
   function speed() {
-    return WALK_SPEED * (getState().hasHorse ? HORSE_SPEED_MUL : 1);
+    // The admin multiplier is on the SPEED and not on the gaps: a road walked
+    // at ten times the pace is the same road with the same stops in the same
+    // places, which is what a tester wants when they are trying to reach the
+    // fourth encounter rather than to change what it is.
+    return WALK_SPEED * (getState().hasHorse ? HORSE_SPEED_MUL : 1) * OVERRIDES.walk.speedMul;
   }
 
   /**
@@ -265,6 +270,32 @@ export function createWalkEngine() {
     nextIndex,
     distanceToNext,
     visibleStructures,
+    /**
+     * The five numbers the road is currently reading off the run. It is the
+     * engine's own `reading()` — the same call `revealToHorizon` is given — so
+     * the admin map can print exactly what the next card is being chosen from
+     * rather than a recomputed approximation of it.
+     */
+    getReading: () => reading(),
+    /**
+     * Shove the traveller down the road. Admin only, and deliberately dumb: it
+     * moves the odometer and nothing else, so the next ordinary tick notices
+     * the encounter and fires it through the normal path. A jump that emitted
+     * ENCOUNTER_REACHED itself would be a second way into a duel, and the one
+     * bug this engine has already had was exactly that.
+     */
+    skip(px) {
+      travelled += px;
+      cameraX += px;
+    },
+    /** Put them on the doorstep of the next stop, a couple of paces short. */
+    jumpToNext() {
+      const gap = distanceToNext();
+      if (!Number.isFinite(gap) || gap <= 0) return false;
+      travelled += Math.max(0, gap - 2);
+      cameraX += Math.max(0, gap - 2);
+      return true;
+    },
     /** Save payload for this engine's slice of state. */
     serialize: () => ({
       travelled,

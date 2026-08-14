@@ -58,6 +58,7 @@ import { CHARACTER_TIMING } from '../art/sprites-character.js';
 import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
 import { resolveDuel } from '../game/run.js';
+import { go } from '../core/router.js';
 import { track as trackAchievement } from '../game/achievements.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import {
@@ -130,7 +131,24 @@ export const DuelScreen = {
     const isBoss = !!params.isBoss;
     const modifiers = buildModifiers();
 
-    let enemy = isBoss
+    /**
+     * A FIGHT THAT DID NOT HAPPEN
+     * -----------------------------------------------------------------------
+     * The Admin Panel can start a duel against anything it likes (see
+     * src/admin/tab-battle.js), and a made-up fight must not be able to touch
+     * the run: no gold, no exp, no lives written back, no death, no encounter
+     * advanced. `sandbox` is that promise, and it is kept in exactly two places
+     * — `endDuel` does not sync the bar back onto the player, and the overview
+     * walks back to the road instead of calling `resolveDuel`.
+     *
+     * The fight itself is completely real. It is the same engine, the same
+     * agent, the same scene and the same enemy shape; only its consequences are
+     * dropped. A sandbox that simulated the duel differently would be a sandbox
+     * that could not be used to reproduce anything.
+     */
+    const sandbox = !!params.sandbox;
+
+    let enemy = params.customEnemy ? params.customEnemy : isBoss
       ? generateBoss(worldId)
       : generateEnemy(
           worldId,
@@ -1088,8 +1106,10 @@ export const DuelScreen = {
       await playTotemRevival();
 
       // The item leaves the bag now rather than when the engine spent it, so a
-      // fight abandoned mid-scene cannot eat a legendary for nothing.
-      breakTotem();
+      // fight abandoned mid-scene cannot eat a legendary for nothing. A sandbox
+      // fight plays the whole scene and keeps the totem: nothing that happens
+      // in a made-up duel is allowed to cost the run a legendary.
+      if (!sandbox) breakTotem();
       totemPlaying = false;
       if (finished) return;
       scene.setPose('player', 'idle');
@@ -1396,10 +1416,15 @@ export const DuelScreen = {
       scene.fx.bannerTimer = 1600;
 
       const sides = duel.getSides();
-      setLives(sides.player.lives);
-      // Whatever is left of the gold, and nothing is ever added back here: the
-      // engine spends them, the run remembers what survived.
-      setBonusLives(sides.player.bonus);
+      // A sandbox fight is not written back at all — and it MUST not be, not
+      // merely as a courtesy: `setLives(0)` is what fires GAME_OVER, so a
+      // tester losing a made-up duel would erase the slot they were testing in.
+      if (!sandbox) {
+        setLives(sides.player.lives);
+        // Whatever is left of the gold, and nothing is ever added back here:
+        // the engine spends them, the run remembers what survived.
+        setBonusLives(sides.player.bonus);
+      }
       setCallout(won ? 'You win the duel' : 'You are down', won ? 'is-good' : 'is-bad');
 
       /**
@@ -1411,7 +1436,9 @@ export const DuelScreen = {
        * for the overview to be dismissed would put the notice a minute late,
        * over a screen that has nothing to do with what earned it.
        */
-      trackAchievement('duelEnded', {
+      // The ledger is not told about a fight that did not happen either. An
+      // achievement earned in a sandbox is an achievement that was not earned.
+      if (!sandbox) trackAchievement('duelEnded', {
         won,
         isBoss,
         worldId,
@@ -1447,6 +1474,15 @@ export const DuelScreen = {
       showOverview(won, sides);
     }
 
+    /**
+     * The way out of a fight that was never on the road. It goes straight back
+     * to the walk rather than through `finishEncounter`, because there is no
+     * encounter to finish — the run controller never heard about this duel.
+     */
+    function goToRoad() {
+      go('explore', { resume: true });
+    }
+
     /** Battle overview: the round-by-round table from version 3. */
     function showOverview(won, sides) {
       const rows = roundLog.map((r) =>
@@ -1466,7 +1502,9 @@ export const DuelScreen = {
         el('div.panel.modal.overview', { role: 'dialog', 'aria-label': 'Battle overview' }, [
           el('div', { class: `result-banner ${won ? 'is-win' : 'is-loss'}` }, [
             el('div.headline', { text: won ? 'Duel won' : 'Duel lost' }),
-            el('div.muted', { text: `${enemy.name} · ${roundLog.length} rounds` }),
+            el('div.muted', {
+              text: `${enemy.name} · ${roundLog.length} rounds${sandbox ? ' · sandbox' : ''}`,
+            }),
           ]),
           el('div.stat-grid', {}, [
             statTile('Shots fired', shotsFired),
@@ -1492,9 +1530,13 @@ export const DuelScreen = {
             el('button.btn.btn--primary', {
               onclick: () => {
                 overlay.remove();
-                resolveDuel({ won, enemy, isBoss, worldId });
+                // A sandbox fight rejoins the road exactly where it left it:
+                // the encounter counter is untouched, so the stop the player
+                // was actually walking towards is still in front of them.
+                if (sandbox) goToRoad();
+                else resolveDuel({ won, enemy, isBoss, worldId });
               },
-            }, [won ? 'Back to the road' : 'Continue']),
+            }, [sandbox ? 'Back to the road' : won ? 'Back to the road' : 'Continue']),
           ]),
         ]),
       ]);

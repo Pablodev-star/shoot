@@ -21,6 +21,7 @@ import { SHOP_POOL, getItem, abilityPoolForWorld } from '../game/items.js';
 import { getWorld } from '../game/worlds.js';
 import { itemPrice } from '../game/progression.js';
 import { getState } from '../game/player.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 export const BASE_SLOTS = 3;
 export const BASE_DISCOUNT_CHANCE = 0.2;
@@ -104,8 +105,18 @@ export function generateStock(worldId, seed) {
   const world = getWorld(worldId);
   const perks = getState().shopPerks || {};
   const rng = makeRng(seed >>> 0);
-  const slots = BASE_SLOTS + Math.floor(perks.extraSlots || 0);
-  const discountChance = Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
+  /**
+   * The three things the Admin Panel can do to a counter, and all three read
+   * as if the player had earned them: extra slots are extra ledgers, the
+   * discount is a silver tongue, and the rarity table is the world's own table
+   * replaced wholesale. Nothing below this line knows a tester was here.
+   */
+  const admin = OVERRIDES.shop;
+  const slots = Math.max(1, BASE_SLOTS + Math.floor(perks.extraSlots || 0) + (admin.extraSlots || 0));
+  const discountChance = admin.discountChance != null
+    ? admin.discountChance
+    : Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
+  const rarity = admin.rarity || world.rarity;
 
   /**
    * The pool for THIS world: the permanent catalogue plus the abilities this
@@ -176,7 +187,7 @@ export function generateStock(worldId, seed) {
 
   const stock = [];
   const taken = new Set();
-  const guaranteed = rng.weighted(world.rarity) === 'common'
+  const guaranteed = rng.weighted(rarity) === 'common'
     ? HEALS.common
     : rng.pick(HEALS.rare);
   taken.add(guaranteed);
@@ -185,7 +196,7 @@ export function generateStock(worldId, seed) {
   for (let i = stock.length; i < slots; i++) {
     // Never put the same item on the counter twice. A visit offering "Bandage,
     // Carrot, Bandage" reads as a bug, and it wastes one of only three slots.
-    const item = pickUnused(rng, rng.weighted(world.rarity), taken, pool);
+    const item = pickUnused(rng, rng.weighted(rarity), taken, pool);
 
     // Only reachable if the entire catalogue is already on the counter, which
     // needs more slots than the game can currently grant. Stop rather than
