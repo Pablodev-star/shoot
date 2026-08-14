@@ -34,7 +34,10 @@ The rule set has not changed since the first prototype:
 
 Both duellists shoot in the same turn → both take a hit. First to zero lives
 loses. Lives are red diamonds, and always will be — and because they are, every
-damage figure in the game is a whole diamond or a half of one.
+damage figure in the game is a whole diamond or a half of one. The only
+diamonds that are not red are the **gold** ones a Potion hangs on the end of the
+bar: three lives that were never yours, spent before the red and healed by
+nothing.
 
 **You start on three diamonds and the trail iron takes half of one a shot, so a
 rider needs six clean hits to finish you.** That number is the feel of this
@@ -319,13 +322,22 @@ There is no level select. You walk, and the road decides what you meet.
   rare high red, will-o'-the-wisps over the bayou, embers rising through falling
   ash in the basin, dust that falls upward in the void.
 - **Guided randomness**: a world's difficulty is a number of duels, and its
-  shops, inns and forge are rolled around them. One or two shops and —
-  separately — one or two inns, usually two of each, shuffled into the road with
-  fights between any two of them. Nothing is ever adjacent to anything of its
-  own kind, and no building is ever stumbled into: they are always approached —
-  and you stop at the door. The building is drawn so its doorway lands on the
-  traveller at the moment the stop is reached, and it is still standing there
-  behind you when you walk on.
+  shops, inns and forge are rolled around them. A world is **eight to eleven
+  fights** long — near enough double what it used to be — and the number of
+  counters and beds is rolled off that length rather than fixed, about one stop
+  for every four fights, so a longer road is a road with more on it rather than
+  the same two shops spread thinner.
+  **Two buildings are never dealt in a row.** There is always at least one fight
+  between them, and the road prefers three where it can afford them: you cannot
+  step out of a shop into another shop, out of an inn into another inn, or walk
+  from a counter straight to a bed. Nor is any building ever stumbled into —
+  they are always approached, and you stop at the door. The building is drawn so
+  its doorway lands on the traveller at the moment the stop is reached, and it
+  is still standing there behind you when you walk on.
+  The stretches between stops came **down** by about a third when the worlds got
+  longer, and deliberately: a longer world should be more of the game, not more
+  of the road between it, and the hunger gauge measures a crossing in seconds of
+  walking. A world costs about what it always did to eat your way across.
 - **You can see five stops ahead, and the rest of the road is still deciding.**
   The map used to print the whole world the moment you walked into it, which
   meant a run's difficulty was settled by one shuffle before you had taken a
@@ -369,15 +381,25 @@ There is no level select. You walk, and the road decides what you meet.
   combined multiplier rides beside the track, and the track looks scoured
   whenever the sky is the reason, so the change is never something you find out
   by dying.
-- **Three things that put lives back, in three different shapes.** A **Bandage**
-  is a flat two diamonds — most of the bar on the road out of the Dust Flats, a
-  ninth of it by the Galaxy, which is the right decay for the cheapest thing on
-  any counter. A **Med Kit** is half of you, rounded up, wherever you are
-  standing. A **Potion** is three quarters. The two rare ones are written as a
-  fraction of the bar so they mean the same thing in every world, and the heal
-  slot every shop guarantees offers a bandage where the world rolls common and
-  one of the big two where it rolls rare — so the world where two diamonds
-  stops being a rescue is the world that starts stocking the boxes.
+- **Two things that put lives back, and one that gives you lives you never
+  had.** A **Bandage** is a flat two diamonds — most of the bar on the road out
+  of the Dust Flats, a ninth of it by the Galaxy, which is the right decay for
+  the cheapest thing on any counter. A **Med Kit** is half of you, rounded up,
+  wherever you are standing: written as a fraction of the bar so it means the
+  same thing in every world. The heal slot every shop guarantees offers a
+  bandage where the world rolls common and the box where it rolls rare — so the
+  world where two diamonds stops being a rescue is the world that starts
+  stocking the boxes.
+
+  The **Potion** is the third one and it is not a heal at all. It hangs **three
+  gold lives on the end of your bar**, past the red ones — Zelda's yellow
+  hearts, in a western. Nothing heals them: not a bed, not a bandage, not a
+  level-up, not the full heal at a world border. Everything that hits you spends
+  them **first**, before a single red diamond. And they stack without a ceiling
+  — a second bottle is three more on the end, a fourth is twelve in total. Which
+  makes it the one thing on any counter worth buying when there is nothing wrong
+  with you: you drink it at the door of the boss, not after the fight that went
+  badly.
 - **Food that keeps up with the road.** A carrot and an apple are fine in the
   Dust Flats, where four shop rolls in five come up common — and useless by the
   Galaxy, where common is eighteen per cent of the table and the counter is
@@ -411,6 +433,13 @@ There is no level select. You walk, and the road decides what you meet.
   one cannot have.
 - **Shops** stock three items (more with the right perks) rolled from a
   per-world rarity table, at exponential prices, with random half-price deals.
+  Everything on the shelf is **twice the catalogue price** — one markup over the
+  whole curve, put there when the worlds got longer and a crossing started
+  paying close to twice the purse. At the old prices the careful player crossed
+  the Bayou with a maxed gun, a full bag and gold they had nothing to do with,
+  which is the ledger switching itself off for the back half of the run. The
+  markup is on the **asking** price only: what a shopkeeper pays you for
+  something out of your bag has not moved.
   **One slot is always something that heals**, because a counter that held one
   bandage offered only if the dice felt like it made lives something you could
   be refused after playing correctly — and by the basin a shop rolls common
@@ -447,7 +476,12 @@ There is no level select. You walk, and the road decides what you meet.
   premium bed (heals everything), and **the two beds are two beds**. The cheap
   bed is written as a fraction rather than a number of lives, because as a
   number it fell behind the thing it was healing at exactly the rate the bar
-  grew. Both offers used to show the
+  grew. They are also priced **four times apart** rather than three halves: at
+  45 against 130 the good bed was under three times the price for twice the
+  lives and the choice made itself, so the straw mattress came down to 40 and
+  the room went up to 175. One of them is the thing a broke run can always
+  afford; the other is what you buy the night before a boss, and it costs you
+  the counter. Both offers used to show the
   same 16 x 16 icon at 3x, so the choice was made by reading two prices under
   one picture. Each now stands in a little room of its own: a plank cot with a
   sacking mattress, the straw coming out of it and an army blanket over the
@@ -904,9 +938,11 @@ Balance lives in data, not in code:
   multipliers, how many duels the road holds, bosses, and which biome each world
   is in.
 - `src/explore/encounters.js` — how the road is laid out: how many shops and
-  inns a world rolls, how far apart they have to be, the spacing between
-  everything on it, how far ahead the player can see (`REVEAL_AHEAD`) and the
-  `APPETITE` table that decides what a face-down stop turns out to be.
+  inns a world rolls for its length (`DUELS_PER_SERVICE`), how far apart they
+  have to be (`SERVICE_GAP`, and the `SERVICE_ADJACENT_GAP` under it that is
+  never traded away), the spacing between everything on it, how far ahead the
+  player can see (`REVEAL_AHEAD`) and the `APPETITE` table that decides what a
+  face-down stop turns out to be.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
 - `src/game/world-abilities.js` — the fourteen mechanics, the nineteen
@@ -939,8 +975,9 @@ Balance lives in data, not in code:
   out, so an ability is an ordinary thing in the saddlebag. Three fields there
   are worth knowing: `food` is hunger restored (`100` fills the gauge), `boon`
   leaves something on the player for the next few *duels* rather than for right
-  now, and `stack: 1` plus `context: 'passive'` is how a bought-once-and-kept
-  item like the Canteen or the Dusk Totem is written.
+  now, `bonusLives` is gold diamonds hung past the end of the bar rather than
+  red ones put back, and `stack: 1` plus `context: 'passive'` is how a
+  bought-once-and-kept item like the Canteen or the Dusk Totem is written.
 
 ## Adding a biome
 

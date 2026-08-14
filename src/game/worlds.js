@@ -65,7 +65,31 @@ export const WORLDS = [
     priceMul: 1,
     goldMul: 1,
     expMul: 1,
-    encounters: { duels: 5 },
+    /**
+     * EVERY WORLD IS LONGER NOW, AND THIS ONE IS THE SHORTEST OF THEM
+     * -----------------------------------------------------------------------
+     * A world used to be four to six fights, which is a stretch of road you
+     * cross rather than one you live on: the buildings came round every other
+     * stop, a bar filled at the border was still most of the way full at the
+     * boss's door, and the pacing rule the whole road is built on — counters
+     * and beds kept apart by fights — had nothing to keep them apart WITH.
+     * Five duels cannot hold five buildings two fights apart; the arithmetic
+     * in src/explore/encounters.js (`bill`) collapses the gap to one and the
+     * world comes out as a parade of doors.
+     *
+     * The six of them are 8, 11, 10, 11, 8 and 6 — near enough double, and the
+     * number of counters and beds went up with them (`DUELS_PER_SERVICE`), so
+     * a longer road is a road with more on it rather than a road with the same
+     * two shops spread thinner.
+     *
+     * The Dust Flats gets the smallest share of that, and the reason is the bar
+     * rather than the road: three diamonds is the shallowest this game ever is,
+     * and the harness ends nearly a third of all beginner runs here whatever
+     * the length. Taking this world from ten fights to eight moved a novice's
+     * odds of ever seeing the Galaxy up by half. It is the world that teaches
+     * the game, and a teaching world should be survivable.
+     */
+    encounters: { duels: 8 },
     rarity: { common: 78, rare: 20, legendary: 2 },
     enemy: {
       lives: { 1: 88, 2: 12 },
@@ -103,16 +127,17 @@ export const WORLDS = [
     goldMul: 1.5,
     expMul: 1.4,
     /**
-     * Six, and it stayed six while the Basin and the Galaxy came down.
+     * The longest world in the game — with the Bayou — and the one that can
+     * most afford to be.
      *
-     * A Prairie duel is still two shots and about a quarter of the bar — the
-     * gun keeps pace out here — so the world is not one of the ones whose
-     * fights got longer. It is also where the money for the pass comes from,
-     * and the harness is blunt about that: cutting it to five measurably cost
-     * runs in world three, because a fight skipped in a world you can afford is
-     * a rung of gun you do not have in the world you cannot.
+     * A Prairie duel is two shots and about an eighth of the bar: the forge
+     * ladder is ahead of the riders out here and the gold is good, so length
+     * costs less on this stretch than anywhere else on the road. It is also
+     * where the money for the pass comes from, and the harness is blunt about
+     * that — every fight taken off this world is a rung of revolver the player
+     * does not have in the one they cannot afford to be under-armed in.
      */
-    encounters: { duels: 6 },
+    encounters: { duels: 11 },
     rarity: { common: 66, rare: 29, legendary: 5 },
     enemy: {
       lives: { 2: 25, 3: 50, 4: 25 },
@@ -137,22 +162,22 @@ export const WORLDS = [
     name: 'Whitecrown Pass',
     subtitle: 'Above the trees, under the storm',
     /**
-     * The short world, and it stays short.
+     * A fight shorter than the two long worlds on either side of it, and that
+     * is the whole of what "the short world" means now.
      *
      * It used to be short because of a rounding — the pass landed on 5/6 of a
      * life a bullet and the half-diamond grid rounded it up. The spine is a
      * straight line now (see EXPECTED_POWER) and the pass gets exactly its
-     * sixth like everybody else, but five duels up here is still the right
-     * number: the Whitecrown is where the ramp starts to bite, and the back
-     * half of a six-duel version was three fights against riders carrying two
-     * whole lives a shot.
+     * sixth like everybody else, but this is where the ramp starts to bite, and
+     * the back half of the crossing is fights against riders carrying two whole
+     * lives a shot.
      */
     biome: 'snow',
     tint: null,
     priceMul: 1.35,
     goldMul: 2.1,
     expMul: 1.9,
-    encounters: { duels: 5 },
+    encounters: { duels: 10 },
     rarity: { common: 54, rare: 36, legendary: 10 },
     enemy: {
       lives: { 4: 25, 5: 50, 6: 25 },
@@ -198,7 +223,7 @@ export const WORLDS = [
     priceMul: 1.6,
     goldMul: 2.9,
     expMul: 2.5,
-    encounters: { duels: 6 },
+    encounters: { duels: 11 },
     rarity: { common: 42, rare: 42, legendary: 16 },
     enemy: {
       lives: { 6: 30, 7: 40, 8: 25, 9: 5 },
@@ -240,16 +265,17 @@ export const WORLDS = [
     goldMul: 3.8,
     expMul: 3.2,
     /**
-     * FIVE, BECAUSE A BASIN DUEL IS HALF AGAIN AS LONG AS A BAYOU ONE
+     * EIGHT, BECAUSE A BASIN DUEL IS HALF AGAIN AS LONG AS A BAYOU ONE
      * -----------------------------------------------------------------------
      * This is where the forge ladder runs out (`EXPECTED_POWER`): the gun stops
      * at three and a half and the riders keep climbing, so a fight out here
      * takes two and a half shots instead of two and runs seven rounds instead
      * of five. A world costs duels times the cost of a duel, and when the
-     * second number goes up by half the first one has to come down or the bar
-     * cannot pay for it. Seven of these was three whole life bars.
+     * second number goes up by half the first one has to come down — so the
+     * Basin gets three fights fewer than the Bayou it follows, and the road
+     * starts narrowing towards the corridor at the end of it.
      */
-    encounters: { duels: 5 },
+    encounters: { duels: 8 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
       lives: { 8: 30, 9: 40, 10: 25, 11: 5 },
@@ -287,12 +313,16 @@ export const WORLDS = [
     goldMul: 5,
     expMul: 4.5,
     /**
-     * The Galaxy is short and brutal: a corridor straight to the boss. Four
-     * now rather than five, for the same reason the Basin lost two — out here a
-     * rider carries eleven diamonds against a gun that stopped at three and a
-     * half, and a single duel costs over half the bar.
+     * The Galaxy is short and brutal: a corridor straight to the boss. Six is
+     * the fewest fights in the game and still half again the corridor it used
+     * to be — out here a rider carries eleven diamonds against a gun that
+     * stopped at three and a half, and a single duel costs better than a third
+     * of the bar. It is the one world whose length is held DOWN while the rest
+     * of the road was let out, and the reason is the ending: at eight, the
+     * share of expert runs that actually finish the game fell by half, and a
+     * last world nobody sees the end of is a wall rather than a climax.
      */
-    encounters: { duels: 4 },
+    encounters: { duels: 6 },
     rarity: { common: 18, rare: 42, legendary: 40 },
     enemy: {
       lives: { 10: 30, 11: 40, 12: 22, 13: 8 },

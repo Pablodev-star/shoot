@@ -72,7 +72,7 @@ export const SlotsScreen = {
 
             el('div.col', { style: { gap: 'var(--sp-2)' } }, [
               el('div.slot-world', { text: world.name }),
-              livesRow(info.lives, info.maxLives),
+              livesRow(info.lives, info.maxLives, { bonus: info.bonusLives }),
             ]),
 
             el('div.slot-lines', {}, [

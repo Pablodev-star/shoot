@@ -135,15 +135,21 @@ export function generateStock(worldId, seed) {
    * refused to honour it.
    *
    * So slot zero is a heal. Which heal still depends on the world's table — a
-   * bandage where it rolls common, a med kit or a potion where it rolls rare,
-   * which is most of the time by the Basin and almost never in the flats, and
-   * is exactly the right shape: the world where two diamonds stops being a
-   * rescue is the world that starts putting the big ones on the counter —
-   * the price is the ordinary price, and the discount roll is the ordinary
-   * roll — the guarantee is only that gold can always be turned into lives.
-   * Everything else on the counter is still whatever the road felt like.
+   * bandage where it rolls common, a med kit where it rolls rare, which is most
+   * of the time by the Basin and almost never in the flats, and is exactly the
+   * right shape: the world where two diamonds stops being a rescue is the world
+   * that starts putting the boxes on the counter — the price is the ordinary
+   * price, and the discount roll is the ordinary roll — the guarantee is only
+   * that gold can always be turned into lives. Everything else on the counter
+   * is still whatever the road felt like.
+   *
+   * The Potion used to share the rare slot with the Med Kit and does not any
+   * more, because it stopped being a heal: three gold lives on the end of the
+   * bar are lives you did not have, not the ones you lost (see
+   * src/game/items.js). It is still stocked like any other rare — what it can
+   * no longer do is stand in for the bandage a hurt player came in for.
    */
-  const HEALS = { common: 'bandage', rare: ['medkit', 'potion'] };
+  const HEALS = { common: 'bandage', rare: ['medkit'] };
 
   /** One counter entry, with as many of the thing on it as it can hold. */
   const entry = (item, slot) => {

@@ -14,52 +14,80 @@ import { uiIconURL } from '../art/sprites-ui.js';
 import { registerPurse } from './gold-fly.js';
 
 /**
- * Row of red diamonds.
+ * Row of red diamonds — and, hung on the end of it, the gold ones.
+ *
+ * THE BAR HAS TWO HALVES AND ONLY ONE OF THEM IS YOURS
+ * ---------------------------------------------------------------------------
+ * Everything left of `maxLives` is the life bar the run has grown: red, healed
+ * by beds and bandages, drawn hollow where it is missing. Everything right of
+ * it is what a Potion hung there — gold, never hollow (a gold life you no
+ * longer have is not drawn at all, because it is not a slot waiting to be
+ * refilled), and spent before the red. See `bonusLives` in src/game/player.js.
+ *
+ * The row is built out of one kind of node in one loop rather than two, so the
+ * flex row cannot disagree with itself about sizing and every animation in here
+ * works on a gold diamond for free.
+ *
  * @param {number} lives current
  * @param {number} maxLives capacity (missing lives are drawn hollow)
- * @param {{large?: boolean, small?: boolean}} opts
+ * @param {{large?: boolean, small?: boolean, bonus?: number}} opts
  */
 export function livesRow(lives, maxLives, opts = {}) {
   const size = opts.large ? 'life--lg' : opts.small ? 'life--sm' : '';
-  const row = el('div.lives', {
-    role: 'img',
-    'aria-label': `${lives} of ${maxLives} lives`,
-  });
-  for (let i = 0; i < Math.ceil(maxLives); i++) {
-    const fill = Math.max(0, Math.min(1, lives - i));
-    row.append(el('span.life', { class: `${fill === 0 ? 'is-empty' : fill === 0.5 ? 'is-half' : ''} ${size}`.trim() }));
-  }
+  const row = el('div.lives', { role: 'img' });
+  row.dataset.size = size;
+  layLives(row, lives, maxLives, opts.bonus || 0, () => el('span.life'), false);
   return row;
 }
 
 /**
  * Update a life row in place, animating the diamonds that just changed. Keeping
  * the nodes rather than rebuilding them is what makes the loss read as a hit.
+ *
+ * @param {number} [bonus] gold lives on the end of the bar
  */
-export function updateLivesRow(row, lives, maxLives) {
-  const slots = Math.ceil(maxLives);
-  while (row.children.length < slots) {
-    const life = el('span.life.is-gained');
-    const sizeClass = row.firstElementChild?.classList;
-    if (sizeClass?.contains('life--lg')) life.classList.add('life--lg');
-    if (sizeClass?.contains('life--sm')) life.classList.add('life--sm');
+export function updateLivesRow(row, lives, maxLives, bonus = 0) {
+  layLives(row, lives, maxLives, bonus, () => el('span.life.is-gained'), true);
+}
+
+/**
+ * The one place that knows what a life row looks like: grow or shrink the node
+ * list to fit, then say what each diamond is. `make` is how a missing node is
+ * born — silently when the row is being built, with the gain animation when one
+ * appears on a row somebody is already looking at — and `animate` is the same
+ * distinction for the other direction: a diamond that empties while being
+ * watched takes the hit, one that is merely drawn empty does not.
+ */
+function layLives(row, lives, maxLives, bonus, make, animate) {
+  const size = row.dataset.size || '';
+  const reds = Math.ceil(maxLives);
+  const golds = Math.ceil(Math.max(0, bonus));
+  while (row.children.length < reds + golds) {
+    const life = make();
+    if (size) life.classList.add(size);
     row.append(life);
   }
-  while (row.children.length > slots) row.lastElementChild.remove();
+  while (row.children.length > reds + golds) row.lastElementChild.remove();
 
   [...row.children].forEach((node, i) => {
+    const gold = i >= reds;
+    const fill = gold
+      ? Math.max(0, Math.min(1, bonus - (i - reds)))
+      : Math.max(0, Math.min(1, lives - i));
     const wasFull = !node.classList.contains('is-empty');
-    const fill = Math.max(0, Math.min(1, lives - i));
-    const isFull = fill === 1;
+    node.classList.toggle('is-bonus', gold);
     node.classList.toggle('is-empty', fill === 0);
     node.classList.toggle('is-half', fill === 0.5);
-    if (wasFull && !isFull) {
+    if (animate && wasFull && fill !== 1) {
       node.classList.remove('is-lost');
       void node.offsetWidth; // restart the animation
       node.classList.add('is-lost');
     }
   });
-  row.setAttribute('aria-label', `${lives} of ${maxLives} lives`);
+  row.setAttribute(
+    'aria-label',
+    `${lives} of ${maxLives} lives${bonus > 0 ? `, plus ${bonus} bonus` : ''}`,
+  );
 }
 
 /**

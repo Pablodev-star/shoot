@@ -444,12 +444,39 @@ export function goldForEnemy({ worldId, lives = 1, isBoss = false }) {
 export const PRICE_GROWTH = 1.42;
 
 /**
+ * WHAT EVERY COUNTER IN THE GAME CHARGES OVER THE CATALOGUE
+ * ---------------------------------------------------------------------------
+ * Double, and it exists because the road got longer rather than because
+ * anything on the shelf changed. A world is close to twice the fights it used
+ * to be, so it pays close to twice the purse — and a shop whose prices were
+ * solved against the old income is a shop that runs out of things to sell.
+ * Measured on the long road at the old prices, the careful player crossed the
+ * Bayou with a maxed gun, a full bag and gold they had nothing to do with, and
+ * went on to reach the Galaxy in five runs out of six: the ledger, which is
+ * where this game says the skill lives, had quietly switched itself off for the
+ * back half of the run. At double it is a live decision again in every world,
+ * and the three skill bands are back where `TARGETS` in tools/sim.mjs wants
+ * them.
+ *
+ * ONE NUMBER RATHER THAN FORTY
+ * ---------------------------------------------------------------------------
+ * Every `basePrice` in src/game/items.js could have been rewritten instead, and
+ * that would have moved something it should not: `sellPrice` is a fraction of
+ * an item's base value, so doubling the catalogue would have doubled what the
+ * saddlebag is worth as well and left the buy-low-sell-high hole this game
+ * closed years ago half open. A markup on the ASKING price only cannot do that
+ * — it makes the shop dearer and leaves what a shopkeeper pays you exactly
+ * where it was.
+ */
+export const SHOP_MARKUP = 2;
+
+/**
  * Shop price for an item in a given world.
- * price = basePrice * PRICE_GROWTH^(world-1) * world.priceMul
+ * price = basePrice * SHOP_MARKUP * PRICE_GROWTH^(world-1) * world.priceMul
  */
 export function itemPrice(item, worldId) {
   const world = getWorld(worldId);
-  const raw = item.basePrice * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul;
+  const raw = item.basePrice * SHOP_MARKUP * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul;
   return Math.max(1, Math.round(raw / 5) * 5); // round to a tidy 5
 }
 
@@ -483,8 +510,28 @@ export function sellPrice(item, worldId) {
 
 // --- Inn pricing -----------------------------------------------------------
 
-export const INN_BASIC_BASE = 45;
-export const INN_PREMIUM_BASE = 130;
+/**
+ * THE TWO BEDS ARE FOUR TIMES APART, NOT THREE HALVES
+ * ---------------------------------------------------------------------------
+ * A straw mattress and a real room used to be 45 and 130, which is close
+ * enough that the choice made itself: the premium was under three times the
+ * price for twice the lives on any bar worth sleeping on, so a player with the
+ * money always took it and a player without one always took the other. Two
+ * prices that near each other are one price with a discount on it.
+ *
+ * They are a cheap bed and an expensive one now. The straw mattress came DOWN —
+ * it is the thing you can always afford, the one purchase on the road that a
+ * broke run can still make — and the room went up by better than a third, which
+ * is what it is worth when it is the night before a boss and the bar is nearly
+ * gone. In between there is an actual decision: half of you now and gold left
+ * over for the counter, or all of you and nothing to buy bandages with.
+ *
+ * Both still ride the same curve as everything else on the road, so the gap
+ * grows with the world: forty against a hundred and seventy-five in the Dust
+ * Flats, and five hundred against two thousand four hundred in the Galaxy.
+ */
+export const INN_BASIC_BASE = 40;
+export const INN_PREMIUM_BASE = 175;
 
 /**
  * Lives a basic bed restores — grows with the world.

@@ -48,7 +48,7 @@ export function trailBand(opts = {}) {
   const player = getState();
   const world = getWorld(player.world);
 
-  const lives = livesRow(player.lives, player.maxLives);
+  const lives = livesRow(player.lives, player.maxLives, { bonus: player.bonusLives });
   const gold = goldChip(player.gold);
   const worldLabel = el('span.world', { text: world.name });
 
@@ -129,7 +129,7 @@ export function trailBand(opts = {}) {
   ]);
 
   const unsubs = [
-    on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => updateLivesRow(lives, l, maxLives)),
+    on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives, bonus }) => updateLivesRow(lives, l, maxLives, bonus)),
     // Gold is not bound here: `goldChip` registers itself as a purse and
     // src/ui/gold-fly.js drives every one of them, so money coming in flies
     // across the screen and lands on this pill instead of appearing in it.

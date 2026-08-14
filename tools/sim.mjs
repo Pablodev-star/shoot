@@ -291,8 +291,16 @@ function bossPhase(worldId, index = 0) {
 
 /**
  * One duel, played out by the real engine.
- * @returns {{won:boolean, rounds:number, livesLeft:number, hazardStrikes:number,
- *            hazardRaised:boolean, shotsFired:number, shotsBlocked:number}}
+ *
+ * `player.bonus` is the gold end of the bar (a Potion's three lives — see
+ * src/game/items.js), and it comes back out as `bonusLeft` because the engine
+ * spends it before anything red and never puts one back. A model that dropped
+ * it on the way in would price the bottle at nothing and a model that dropped
+ * it on the way out would hand the player a fresh three every fight.
+ *
+ * @returns {{won:boolean, rounds:number, livesLeft:number, bonusLeft:number,
+ *            hazardStrikes:boolean, hazardRaised:boolean, shotsFired:number,
+ *            shotsBlocked:number}}
  */
 export async function fight({ enemy, player, policy, seed }) {
   const rng = makeRng(seed >>> 0);
@@ -344,6 +352,7 @@ export async function fight({ enemy, player, policy, seed }) {
     won: duel.getResult()?.winner === 'player',
     rounds,
     livesLeft: duel.getSides().player.lives,
+    bonusLeft: duel.getSides().player.bonus,
     ...stats,
   };
 }
@@ -640,7 +649,21 @@ async function runOnce(seed, policy) {
   const player = {
     level: 1, exp: 0, gold: 60, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
+    /** Gold lives off Potions. Spent before the bar, never healed back. */
+    bonus: 0,
     hunger: P.HUNGER_MAX, food: 44, heals: ['bandage', 'bandage'],
+  };
+
+  /**
+   * Anything that hurts, in the order the game hurts you in: the gold end of
+   * the bar first, whatever is left over off the red. The engine does this
+   * itself inside a duel (`damage`); this is the same rule for the two things
+   * that can kill you between fights.
+   */
+  const hurt = (amount) => {
+    const spent = Math.min(player.bonus, amount);
+    player.bonus -= spent;
+    player.lives -= amount - spent;
   };
 
   const levelUp = () => {
@@ -679,7 +702,7 @@ async function runOnce(seed, policy) {
       if (player.hunger < 0) {
         const starving = -player.hunger / P.HUNGER_DRAIN_PER_SEC;
         const ticks = Math.floor((starving * 1000) / P.starvationIntervalMs(player.maxLives));
-        player.lives -= ticks * P.STARVATION_LIFE_PER_TICK;
+        hurt(ticks * P.STARVATION_LIFE_PER_TICK);
         player.hunger = 0;
         if (player.lives <= 0) return { died: true, worldId, cause: 'starvation' };
       }
@@ -732,6 +755,7 @@ async function runOnce(seed, policy) {
             enemy,
             player: {
               lives: player.lives, maxLives: player.maxLives, bullets: 0,
+              bonus: player.bonus,
               gunDamage: P.gunDamageAt(player.gun),
             },
             policy,
@@ -741,6 +765,7 @@ async function runOnce(seed, policy) {
             return { died: true, worldId, cause: ev.type === 'boss' ? 'boss' : 'duel' };
           }
           player.lives = Math.max(0.5, r.livesLeft);
+          player.bonus = r.bonusLeft;
         }
         player.gold += P.goldForEnemy({ worldId, lives: enemy.maxLives, isBoss: enemy.isBoss });
         player.exp += P.expForEnemy({ worldId, lives: enemy.maxLives, isBoss: enemy.isBoss });
@@ -812,16 +837,31 @@ async function runOnce(seed, policy) {
          * it by a factor of three, and a run that keeps buying bandages out
          * there is a run that dies with a full purse.
          */
+        /**
+         * THE POTION IS ON THIS SHELF TOO, AND IT IS NOT A HEAL
+         * -------------------------------------------------------------------
+         * Three gold lives on the end of the bar rather than red ones put back
+         * (see src/game/items.js), which means two things for a model of a
+         * player. It is worth its full three whatever state the bar is in — a
+         * bandage bought on a full bar is worth nothing until something takes
+         * a diamond off you — and it is DRUNK AT THE COUNTER rather than
+         * carried, because gold lives are only ever spent by being hit and
+         * holding the bottle cannot make them go further.
+         *
+         * So it competes on the same ledger, at lives per gold, and the buyer
+         * simply does something different with it.
+         */
+        const livesFor = (item) => (item.bonusLives || P.itemHeal(item, player.maxLives));
         let budget = player.gold * buy.healBudget;
         const heals = stock
-          .filter((line) => line.item.heal && line.units > 0)
-          .sort((a, b) => P.itemHeal(b.item, player.maxLives) / b.price
-            - P.itemHeal(a.item, player.maxLives) / a.price);
+          .filter((line) => (line.item.heal || line.item.bonusLives) && line.units > 0)
+          .sort((a, b) => livesFor(b.item) / b.price - livesFor(a.item) / a.price);
         for (const line of heals) {
           while (line.units > 0 && budget >= line.price && player.heals.length < 16) {
             player.gold -= line.price;
             budget -= line.price;
-            player.heals.push(line.item.id);
+            if (line.item.bonusLives) player.bonus += line.item.bonusLives;
+            else player.heals.push(line.item.id);
             line.units -= 1;
           }
         }

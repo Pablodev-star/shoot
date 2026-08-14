@@ -8,13 +8,15 @@
  * duel, where the bag closes onto a fight already in motion, it was routinely
  * missed altogether.
  *
- * So it happens ON the man. Two pops, and they are deliberately the same shape
- * in two colours, because they are the same kind of event:
+ * So it happens ON the man. Three pops, and they are deliberately the same
+ * shape in three colours, because they are the same kind of event:
  *
- *   HEAL  the whole figure washes GREEN, and a dark green plus rises out of
- *         his chest and fades. Bandages, med kits, potions.
- *   FOOD  the same wash in ORANGE, and what rises is the food's own icon in a
- *         darker orange — the carrot you just ate, drawn as the carrot.
+ *   HEAL   the whole figure washes GREEN, and a dark green plus rises out of
+ *          his chest and fades. Bandages and med kits.
+ *   FOOD   the same wash in ORANGE, and what rises is the food's own icon in a
+ *          darker orange — the carrot you just ate, drawn as the carrot.
+ *   BONUS  the same again in GOLD, with the bottle rising out of it: the
+ *          Potion, and three gold lives arriving on the end of the bar.
  *
  * WHY IT LIVES IN /art AND NOT IN EITHER SCREEN
  * ---------------------------------------------------------------------------
@@ -38,13 +40,20 @@ import { getItemSprites } from './sprites-items.js';
 export const POP_MS = 950;
 
 /**
- * The two flavours. `wash` is what the body turns; `mark` is what the symbol
+ * The three flavours. `wash` is what the body turns; `mark` is what the symbol
  * over it is drawn in — always the darker of the pair, so it reads AGAINST the
  * wash rather than dissolving into it.
+ *
+ * BONUS is the Potion, and it is deliberately not the heal pop in another
+ * colour on the strength of the colour alone: what the bottle hands over is
+ * gold lives on the end of the bar rather than red ones put back, and the two
+ * are worth different things at different moments. Gold wash, gold plus, and
+ * the bar underneath grows by three diamonds the player has never seen before.
  */
 const KINDS = {
   heal: { wash: PALETTE.greenLight, mark: PALETTE.greenDark },
   food: { wash: PALETTE.magma, mark: PALETTE.magmaDeep },
+  bonus: { wash: PALETTE.goldLight, mark: PALETTE.goldDark },
 };
 
 /** Cache of icons already silhouetted in a mark colour. */
@@ -75,7 +84,7 @@ export function createVitalPops() {
 
   return {
     /**
-     * @param {'heal'|'food'} kind
+     * @param {'heal'|'food'|'bonus'} kind
      * @param {string|null} [iconName] the item's icon, for a food pop
      */
     spawn(kind, iconName = null) {
@@ -130,8 +139,10 @@ export function createVitalPops() {
         // nothing while standing still reads as a rendering glitch.
         ctx.globalAlpha = k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45;
         const y = cy - rise;
-        if (pop.kind === 'food' && pop.icon) {
-          const art = markedIcon(pop.icon, KINDS.food.mark);
+        // A plus for a heal, and the thing itself for anything else that has an
+        // icon — the carrot you ate, the bottle you drank.
+        if (pop.kind !== 'heal' && pop.icon) {
+          const art = markedIcon(pop.icon, KINDS[pop.kind].mark);
           const s = Math.max(1, Math.round(scale * 0.75));
           drawSprite(ctx, art, Math.round(cx - (art.width * s) / 2), Math.round(y - art.height * s), s);
         } else {

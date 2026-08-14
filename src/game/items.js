@@ -153,15 +153,15 @@ const CATALOGUE = {
 
   // --- Healing -------------------------------------------------------------
   /**
-   * THE TWO THINGS YOU CAN DRINK IN THE MIDDLE OF A GUNFIGHT
+   * THE THREE THINGS YOU CAN REACH FOR IN THE MIDDLE OF A GUNFIGHT
    * -------------------------------------------------------------------------
-   * Both are `anytime`, which means both are on the bar during a duel, and
-   * that is what they are priced against: a bed is cheaper per life and a bed
-   * is not there when a rider has you on your last diamond.
+   * All three are `anytime`, which means all three are on the bar during a
+   * duel, and that is what they are priced against: a bed is cheaper per life
+   * and a bed is not there when a rider has you on your last diamond.
    *
-   * A FLAT ONE, AND TWO THAT ARE A FRACTION OF YOU
+   * A FLAT ONE, ONE THAT IS A FRACTION OF YOU, AND ONE THAT IS NOT A HEAL
    * -------------------------------------------------------------------------
-   * Three things put lives back in the middle of a fight, and they are three
+   * Three things go in the bag against losing lives, and they are three
    * different SHAPES on purpose.
    *
    * The bandage is a flat two diamonds. On the road out of the Dust Flats that
@@ -170,10 +170,13 @@ const CATALOGUE = {
    * decay is the point — the cheapest thing on the counter should be a rescue
    * early and small change late, or the shop has nothing to sell you.
    *
-   * The Med Kit and the Potion are written as a FRACTION of the bar (see
-   * `itemHeal` in src/game/progression.js), so they mean the same thing in
-   * every world: half of you and three quarters of you. They are what the
-   * later worlds are for, and what the price curve is charging for.
+   * The Med Kit is written as a FRACTION of the bar (see `itemHeal` in
+   * src/game/progression.js), so it means the same thing in every world: half
+   * of you, wherever you are standing. It is what the later worlds are for, and
+   * what the price curve is charging for.
+   *
+   * The Potion is the odd one and has its own note below: it does not put
+   * anything back, it hangs three gold lives off the end of the bar.
    *
    * `heal` sits alongside `healFraction` as what that fraction comes to on the
    * starting bar, because a shop card reading "2" is worth more to a player
@@ -208,17 +211,38 @@ const CATALOGUE = {
     stack: 4,
     desc: 'Field surgery in a tin box. Puts half of you back together.',
   },
+  /**
+   * THE ONE THING ON THE COUNTER THAT MAKES YOU BIGGER INSTEAD OF WHOLE
+   * -------------------------------------------------------------------------
+   * It used to be the big heal — three quarters of the bar in one gulp — which
+   * made it a more expensive Med Kit and nothing else. Two items doing one job,
+   * and the cheaper one usually winning.
+   *
+   * It does a different job now, and the shape of it is borrowed from the game
+   * that invented it: three GOLD lives, hung on the end of your bar past the
+   * red ones. They are not part of you and they never become part of you —
+   * nothing heals them, no bed touches them, and a level-up does not top them
+   * up. They come off FIRST, before a single red diamond is spent, and once
+   * they are gone they are gone until you buy another bottle. Drink a second
+   * one and it is three more on the end, however many are already there; there
+   * is no ceiling on it.
+   *
+   * Which makes it the only purchase in the game that can be made when there is
+   * nothing wrong with you — you buy it before the boss's door, not after the
+   * fight that went badly — and the only one whose value does not depend on how
+   * hurt you are. See `addBonusLives` in src/game/player.js for the state and
+   * `livesRow` in src/ui/widgets.js for the gold diamonds.
+   */
   potion: {
     id: 'potion',
     name: 'Potion',
     icon: 'potion',
     rarity: 'rare',
-    basePrice: 130,
+    basePrice: 150,
     context: 'anytime',
-    heal: 3,
-    healFraction: 0.75,
+    bonusLives: 3,
     stack: 5,
-    desc: 'Puts three quarters of you back together in one gulp.',
+    desc: 'Three extra lives in gold, hung on the end of your bar. Nothing heals them, they are spent before your own, and another bottle adds three more.',
   },
 
   /**
