@@ -29,7 +29,12 @@ import { hintGoldOrigin } from './gold-fly.js';
 
 const FILTERS = [
   { id: 'all', label: 'All', match: () => true },
-  { id: 'food', label: 'Food', match: (item) => !!item.food || !!item.heal },
+  {
+    id: 'food',
+    label: 'Food',
+    /** Everything you swallow: meals, bandages, and the bottle of gold lives. */
+    match: (item) => !!item.food || !!item.heal || !!item.bonusLives,
+  },
   { id: 'duel', label: 'Duel', match: (item) => item.context === 'duel' },
   /**
    * Abilities get a tab of their own rather than sitting under Gear, because
@@ -93,6 +98,7 @@ export function openInventory(opts = {}) {
   function actionLabel(item) {
     if (item.ability) return isEquipped(item.id) ? 'In hand' : 'Equip';
     if (item.food) return 'Eat';
+    if (item.bonusLives) return 'Drink';
     if (item.heal) return 'Use';
     if (item.context === 'utility') return 'Open';
     // A vest, a diadem, a canteen, a totem: the button is dead for all of them
@@ -173,6 +179,9 @@ export function openInventory(opts = {}) {
     if (result.effect === 'food') toast('That hits the spot', 'good');
     if (result.effect === 'heal') {
       toast(`Restored ${result.amount} ${result.amount === 1 ? 'life' : 'lives'}`, 'good');
+    }
+    if (result.effect === 'bonus') {
+      toast(`${result.amount} extra lives — they go first`, 'gold');
     }
     if (result.effect === 'equip') toast('In hand for the next fight', 'good');
     if (context === 'duel') close();

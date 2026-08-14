@@ -62,6 +62,8 @@ export function describeSlot(data) {
     gold: p.gold || 0,
     lives: p.lives ?? 3,
     maxLives: p.maxLives ?? 3,
+    /** Gold lives a Potion left on the bar. Absent in saves written before them. */
+    bonusLives: p.bonusLives || 0,
     savedAt: data.savedAt || 0,
     /** A finished run: the slot replays the ending instead of the road. */
     completed: !!data.completed,

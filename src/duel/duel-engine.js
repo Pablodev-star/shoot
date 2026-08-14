@@ -110,6 +110,14 @@ export function createDuel(config) {
       name: config.player.name || 'You',
       lives: config.player.lives,
       maxLives: config.player.maxLives,
+      /**
+       * Gold lives, hung on the end of the bar by a Potion — see `bonusLives`
+       * in src/game/player.js. The engine knows two things about them and no
+       * more: they come off before `lives` does, and nothing in here ever puts
+       * one back. That is enough for every rule below to be written once, for
+       * both fighters, without asking what a Potion is.
+       */
+      bonus: config.player.bonus || 0,
       bullets: config.player.bullets || 0,
       hasVest: !!config.player.hasVest,
       /**
@@ -135,6 +143,8 @@ export function createDuel(config) {
       name: config.enemy.name,
       lives: config.enemy.lives,
       maxLives: config.enemy.maxLives,
+      /** Nobody sells the road a Potion. It is here so both sides have one. */
+      bonus: 0,
       bullets: config.enemy.bullets || 0,
       hasVest: false,
       hasTotem: false,
@@ -233,16 +243,25 @@ export function createDuel(config) {
   function publicView(selfId) {
     const self = sides[selfId];
     const foe = sides[selfId === 'player' ? 'enemy' : 'player'];
+    /**
+     * `lives` is what the man is STANDING ON, gold included, because that is
+     * what the diamonds on the card say and an agent is only ever allowed to
+     * read the card. A rival on one red life behind three gold ones is not on
+     * his last life and neither side should be playing as though he is;
+     * `bonus` is beside it for anything that wants to tell the two apart.
+     */
     return {
       round,
       self: {
-        lives: self.lives,
+        lives: self.lives + self.bonus,
+        bonus: self.bonus,
         bullets: self.bullets,
         gunDamage: self.gunDamage,
         status: { ...self.status },
       },
       foe: {
-        lives: foe.lives,
+        lives: foe.lives + foe.bonus,
+        bonus: foe.bonus,
         bullets: foe.bullets,
         gunDamage: foe.gunDamage,
         status: { ...foe.status },
@@ -294,14 +313,34 @@ export function createDuel(config) {
      * first) and it does not report a hit either, because the screen has a
      * whole scene to play before the round is allowed to look normal again.
      */
-    if (side.hasTotem && side.lives - amount <= 0) {
+    if (side.hasTotem && side.lives + side.bonus - amount <= 0) {
       side.hasTotem = false;
+      side.bonus = 0;
       side.lives = Math.max(1, side.totemLives || Math.ceil(side.maxLives / 2));
       log('totem', { side: sideId, lives: side.lives });
       return false;
     }
+    /**
+     * THE GOLD DIAMONDS ARE SPENT FIRST, AND THEY ARE SPENT BY EVERYTHING
+     * -----------------------------------------------------------------------
+     * A bullet, a rock off the mountain, a tick of venom, a round coming back
+     * off a mirror — they all arrive here, so putting the Potion's lives in
+     * front of the bar in this one place is what makes "they go first" true of
+     * the whole game rather than of shots. What is left over after the gold
+     * runs out carries on into the red, so a blast bigger than the bonus is one
+     * hit rather than two.
+     */
+    if (side.bonus > 0) {
+      const spent = Math.min(side.bonus, amount);
+      side.bonus -= spent;
+      amount -= spent;
+      if (amount <= 0) {
+        log('damage', { side: sideId, amount: spent, source, lives: side.lives, bonus: side.bonus });
+        return true;
+      }
+    }
     side.lives = Math.max(0, side.lives - amount);
-    log('damage', { side: sideId, amount, source, lives: side.lives });
+    log('damage', { side: sideId, amount, source, lives: side.lives, bonus: side.bonus });
     return true;
   }
 
@@ -675,10 +714,16 @@ export function createDuel(config) {
   }
 
   function checkEnd() {
-    if (sides.player.lives <= 0 || sides.enemy.lives <= 0) {
+    // Gold lives are lives: a fighter standing on nothing but a Potion's three
+    // is still standing. `damage` spends them before the bar, so in practice the
+    // sum is only ever a different number from `lives` while `lives` is full —
+    // it is written as the sum anyway, because a rule that reads "you are down
+    // when you have nothing left" cannot be broken by a future effect.
+    const down = (side) => side.lives + side.bonus <= 0;
+    if (down(sides.player) || down(sides.enemy)) {
       over = true;
-      const playerDead = sides.player.lives <= 0;
-      const enemyDead = sides.enemy.lives <= 0;
+      const playerDead = down(sides.player);
+      const enemyDead = down(sides.enemy);
       // Simultaneous knockout: the challenger (player) loses the tie, exactly
       // as in every previous version of the game.
       ended = { winner: playerDead ? 'enemy' : enemyDead ? 'player' : null, rounds: round };
@@ -707,6 +752,7 @@ export function createDuel(config) {
       hits: { player: false, enemy: false },
       shotHits: { player: false, enemy: false },
       lives: { player: sides.player.lives, enemy: sides.enemy.lives },
+      bonus: { player: sides.player.bonus, enemy: sides.enemy.bonus },
       bullets: { player: sides.player.bullets, enemy: sides.enemy.bullets },
       ended,
       /** Set when the round did not play out normally. */
@@ -898,6 +944,7 @@ export function createDuel(config) {
       bounced,
       status: { player: { ...sides.player.status }, enemy: { ...sides.enemy.status } },
       lives: { player: sides.player.lives, enemy: sides.enemy.lives },
+      bonus: { player: sides.player.bonus, enemy: sides.enemy.bonus },
       bullets: { player: sides.player.bullets, enemy: sides.enemy.bullets },
       ended,
     };
@@ -953,6 +1000,7 @@ export function createDuel(config) {
       name: next.name,
       lives: next.lives,
       maxLives: next.maxLives,
+      bonus: 0,
       bullets: next.bullets || 0,
       accuracy: next.accuracy,
       abilities: next.abilities || [],

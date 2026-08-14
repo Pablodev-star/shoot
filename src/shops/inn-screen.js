@@ -53,7 +53,7 @@ export const InnScreen = {
     setRenderer(createInteriorScene('inn'));
 
     const band = trailBand();
-    const lives = livesRow(player.lives, player.maxLives, { large: true });
+    const lives = livesRow(player.lives, player.maxLives, { large: true, bonus: player.bonusLives });
     const livesNote = el('span.muted', { text: livesText() });
     const bedGrid = el('div.bed-grid.stagger');
 
@@ -62,8 +62,8 @@ export const InnScreen = {
     const BED_SCALE = 5;
     const bedPx = venueSize('bedStraw');
 
-    const unsub = on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives }) => {
-      updateLivesRow(lives, l, maxLives);
+    const unsub = on(EVENTS.LIVES_CHANGED, ({ lives: l, maxLives, bonus }) => {
+      updateLivesRow(lives, l, maxLives, bonus);
       livesNote.textContent = livesText();
     });
     // …and the beds follow the purse, the same way the stall and the forge do:

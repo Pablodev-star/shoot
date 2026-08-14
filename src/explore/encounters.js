@@ -7,8 +7,10 @@
  * with *guarantees*:
  *
  *   - exactly `duels` duels, which is what the world's difficulty is measured in
- *   - one or two shops and, quite separately, one or two inns
- *   - at least SERVICE_GAP duels between any two of those stops
+ *   - shops and, quite separately, inns — as many of each as the length of the
+ *     road is worth (`DUELS_PER_SERVICE`), or one fewer
+ *   - never two of those stops in a row: a fight always stands between them
+ *   - SERVICE_GAP duels between any two of them wherever the road can pay for it
  *   - order and spacing shuffled freely inside those guarantees
  *   - the world boss always closes the segment
  *
@@ -29,13 +31,17 @@
  *
  * NOTHING IS EVER SHOULDER TO SHOULDER
  * ---------------------------------------------------------------------------
- * Two rules keep the stops apart, and they are deliberately different rules:
+ * Three rules keep the stops apart, and they are deliberately different rules:
  *
- *   1. SERVICE_GAP duels sit between any two of them, so you never step out of
- *      a shop into another shop, or out of an inn into another inn, and never
- *      walk from a counter straight to a bed either. There is always a road in
- *      between, and something on it.
- *   2. SERVICE_MIN_GAP source pixels of approach in front of each one, which is
+ *   1. SERVICE_ADJACENT_GAP duels sit between any two of them, ALWAYS. You
+ *      never step out of a shop into another shop, out of an inn into another
+ *      inn, or out of a counter straight into a bed. This one is absolute: it
+ *      is not weighed against anything and it is not given up when the road
+ *      runs short.
+ *   2. SERVICE_GAP duels sit between them when the world can afford it, which
+ *      is what makes a stretch of road feel like a stretch rather than a row
+ *      of doors.
+ *   3. SERVICE_MIN_GAP source pixels of approach in front of each one, which is
  *      the same rule expressed in distance rather than in events: a building
  *      should come up over the horizon and be walked towards, not appear.
  *
@@ -72,32 +78,104 @@
 import { makeRng, hashSeed } from '../core/rng.js';
 import { getWorld } from '../game/worlds.js';
 
-/** Spacing between encounters, in source pixels. */
-export const MIN_GAP = 320;
-export const MAX_GAP = 780;
-/** A shop or an inn is always approached, never stumbled into. */
-export const SERVICE_MIN_GAP = 480;
+/**
+ * Spacing between encounters, in source pixels.
+ *
+ * A LONGER WORLD IS MORE FIGHTS, NOT MORE WALKING
+ * ---------------------------------------------------------------------------
+ * These were solved against a world of five or six stops. At a dozen and a
+ * half they were the same numbers describing twice the journey, and the thing
+ * that noticed first was the hunger gauge: a crossing is `distance / speed`
+ * seconds of rations however many duels are on it, so doubling the road
+ * doubled the food bill without a single shop appearing to sell more. Measured
+ * before they came down, starvation went from a rare death to the commonest
+ * one in the middle worlds.
+ *
+ * So the stretches between stops are about two thirds of what they were, and a
+ * crossing costs roughly what it always did. What the player gets out of the
+ * extra length is what they were promised — more of the game, rather than more
+ * of the road between it.
+ */
+export const MIN_GAP = 220;
+export const MAX_GAP = 520;
+/**
+ * A shop or an inn is always approached, never stumbled into. Still the better
+ * part of six seconds on foot, which is what "over the horizon and walked
+ * towards" costs.
+ */
+export const SERVICE_MIN_GAP = 330;
 /** The run-up to a boss is always long — it should feel like a march. */
-export const BOSS_GAP = 1050;
+export const BOSS_GAP = 900;
 
 /**
- * How many shops (and, rolled again, how many inns) a world gets. Two is the
- * normal shape of a world and one is the lean version of it, which is why the
- * odds are lopsided rather than a coin toss: at 50/50 a quarter of all worlds
- * would have a single shop *and* a single inn, and that stretch is noticeably
- * harder than its neighbours for a reason the player cannot see.
+ * How many shops (and, rolled again, how many inns) a world gets: the full
+ * number, or one fewer.
+ *
+ * The odds are lopsided rather than a coin toss because a world that rolls the
+ * lean version of BOTH is noticeably harder than its neighbours for a reason
+ * the player cannot see; at 50/50 that would be a quarter of all worlds.
  */
 export const SERVICE_PAIR_CHANCE = 0.8;
 
-/** Duels that must sit between two service stops. Reduced only if it cannot fit. */
-export const SERVICE_GAP = 2;
+/**
+ * HOW MANY COUNTERS AND BEDS A ROAD OF A GIVEN LENGTH IS WORTH
+ * ---------------------------------------------------------------------------
+ * It used to be "one or two", flat, and that was fine while every world was
+ * five or six fights long. It stops being fine the moment a world is a dozen:
+ * a bed is worth about half a bar and a duel costs about a third of one, so
+ * what a world's stops have to cover is its LENGTH, not its name. Two beds on
+ * a five-duel road is a comfortable crossing; two beds on an eleven-duel road
+ * is a run that dies in the last third of every world with a full purse.
+ *
+ * So the count is the road divided by this, rounded, and never less than two —
+ * a world with one shop and one bed is the lean shape, not the standard one.
+ * Four is chosen against the two numbers above: a stop every four fights is
+ * roughly a bed for every bar and a half the road takes off you.
+ */
+export const DUELS_PER_SERVICE = 4;
+
+/**
+ * How much road the generator would LIKE between two buildings.
+ *
+ * THREE, AND IT IS A WISH RATHER THAN A RULE
+ * ---------------------------------------------------------------------------
+ * A world holding six buildings would need nineteen fights to keep them all
+ * three apart and the longest road in the game is eleven, so this is never
+ * fully paid — and it is not supposed to be. It is the window `revealNext`
+ * measures against: a building's chance of being dealt is scaled by how much of
+ * this has been walked off since the last one, so the road spreads its doors
+ * out as far as the hand can afford and no further. Measured over the six
+ * worlds, that comes out at about a fight and a third between buildings against
+ * the old five-duel road's four fifths.
+ *
+ * That "about" is why the old version of this number was not enough on its own.
+ * It was a hard filter — inside the window, deal a fight — which sounds
+ * stricter and is weaker, because a filter that has to yield when the hand runs
+ * out of riders yields at the END of the world, where all the buildings it
+ * pushed back are waiting. Fifty-nine per cent of all neighbouring buildings on
+ * the old road were shoulder to shoulder.
+ */
+export const SERVICE_GAP = 3;
+
+/**
+ * The hard floor under it: fights that MUST separate two buildings. One, and it
+ * is never traded away — see the note above for why the soft number could not
+ * be trusted with this job. It costs the generator nothing to guarantee: a
+ * world is never given more buildings than it has duels, and every building
+ * spends exactly one of them on the fight that has to follow it.
+ */
+export const SERVICE_ADJACENT_GAP = 1;
 
 /**
  * How many stops down the road the player can see.
  *
- * Five, which is between a third and a half of a world: enough to plan a
- * purchase around ("there is a forge before the next bed, so I bank"), and not
- * enough to plan the whole world around. The boss is exempt — it is always the
+ * Five, which was between a third and a half of a world when a world was five
+ * duels long and is nearer a quarter of one now: enough to plan a purchase
+ * around ("there is a forge before the next bed, so I bank"), and not enough to
+ * plan the whole world around. It did not go up with the length, because what
+ * the horizon is for is the next decision rather than the next world — and on a
+ * road this long, five stops is still further ahead than a purse can usefully
+ * see. The boss is exempt — it is always the
  * last thing on the road and pretending otherwise would be a lie the player
  * can count.
  */
@@ -163,9 +241,10 @@ const LAST_CALL = 2;
  */
 export const OPENING_FIGHTS = 2;
 
-/** One or two, weighted towards two. */
-function rollServiceCount(rng) {
-  return rng.chance(SERVICE_PAIR_CHANCE) ? 2 : 1;
+/** What a road this long is worth, or one fewer — weighted towards the full number. */
+function rollServiceCount(rng, duels) {
+  const full = Math.max(2, Math.round(duels / DUELS_PER_SERVICE));
+  return rng.chance(SERVICE_PAIR_CHANCE) ? full : full - 1;
 }
 
 /**
@@ -182,18 +261,18 @@ export function generateSegment(worldId, seed) {
 
   // --- 1. What the road has on it ----------------------------------------
   const services = [
-    ...Array(rollServiceCount(rng)).fill('shop'),
-    ...Array(rollServiceCount(rng)).fill('inn'),
+    ...Array(rollServiceCount(rng, duels)).fill('shop'),
+    ...Array(rollServiceCount(rng, duels)).fill('inn'),
     /**
      * One smithy, always, in the world that has to teach you what a smithy is;
      * four worlds in five everywhere else.
      *
      * It used to be two in the Dust Flats, which was a fair way to make sure
-     * nobody missed the forge and stopped being fair when the worlds got
-     * shorter. Six services on a road with seven duels cannot be kept two
-     * fights apart, so `SERVICE_GAP` collapsed to one and the opening stretch
-     * came out as counter, fight, bed, fight, counter — every building in the
-     * world in the first half of it. The forge is unmissable at one.
+     * nobody missed the forge and stopped being fair the moment the road had to
+     * hold anything else. Six buildings cannot be kept three fights apart on
+     * any road this game has, so the gap collapsed and the opening stretch came
+     * out as counter, fight, bed, fight, counter — every building in the world
+     * in the first half of it. The forge is unmissable at one.
      */
     ...Array(worldId === 1 ? 1 : (rng.chance(0.8) ? 1 : 0)).fill('forge'),
   ];
@@ -203,12 +282,21 @@ export function generateSegment(worldId, seed) {
   // The opening duel plus one gap per pair of stops is the minimum duel bill.
   // A world too short to pay it buys a smaller gap first, and only then gives
   // up a stop — and when it does, it gives up a duplicate, so a world can lose
-  // its second shop but never its only inn. No world in the game is currently
-  // tight enough to reach either branch; they exist so that adding one cannot
-  // quietly produce a road with two counters side by side.
+  // its second shop but never its only inn.
+  //
+  // In practice the first branch runs all the way down on every road in the
+  // game — no world can pay nineteen fights for six buildings three apart — so
+  // what this loop actually establishes is that the multiset FITS: one fight
+  // per building, which is the promise `SERVICE_ADJACENT_GAP` keeps in
+  // `revealNext`. The spacing the player feels is the dimmer over there, not
+  // the bucket layout here; the buckets only decide what the world holds.
+  //
+  // The second branch is the one no world reaches. It exists so that a future
+  // world short enough to be crowded gives up a duplicate rather than quietly
+  // producing a road with two counters side by side.
   let gap = SERVICE_GAP;
   const bill = () => 1 + gap * (services.length - 1);
-  while (gap > 1 && bill() > duels) gap--;
+  while (gap > SERVICE_ADJACENT_GAP && bill() > duels) gap--;
   while (services.length > 1 && bill() > duels) dropDuplicate(services, rng);
 
   // --- 3. Deal the duels out around them ----------------------------------
@@ -320,6 +408,23 @@ export function revealNext(segment, state) {
   const kinds = [...new Set(segment.hand)];
 
   /**
+   * THE RESERVE, WHICH IS WHAT MAKES THE ALTERNATION AFFORDABLE
+   * -------------------------------------------------------------------------
+   * Every building still in the hand except the first one needs a fight in
+   * front of it, or the road finishes as a row of doors. So `buildingsLeft - 1`
+   * riders are spoken for from the moment the world is generated, and
+   * `canFight` is the question "is this rider one of the spare ones". Once it
+   * goes false the rest of the road is forced — door, fight, door, fight — and
+   * every stop after it deals itself.
+   *
+   * It is asked BEFORE the opening rule as well as after it. Two free fights at
+   * the border is a pacing nicety; never two doors in a row is a promise.
+   */
+  const enemiesLeft = segment.hand.filter((kind) => kind === 'enemy').length;
+  const buildingsLeft = segment.hand.length - enemiesLeft;
+  const canFight = enemiesLeft > 0 && enemiesLeft > buildingsLeft - 1;
+
+  /**
    * A WORLD OPENS WITH FIGHTS
    * -------------------------------------------------------------------------
    * The first two stops of every world are riders while the hand still has
@@ -336,7 +441,7 @@ export function revealNext(segment, state) {
    * the sequence is whatever `revealNext` chooses. So it lives here, where the
    * choosing happens.
    */
-  if (event.index < OPENING_FIGHTS && segment.hand.includes('enemy')) {
+  if (event.index < OPENING_FIGHTS && canFight) {
     segment.hand.splice(segment.hand.indexOf('enemy'), 1);
     event.type = 'enemy';
     event.hidden = false;
@@ -347,17 +452,39 @@ export function revealNext(segment, state) {
   const reading = { ...state, lastCall };
 
   /**
-   * The one structural rule that survives the shuffle: two counters, two beds
-   * or a counter and a bed never stand shoulder to shoulder. It is checked
-   * against what has actually been dealt rather than against the plan, and it
-   * yields when the hand has nothing else left — the last three stops of a
-   * world are allowed to be three buildings if that is all there is.
+   * HOW LONG IT HAS BEEN SINCE THE LAST DOOR
+   * -------------------------------------------------------------------------
+   * Counted in what was actually DEALT rather than in what was planned,
+   * because the plan is only a multiset by the time anybody is walking on it.
+   * It drives the two halves of the spacing rule:
+   *
+   *   `mustFight` — the stop immediately behind this one was a building, so
+   *   this one is a fight, full stop. Nothing outweighs it and nothing trades
+   *   it away. It cannot run the road out of riders either, because `canFight`
+   *   above is what keeps a fight in reserve for every building still in hand.
+   *
+   *   `spacing` — the soft one, and it is a dimmer rather than a switch. A
+   *   building's appetite is scaled by how much of SERVICE_GAP has been walked
+   *   off since the last one: a third of it one fight later, two thirds two
+   *   fights later, all of it after three. Forcing a fight outright inside the
+   *   window was tried and it does the opposite of what it looks like — the
+   *   riders all get spent in the first half of the world and the last four
+   *   stops come out as a parade of doors, which is the exact thing the rule
+   *   exists to prevent.
    */
-  const recent = segment.events
-    .slice(Math.max(0, event.index - SERVICE_GAP), event.index)
-    .map((e) => e.type);
-  const crowded = recent.some((type) => type && type !== 'enemy' && type !== 'boss');
-  let allowed = crowded && segment.hand.includes('enemy') ? ['enemy'] : kinds;
+  const isBuilding = (type) => type && type !== 'enemy' && type !== 'boss';
+  let since = 0;
+  for (let i = event.index - 1; i >= 0 && !isBuilding(segment.events[i].type); i--) since += 1;
+  const mustFight = since < SERVICE_ADJACENT_GAP && segment.hand.includes('enemy');
+  const spacing = Math.min(1, since / SERVICE_GAP);
+
+  let allowed = kinds;
+  if (mustFight) allowed = ['enemy'];
+  else if (!canFight) {
+    // Out of slack: the rest of the road alternates, and this stop is a door.
+    const doors = kinds.filter((kind) => kind !== 'enemy');
+    if (doors.length) allowed = doors;
+  }
 
   /**
    * THE LAST BED IS SAVED FOR THE DOOR OF THE BOSS
@@ -403,8 +530,25 @@ export function revealNext(segment, state) {
    */
   const lastBed = lastCall && state.health < 1 && allowed.includes('inn');
 
+  /**
+   * The draw, and it is a draw from a HAND rather than from a menu of kinds.
+   *
+   * Each kind's appetite is multiplied by how many of it are still in there,
+   * which is the difference between a road that paces itself and one that
+   * front-loads its fights. Without it a hand of six riders and one counter
+   * weighs the counter exactly as heavily as the riders — a shop is one kind
+   * out of two, never mind that it is one card out of seven — so the fights
+   * come out early, the buildings pile up at the end, and the alternation rule
+   * spends the whole last third of the world holding them apart.
+   *
+   * The second term is the spacing dimmer above; fights are never dimmed.
+   */
   const weights = {};
-  for (const kind of allowed) weights[kind] = Math.max(0.01, APPETITE[kind]?.(reading) ?? 1);
+  for (const kind of allowed) {
+    const held = segment.hand.filter((k) => k === kind).length;
+    const appetite = Math.max(0.01, APPETITE[kind]?.(reading) ?? 1);
+    weights[kind] = Math.max(0.01, appetite * held * (kind === 'enemy' ? 1 : spacing));
+  }
   const kind = lastBed ? 'inn' : rng.weighted(weights);
 
   segment.hand.splice(segment.hand.indexOf(kind), 1);

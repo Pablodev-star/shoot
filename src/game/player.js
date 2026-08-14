@@ -51,6 +51,24 @@ function blankState() {
 
     maxLives: STARTING_LIVES,
     lives: STARTING_LIVES,
+    /**
+     * THE GOLD DIAMONDS ON THE END OF THE BAR
+     * -----------------------------------------------------------------------
+     * Lives that are not yours. A Potion hangs three of them past `maxLives`
+     * and they obey a different set of rules from everything to their left:
+     *
+     *   - nothing heals them. Not a bed, not a bandage, not a level-up, not the
+     *     full heal at a world border. The only way to have one is to buy it.
+     *   - they are spent FIRST. Every hit in the game comes off the gold before
+     *     it touches a red diamond, which is what makes them worth buying
+     *     before a boss rather than after a bad fight.
+     *   - they stack without a ceiling. A second bottle is three more.
+     *
+     * Kept as its own number rather than folded into `lives` because those two
+     * properties are exactly what folding them in would lose: `setLives` clamps
+     * to `maxLives`, and every heal in the game goes through it.
+     */
+    bonusLives: 0,
     hunger: HUNGER_MAX,
 
     hasHorse: false,
@@ -160,7 +178,7 @@ function rebuildLifeBar() {
 }
 
 function emitAll() {
-  emit(EVENTS.LIVES_CHANGED, { lives: state.lives, maxLives: state.maxLives });
+  emitLives();
   emit(EVENTS.GOLD_CHANGED, { gold: state.gold });
   emit(EVENTS.EXP_CHANGED, { exp: state.exp, level: state.level, next: expForNextLevel(state.level) });
   emit(EVENTS.HUNGER_CHANGED, { hunger: state.hunger, max: HUNGER_MAX });
@@ -173,8 +191,48 @@ function emitAll() {
 
 export function setLives(value) {
   state.lives = Math.max(0, Math.min(state.maxLives, Math.round(value * 2) / 2));
-  emit(EVENTS.LIVES_CHANGED, { lives: state.lives, maxLives: state.maxLives });
+  emitLives();
   return state.lives;
+}
+
+function emitLives() {
+  emit(EVENTS.LIVES_CHANGED, {
+    lives: state.lives,
+    maxLives: state.maxLives,
+    bonus: state.bonusLives,
+  });
+}
+
+/**
+ * Hang more gold lives on the end of the bar. See `bonusLives` in the state.
+ *
+ * There is no cap and there never will be: a bottle adds three, a hit takes
+ * one away, and a player who drinks four bottles is carrying twelve.
+ */
+export function addBonusLives(amount = 3) {
+  state.bonusLives = Math.max(0, state.bonusLives + amount);
+  emitLives();
+  return state.bonusLives;
+}
+
+/**
+ * Write the gold count back after a fight.
+ *
+ * A duel keeps its own life count while it runs — the engine is the authority
+ * for the length of a fight, for the bar and for the gold alike — so this is
+ * how the run finds out what survived it. It is the only place in the game
+ * that sets the number rather than adding to it, and it is called from exactly
+ * one line (`endDuel` in src/duel/duel-screen.js).
+ */
+export function setBonusLives(value) {
+  state.bonusLives = Math.max(0, Math.round(value * 2) / 2);
+  emitLives();
+  return state.bonusLives;
+}
+
+/** Gold lives in hand. */
+export function getBonusLives() {
+  return state.bonusLives;
 }
 
 /**
@@ -218,6 +276,18 @@ export function upgradeGun() {
  */
 export function loseLife(amount = 1) {
   const before = state.lives;
+  /**
+   * The gold goes first, and it goes silently: a starvation tick that lands on
+   * a Potion's diamond is the Potion doing its job, so there is no death to
+   * check for until the gold has run out. See `bonusLives`.
+   */
+  if (state.bonusLives > 0) {
+    const spent = Math.min(state.bonusLives, amount);
+    state.bonusLives -= spent;
+    amount -= spent;
+    emitLives();
+    if (amount <= 0) return state.lives;
+  }
   setLives(state.lives - amount);
   if (state.lives <= 0 && before > 0) {
     if (hasTotem()) emit(EVENTS.TOTEM_TRIGGERED, { reason: 'lives' });
@@ -286,7 +356,7 @@ export function addExp(amount) {
      * comes out at 2 of 6, and the bed is still the only way back to the top.
      */
     state.lives = Math.min(state.maxLives, state.lives + LIVES_PER_LEVEL * levelled);
-    emit(EVENTS.LIVES_CHANGED, { lives: state.lives, maxLives: state.maxLives });
+    emitLives();
     emit(EVENTS.LEVEL_UP, { level: state.level, maxLives: state.maxLives, gained: levelled });
     play('levelUp');
     toast(`Level ${state.level}! +${LIVES_PER_LEVEL * levelled} life`, 'gold');
@@ -452,6 +522,26 @@ export function useItem(id, opts = {}) {
     // note on ITEM_USED in src/core/events.js.
     emit(EVENTS.ITEM_USED, { id, effect: 'food', amount: item.food, icon: item.icon });
     return { ok: true, effect: 'food', boon: item.boon ? getBoon() : null };
+  }
+
+  /**
+   * A bottle of gold lives, and the one thing in the bag with no reason to
+   * refuse it: you can drink it on a full bar, on your last diamond, at the
+   * counter or in the middle of a round. There is nothing for it to be
+   * "already at full" of.
+   *
+   * In a duel the authoritative count lives in the engine, exactly like a
+   * bandage's, so the screen is handed the number and puts it on the fighter
+   * (see `onUse` in src/duel/duel-screen.js). Off the road it goes straight on
+   * the run.
+   */
+  if (item.bonusLives) {
+    const amount = item.bonusLives;
+    if (opts.context !== 'duel') addBonusLives(amount);
+    removeItem(id, 1);
+    play('levelUp');
+    emit(EVENTS.ITEM_USED, { id, effect: 'bonus', amount, icon: item.icon });
+    return { ok: true, effect: 'bonus', amount };
   }
 
   if (item.heal) {

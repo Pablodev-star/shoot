@@ -33,6 +33,7 @@ import { EVENTS, on } from '../core/events.js';
 import {
   getState,
   setLives,
+  setBonusLives,
   hasVest,
   hasTotem,
   breakTotem,
@@ -190,6 +191,8 @@ export const DuelScreen = {
         name: 'You',
         lives: player.lives,
         maxLives: player.maxLives,
+        /** The gold diamonds a Potion left on the bar. They ride into the fight. */
+        bonus: player.bonusLives,
         bullets: Math.min(MAX_BULLETS, boon?.bullets || 0),
         hasVest: hasVest(),
         hasTotem: hasTotem(),
@@ -234,7 +237,10 @@ export const DuelScreen = {
     let playerHazardUp = false;
 
     // --- fighter cards -----------------------------------------------------
-    const playerLives = livesRow(player.lives, player.maxLives, { large: true });
+    const playerLives = livesRow(player.lives, player.maxLives, {
+      large: true,
+      bonus: player.bonusLives,
+    });
     const enemyLives = livesRow(enemy.lives, enemy.maxLives, { large: true });
     const playerCylinder = cylinder(0, MAX_BULLETS);
     const enemyCylinder = cylinder(enemy.bullets || 0, MAX_BULLETS);
@@ -618,8 +624,8 @@ export const DuelScreen = {
     // --- state sync --------------------------------------------------------
     function syncBars() {
       const sides = duel.getSides();
-      updateLivesRow(playerLives, sides.player.lives, sides.player.maxLives);
-      updateLivesRow(enemyLives, sides.enemy.lives, sides.enemy.maxLives);
+      updateLivesRow(playerLives, sides.player.lives, sides.player.maxLives, sides.player.bonus);
+      updateLivesRow(enemyLives, sides.enemy.lives, sides.enemy.maxLives, sides.enemy.bonus);
       updateCylinder(playerCylinder, sides.player.bullets);
       updateCylinder(enemyCylinder, sides.enemy.bullets);
       renderStatus(playerStatus, sides.player);
@@ -763,6 +769,17 @@ export const DuelScreen = {
             sides.player.lives = Math.min(sides.player.maxLives, sides.player.lives + result.amount);
             syncBars();
             trackAchievement('bandageInDuel', { id });
+          }
+          /**
+           * A Potion drunk mid-fight. It goes on the ENGINE's count rather than
+           * on the run's, exactly like a bandage does, and `endDuel` writes
+           * whatever survived the fight back onto the player — otherwise three
+           * gold lives bought in the middle of a round would be paid for twice
+           * and spent once.
+           */
+          if (result.effect === 'bonus') {
+            duel.getSides().player.bonus += result.amount;
+            syncBars();
           }
         },
       });
@@ -1380,6 +1397,9 @@ export const DuelScreen = {
 
       const sides = duel.getSides();
       setLives(sides.player.lives);
+      // Whatever is left of the gold, and nothing is ever added back here: the
+      // engine spends them, the run remembers what survived.
+      setBonusLives(sides.player.bonus);
       setCallout(won ? 'You win the duel' : 'You are down', won ? 'is-good' : 'is-bad');
 
       /**

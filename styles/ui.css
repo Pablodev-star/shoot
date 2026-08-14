@@ -700,6 +700,23 @@
   box-shadow: none;
 }
 
+/*
+   The gold ones, hung on the end of the bar by a Potion.
+   They are the same diamond in the game's gold rather than a new shape: the
+   bar is one row and the player reads it left to right, so what says "these
+   three are not yours" has to be the colour and nothing else. A gold life is
+   never drawn hollow — see `layLives` in src/ui/widgets.js — because it is not
+   a slot waiting to be refilled, so there is no `.is-bonus.is-empty` rule.
+*/
+.life.is-bonus {
+  background: linear-gradient(150deg, var(--gold-light), var(--gold) 45%, var(--gold-dark));
+  border-color: var(--gold-dark);
+}
+
+.life.is-bonus.is-half {
+  background: linear-gradient(135deg, var(--gold) 0 50%, transparent 50%);
+}
+
 .life.is-lost { animation: life-pop var(--dur-slow) var(--ease-out) both; }
 
 @keyframes life-pop {

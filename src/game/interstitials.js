@@ -60,7 +60,11 @@ export const WorldIntroScreen = {
         el('h1.intro-title', { text: world.name }),
         el('p.intro-sub', { text: world.subtitle }),
         el('div.row', { style: { justifyContent: 'center', marginTop: 'var(--sp-4)' } }, [
-          livesRow(getState().lives, getState().maxLives, { large: true }),
+          livesRow(getState().lives, getState().maxLives, {
+            large: true,
+            /** A world border refills the red diamonds; the gold ones simply ride along. */
+            bonus: getState().bonusLives,
+          }),
         ]),
         el('p.muted.center', { style: { marginTop: 'var(--sp-2)' }, text: 'Lives restored' }),
         el('div.intro-continue', {}, [
