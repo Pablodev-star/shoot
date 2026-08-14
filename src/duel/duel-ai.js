@@ -13,6 +13,7 @@
  */
 
 import { MOVES } from './duel-engine.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 /** Human player: the duel screen calls `submit()` from its buttons. */
 export function createLocalAgent() {
@@ -117,17 +118,49 @@ const STREAK_TRIGGER = 3;
 /** How much a streak that long adds to the chance of answering it. */
 const STREAK_BONUS = 0.34;
 
+/**
+ * THE ADMIN'S HAND ON THE OPPONENT'S HEAD
+ * ---------------------------------------------------------------------------
+ * Six policies, and the five that are not `normal` exist because the ordinary
+ * agent is a bad instrument for testing anything except itself. A rule about
+ * shields cannot be watched while the opponent is deciding for itself whether
+ * to raise one; a poison tick cannot be counted while the fight is ending in
+ * four rounds. So a tester can nail the other side down:
+ *
+ *   normal     the game's opponent, tuned by the three numbers under it
+ *   dummy      reloads forever. A punchbag with a full gun and no intent
+ *   aggressive fires the moment it has a round, reloads when it does not
+ *   defensive  shields whenever the rules allow, reloads otherwise
+ *   oracle     always plays the counter to its read — the old cheating agent,
+ *              kept as a deliberately unfair baseline to measure against
+ *   random     a flat third each way, the honest control for any win-rate claim
+ *
+ * `script` outranks all of them: a list of moves played in order and looped, so
+ * a bug that only happens on "reload, reload, shoot into a shield" can be
+ * reproduced exactly instead of waited for.
+ */
+const POLICIES = ['normal', 'dummy', 'aggressive', 'defensive', 'oracle', 'random'];
+
 export function createAiAgent(enemy, modifiers = {}, options = {}) {
   const history = { reload: 1, shield: 1, shoot: 1 }; // Laplace-smoothed priors
   const random = options.random || Math.random;
-  const thinkMs = options.thinkMs ?? 0;
+  const admin = OVERRIDES.ai;
+  const thinkMs = admin.thinkMs ?? options.thinkMs ?? 0;
+  const mode = POLICIES.includes(admin.mode) ? admin.mode : 'normal';
+  const PLAYABLE = [MOVES.RELOAD, MOVES.SHIELD, MOVES.SHOOT];
+  const script = (Array.isArray(admin.script) ? admin.script : []).filter((m) => PLAYABLE.includes(m));
+  let scriptAt = 0;
 
   const accuracy = Math.max(
     0.05,
-    (enemy.accuracy ?? 0.5) - (modifiers.enemyAccuracyPenalty || 0),
+    (admin.accuracy ?? enemy.accuracy ?? 0.5) - (modifiers.enemyAccuracyPenalty || 0),
   );
+  const readCeiling = admin.readShare ?? READ_SHARE;
+  const shieldCeiling = admin.shieldShare ?? SHIELD_SHARE;
   /** How often it plays the counter instead of its own game. */
-  const readChance = Math.min(READ_SHARE, accuracy * READ_SHARE * 1.35);
+  const readChance = mode === 'oracle'
+    ? 1
+    : Math.min(readCeiling, accuracy * readCeiling * 1.35);
 
   let turns = 0;
   let shields = 0;
@@ -199,7 +232,7 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
     // Twice is a duellist covering up. Three times is a wall, and a wall is
     // what made this agent unreadable in the wrong direction.
     if (shieldRun >= 2) return false;
-    return shields < Math.max(1, Math.round((turns + 1) * SHIELD_SHARE));
+    return shields < Math.max(1, Math.round((turns + 1) * shieldCeiling));
   }
 
   /**
@@ -271,6 +304,35 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
     return canShield() ? MOVES.SHIELD : MOVES.RELOAD;
   }
 
+  /**
+   * What the admin has decided this agent does, or null when it is allowed to
+   * think for itself. `oracle` is not here — it is the ordinary agent with the
+   * read turned all the way up, which is exactly what it was before it was
+   * capped (see the note at the top of this file).
+   */
+  function dictate(view) {
+    if (script.length) {
+      const move = script[scriptAt % script.length];
+      scriptAt += 1;
+      return move;
+    }
+    switch (mode) {
+      case 'dummy':
+        return MOVES.RELOAD;
+      case 'aggressive':
+        return view.self.bullets > 0 ? MOVES.SHOOT : MOVES.RELOAD;
+      case 'defensive':
+        return canShield() ? MOVES.SHIELD : MOVES.RELOAD;
+      case 'random': {
+        const roll = random();
+        if (roll < 1 / 3) return MOVES.RELOAD;
+        return roll < 2 / 3 ? MOVES.SHIELD : MOVES.SHOOT;
+      }
+      default:
+        return null;
+    }
+  }
+
   return {
     isLocal: false,
     /** Feed the player's actual move back in after each round. */
@@ -281,6 +343,22 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
     },
     async chooseMove(view) {
       if (thinkMs) await new Promise((r) => setTimeout(r, thinkMs));
+
+      // The scripted and fixed policies short-circuit everything below,
+      // including the two brink rules — an opponent that still panics on its
+      // last life is not the fixed opponent a test asked for. The turn/shield
+      // bookkeeping is still kept, so switching back mid-fight is coherent.
+      const dictated = dictate(view);
+      if (dictated) {
+        turns += 1;
+        if (dictated === MOVES.SHIELD) {
+          shields += 1;
+          shieldRun += 1;
+        } else {
+          shieldRun = 0;
+        }
+        return dictated;
+      }
 
       let move;
       const streak = streakAnswer();

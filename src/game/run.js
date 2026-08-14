@@ -39,6 +39,8 @@ import { toast } from '../ui/toast.js';
 import { playTotemRevival } from '../ui/totem.js';
 import { bumpStat } from '../core/settings.js';
 import { track as trackAchievement } from './achievements.js';
+import { resetOverrides } from '../admin/overrides.js';
+import { setOutfitOverride } from './wardrobe.js';
 
 const run = {
   engine: null,
@@ -70,10 +72,25 @@ export function getSlot() {
 // Starting / loading
 // ---------------------------------------------------------------------------
 
+/**
+ * ANYTHING THE ADMIN PANEL BENT BELONGS TO THE RUN IT WAS BENT IN
+ * ---------------------------------------------------------------------------
+ * Overrides and the borrowed outfit are held in memory and never written to a
+ * slot (see src/admin/overrides.js), so the only thing needed to keep a tester's
+ * session from leaking into the next one is to put them back at both doors into
+ * a run. It is called even when nothing was changed, because a reset that is
+ * conditional is a reset somebody has to remember to check.
+ */
+function clearAdminState() {
+  resetOverrides();
+  setOutfitOverride(null);
+}
+
 export async function startNewRun(slot) {
   run.slot = slot;
   run.dead = false;
   run.inBattle = false;
+  clearAdminState();
   newRun();
   daynight.reset(0.32);
   weather.force('clear');
@@ -89,6 +106,7 @@ export async function loadRun(slot, data) {
   run.slot = slot;
   run.dead = false;
   run.inBattle = false;
+  clearAdminState();
   restorePlayer(data.player);
   /**
    * Before a single step is taken. The ledger measures the road in

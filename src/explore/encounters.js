@@ -77,6 +77,7 @@
 
 import { makeRng, hashSeed } from '../core/rng.js';
 import { getWorld } from '../game/worlds.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 /**
  * Spacing between encounters, in source pixels.
@@ -391,20 +392,24 @@ export function generateSegment(worldId, seed) {
 }
 
 /**
- * Turn the next face-down stop over, choosing its kind from how the run is
- * going. Call it once per encounter cleared; it is a no-op when there is
- * nothing left hidden.
+ * Everything the road weighs before it turns a card over, worked out and
+ * handed back rather than acted on.
  *
- * @param {object} segment the walk engine's segment, mutated in place
+ * IT IS SPLIT OUT SO THAT TWO THINGS CANNOT DISAGREE
+ * ---------------------------------------------------------------------------
+ * `revealNext` deals the card; `explainReveal` prints the odds on the admin
+ * map. Those have to be the SAME arithmetic or the second one is a lie that
+ * looks like documentation — the whole value of showing a tester "shop 41%,
+ * inn 27%" is that the road really is about to roll those numbers. So the
+ * reasoning lives here, once, and the two callers differ only in whether they
+ * spend an rng on the result.
+ *
+ * @param {object} segment
+ * @param {object} event the face-down event about to be turned over
  * @param {object} state a reading of the run — see `roadReading` below
- * @returns {object|null} the event that was revealed
+ * @returns {{forced: string|null, allowed: string[], weights: object, flags: object, reading: object}}
  */
-export function revealNext(segment, state) {
-  if (!segment || !segment.hand || segment.hand.length === 0) return null;
-  const event = segment.events.find((e) => e.hidden);
-  if (!event) return null;
-
-  const rng = makeRng((segment.seed ^ (event.index * 2654435761)) >>> 0);
+function planReveal(segment, event, state) {
   const kinds = [...new Set(segment.hand)];
 
   /**
@@ -441,12 +446,8 @@ export function revealNext(segment, state) {
    * the sequence is whatever `revealNext` chooses. So it lives here, where the
    * choosing happens.
    */
-  if (event.index < OPENING_FIGHTS && canFight) {
-    segment.hand.splice(segment.hand.indexOf('enemy'), 1);
-    event.type = 'enemy';
-    event.hidden = false;
-    return event;
-  }
+  const opening = event.index < OPENING_FIGHTS && canFight;
+
   /** True when the boss is close enough that this is the last chance to prepare. */
   const lastCall = segment.hand.length <= LAST_CALL;
   const reading = { ...state, lastCall };
@@ -475,8 +476,15 @@ export function revealNext(segment, state) {
   const isBuilding = (type) => type && type !== 'enemy' && type !== 'boss';
   let since = 0;
   for (let i = event.index - 1; i >= 0 && !isBuilding(segment.events[i].type); i--) since += 1;
-  const mustFight = since < SERVICE_ADJACENT_GAP && segment.hand.includes('enemy');
-  const spacing = Math.min(1, since / SERVICE_GAP);
+  /**
+   * The admin's one lever on the shape of the road rather than on its odds:
+   * with the spacing waived, the adjacency floor and the dimmer both come off
+   * and a tester can get five counters in a row to walk through a shop bug.
+   * See src/admin/overrides.js.
+   */
+  const spaced = !OVERRIDES.road.ignoreSpacing;
+  const mustFight = spaced && since < SERVICE_ADJACENT_GAP && segment.hand.includes('enemy');
+  const spacing = spaced ? Math.min(1, since / SERVICE_GAP) : 1;
 
   let allowed = kinds;
   if (mustFight) allowed = ['enemy'];
@@ -547,14 +555,112 @@ export function revealNext(segment, state) {
   for (const kind of allowed) {
     const held = segment.hand.filter((k) => k === kind).length;
     const appetite = Math.max(0.01, APPETITE[kind]?.(reading) ?? 1);
-    weights[kind] = Math.max(0.01, appetite * held * (kind === 'enemy' ? 1 : spacing));
+    // The admin's thumb on the scale, and it is a multiplier on the APPETITE
+    // rather than on the finished weight so that the hand count and the
+    // spacing dimmer still mean what they mean. One is the untouched game.
+    const thumb = OVERRIDES.road.appetite[kind] ?? 1;
+    weights[kind] = Math.max(0.01, appetite * thumb * held * (kind === 'enemy' ? 1 : spacing));
   }
-  const kind = lastBed ? 'inn' : rng.weighted(weights);
+
+  /**
+   * Everything that takes the choice away, strongest first. The admin's
+   * `forceNext` outranks even the opening-fights rule — it is the tool for
+   * "put a forge in front of me right now" — but it can only name a kind the
+   * world is actually still holding: the road can be bent, not counterfeited.
+   */
+  const demanded = OVERRIDES.road.forceNext;
+  const forced = demanded && segment.hand.includes(demanded)
+    ? demanded
+    : opening
+      ? 'enemy'
+      : lastBed
+        ? 'inn'
+        : null;
+
+  return {
+    forced,
+    allowed,
+    weights,
+    reading,
+    flags: {
+      opening,
+      lastCall,
+      lastBed,
+      mustFight,
+      canFight,
+      spacing,
+      since,
+      enemiesLeft,
+      buildingsLeft,
+      bedsInHand,
+      admin: demanded && segment.hand.includes(demanded) ? demanded : null,
+    },
+  };
+}
+
+/**
+ * Turn the next face-down stop over, choosing its kind from how the run is
+ * going. Call it once per encounter cleared; it is a no-op when there is
+ * nothing left hidden.
+ *
+ * @param {object} segment the walk engine's segment, mutated in place
+ * @param {object} state a reading of the run — see `roadReading` below
+ * @returns {object|null} the event that was revealed
+ */
+export function revealNext(segment, state) {
+  if (!segment || !segment.hand || segment.hand.length === 0) return null;
+  const event = segment.events.find((e) => e.hidden);
+  if (!event) return null;
+
+  const plan = planReveal(segment, event, state);
+  const rng = makeRng((segment.seed ^ (event.index * 2654435761)) >>> 0);
+  const kind = plan.forced ?? rng.weighted(plan.weights);
 
   segment.hand.splice(segment.hand.indexOf(kind), 1);
   event.type = kind;
   event.hidden = false;
   return event;
+}
+
+/**
+ * The same decision, taken apart instead of taken.
+ *
+ * Nothing is mutated and no card is dealt: this is what the admin map draws so
+ * a tester can see WHY the road is about to do what it does — which kinds are
+ * still in the hand, which of them are legal here, what each one's appetite
+ * evaluates to on the run as it stands, and the probability that falls out of
+ * all of it. See `planReveal`.
+ *
+ * @returns {object|null} null when there is nothing face down left
+ */
+export function explainReveal(segment, state) {
+  if (!segment || !segment.hand || segment.hand.length === 0) return null;
+  const event = segment.events.find((e) => e.hidden);
+  if (!event) return null;
+
+  const plan = planReveal(segment, event, state);
+  const total = Object.values(plan.weights).reduce((sum, w) => sum + w, 0) || 1;
+  const chances = {};
+  for (const [kind, weight] of Object.entries(plan.weights)) {
+    chances[kind] = plan.forced ? (kind === plan.forced ? 1 : 0) : weight / total;
+  }
+  // A forced kind may not even be in the weight table (the opening rule can
+  // name a fight the spacing had excluded), so it is added rather than assumed.
+  if (plan.forced && chances[plan.forced] == null) chances[plan.forced] = 1;
+
+  return {
+    event,
+    ...plan,
+    chances,
+    /** What each appetite function returns on its own, before the hand count. */
+    appetites: Object.fromEntries(
+      [...new Set(segment.hand)].map((kind) => [
+        kind,
+        Math.max(0.01, APPETITE[kind]?.(plan.reading) ?? 1),
+      ]),
+    ),
+    hand: [...segment.hand],
+  };
 }
 
 /**

@@ -41,6 +41,7 @@ import {
 import { getState, setHunger, loseLife, hasCanteen } from '../game/player.js';
 import { getWeatherState } from './weather.js';
 import { toast } from '../ui/toast.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 const state = { paused: true, starveTimer: 0 };
 
@@ -73,10 +74,18 @@ export function drainMultiplier() {
     canteen,
     weather,
     weatherLabel: weather > 1 ? sky.label : null,
+    /**
+     * The admin multiplier rides in the total with the other three rather than
+     * beside it, so the travel band's rate badge tells the truth about a run
+     * that has been tampered with — a bent gauge that looks untouched is worse
+     * than no gauge.
+     */
+    admin: OVERRIDES.walk.hungerMul,
     total:
       (horse ? HUNGER_DRAIN_HORSE_MUL : 1) *
       (canteen ? HUNGER_DRAIN_CANTEEN_MUL : 1) *
-      weather,
+      weather *
+      OVERRIDES.walk.hungerMul,
   };
 }
 
@@ -86,6 +95,10 @@ export function drainMultiplier() {
  */
 export function update(dt) {
   if (state.paused) return;
+  // Held from the Admin Panel: the gauge stops where it is and the starvation
+  // clock stops with it, which is the difference between "hunger is slow" and
+  // "hunger is not part of this test".
+  if (OVERRIDES.walk.freezeHunger) return;
   const player = getState();
 
   if (player.hunger > 0) {

@@ -1,0 +1,528 @@
+/* ==========================================================================
+   SHOOT! — Admin Panel.
+
+   The only screen in this game that is not made of the five materials.
+
+   Everything the player sees is plank, iron, brass, paper and rope, because
+   the interface is meant to read as a place. This is not part of that place:
+   it is a workbench bolted to the back of it, opened by somebody who is
+   building the game rather than playing it, and the moment it starts looking
+   like the rest of the interface is the moment a screenshot of it gets mistaken
+   for one. So it is deliberately colder — flat panels, a monospaced readout, a
+   single accent — and it keeps the game's own buttons and chips so that
+   anything borrowed from `ui.css` still behaves.
+
+   It is also the one place in the game where DENSITY beats calm. Every other
+   screen is built so a player never has to read twice; this one is built so a
+   tester can see forty numbers without scrolling.
+   ========================================================================== */
+
+:root {
+  --admin-face: #171a1f;
+  --admin-face-raised: #1f242b;
+  --admin-line: #2f3742;
+  --admin-line-soft: rgba(120, 140, 160, 0.16);
+  --admin-text: #d7dee6;
+  --admin-dim: #8b97a5;
+  --admin-accent: #7fb8ff;
+  --admin-warn: #f0574f;
+}
+
+/* --- The shell ------------------------------------------------------------ */
+
+.admin-backdrop {
+  /* Above the saddlebag and the map, below the achievement layer: an unlock
+     that lands while the panel is open still has to be visible. */
+  z-index: 55;
+  background: rgba(6, 8, 11, 0.86);
+}
+
+.admin-modal {
+  width: min(1180px, 100%);
+  max-height: min(92vh, 940px);
+  background: var(--admin-face);
+  border: 1px solid var(--admin-line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  color: var(--admin-text);
+  padding: var(--sp-4);
+}
+
+.admin-modal .panel-title {
+  color: var(--admin-accent);
+  letter-spacing: 0.22em;
+  text-shadow: none;
+  font-size: var(--text-lg);
+}
+
+.admin-modal .modal-header { border-bottom: 1px solid var(--admin-line); }
+
+.admin-head-chips,
+.admin-foot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  align-items: center;
+}
+
+.admin-chip {
+  border-color: var(--admin-line);
+  color: var(--admin-dim);
+  background: var(--admin-face-raised);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+/* The game's tab pill is a gold lozenge, which is right on a menu and wrong
+   here: it puts brass in the middle of a workbench and makes the accent colour
+   unreadable on top of it. The bar keeps the shape and loses the gold. */
+.admin-tabs {
+  /* Never squashed. The body is a long document in the same flex column, and
+     without this the tab row is the thing that gives up its height — the
+     labels get sliced in half and the content appears to run over them. */
+  flex: 0 0 auto;
+  margin-top: var(--sp-2);
+  background: #0c0f13;
+  border-color: var(--admin-line);
+  box-shadow: none;
+}
+
+.admin-modal .tab { color: var(--admin-dim); }
+.admin-modal .tab:hover { color: var(--admin-text); }
+.admin-modal .tab[aria-selected='true'] {
+  color: #0d1117;
+  background: linear-gradient(180deg, #9ecbff, var(--admin-accent));
+  box-shadow: none;
+}
+
+/* The drawer tabs inside the Looks tab are the same control one level down. */
+.admin-section .tabs {
+  background: #0c0f13;
+  border-color: var(--admin-line);
+  box-shadow: none;
+}
+
+.admin-body {
+  padding-right: var(--sp-2);
+  /* The panel is a long document. Scrolling it must never scroll the road
+     underneath, which is still mounted and still listening. */
+  overscroll-behavior: contain;
+}
+
+.admin-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  border-top: 1px solid var(--admin-line);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+/* --- Sections and rows ---------------------------------------------------- */
+
+.admin-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.admin-section {
+  background: var(--admin-face-raised);
+  border: 1px solid var(--admin-line);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3);
+}
+
+.admin-section-title {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--admin-accent);
+  margin: 0 0 var(--sp-1);
+}
+
+.admin-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.admin-hint {
+  font-size: var(--text-xs);
+  color: var(--admin-dim);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: center;
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--admin-line-soft);
+}
+
+.admin-row:last-child { border-bottom: 0; }
+
+.admin-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-label {
+  font-size: var(--text-sm);
+  color: var(--admin-text);
+}
+
+.admin-row-control {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .admin-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-row-control { justify-content: flex-start; }
+}
+
+/* --- Controls ------------------------------------------------------------- */
+
+.admin-modal .input {
+  background: #101317;
+  border-color: var(--admin-line);
+  color: var(--admin-text);
+  font-size: var(--text-sm);
+  padding: 6px 8px;
+  min-height: 34px;
+}
+
+.admin-modal .input:focus {
+  border-color: var(--admin-accent);
+  box-shadow: 0 0 0 2px rgba(127, 184, 255, 0.25);
+}
+
+.admin-number { text-align: right; font-variant-numeric: tabular-nums; }
+
+.admin-search { width: min(280px, 100%); }
+
+.admin-btn {
+  font-size: var(--text-xs);
+  padding: 6px 10px;
+  min-height: 32px;
+  letter-spacing: 0.04em;
+}
+
+.admin-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.admin-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.admin-slider { width: min(220px, 42vw); max-width: none; }
+
+.admin-slider-value {
+  font-size: var(--text-xs);
+  color: var(--admin-accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+  text-align: right;
+}
+
+.admin-switch { gap: var(--sp-2); }
+
+/* Toggle chips — an ability, on or off. */
+.admin-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-chip-toggle {
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--admin-dim);
+  background: #101317;
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.admin-chip-toggle:hover { color: var(--admin-text); border-color: var(--admin-accent); }
+
+.admin-chip-toggle.is-on {
+  color: #0d1117;
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+}
+
+/* --- Readouts ------------------------------------------------------------- */
+
+.admin-readout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 2px var(--sp-3);
+}
+
+.admin-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--admin-line-soft);
+  font-size: var(--text-xs);
+}
+
+.admin-kv .k { color: var(--admin-dim); }
+.admin-kv .v {
+  color: var(--admin-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-dump {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  background: #0c0f13;
+  border: 1px solid var(--admin-line);
+  border-radius: var(--radius);
+  color: #b6c2d0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  max-height: 340px;
+  overflow: auto;
+  white-space: pre;
+}
+
+.admin-paste {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+
+/* --- Probabilities -------------------------------------------------------- */
+
+.admin-probs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-3);
+}
+
+.admin-prob-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: var(--text-xs);
+}
+
+.admin-prob-label { color: var(--admin-text); }
+.admin-prob-value { color: var(--admin-accent); font-variant-numeric: tabular-nums; }
+
+.admin-prob-track {
+  height: 6px;
+  margin: 4px 0;
+  background: #0c0f13;
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.admin-prob-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--admin-accent), #b9dcff);
+}
+
+.admin-prob-detail {
+  font-size: 10px;
+  color: var(--admin-dim);
+  line-height: 1.4;
+}
+
+/* --- The road listing ----------------------------------------------------- */
+
+.admin-stops {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--admin-line);
+  border-radius: var(--radius);
+  padding: 4px;
+  background: #0c0f13;
+}
+
+.admin-stop {
+  display: grid;
+  grid-template-columns: 34px 1fr 90px 56px 84px;
+  gap: var(--sp-2);
+  align-items: center;
+  font-size: var(--text-xs);
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  color: var(--admin-text);
+}
+
+.admin-stop-index { color: var(--admin-dim); font-variant-numeric: tabular-nums; }
+.admin-stop-dist,
+.admin-stop-progress { color: var(--admin-dim); text-align: right; font-variant-numeric: tabular-nums; }
+.admin-stop-state { color: var(--admin-dim); text-align: right; }
+
+.admin-stop.is-cleared { opacity: 0.45; }
+.admin-stop.is-next {
+  background: rgba(127, 184, 255, 0.12);
+  outline: 1px solid rgba(127, 184, 255, 0.4);
+}
+.admin-stop.is-face-down .admin-stop-kind { color: var(--admin-dim); font-style: italic; }
+
+/* --- Cards (items, garments) ---------------------------------------------- */
+
+.admin-grid {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.admin-grid--items { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.admin-grid--garments { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+.admin-card {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: var(--sp-2);
+  background: #101317;
+  border: 1px solid var(--admin-line);
+  border-radius: var(--radius);
+  text-align: left;
+  color: var(--admin-text);
+  font: inherit;
+}
+
+.admin-card.is-held { border-color: var(--admin-accent); }
+
+.admin-card--garment {
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.admin-card--garment:hover { border-color: var(--admin-accent); }
+.admin-card--garment .admin-card-body { text-align: center; }
+
+.admin-card-body { flex: 1 1 auto; min-width: 0; }
+.admin-card-name { font-size: var(--text-sm); }
+.admin-card-meta { font-size: 10px; color: var(--admin-accent); }
+.admin-card-desc { font-size: 10px; color: var(--admin-dim); line-height: 1.4; }
+
+/* Give/take, two to a line. A column of four buttons made every card in the
+   catalogue as tall as its own description, and the catalogue is forty cards. */
+.admin-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  width: 108px;
+  flex: 0 0 auto;
+}
+
+.admin-card-actions .admin-btn { padding: 4px 6px; min-height: 26px; }
+
+.admin-card-count {
+  font-size: var(--text-xs);
+  color: var(--admin-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-figure { image-rendering: pixelated; }
+
+.admin-outfit {
+  display: flex;
+  gap: var(--sp-4);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-outfit .admin-readout { flex: 1 1 260px; }
+
+.admin-modal .divider { color: var(--admin-dim); }
+.admin-modal .divider::before,
+.admin-modal .divider::after { background: var(--admin-line); }
+
+/* ==========================================================================
+   The door: the sigil's ink and the passphrase box.
+
+   Both are as quiet as they can be made. The ink is a stroke of light that
+   fades in half a second, and the box says nothing about what it opens — a
+   player who draws a large P by accident should find a locked door with no
+   label on it and walk away none the wiser.
+   ========================================================================== */
+
+.sigil-ink {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+}
+
+.gate-modal {
+  background: rgba(10, 8, 7, 0.94);
+  border: 1px solid #2a1a0c;
+}
+
+.gate-modal .panel-title {
+  letter-spacing: 0.4em;
+  color: var(--text-dim);
+}
+
+.gate-modal .input {
+  width: 100%;
+  text-align: center;
+  letter-spacing: 0.3em;
+  background: #12100e;
+  border-color: #3a2a18;
+  color: var(--bone);
+}
+
+.gate-modal .input.is-wrong {
+  border-color: var(--red);
+  animation: gate-shake 320ms ease both;
+}
+
+@keyframes gate-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-modal .input.is-wrong { animation: none; }
+}

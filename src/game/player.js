@@ -29,6 +29,7 @@ import {
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
 import { track as trackAchievement } from './achievements.js';
+import { OVERRIDES } from '../admin/overrides.js';
 
 function blankState() {
   return {
@@ -177,6 +178,20 @@ function rebuildLifeBar() {
   state.lives = Math.max(0.5, Math.min(rebuilt, Math.round(rebuilt * fraction * 2) / 2));
 }
 
+/**
+ * Say everything again.
+ *
+ * The Admin Panel writes fields on the state directly — that is what it is for
+ * — and the interface in this game never polls, so something has to tell the
+ * HUD that the level it is drawing is two levels out of date. Every screen is
+ * already listening for these; this is the one caller that has no event of its
+ * own to fire. Nothing in the ordinary game needs it: every mutation up here
+ * announces itself.
+ */
+export function announce() {
+  emitAll();
+}
+
 function emitAll() {
   emitLives();
   emit(EVENTS.GOLD_CHANGED, { gold: state.gold });
@@ -241,7 +256,9 @@ export function getBonusLives() {
  * `src/game/progression.js` with every other curve in the game.
  */
 export function gunDamage() {
-  return gunDamageAt(state.gunLevel);
+  // A flat figure set from the Admin Panel replaces the ladder entirely, which
+  // is the only honest way to test a fight at a damage the forge cannot sell.
+  return OVERRIDES.player.gunDamage ?? gunDamageAt(state.gunLevel);
 }
 
 export function gunUpgradeCost() {
@@ -275,6 +292,15 @@ export function upgradeGun() {
  * has to be able to carry on after you come back.
  */
 export function loseLife(amount = 1) {
+  /**
+   * Nothing gets through while the Admin Panel says otherwise. It is checked
+   * here rather than at each of the callers because "the road cannot kill me"
+   * has to mean the starvation tick as well as the hit — a tester walking a
+   * long world to find a rendering bug should not have to keep eating. The
+   * duel keeps its own life count, so a fight is still a fight; see the
+   * sandbox flag on the duel screen for the other half of this.
+   */
+  if (OVERRIDES.player.invulnerable) return state.lives;
   const before = state.lives;
   /**
    * The gold goes first, and it goes silently: a starvation tick that lands on
@@ -318,11 +344,15 @@ export function addGold(amount) {
 }
 
 export function canAfford(cost) {
-  return state.gold >= cost;
+  // Everything is affordable when the panel says so, which is how a tester
+  // buys the top of the forge ladder in world one without editing the purse
+  // first and then having to remember what it used to be.
+  return OVERRIDES.player.freeGold || state.gold >= cost;
 }
 
 export function spendGold(cost) {
   if (!canAfford(cost)) return false;
+  if (OVERRIDES.player.freeGold) return true;
   addGold(-cost);
   return true;
 }

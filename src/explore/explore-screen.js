@@ -40,7 +40,8 @@ import { createParallax, heroX as heroAnchorX } from './parallax.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
-import { getEngine, quitToMenu } from '../game/run.js';
+import { getEngine, getSlot, quitToMenu } from '../game/run.js';
+import { armSigil } from '../admin/access.js';
 import { getState, getInventory, countOf } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { icon, iconButton } from '../ui/widgets.js';
@@ -178,6 +179,24 @@ export const ExploreScreen = {
       if ((e.key === 'm' || e.key === 'M') && !mapOpen && !bagOpen) openMap();
     };
     window.addEventListener('keydown', onKey);
+
+    /**
+     * THE ONE DOOR THAT IS NOT ON THE SCREEN
+     * -----------------------------------------------------------------------
+     * A sigil drawn over the road opens the Admin Panel — three big letters,
+     * then a passphrase, then three permanent tries per slot and no more. All
+     * of it lives in src/admin/, none of it is advertised anywhere in the
+     * interface, and nothing here changes for a player who never draws it: the
+     * watcher only looks at strokes that start on the backdrop and are a third
+     * of the screen across, so the bag, the map button and every drag on the
+     * HUD go past it untouched.
+     *
+     * It is armed on the ROAD and only on the road. That is the spec's own
+     * wording — "while you are walking" — and it is also the only screen in
+     * the game with something to hold: the walk is paused for as long as the
+     * panel is up.
+     */
+    const sigil = armSigil({ engine, slot: () => getSlot() });
 
     const screen = el('div.screen.explore-screen', {}, [
       band,
@@ -347,6 +366,7 @@ export const ExploreScreen = {
 
     return () => {
       window.removeEventListener('keydown', onKey);
+      sigil.dispose();
       unsubs.forEach((fn) => fn());
       band.dispose();
       engine.pause();

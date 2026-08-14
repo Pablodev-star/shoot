@@ -185,11 +185,44 @@ export function getWardrobe(outfit = getOutfit()) {
 // ---------------------------------------------------------------------------
 
 /**
+ * WHAT THE ADMIN PANEL IS WEARING
+ * ---------------------------------------------------------------------------
+ * The one legitimate way past the lock above, and it is deliberately the
+ * narrowest possible hole: an outfit held in memory, never written to the
+ * profile, cleared when the run is left. A tester changing into the Starcrown
+ * mid-crossing to check how it draws in the snow is not the same act as owning
+ * it — the ledger is untouched, `saveOutfit` still refuses to write anything
+ * unearned, and the next boot is back in whatever was actually unlocked.
+ *
+ * It is checked inside `getOutfit` rather than by having the panel call
+ * `applyOutfit` directly, because the rig is re-dressed from `getOutfit` in
+ * several places (the wardrobe screen's mannequin, a fresh boot); an override
+ * that only reached the sprite cache would be quietly undone by any of them.
+ */
+let override = null;
+
+/**
+ * Wear anything, owned or not, for as long as this session lasts.
+ * @param {object|null} outfit four garment ids, or null to hand it back
+ */
+export function setOutfitOverride(outfit) {
+  override = outfit ? normalizeOutfit(outfit) : null;
+  applyOutfit();
+  return override;
+}
+
+/** What the panel has forced on, or null. */
+export function getOutfitOverride() {
+  return override;
+}
+
+/**
  * The equipped outfit, with anything unknown or unearned replaced by the
  * default for that slot. Every read goes through here — a garment cannot be
  * worn out of a save file that was edited, or out of a ledger that was reset.
  */
 export function getOutfit() {
+  if (override) return { ...override };
   const stored = normalizeOutfit(getProfile().outfit || {});
   const out = {};
   for (const slot of OUTFIT_SLOTS) {
