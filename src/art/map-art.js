@@ -212,6 +212,35 @@ const MARKERS = {
   ],
 
   /**
+   * The clothier: a false front with a lit shop window under a striped awning,
+   * and a dressed figure standing in the glass.
+   *
+   * It has to be told from the general store at a glance on a sheet where both
+   * are sixteen pixels, so the two differ where a map marker can afford to: the
+   * store is a box with two dark windows and a barrel, this is a box with ONE
+   * big pale window and something standing in it. Light where the other is
+   * dark, and one shape instead of two.
+   */
+  tailor: [
+    '................',
+    '....kkkkkkkk....',
+    '...kWWWWWWWWk...',
+    '...kWXXXXXXWk...',
+    '...kWXOOOOXWk...',
+    '...kWXXXXXXWk...',
+    '..kWWWWWWWWWWk..',
+    '..ke1e1e1e1e1k..',
+    '..kkkkkkkkkkkk..',
+    '..kW111111111k..',
+    '..kW11kek1111k..',
+    '..kW1keeek111k..',
+    '..kW1keeek111k..',
+    '..kW11keek111k..',
+    '..kMMMMMMMMMMk..',
+    '..kkkkkkkkkkkk..',
+  ],
+
+  /**
    * A stop nobody has reached yet: the trailhead's own signboard, blank except
    * for a question mark burned into it.
    *

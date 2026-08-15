@@ -105,6 +105,7 @@ const MARKER_ART = {
   shop: 'shop',
   inn: 'inn',
   forge: 'forge',
+  tailor: 'tailor',
   boss: 'boss',
   unknown: 'unknown',
 };
@@ -313,6 +314,7 @@ export function openTrailMap(opts = {}) {
       legendChip(markers.shop, 'Shop'),
       legendChip(markers.inn, 'Inn'),
       legendChip(markers.forge, 'Forge'),
+      legendChip(markers.tailor, 'Clothier'),
       legendChip(markers.boss, 'Boss'),
       legendChip(markers.unknown, 'Unknown'),
       el('span.chip.map-legend-you', {}, [el('span.map-you-dot'), 'You']),

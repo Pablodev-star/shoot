@@ -44,20 +44,55 @@
  * ONE CHARACTER, ONE SLOT
  * ---------------------------------------------------------------------------
  * Each slot owns two palette characters of its own — `a A` for hats, `f F` for
- * shirts, `c C` for trousers, `v V` for boots (see KEY in sprites-character.js)
- * — plus the ones the rig already gives that part of the body. No garment may
- * write another slot's characters, which is what lets any hat be worn with any
- * shirt without the two of them arguing over what colour brass is.
+ * shirts, `c C` for trousers, `v V` for boots, `j J i` for tack (see KEY in
+ * sprites-character.js) — plus the ones the rig already gives that part of the
+ * body. No garment may write another slot's characters, which is what lets any
+ * hat be worn with any shirt without the two of them arguing over what colour
+ * brass is.
+ *
+ * THE FIFTH SLOT IS NOT ON THE MAN
+ * ---------------------------------------------------------------------------
+ * A HARNESS is the tack the horse wears, and it is the one garment in here that
+ * is worn by something else. It works the same way everything above does — a
+ * description stamped onto a rig at composition time — but it goes onto the
+ * horse's frames rather than the fighter's (`composeHorse` in
+ * sprites-character.js), which means it animates with the animal: it walks, it
+ * gallops, and it leaves the road in the airborne frames without a line of code
+ * knowing what a bridle is.
+ *
+ * Two things about harnesses that the other four slots do not have:
+ *
+ *   - they come WHOLE. A hat is a hat and a shirt is a shirt, but a rig is a
+ *     bridle and reins and a breast collar and a girth, and nobody has ever
+ *     wanted to wear one make of bridle with another make of girth. So a
+ *     harness is one piece of art, bought and worn as one thing.
+ *   - one of them is nothing at all. `none` is a real choice with a real name:
+ *     the horse the game shipped with, in its own saddle and no tack over it.
  */
 
 import { PALETTE } from './palette.js';
 import { bake } from './pixel.js';
-import { FACE, LEGS, RIDER_LEGS, TORSO, stamp, fighterStill } from './sprites-character.js';
+import {
+  FACE,
+  LEGS,
+  RIDER_LEGS,
+  TORSO,
+  HORSE_STILL_ROWS,
+  stamp,
+  fighterStill,
+  horseStill,
+} from './sprites-character.js';
 
 /** What an outfit is, and what you are wearing before you have earned a thing. */
-export const DEFAULT_OUTFIT = { hat: 'trail', shirt: 'serape', pants: 'trail', boots: 'trail' };
+export const DEFAULT_OUTFIT = {
+  hat: 'trail',
+  shirt: 'serape',
+  pants: 'trail',
+  boots: 'trail',
+  horse: 'trail',
+};
 
-export const OUTFIT_SLOTS = ['hat', 'shirt', 'pants', 'boots'];
+export const OUTFIT_SLOTS = ['hat', 'shirt', 'pants', 'boots', 'horse'];
 
 // ---------------------------------------------------------------------------
 // Leg helpers
@@ -321,6 +356,111 @@ export const HATS = {
       '....kaaaaak.....',
     ],
   },
+
+  // --- Bought, never earned ------------------------------------------------
+  //
+  // Everything from here down is sold over a counter and hangs on no
+  // achievement at all — see the note over the tailor's stock in
+  // src/game/wardrobe.js. They are LAST in the drawer on purpose: the road's
+  // own rewards keep the order the road hands them out in, and the shop's
+  // stock is a shelf at the end of it rather than a run of new gaps in the
+  // middle of a list the player has been filling in for weeks.
+
+  /** A town derby. Low, round, and completely out of place on a horse. */
+  bowler: {
+    key: { h: PALETTE.charDark, H: PALETTE.char, a: PALETTE.leatherDark },
+    rows: [
+      '................',
+      '................',
+      '.....kkkkk......',
+      '....kHHHHHk.....',
+      '...khhhhhhhk....',
+      '..kkhhhhhhhkk...',
+      '..kaaaaaaaaak...',
+      '.kHHHHHHHHHHHk..',
+      '.kkkkkkkkkkkkk..',
+      '................',
+      '................',
+    ],
+  },
+
+  /**
+   * A cavalry campaign hat: crossed sabres in brass on the front of a crown
+   * pinched into four, and the brim turned up on the near side.
+   */
+  cavalry: {
+    key: { h: PALETTE.blueDark, H: PALETTE.blue, a: PALETTE.goldLight, A: PALETTE.goldDark },
+    rows: [
+      '................',
+      '.....kkkkk......',
+      '....kHhhhHk.....',
+      '....kHhhhHk.....',
+      '....kaAaAak.....',
+      '..kkkhhhhhkkkk..',
+      '.kHHHHHHHHHHHk..',
+      '.kkkkkkkkkkkkk..',
+      '....k.......k...',
+      '................',
+      '................',
+    ],
+  },
+
+  /**
+   * A trader's headwrap out of the deep desert: cloth over the crown with the
+   * tail of it left hanging down the near side of the jaw.
+   */
+  nomad: {
+    key: { h: PALETTE.sandDeep, H: PALETTE.sand, a: PALETTE.bogLight },
+    rows: [
+      '................',
+      '....kkkkkkk.....',
+      '...kHHHHHHHk....',
+      '...khhhhhhhk....',
+      '..kkHHHHHHHkk...',
+      '.kaaaaaaaaaaak..',
+      '.kkkkkkkkkkkkk..',
+      '..........kHk...',
+      '..........kHk...',
+      '..........khk...',
+      '..........kkk...',
+    ],
+  },
+
+  /** Undertaker's Sunday: crepe over a tall crown, and a mourning band. */
+  mourning: {
+    key: { h: PALETTE.ink, H: PALETTE.charDark, a: PALETTE.greyDark, A: PALETTE.grey },
+    rows: [
+      '....kkkkkkk.....',
+      '....khhhhhk.....',
+      '....khhhhhk.....',
+      '....khhhhhk.....',
+      '....kaAAAak.....',
+      '..kkkhhhhhkkk...',
+      '..kHHHHHHHHHk...',
+      '..kkkkkkkkkkk...',
+      '................',
+      '................',
+      '................',
+    ],
+  },
+
+  /** Rail Baron: a peaked company cap with the road's badge on the band. */
+  rail: {
+    key: { h: PALETTE.steelDark, H: PALETTE.steel, a: PALETTE.gold, A: PALETTE.goldDark },
+    rows: [
+      '................',
+      '................',
+      '....kkkkkkk.....',
+      '...kHHHHHHHk....',
+      '...khhhhhhhk....',
+      '...kAaAaAaAk....',
+      '..kkkkkkkkkkkk..',
+      '..kHHHHHHHHHHk..',
+      '..kkkkkkkkkkkk..',
+      '................',
+      '................',
+    ],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -465,6 +605,60 @@ export const SHIRTS = {
     chest: ['PPPPPPPP', 'PffffffffP', 'PPffffffPP', 'PffffffffP', 'sPPffffPPs', 'PPffffPP'],
     hem: 'PffffffffP',
   }),
+
+  // --- Bought, never earned ------------------------------------------------
+
+  /** Mule-train wool: broad bands, worn over the head and never buttoned. */
+  poncho: shirt({
+    key: {
+      p: PALETTE.bogDark, P: PALETTE.bogDeep, q: PALETTE.bog,
+      w: PALETTE.sandLight, W: PALETTE.sandDark,
+      f: PALETTE.sand, F: PALETTE.sandDark,
+      t: PALETTE.leatherDark, T: PALETTE.woodDeep, l: PALETTE.sandDark,
+    },
+    collar: 'pqqqqqqp',
+    chest: ['qqqqqqqq', 'qwwwwwwwwq', 'pPPPPPPPPp', 'pwwwwwwwwp', 'spPPPPPPps', 'PwwwwwwP'],
+    hem: 'PwwwwwwwwP',
+  }),
+
+  /** A cardsharp's brocade waistcoat, over sleeves nobody paid for. */
+  brocade: shirt({
+    key: {
+      p: PALETTE.purpleDark, P: PALETTE.purpleDark, q: PALETTE.purple,
+      w: PALETTE.boneDark, W: PALETTE.bone,
+      f: PALETTE.goldLight, F: PALETTE.goldDark,
+      t: PALETTE.charDark, T: PALETTE.ink, l: PALETTE.gold,
+    },
+    collar: 'wwwwwwww',
+    chest: ['qqqqqqqq', 'qwPfPfPfwq', 'pwPfPfPfwp', 'pwfPfPfPwp', 'spwPfPfwps', 'PfPfPfPf'],
+    hem: 'PfPfPfPfPP',
+  }),
+
+  /** Undertaker's Sunday: a buttoned frock coat, black on black. */
+  mourning: shirt({
+    key: {
+      p: PALETTE.charDark, P: PALETTE.ink, q: PALETTE.char,
+      w: PALETTE.boneDark, W: PALETTE.bone,
+      f: PALETTE.greyDark, F: PALETTE.grey,
+      t: PALETTE.ink, T: PALETTE.ink, l: PALETTE.greyDark,
+    },
+    collar: 'pwwwwwwp',
+    chest: ['pppppppp', 'pPPwwwPPPp', 'pPPwwfwPPp', 'pPPwwwPPPp', 'spPPffPPps', 'PPPPPPPP'],
+    hem: 'PPPPPPPPPP',
+  }),
+
+  /** Rail Baron: company blue, and two rows of brass down the front of it. */
+  rail: shirt({
+    key: {
+      p: PALETTE.blueDark, P: PALETTE.blueDark, q: PALETTE.blue,
+      w: PALETTE.steel, W: PALETTE.steelDark,
+      f: PALETTE.gold, F: PALETTE.goldDark,
+      t: PALETTE.leatherDark, T: PALETTE.charDark, l: PALETTE.goldLight,
+    },
+    collar: 'qwwwwwwq',
+    chest: ['qqqqqqqq', 'qpfPPfpppq', 'ppfPPfpppp', 'ppfPPfPPPp', 'sppfPfPPps', 'PPfPPfPP'],
+    hem: 'PPfPPPPfPP',
+  }),
 };
 
 // ---------------------------------------------------------------------------
@@ -520,6 +714,36 @@ export const PANTS = {
     hip: hip('cbbbbbbc'),
     transform: (rows, band) => outside(rows, band.lower, 'c'),
   },
+
+  // --- Bought, never earned ------------------------------------------------
+
+  /** Riveted denim, indigo, with copper at every seam that ever tore. */
+  denim: {
+    key: { b: PALETTE.blueDark, c: PALETTE.goldDark, C: PALETTE.blue },
+    hip: hip('bcbbbbcb'),
+    transform: (rows, band) => studs(seam(rows, band.thigh, 'C'), band.top, 'c'),
+  },
+
+  /** Buffalo hide, hair left on, cut heavy enough to turn a thorn. */
+  hide: {
+    key: { b: PALETTE.woodDeep, c: PALETTE.leatherDark, C: PALETTE.leather },
+    hip: hip('cCbbbbCc'),
+    transform: (rows, band) => outside(tint(rows, band.calf, 'b', 'c'), band.upper, 'C'),
+  },
+
+  /** Undertaker's Sunday: pressed black, one satin line down the seam. */
+  mourning: {
+    key: { b: PALETTE.ink, c: PALETTE.greyDark, C: PALETTE.grey },
+    hip: hip('bbcccbbb'),
+    transform: (rows, band) => seam(rows, [...band.thigh, ...band.shin], 'c'),
+  },
+
+  /** Rail Baron: heavy canvas, striped like the company's own paintwork. */
+  rail: {
+    key: { b: PALETTE.steelDark, c: PALETTE.gold, C: PALETTE.steel },
+    hip: hip('bCccccCb'),
+    transform: (rows, band) => studs(seam(rows, band.lower, 'C'), band.upper, 'c'),
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -567,9 +791,166 @@ export const BOOTS = {
     key: { B: PALETTE.goldDark, v: PALETTE.goldLight },
     transform: (rows, band) => seam(bootTops(rows, band), [...band.shin, ...band.boot], 'v'),
   },
+
+  // --- Bought, never earned ------------------------------------------------
+
+  /** Muleskinner's boots: laced to the knee, and re-soled twice already. */
+  mule: {
+    key: { B: PALETTE.leatherDark, v: PALETTE.sandDark },
+    transform: (rows, band) => studs(bootTops(rows, band, 2), [...band.calf, ...band.shin], 'v'),
+  },
+
+  /** Hobnails. You can hear the man coming before the horse. */
+  hobnail: {
+    key: { B: PALETTE.woodDeep, v: PALETTE.steel },
+    transform: (rows, band) => outside(tint(rows, band.boot, 'B', 'v'), band.boot, 'v'),
+  },
+
+  /** Undertaker's Sunday: patent leather, polished to a black mirror. */
+  mourning: {
+    key: { B: PALETTE.ink, v: PALETTE.grey },
+    transform: (rows, band) => seam(bootTops(rows, band), band.boot, 'v'),
+  },
+
+  /** Rail Baron: steel toecaps, and a strap over the instep. */
+  rail: {
+    key: { B: PALETTE.steelDark, v: PALETTE.gold },
+    transform: (rows, band) => seam(tint(bootTops(rows, band), band.shin, 'b', 'B'), band.shin, 'v'),
+  },
 };
 
-const CATALOGUE = { hat: HATS, shirt: SHIRTS, pants: PANTS, boots: BOOTS };
+// ---------------------------------------------------------------------------
+// HARNESSES — tack, stamped over the horse's own frames.
+//
+// WHY THESE ARE WRITTEN AS RUNS AND NOT AS PIXEL ROWS
+// ---------------------------------------------------------------------------
+// Everything else in this file is typed as rows of characters, because a hat is
+// a shape and a shape wants to be drawn. A harness is not a shape — it is four
+// or five STRAPS lying on an animal that is already drawn, and typed as full
+// rows it would be seventeen lines of thirty-two dots with six letters hidden
+// somewhere in them, which is unreadable and unmaintainable in equal measure.
+//
+// So a strap is `[row, x, characters]` — "this many pixels, starting here" —
+// and a rig is a list of the straps it is made of. The parts below are shared:
+// a bridle is a bridle whatever it is made of, and a harness that wants one
+// names it rather than re-typing it. What changes between rigs is which parts
+// they carry and what colour their leather and their fittings are.
+//
+// The coordinates are the horse's own 32 x 24 grid, and only rows 0..16 are
+// ever touched: below that are the legs, which are re-stamped every frame.
+// ---------------------------------------------------------------------------
+
+/** Paint runs of characters onto a copy of `rows`. See the note above. */
+function paintRuns(rows, runs) {
+  const out = rows.map((r) => r.split(''));
+  for (const [y, x, chars] of runs) {
+    if (y < 0 || y >= out.length) continue;
+    for (let i = 0; i < chars.length; i++) {
+      const tx = x + i;
+      if (chars[i] === '.' || tx < 0 || tx >= out[y].length) continue;
+      out[y][tx] = chars[i];
+    }
+  }
+  return out.map((r) => r.join(''));
+}
+
+/** A blank sheet the size of the horse's static half. */
+const TACK_SHEET = Array(17).fill('.'.repeat(32));
+
+/** The pieces a rig is assembled from. */
+const TACK = {
+  /** Browband, cheekpiece, noseband and the bit at the corner of the mouth. */
+  bridle: [[3, 23, 'jjjj'], [4, 27, 'j'], [5, 27, 'j'], [6, 27, 'jjjj'], [7, 27, 'i']],
+  /** From the bit, back over the neck, to the hands of whoever is sitting up there. */
+  reins: [[7, 24, 'jj'], [8, 21, 'jjj'], [9, 18, 'jjj'], [10, 16, 'jj']],
+  /** A breast collar, laid down the shoulder to the chest. */
+  collar: [[11, 22, 'jjjj'], [12, 24, 'jjj'], [13, 25, 'jj'], [14, 25, 'j']],
+  /** The girth, hanging out from under the saddle skirt. */
+  girth: [[15, 11, 'JJ'], [16, 11, 'JJ']],
+  /** Saddlebags, slung behind the cantle. */
+  bags: [[12, 6, 'jjj'], [13, 6, 'jij'], [14, 6, 'jjj'], [15, 7, 'jj']],
+  /** A blanket roll across the back, behind the withers. */
+  bedroll: [[10, 7, 'JjjJ']],
+  /** Brass on the cheek and on the collar. */
+  conchos: [[4, 27, 'i'], [11, 23, 'i'], [12, 25, 'i']],
+  /** A feather standing up between the ears. */
+  plume: [[0, 25, 'i'], [1, 25, 'i'], [2, 25, 'i']],
+  /** A shoulder plate, with two spikes off the top of it. */
+  plate: [[10, 22, 'i'], [10, 24, 'i'], [11, 21, 'jjjjj'], [12, 22, 'jjjj'], [13, 23, 'jjj']],
+};
+
+/**
+ * One rig.
+ * @param {string[]} parts names from TACK, in the order they are laid on
+ * @param {object} key the three characters a harness owns: j, J, i
+ */
+function harness(parts, key) {
+  return { rows: paintRuns(TACK_SHEET, parts.flatMap((name) => TACK[name])), key };
+}
+
+export const HARNESS = {
+  /**
+   * Nothing at all — the horse in its own saddle, exactly as the game has
+   * always drawn it. It is a real entry rather than an absence because "no
+   * tack" is a look somebody chooses, and a wardrobe that expresses it as an
+   * empty slot is a wardrobe you cannot tell is working.
+   */
+  none: { rows: null, key: {} },
+
+  /**
+   * The rig the stable throws in with the animal: a plain bridle, reins and a
+   * girth, in the near-black leather every working bridle in the world is made
+   * of. It is dark for a reason that is nothing to do with taste — a strap the
+   * colour of the coat it lies on is a strap nobody can see, and this is the
+   * one rig every player owns from the first minute.
+   */
+  trail: harness(['bridle', 'reins', 'girth'], {
+    j: PALETTE.woodDeep, J: PALETTE.ink, i: PALETTE.gold,
+  }),
+
+  /** A drover's working rig: bags for the long stretches and a roll behind. */
+  drover: harness(['bridle', 'reins', 'collar', 'girth', 'bags', 'bedroll'], {
+    j: PALETTE.woodDark, J: PALETTE.woodDeep, i: PALETTE.sandDark,
+  }),
+
+  /** Show tack: oiled black leather under more brass than it needs. */
+  brass: harness(['bridle', 'reins', 'collar', 'girth', 'conchos'], {
+    j: PALETTE.charDark, J: PALETTE.ink, i: PALETTE.goldLight,
+  }),
+
+  /** Basin barding: a plate over the shoulder with the horns still on it. */
+  iron: harness(['bridle', 'reins', 'plate', 'girth'], {
+    j: PALETTE.steelDark, J: PALETTE.char, i: PALETTE.magma,
+  }),
+
+  /** Cut past the last horizon. The fittings are not reflecting anything. */
+  star: harness(['bridle', 'reins', 'collar', 'girth', 'conchos', 'plume'], {
+    j: PALETTE.voidRock, J: PALETTE.voidRockDark, i: PALETTE.star,
+  }),
+
+  // --- Bought, never earned ------------------------------------------------
+
+  /** Silverwork off a border saddler: conchos from the browband to the girth. */
+  silver: harness(['bridle', 'reins', 'collar', 'girth', 'conchos'], {
+    j: PALETTE.leatherDark, J: PALETTE.woodDeep, i: PALETTE.snow,
+  }),
+
+  /** Parade rig: scarlet webbing and a feather standing straight up. */
+  parade: harness(['bridle', 'reins', 'collar', 'girth', 'plume'], {
+    j: PALETTE.red, J: PALETTE.redDark, i: PALETTE.goldLight,
+  }),
+
+  /** A packer's rig. Everything you own, and the horse carries it. */
+  packer: harness(['bridle', 'reins', 'girth', 'bags', 'bedroll', 'collar'], {
+    j: PALETTE.bogDark, J: PALETTE.bogDeep, i: PALETTE.sandLight,
+  }),
+};
+
+// Every rig knows its own name, so the horse cache can be keyed by it without
+// the rig having to be told twice. See `getCharacterSprites`.
+for (const [id, rig] of Object.entries(HARNESS)) rig.id = id;
+
+const CATALOGUE = { hat: HATS, shirt: SHIRTS, pants: PANTS, boots: BOOTS, horse: HARNESS };
 
 export function hasPiece(slot, id) {
   return !!(CATALOGUE[slot] && CATALOGUE[slot][id]);
@@ -621,6 +1002,12 @@ export function outfitParts(outfit) {
     flare: shirt.flare,
     legs: buildLegs(pants, boots),
     /**
+     * The tack, handed straight through. The rig stamps it onto the horse
+     * rather than onto the man (`composeHorse`), and `none` is a real harness
+     * with no art in it, which is why this is never null.
+     */
+    harness: HARNESS[worn.horse] || HARNESS[DEFAULT_OUTFIT.horse],
+    /**
      * The same trousers and the same boots, on the seated leg. Without this the
      * rig falls back to its own bare RIDER_LEGS: the colours would still be
      * right (the key is the outfit's) but the fringe, the tall boot and the
@@ -654,13 +1041,20 @@ const SLOT_CROP = { hat: [0, 11], shirt: [8, 19], pants: [16, 24], boots: [18, 2
 
 /**
  * A garment on its own, worn over the default of every other slot.
- * @param {'hat'|'shirt'|'pants'|'boots'} slot
+ *
+ * The horse is the exception and has to be: a harness is not a band of rows off
+ * a man, it is tack on an animal, so its card is a picture of the whole horse
+ * standing in it. That is also the honest picture — a bridle cropped to a
+ * bridle is four brown pixels.
+ *
+ * @param {'hat'|'shirt'|'pants'|'boots'|'horse'} slot
  */
 export function pieceThumb(slot, id) {
   const cacheKey = `${slot}:${id}`;
   if (thumbCache.has(cacheKey)) return thumbCache.get(cacheKey);
-  const outfit = normalizeOutfit({ ...DEFAULT_OUTFIT, [slot]: id });
-  const thumb = fighterStill(outfitParts(outfit), SLOT_CROP[slot]);
+  const thumb = slot === 'horse'
+    ? horseStill(HARNESS[id] || HARNESS.none)
+    : fighterStill(outfitParts(normalizeOutfit({ ...DEFAULT_OUTFIT, [slot]: id })), SLOT_CROP[slot]);
   thumbCache.set(cacheKey, thumb);
   return thumbCache.get(cacheKey);
 }
@@ -673,8 +1067,9 @@ export function pieceThumb(slot, id) {
 export function lockedThumb(slot) {
   const cacheKey = `locked:${slot}`;
   if (thumbCache.has(cacheKey)) return thumbCache.get(cacheKey);
-  const [from, to] = SLOT_CROP[slot];
-  const rows = [...FACE, ...TORSO, ...LEGS.stand].slice(from, to);
+  const rows = slot === 'horse'
+    ? HORSE_STILL_ROWS
+    : [...FACE, ...TORSO, ...LEGS.stand].slice(SLOT_CROP[slot][0], SLOT_CROP[slot][1]);
   const flat = rows.map((row) => row.replace(/[^.]/g, 'x'));
   thumbCache.set(cacheKey, bake({ key: { '.': null, x: PALETTE.greyDark }, rows: flat }));
   return thumbCache.get(cacheKey);

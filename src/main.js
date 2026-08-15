@@ -30,6 +30,7 @@ import { ExploreScreen } from './explore/explore-screen.js';
 import { ShopScreen } from './shops/shop-screen.js';
 import { InnScreen } from './shops/inn-screen.js';
 import { ForgeScreen } from './shops/forge-screen.js';
+import { TailorScreen } from './shops/tailor-screen.js';
 import { DuelScreen } from './duel/duel-screen.js';
 import { WorldIntroScreen, VictoryScreen, GameOverScreen } from './game/interstitials.js';
 
@@ -52,6 +53,7 @@ const SCREENS = [
   ShopScreen,
   InnScreen,
   ForgeScreen,
+  TailorScreen,
   DuelScreen,
   WorldIntroScreen,
   VictoryScreen,

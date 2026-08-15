@@ -1,17 +1,23 @@
 /**
- * SHOOT! — Interior backdrop for the shop and the inn.
+ * SHOOT! — Interior backdrop for the shop, the inn and the clothier.
  *
  * These used to be the same picture: a plank wall, one lantern hung off to the
  * left, and floating dust. Two screens shared it and neither of them looked
- * like anywhere. They are now two rooms that have nothing in common but the
+ * like anywhere. They are now three rooms that have nothing in common but the
  * boards they are built from.
  *
- *   shop  a trading post — shelves of jars and tins down both walls, stock
- *         stacked on the floor, a rail of pans and hats overhead, and the
- *         counter you are standing at running across the foreground.
- *   inn   a room with a fire in it — a stone hearth throwing live light, a
- *         window with the night behind it, a rug, a chair pulled up to the
- *         heat, and a beamed ceiling.
+ *   shop    a trading post — shelves of jars and tins down both walls, stock
+ *           stacked on the floor, a rail of pans and hats overhead, and the
+ *           counter you are standing at running across the foreground.
+ *   inn     a room with a fire in it — a stone hearth throwing live light, a
+ *           window with the night behind it, a rug, a chair pulled up to the
+ *           heat, and a beamed ceiling.
+ *   tailor  a clothier's — bolts of cloth stacked to the ceiling down both
+ *           walls, a rail of hanging garments across each one, dress forms
+ *           standing on the floor, and a cutting table for a counter. Papered
+ *           rather than boarded, because the one thing every clothing shop in
+ *           the world has and no trading post does is a wall you would not mind
+ *           standing a mirror against.
  *
  * The forge used to be a third `kind` in here — a brick oblong and four grey
  * ticks for tools. It has a workshop of its own now, with its own furniture
@@ -41,7 +47,8 @@ const FLOOR_AT = 0.78;
 
 export function createInteriorScene(kind = 'shop') {
   const isInn = kind === 'inn';
-  const rng = makeRng(isInn ? 8123 : 4242);
+  const isTailor = kind === 'tailor';
+  const rng = makeRng(isInn ? 8123 : isTailor ? 5717 : 4242);
 
   const motes = Array.from({ length: 34 }, () => ({
     x: rng(),
@@ -109,7 +116,8 @@ export function createInteriorScene(kind = 'shop') {
       const s = view.scale;
       const floorY = snap(view.h * FLOOR_AT, s);
 
-      drawWall(ctx, view, s, floorY, isInn);
+      if (isTailor) drawPaperedWall(ctx, view, s, floorY);
+      else drawWall(ctx, view, s, floorY, isInn);
       drawFloor(ctx, view, s, floorY, isInn);
 
       // Furniture standing on the floor is drawn at twice the scale of what is
@@ -120,6 +128,7 @@ export function createInteriorScene(kind = 'shop') {
       const fs = view.w < 760 ? s : s * 2;
 
       if (isInn) drawInnRoom(ctx, view, s, fs, floorY, flicker, flames, sparks, t);
+      else if (isTailor) drawTailorRoom(ctx, view, s, fs, floorY, flicker, t);
       else drawShopRoom(ctx, view, s, fs, floorY, flicker, t);
 
       drawMotes(ctx, view, s, motes, flicker);
@@ -418,6 +427,220 @@ function drawShopRoom(ctx, view, s, fs, floorY, flicker, t) {
   ctx.globalCompositeOperation = 'source-over';
   lantern(ctx, lx, ly, s, flicker, PALETTE.gold);
   lantern(ctx, view.w - lx, ly, s, flicker * 0.94, PALETTE.gold);
+}
+
+// ---------------------------------------------------------------------------
+// The clothier
+// ---------------------------------------------------------------------------
+
+/**
+ * A papered wall, and it is the fastest way to say "this is not the trading
+ * post". The other two rooms are built out of boards; this one has a striped
+ * paper over the boards with a dado rail across it, which is exactly the thing
+ * a frontier store put up the week it decided to sell to people who were
+ * choosing rather than provisioning.
+ *
+ * The stripes are two shades apart rather than two colours apart. Paper that
+ * contrasts as hard as the wall behind the shop's shelving would fight
+ * everything hung on it, and everything worth looking at in this room is hung
+ * on it.
+ */
+function drawPaperedWall(ctx, view, s, floorY) {
+  ctx.fillStyle = PALETTE.woodDeep;
+  ctx.fillRect(0, 0, view.w, floorY);
+
+  const stripe = 5 * s;
+  for (let x = 0; x < view.w; x += stripe * 2) {
+    ctx.fillStyle = PALETTE.leatherDark;
+    ctx.fillRect(x, 0, stripe, floorY);
+    ctx.fillStyle = PALETTE.woodDeep;
+    ctx.fillRect(x + stripe, 0, stripe, floorY);
+    // A hairline down every second stripe: at this scale it is what stops the
+    // paper reading as a flat two-tone gradient.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    ctx.fillRect(x + stripe - s, 0, s, floorY);
+  }
+
+  // Picture rail at the top, dado rail low down. Two horizontals, because one
+  // is a fence and two is a room.
+  ctx.fillStyle = PALETTE.wood;
+  ctx.fillRect(0, 5 * s, view.w, 2 * s);
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(0, 7 * s, view.w, s);
+
+  const railY = floorY - 13 * s;
+  ctx.fillStyle = PALETTE.woodLight;
+  ctx.fillRect(0, railY, view.w, s);
+  ctx.fillStyle = PALETTE.wood;
+  ctx.fillRect(0, railY + s, view.w, 2 * s);
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(0, railY + 3 * s, view.w, s);
+  // Below the dado the wall is plain boarding, painted — the half of the wall
+  // that gets kicked.
+  ctx.fillStyle = PALETTE.woodDark;
+  ctx.fillRect(0, railY + 4 * s, view.w, floorY - railY - 4 * s);
+}
+
+/**
+ * A bolt of cloth standing on its end, or a stack of them lying flat.
+ *
+ * Drawn here rather than kept as a sprite because a bolt is a rectangle with a
+ * roll at the top and its whole character is its COLOUR — the room needs eight
+ * of them in eight different cloths, and eight sprites of a rectangle is eight
+ * copies of the same sprite.
+ */
+function bolt(ctx, x, y, w, h, s, cloth, shade) {
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(x, y - h, w, h);
+  ctx.fillStyle = cloth;
+  ctx.fillRect(x, y - h, w - s, h - s);
+  ctx.fillStyle = shade;
+  ctx.fillRect(x, y - h, w - s, 2 * s);
+  ctx.fillRect(x + w - 2 * s, y - h, s, h - s);
+}
+
+/**
+ * A garment hanging off a rail: shoulders, a body that narrows, and a hem that
+ * swings. The sway is the only moving thing in this room and it is deliberately
+ * tiny — a whole pixel, every few seconds, out of phase along the rail. Cloth
+ * hanging in a still room is not motionless, it just is not doing much.
+ */
+function hanging(ctx, x, y, s, cloth, shade, height, phase, t) {
+  const sway = Math.round(Math.sin(t / 1300 + phase) * 0.6) * s;
+  const w = 7 * s;
+  // The hanger, and the hook over the rail.
+  ctx.fillStyle = PALETTE.steelDark;
+  ctx.fillRect(x + 3 * s + sway, y, s, 2 * s);
+  ctx.fillRect(x + s + sway, y + 2 * s, 5 * s, s);
+  // Shoulders, then the fall of it.
+  ctx.fillStyle = cloth;
+  ctx.fillRect(x + sway, y + 3 * s, w, height);
+  ctx.fillStyle = shade;
+  ctx.fillRect(x + sway, y + 3 * s, 2 * s, height);
+  ctx.fillRect(x + sway, y + 3 * s + height - 2 * s, w, 2 * s);
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(x + w - s + sway, y + 3 * s, s, height);
+}
+
+/** A dress form: a shaped torso on a post and a tripod foot. */
+function dressForm(ctx, x, base, s, cloth, shade) {
+  const w = 10 * s;
+  // Post and feet first, so the body sits on top of them.
+  ctx.fillStyle = PALETTE.woodDark;
+  ctx.fillRect(x + 4 * s, base - 10 * s, 2 * s, 10 * s);
+  ctx.fillStyle = PALETTE.woodDeep;
+  ctx.fillRect(x + s, base - s, 8 * s, s);
+  ctx.fillRect(x + 2 * s, base - 2 * s, 6 * s, s);
+
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(x, base - 26 * s, w, 16 * s);
+  ctx.fillStyle = cloth;
+  ctx.fillRect(x, base - 26 * s, w - s, 15 * s);
+  ctx.fillStyle = shade;
+  ctx.fillRect(x, base - 26 * s, 3 * s, 15 * s);
+  ctx.fillRect(x, base - 22 * s, w - s, 2 * s);
+  // The neck stump. Without it the form reads as a cushion on a stick.
+  ctx.fillStyle = PALETTE.woodDark;
+  ctx.fillRect(x + 3 * s, base - 29 * s, 4 * s, 3 * s);
+}
+
+function drawTailorRoom(ctx, view, s, fs, floorY, flicker, t) {
+  const right = view.w;
+
+  // --- Rails of stock down both walls ---------------------------------------
+  // Only over the walls, for the same reason the trading post hangs its pans
+  // there: anything across the middle sits behind the goods board, where it is
+  // half a coat sticking out either side of a panel.
+  const railW = snap(Math.min(view.w * 0.3, 40 * s), s);
+  const railY = 13 * s;
+  const cloths = [
+    [PALETTE.red, PALETTE.redDark],
+    [PALETTE.bogLight, PALETTE.bogDark],
+    [PALETTE.blue, PALETTE.blueDark],
+    [PALETTE.sand, PALETTE.sandDark],
+    [PALETTE.purple, PALETTE.purpleDark],
+    [PALETTE.bone, PALETTE.boneDark],
+  ];
+
+  for (const side of [0, 1]) {
+    const x0 = side === 0 ? 0 : view.w - railW;
+    ctx.fillStyle = PALETTE.steelDark;
+    ctx.fillRect(x0, railY, railW, s);
+    ctx.fillStyle = PALETTE.shadow;
+    ctx.fillRect(x0, railY + s, railW, s);
+
+    for (let i = 0; i < 4; i++) {
+      const x = snap(x0 + 2 * s + i * 9 * s, s);
+      if (x + 8 * s > x0 + railW) break;
+      const [cloth, shade] = cloths[(i + side * 3) % cloths.length];
+      hanging(ctx, x, railY + 2 * s, s, cloth, shade, (11 + ((i + side) % 3) * 3) * s, i + side * 2, t);
+    }
+  }
+
+  // --- Bolts of cloth, stacked to the dado ----------------------------------
+  const shelfTop = snap(view.h * 0.34, s);
+  for (const side of [0, 1]) {
+    for (let row = 0; row < 3; row++) {
+      const y = shelfTop + row * 13 * s;
+      if (y > floorY - 14 * s) break;
+      // The plank they are standing on.
+      const width = snap(Math.min(view.w * 0.2, 26 * s), s);
+      const x0 = side === 0 ? 2 * s : right - width - 2 * s;
+      ctx.fillStyle = PALETTE.woodLight;
+      ctx.fillRect(x0, y, width, s);
+      ctx.fillStyle = PALETTE.shadow;
+      ctx.fillRect(x0, y + s, width, s);
+      for (let i = 0; i < 4; i++) {
+        const [cloth, shade] = cloths[(i + row + side * 2) % cloths.length];
+        const bw = 5 * s;
+        const bx = x0 + 2 * s + i * (bw + s);
+        if (bx + bw > x0 + width) break;
+        bolt(ctx, bx, y, bw, (7 + ((i + row) % 3) * 2) * s, s, cloth, shade);
+      }
+    }
+  }
+
+  // --- Dress forms on the floor ---------------------------------------------
+  const base = snap(view.h * 0.92, fs);
+  dressForm(ctx, fs, base, fs, PALETTE.redDark, PALETTE.redDeep);
+  dressForm(ctx, right - 14 * fs, base, fs, PALETTE.blueDark, PALETTE.steelDark);
+  stand(ctx, 'trunk', right - 30 * fs, base + fs, fs);
+  stand(ctx, 'crate', 14 * fs, base, fs);
+
+  // --- The cutting table you are standing at --------------------------------
+  // Same foreground counter the trading post has, in a paler wood and with a
+  // measuring tape's brass tacks hammered along the front edge: the one detail
+  // that says this plank is for cutting cloth on rather than for stacking tins.
+  const counterY = snap(view.h * 0.93, s);
+  ctx.fillStyle = PALETTE.woodDark;
+  ctx.fillRect(0, counterY, view.w, view.h - counterY);
+  ctx.fillStyle = PALETTE.woodLight;
+  ctx.fillRect(0, counterY, view.w, s);
+  ctx.fillStyle = PALETTE.wood;
+  ctx.fillRect(0, counterY + s, view.w, 3 * s);
+  ctx.fillStyle = PALETTE.shadow;
+  ctx.fillRect(0, counterY + 4 * s, view.w, s);
+  ctx.fillStyle = PALETTE.gold;
+  for (let x = 6 * s; x < view.w; x += 12 * s) {
+    ctx.fillRect(snap(x, s), counterY + 2 * s, s, s);
+  }
+
+  // --- Light -----------------------------------------------------------------
+  // Two lamps, hung further in than the trading post's and burning a little
+  // steadier: a room where colour is the whole product is a room that is lit
+  // properly, and a flickering shop is a shop where you cannot tell brown from
+  // black.
+  const lx = snap(view.w * 0.2, s);
+  const ly = snap(view.h * 0.18, s);
+  const steady = 0.94 + (flicker - 0.9) * 0.35;
+  ctx.globalCompositeOperation = 'lighter';
+  pool(ctx, lx, ly, Math.max(view.w, view.h) * 0.6,
+    `rgba(255, 226, 170, ${0.2 * steady})`, `rgba(190, 140, 70, ${0.07 * steady})`);
+  pool(ctx, view.w - lx, ly, Math.max(view.w, view.h) * 0.5,
+    `rgba(255, 226, 170, ${0.15 * steady})`, `rgba(190, 140, 70, ${0.05 * steady})`);
+  ctx.globalCompositeOperation = 'source-over';
+  lantern(ctx, lx, ly, s, steady, PALETTE.goldLight);
+  lantern(ctx, view.w - lx, ly, s, steady * 0.97, PALETTE.goldLight);
 }
 
 // ---------------------------------------------------------------------------

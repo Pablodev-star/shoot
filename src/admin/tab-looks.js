@@ -21,6 +21,7 @@
 
 import { el } from '../core/dom.js';
 import { crisp, drawSprite, makeCanvas } from '../art/pixel.js';
+import { RIDER_OFFSET } from '../art/sprites-character.js';
 import { OUTFIT_SLOTS, DEFAULT_OUTFIT } from '../art/sprites-wardrobe.js';
 import {
   WARDROBE,
@@ -29,8 +30,9 @@ import {
   getOutfitOverride,
   setOutfitOverride,
   isOwned,
+  lockFor,
+  previewMount,
   previewSprites,
-  requirementFor,
 } from '../game/wardrobe.js';
 import { note } from './overrides.js';
 import { section, buttons, action, grid, readout } from './widgets.js';
@@ -66,16 +68,18 @@ export const LooksTab = {
     const cards = WARDROBE[openSlot].map((item) => {
       const on = worn[openSlot] === item.id;
       const owned = isOwned(openSlot, item.id);
-      const requirement = requirementFor(openSlot, item.id);
+      const lock = lockFor(openSlot, item.id);
       return el(`button.admin-card.admin-card--garment${on ? '.is-held' : ''}`, {
         onclick: () => wear(openSlot, item.id),
         'aria-pressed': String(on),
       }, [
-        figure({ ...worn, [openSlot]: item.id }),
+        figure({ ...worn, [openSlot]: item.id }, openSlot === 'horse' ? 2 : 3, openSlot === 'horse'),
         el('div.admin-card-body', {}, [
           el('div.admin-card-name', { text: item.name }),
           el('div.admin-card-meta', {
-            text: owned ? 'earned' : `locked · ${requirement ? requirement.name : 'nothing grants it'}`,
+            text: owned
+              ? (item.source === 'shop' ? 'bought' : 'earned')
+              : `locked · ${lock ? lock.name : 'nothing grants it'}`,
           }),
           el('div.admin-card-desc', { text: item.blurb }),
         ]),
@@ -85,7 +89,7 @@ export const LooksTab = {
     return el('div.admin-tab', {}, [
       section('Wearing', [
         el('div.admin-outfit', {}, [
-          figure(worn, 4),
+          figure(worn, openSlot === 'horse' ? 3 : 4, openSlot === 'horse'),
           readout(OUTFIT_SLOTS.map((slot) => {
             const item = WARDROBE[slot].find((g) => g.id === worn[slot]);
             return [
@@ -108,7 +112,7 @@ export const LooksTab = {
             }
             setOutfitOverride(dressed);
             ctx.refresh();
-          }, { tip: 'The last garment in every drawer — the end-of-game set' }),
+          }, { tip: 'The last garment in every drawer' }),
           action('Dress at random', () => {
             const dressed = {};
             for (const slot of OUTFIT_SLOTS) {
@@ -143,12 +147,36 @@ export const LooksTab = {
  * same trick the wardrobe screen uses, and the same baked preview set, so what
  * is on this card is exactly what walks out onto the road.
  */
-function figure(outfit, scale = 3) {
+function figure(outfit, scale = 3, mounted = false) {
+  if (mounted) return mount(outfit, scale);
   const set = previewSprites(outfit);
   const sprite = set.idle[0];
   const { canvas, ctx } = makeCanvas(sprite.width * scale, sprite.height * scale);
   crisp(ctx);
   drawSprite(ctx, sprite, 0, 0, scale);
+  canvas.className = 'pixel admin-figure';
+  canvas.style.width = `${canvas.width}px`;
+  canvas.style.height = `${canvas.height}px`;
+  return canvas;
+}
+
+/**
+ * The same still, in the saddle — what the Horse drawer shows, because a
+ * harness on a man is nothing at all. Rider included: the bug being looked for
+ * is always "the tack goes through the rider's leg", and it cannot be seen on
+ * an empty horse.
+ */
+function mount(outfit, scale = 2) {
+  const { horse, rider } = previewMount(outfit);
+  const sprite = horse.idle[0];
+  // The rider sits four rows ABOVE the horse's own top edge (RIDER_OFFSET is
+  // negative), so the canvas is grown by that much and everything is dropped
+  // into it — otherwise the man is beheaded by the top of his own picture.
+  const lift = -Math.min(0, RIDER_OFFSET.y);
+  const { canvas, ctx } = makeCanvas(sprite.width * scale, (sprite.height + lift) * scale);
+  crisp(ctx);
+  drawSprite(ctx, sprite, 0, lift * scale, scale);
+  drawSprite(ctx, rider.ride[0], RIDER_OFFSET.x * scale, (RIDER_OFFSET.y + lift) * scale, scale);
   canvas.className = 'pixel admin-figure';
   canvas.style.width = `${canvas.width}px`;
   canvas.style.height = `${canvas.height}px`;

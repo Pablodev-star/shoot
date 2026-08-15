@@ -476,20 +476,14 @@
 .admin-modal .divider::after { background: var(--admin-line); }
 
 /* ==========================================================================
-   The door: the sigil's ink and the passphrase box.
+   The door: the passphrase box, and the shortcut back through it.
 
-   Both are as quiet as they can be made. The ink is a stroke of light that
-   fades in half a second, and the box says nothing about what it opens — a
-   player who draws a large P by accident should find a locked door with no
-   label on it and walk away none the wiser.
+   The sigil itself has no style any more, because it has no ink any more —
+   nothing is drawn on the screen while it is being made (see the note at the
+   top of src/admin/sigil.js). What is left here is the box, which says nothing
+   about what it opens: a player who draws a large P by accident should find a
+   locked door with no label on it and walk away none the wiser.
    ========================================================================== */
-
-.sigil-ink {
-  position: fixed;
-  inset: 0;
-  z-index: 95;
-  pointer-events: none;
-}
 
 .gate-modal {
   background: rgba(10, 8, 7, 0.94);

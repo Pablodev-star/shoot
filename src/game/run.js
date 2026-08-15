@@ -178,6 +178,7 @@ on(EVENTS.ENCOUNTER_REACHED, async (event) => {
   if (event.type === 'shop') await go('shop', { encounter: event });
   else if (event.type === 'inn') await go('inn', { encounter: event });
   else if (event.type === 'forge') await go('forge', { encounter: event });
+  else if (event.type === 'tailor') await go('tailor', { encounter: event });
   else {
     // A fight is the one place the run cannot be walked out of. The flag goes
     // up before the screen so the road's Menu button is already refusing by

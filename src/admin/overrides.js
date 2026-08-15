@@ -45,7 +45,7 @@ function blank() {
     road: {
       forceNext: null,
       /** Multipliers on each kind's appetite. See APPETITE in encounters.js. */
-      appetite: { enemy: 1, inn: 1, shop: 1, forge: 1 },
+      appetite: { enemy: 1, inn: 1, shop: 1, forge: 1, tailor: 1 },
       /** Ignore the spacing dimmer and the "never two doors in a row" floor. */
       ignoreSpacing: false,
     },

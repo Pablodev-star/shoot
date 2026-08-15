@@ -180,6 +180,29 @@
 
 .bag-button { position: relative; }
 
+/*
+   The workbench's own button, and it is deliberately the quietest control on
+   the road: no gold, no icon, a hair smaller than the two beside it. It only
+   exists on a slot that has already been through the sigil and the passphrase,
+   and it should read as a tool somebody left on the screen rather than as
+   something the game is offering.
+ */
+.admin-shortcut {
+  border-color: #3a2a18;
+  background: rgba(18, 14, 10, 0.82);
+  color: var(--text-dim);
+  letter-spacing: 0.18em;
+  font-size: var(--text-xs);
+  padding: var(--sp-1) var(--sp-3);
+}
+
+.admin-shortcut:hover { color: var(--bone); }
+
+/* `.btn` sets its own display, so it wins over the browser's [hidden] rule —
+   and a door nobody is supposed to know about must actually be gone from the
+   screen, not merely marked as hidden. Same fix the map button carries. */
+.admin-shortcut[hidden] { display: none; }
+
 .bag-count {
   display: grid;
   place-items: center;
@@ -820,6 +843,52 @@
 }
 
 .shop-icon { flex: 0 0 auto; }
+
+/* ---------------------------------------------------------------------------
+   The clothing shop.
+
+   The same stall, the same cards, one different awning — cloth instead of
+   canvas, in the deep green a dry-goods store put over its window so the sun
+   could not take the colour out of the stock. Everything else is inherited on
+   purpose: a player who has bought a bandage should not have to work out how
+   this counter operates, and the only thing they need to be told is that what
+   they buy here is theirs for good.
+   --------------------------------------------------------------------------- */
+
+.tailor-screen .stall-awning,
+.tailor-screen .stall-awning::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.36)),
+    repeating-linear-gradient(
+      90deg,
+      var(--bog-dark, #2f4034) 0 var(--stall-stripe),
+      var(--bone-dark) var(--stall-stripe) calc(var(--stall-stripe) * 2)
+    );
+}
+
+/* The garment itself, standing in the middle of the card with room around it:
+   a hat crop is 16 pixels tall and a horse is 24, so the box is fixed and the
+   art is bottom-aligned inside it. Without that the cards jump about by half
+   their own height as the rail rolls different slots. */
+.clothes-art {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 104px;
+  padding-bottom: var(--sp-1);
+}
+
+.clothes-slot {
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  font-size: var(--text-xs);
+}
+
+.clothes-note {
+  margin-top: var(--sp-3);
+  max-width: 46ch;
+  margin-inline: auto;
+}
 
 .shop-name {
   font-family: var(--font-display);

@@ -27,12 +27,20 @@ const DEFAULT_PROFILE = {
   createdAt: null,
   stats: { duelsWon: 0, duelsLost: 0, worldsCleared: 0, goldEarned: 0, milesWalked: 0 },
   /**
-   * What the gunslinger is wearing: four garment ids, one per slot. The
-   * catalogue and the lock on each piece live in `src/game/wardrobe.js` — this
-   * file only keeps the four strings, and what it keeps is never trusted: an
-   * outfit is validated against the achievement ledger every time it is read.
+   * What the gunslinger is wearing: five garment ids, one per slot (the fifth
+   * is the horse's harness). The catalogue and the lock on each piece live in
+   * `src/game/wardrobe.js` — this file only keeps the strings, and what it
+   * keeps is never trusted: an outfit is validated against the achievement
+   * ledger and the receipts below every time it is read.
    */
-  outfit: { hat: 'trail', shirt: 'serape', pants: 'trail', boots: 'trail' },
+  outfit: { hat: 'trail', shirt: 'serape', pants: 'trail', boots: 'trail', horse: 'trail' },
+  /**
+   * Garments bought over a counter, as `slot:id`. Clothing is the one thing in
+   * this game that is paid for with a run's gold and kept by the DEVICE — the
+   * clothing shop turns up once in a whole run, so a shirt that died with the
+   * run would be a shirt nobody ever wore.
+   */
+  clothing: [],
 };
 
 /** Only English is functional; the others are listed but disabled in the UI. */
@@ -55,6 +63,9 @@ export async function loadSettings() {
     ...(storedProfile || {}),
     stats: { ...DEFAULT_PROFILE.stats, ...((storedProfile && storedProfile.stats) || {}) },
     outfit: { ...DEFAULT_PROFILE.outfit, ...((storedProfile && storedProfile.outfit) || {}) },
+    // A profile written before clothes could be bought has no list at all, and
+    // one that arrived from somewhere else may have something that is not one.
+    clothing: Array.isArray(storedProfile?.clothing) ? [...storedProfile.clothing] : [],
   };
   if (!profile.createdAt) profile.createdAt = Date.now();
   applyAudio();
@@ -78,7 +89,12 @@ export async function updateSettings(patch) {
 }
 
 export function getProfile() {
-  return { ...profile, stats: { ...profile.stats }, outfit: { ...profile.outfit } };
+  return {
+    ...profile,
+    stats: { ...profile.stats },
+    outfit: { ...profile.outfit },
+    clothing: [...(profile.clothing || [])],
+  };
 }
 
 export async function updateProfile(patch) {
@@ -87,6 +103,10 @@ export async function updateProfile(patch) {
     ...patch,
     stats: { ...profile.stats, ...(patch.stats || {}) },
     outfit: { ...profile.outfit, ...(patch.outfit || {}) },
+    // Receipts are replaced wholesale rather than merged: the caller owns the
+    // whole list (see `grantClothing`), and merging two arrays by key is a
+    // guess about which one is newer.
+    clothing: patch.clothing ? [...patch.clothing] : [...(profile.clothing || [])],
   };
   await write(PROFILE_KEY, profile);
   return profile;

@@ -9,18 +9,33 @@
  *
  * WHERE THE LOCK COMES FROM
  * ---------------------------------------------------------------------------
- * Nowhere in here. A garment does not name its achievement — the achievement
- * names its reward (`reward: { kind: 'clothing', slot, id }` in
+ * Two places, and a garment belongs to exactly one of them.
+ *
+ * EARNED. A garment does not name its achievement — the achievement names its
+ * reward (`reward: { kind: 'clothing', slot, id }` in
  * src/game/achievements.js) and this file reads the list backwards. One
  * direction, one source of truth: retune an achievement, move a reward, drop a
  * line entirely, and the wardrobe follows without anybody remembering it exists.
  *
+ * BOUGHT. Everything marked `source: 'shop'` hangs on no achievement at all and
+ * is sold over one counter in the game: the clothing shop, which turns up once
+ * in a whole run, in a world the seed picks (see src/shops/tailor.js). Those are
+ * the pieces at the END of every drawer, and they are the reason the drawer has
+ * two halves: what the road gave you, and what you paid for. A bought garment is
+ * written onto the PROFILE the moment it is paid for, so it is yours for good —
+ * not for the run, which would make a shop that appears once a run a shop that
+ * sells you nothing.
+ *
  * WHAT AN OUTFIT IS
  * ---------------------------------------------------------------------------
- * Four ids on the profile, next to the name — device-side, outside the save
+ * Five ids on the profile, next to the name — device-side, outside the save
  * slots, through the same storage driver as everything else. It survives a run
  * dying, because a hat earned by beating the boss of the Basin is not something
  * to lose to a bad duel in the Flats.
+ *
+ * The fifth is the HORSE's, and it is worn by the horse rather than by the man:
+ * a harness comes whole (see the note in src/art/sprites-wardrobe.js) and one of
+ * them is deliberately nothing at all, for a player who likes the animal bare.
  *
  * The equipped outfit is validated on every read. A profile that arrives from
  * somewhere else claiming a Starcrown, with the ledger saying otherwise, walks
@@ -28,9 +43,10 @@
  */
 
 import { getProfile, updateProfile } from '../core/settings.js';
-import { setPlayerParts, composeFighter } from '../art/sprites-character.js';
+import { setPlayerParts, composeFighter, composeRider, horseSprites } from '../art/sprites-character.js';
 import {
   DEFAULT_OUTFIT,
+  HARNESS,
   OUTFIT_SLOTS,
   hasPiece,
   normalizeOutfit,
@@ -47,14 +63,22 @@ export const SLOT_LABELS = {
   shirt: { name: 'Shirt', plural: 'Shirts' },
   pants: { name: 'Trousers', plural: 'Trousers' },
   boots: { name: 'Boots', plural: 'Boots' },
+  horse: { name: 'Harness', plural: 'Horse' },
 };
 
 /**
  * Every garment, by slot, in the order the wardrobe lists it — the default
- * first, then the earned ones roughly in the order the road hands them over.
+ * first, then the earned ones roughly in the order the road hands them over,
+ * and last of all the ones that are only ever bought.
  *
  * `name` is what it is called. `blurb` is one line about what it is, written to
  * be read on the card next to the picture, never restating the picture.
+ * `source: 'shop'` marks a garment no achievement will ever hand over, and
+ * `price` is what it costs in the Dust Flats — the same base the item catalogue
+ * quotes, run through the same curve, so a shirt in the Galaxy costs what
+ * everything else in the Galaxy costs (see `itemPrice`).
+ * `set` names the outfit a piece belongs to: those are sold as one thing and
+ * never separately, so the piece carries no price of its own.
  */
 export const WARDROBE = {
   hat: [
@@ -66,6 +90,11 @@ export const WARDROBE = {
     { id: 'tophat', name: "Gambler's Stovepipe", blurb: 'Silk, and a brim that has never been rained on.' },
     { id: 'horns', name: 'Basin Helm', blurb: 'Iron off the Brimstone floor, with the horns still on it.' },
     { id: 'starcrown', name: 'Starcrown', blurb: 'A circlet of void iron, and a ring of light that does not touch it.' },
+    { id: 'bowler', name: 'Derby Bowler', blurb: 'Town hat. Out here it is a joke, and it knows it.', source: 'shop', price: 70 },
+    { id: 'cavalry', name: 'Cavalry Campaign', blurb: 'Crossed sabres in brass, off a regiment that is not coming back.', source: 'shop', price: 90 },
+    { id: 'nomad', name: 'Trader\'s Wrap', blurb: 'Cloth over the crown, and the tail of it left long down one side.', source: 'shop', price: 80 },
+    { id: 'mourning', name: 'Crepe Topper', blurb: 'Black silk under black crepe. Somebody has to be dignified about it.', source: 'shop', set: 'mourning' },
+    { id: 'rail', name: 'Company Cap', blurb: 'Peaked, badged, and worn by men who own the track under you.', source: 'shop', set: 'rail' },
   ],
 
   shirt: [
@@ -77,6 +106,10 @@ export const WARDROBE = {
     { id: 'ember', name: 'Cinder Coat', blurb: 'Char that never finished burning. The seams are still lit.' },
     { id: 'bones', name: 'Boneyard Shirt', blurb: 'Six of them are in the ground. This is what the seventh wears.' },
     { id: 'voidrobe', name: 'Horizon Cloth', blurb: 'Cut past the last horizon, with the sky still caught in the weave.' },
+    { id: 'poncho', name: 'Mule-Train Poncho', blurb: 'Banded wool, pulled over the head. It has smelled of mules for years.', source: 'shop', price: 95 },
+    { id: 'brocade', name: 'Cardsharp\'s Brocade', blurb: 'Gold thread on plum, over sleeves nobody paid for.', source: 'shop', price: 120 },
+    { id: 'mourning', name: 'Undertaker\'s Frock', blurb: 'Buttoned to the throat. It is the only coat he owns and it fits.', source: 'shop', set: 'mourning' },
+    { id: 'rail', name: 'Company Coat', blurb: 'Two rows of brass down the front of the bluest blue in the territory.', source: 'shop', set: 'rail' },
   ],
 
   pants: [
@@ -87,6 +120,10 @@ export const WARDROBE = {
     { id: 'iron', name: 'Riveted Greaves', blurb: 'Plate over the thighs. Heavy, and it looks it.' },
     { id: 'ash', name: 'Scorched Leggings', blurb: 'Basin char with the cracks still glowing through them.' },
     { id: 'star', name: 'Starfall Trousers', blurb: 'Cloth with a sky in it. The stars move when you do.' },
+    { id: 'denim', name: 'Rivet Denim', blurb: 'Indigo, and a copper rivet at every seam that ever gave out.', source: 'shop', price: 75 },
+    { id: 'hide', name: 'Buffalo Hide', blurb: 'Hair left on the outside. Heavy, warm, and nothing gets through it.', source: 'shop', price: 90 },
+    { id: 'mourning', name: 'Sunday Blacks', blurb: 'Pressed, and one satin line down the outside of each leg.', source: 'shop', set: 'mourning' },
+    { id: 'rail', name: 'Surveyor\'s Canvas', blurb: 'Company canvas, striped the same yellow as the engines.', source: 'shop', set: 'rail' },
   ],
 
   boots: [
@@ -97,8 +134,64 @@ export const WARDROBE = {
     { id: 'ember', name: 'Emberwelt Boots', blurb: 'The melt never stopped running out of the welt.' },
     { id: 'gilded', name: 'Gilt Boots', blurb: 'Gold from the toe to the top. Loud, and meant to be.' },
     { id: 'star', name: 'Starfall Boots', blurb: 'They leave a little light wherever they land.' },
+    { id: 'mule', name: 'Muleskinner Boots', blurb: 'Laced to the knee and re-soled twice. They will see you out.', source: 'shop', price: 70 },
+    { id: 'hobnail', name: 'Hobnail Boots', blurb: 'Iron in the sole. You can hear the man coming before the horse.', source: 'shop', price: 85 },
+    { id: 'mourning', name: 'Patent Blacks', blurb: 'Polished until the road shows up in them.', source: 'shop', set: 'mourning' },
+    { id: 'rail', name: 'Steel-Toed Boots', blurb: 'Made for standing on sleepers while something heavy goes past.', source: 'shop', set: 'rail' },
+  ],
+
+  /**
+   * THE FIFTH DRAWER, AND THE ONE NOBODY WEARS
+   * -------------------------------------------------------------------------
+   * Tack. It is listed last because it is the odd one out — it hangs on the
+   * horse, it only exists once you have bought one, and it comes as a whole rig
+   * rather than as parts. `none` is first and it is a real answer: the animal
+   * in its own saddle, which is what the game looked like before any of this.
+   */
+  horse: [
+    { id: 'trail', name: 'Trail Tack', blurb: 'Plain leather and a brass bit. It came with the animal.' },
+    { id: 'none', name: 'No Tack', blurb: 'Nothing but the saddle. Some horses are better left alone.' },
+    { id: 'drover', name: 'Drover\'s Rig', blurb: 'Bags for the long stretches, and a roll behind the cantle.' },
+    { id: 'brass', name: 'Brass Show Rig', blurb: 'Oiled black leather under more brass than any horse needs.' },
+    { id: 'iron', name: 'Basin Barding', blurb: 'A plate over the shoulder, off the same floor the helm came from.' },
+    { id: 'star', name: 'Starfall Tack', blurb: 'The fittings are not reflecting anything. There is nothing to reflect.' },
+    { id: 'silver', name: 'Silverwork Tack', blurb: 'Border saddlery. Conchos from the browband to the girth.', source: 'shop', price: 130 },
+    { id: 'parade', name: 'Parade Rig', blurb: 'Scarlet webbing and a feather that stands straight up.', source: 'shop', price: 145 },
+    { id: 'packer', name: 'Packer\'s Rig', blurb: 'Everything you own, and the horse is the one carrying it.', source: 'shop', price: 115 },
   ],
 };
+
+/**
+ * THE COMPLETE OUTFITS
+ * ---------------------------------------------------------------------------
+ * Four pieces cut to go together, sold as one thing and never separately. They
+ * exist because the shop-only half of the wardrobe is a shelf rather than a
+ * ladder: nothing out there is stronger than anything else, so the only way to
+ * make a purchase feel like an event is to sell a LOOK — walk out of the tailor
+ * dressed as an undertaker, all four slots at once, for the price of about
+ * three garments.
+ *
+ * The pieces are ordinary wardrobe entries carrying `set:` and no price of
+ * their own; this is the only thing that hands them over.
+ */
+export const WARDROBE_SETS = [
+  {
+    id: 'mourning',
+    name: "Undertaker's Sunday",
+    blurb: 'Crepe, black frock, pressed blacks and patent boots. Somebody has to be dignified about all this.',
+    price: 260,
+    pieces: { hat: 'mourning', shirt: 'mourning', pants: 'mourning', boots: 'mourning' },
+  },
+  {
+    id: 'rail',
+    name: 'Rail Baron',
+    blurb: 'Company blue from the cap to the toecaps. The men who own the track dress like they own it.',
+    price: 290,
+    pieces: { hat: 'rail', shirt: 'rail', pants: 'rail', boots: 'rail' },
+  },
+];
+
+const SET_BY_ID = new Map(WARDROBE_SETS.map((s) => [s.id, s]));
 
 const BY_ID = new Map();
 for (const slot of OUTFIT_SLOTS) {
@@ -143,8 +236,63 @@ export function rewardOf(achievement) {
   return BY_ID.get(`${reward.slot}:${reward.id}`) || null;
 }
 
+// ---------------------------------------------------------------------------
+// What is bought
+// ---------------------------------------------------------------------------
+
+/**
+ * The receipts. One flat list of `slot:id` on the profile, next to the outfit
+ * and outside the save slots — a garment paid for in a run that later died is
+ * still a garment you paid for.
+ */
+function receipts() {
+  const list = getProfile().clothing;
+  return new Set(Array.isArray(list) ? list : []);
+}
+
+export function isBought(slot, id) {
+  return receipts().has(`${slot}:${id}`);
+}
+
+/**
+ * Write a purchase down. Takes the whole basket at once, because a complete
+ * outfit is four garments and a half-written set is the one state this must
+ * never leave behind.
+ *
+ * @param {Array<{slot: string, id: string}>} pieces
+ */
+export async function grantClothing(pieces) {
+  const owned = receipts();
+  for (const { slot, id } of pieces) {
+    if (hasPiece(slot, id)) owned.add(`${slot}:${id}`);
+  }
+  await updateProfile({ clothing: [...owned] });
+  return [...owned];
+}
+
+/** The set a garment belongs to, or null. */
+export function setOf(slot, id) {
+  const item = BY_ID.get(`${slot}:${id}`);
+  return item?.set ? SET_BY_ID.get(item.set) || null : null;
+}
+
+export function getSet(id) {
+  return SET_BY_ID.get(id) || null;
+}
+
+/** Every piece a complete outfit hands over. */
+export function setPieces(set) {
+  return Object.entries(set.pieces).map(([slot, id]) => ({ slot, id }));
+}
+
+export function isSetOwned(set) {
+  return setPieces(set).every(({ slot, id }) => isOwned(slot, id));
+}
+
 export function isOwned(slot, id) {
   if (!hasPiece(slot, id)) return false;
+  const item = BY_ID.get(`${slot}:${id}`);
+  if (item?.source === 'shop') return isBought(slot, id);
   const req = requirementFor(slot, id);
   return !req || isUnlocked(req.id);
 }
@@ -154,20 +302,48 @@ export function findItem(slot, id) {
 }
 
 /**
+ * Why a garment is not in the drawer yet, in the two words a card has room for
+ * and the sentence underneath it.
+ *
+ * Both halves of the wardrobe answer the same question here, which is the whole
+ * point of the shape: a card does not have to know whether the thing it is
+ * drawing is earned or bought, only what to print on a locked one.
+ */
+export function lockFor(slot, id) {
+  const item = BY_ID.get(`${slot}:${id}`);
+  if (!item) return null;
+  if (item.set) {
+    const set = SET_BY_ID.get(item.set);
+    return {
+      kind: 'set',
+      name: set ? set.name : 'A complete outfit',
+      description: `Sold as part of ${set ? set.name : 'a complete outfit'}, at a clothing shop.`,
+    };
+  }
+  if (item.source === 'shop') {
+    return {
+      kind: 'shop',
+      name: 'Clothing shop',
+      description: 'Sold over the counter at a clothing shop, if the road puts one in front of you.',
+    };
+  }
+  const req = requirementFor(slot, id);
+  return req ? { kind: 'achievement', name: req.name, description: req.description } : null;
+}
+
+/**
  * The wardrobe as the screen draws it: every slot, every garment, whether it
  * is owned, whether it is on, and what it is waiting for if it is not.
  */
 export function getWardrobe(outfit = getOutfit()) {
   const slots = OUTFIT_SLOTS.map((slot) => {
-    const items = WARDROBE[slot].map((item) => {
-      const requirement = requirementFor(slot, item.id);
-      return {
-        ...item,
-        requirement,
-        owned: !requirement || isUnlocked(requirement.id),
-        equipped: outfit[slot] === item.id,
-      };
-    });
+    const items = WARDROBE[slot].map((item) => ({
+      ...item,
+      requirement: requirementFor(slot, item.id),
+      lock: lockFor(slot, item.id),
+      owned: isOwned(slot, item.id),
+      equipped: outfit[slot] === item.id,
+    }));
     return {
       slot,
       label: SLOT_LABELS[slot],
@@ -178,6 +354,50 @@ export function getWardrobe(outfit = getOutfit()) {
   const owned = slots.reduce((sum, s) => sum + s.ownedCount, 0);
   const total = slots.reduce((sum, s) => sum + s.items.length, 0);
   return { slots, owned, total };
+}
+
+/**
+ * Everything a clothing shop could ever have on its rail, as offers: the
+ * shop-only garments that are sold on their own, and the complete outfits.
+ *
+ * Nothing earned is in here and nothing already owned is either — a counter
+ * that offers a man the hat he is wearing is a counter with two of its three
+ * slots wasted. See src/shops/tailor.js for what one visit actually rolls.
+ */
+export function clothingOffers({ includeOwned = false } = {}) {
+  const out = [];
+  for (const slot of OUTFIT_SLOTS) {
+    for (const item of WARDROBE[slot]) {
+      if (item.source !== 'shop' || item.set) continue;
+      if (!includeOwned && isOwned(slot, item.id)) continue;
+      out.push({
+        kind: 'piece',
+        id: `${slot}:${item.id}`,
+        slot,
+        pieceId: item.id,
+        name: item.name,
+        blurb: item.blurb,
+        basePrice: item.price,
+        label: SLOT_LABELS[slot].name,
+        pieces: [{ slot, id: item.id }],
+      });
+    }
+  }
+  for (const set of WARDROBE_SETS) {
+    if (!includeOwned && isSetOwned(set)) continue;
+    out.push({
+      kind: 'set',
+      id: `set:${set.id}`,
+      slot: 'hat',
+      pieceId: set.pieces.hat,
+      name: set.name,
+      blurb: set.blurb,
+      basePrice: set.price,
+      label: 'Complete outfit',
+      pieces: setPieces(set),
+    });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,6 +500,29 @@ export function previewSprites(outfit) {
   previews.set(key, set);
   if (previews.size > PREVIEW_LIMIT) previews.delete(previews.keys().next().value);
   return set;
+}
+
+/**
+ * The same thing in the saddle: the horse in the outfit's harness, with the
+ * rider dressed in the rest of it.
+ *
+ * The wardrobe screen shows this instead of the man on foot while the Horse
+ * drawer is open, for the reason every other drawer shows a man: you cannot
+ * choose tack off a list of names, and a bridle drawn on nothing is four brown
+ * pixels. The horse is baked once per RIG rather than once per outfit — a
+ * change of hat is no reason to build a horse — so the two halves are cached
+ * separately and only the rider is keyed by the whole outfit.
+ */
+export function previewMount(outfit) {
+  const parts = outfitParts(outfit);
+  const key = `ride:${outfitKey(outfit)}`;
+  let rider = previews.get(key);
+  if (!rider) {
+    rider = composeRider(parts);
+    previews.set(key, rider);
+    if (previews.size > PREVIEW_LIMIT) previews.delete(previews.keys().next().value);
+  }
+  return { horse: horseSprites(parts.harness), rider };
 }
 
 /** How many garments exist in total. */

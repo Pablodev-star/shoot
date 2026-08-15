@@ -30,7 +30,7 @@
  *
  * REWARDS
  * ---------------------------------------------------------------------------
- * Twenty-six of these hand over a piece of clothing:
+ * Thirty of these hand over a piece of clothing:
  * `reward: { kind: 'clothing', slot, id }`, naming a garment in
  * `src/game/wardrobe.js`. THIS IS THE ONLY PLACE THE LINK IS WRITTEN DOWN. The
  * wardrobe reads the list backwards to find out what each garment is waiting
@@ -40,7 +40,17 @@
  *
  * The rewards are spread on purpose: no slot is filled by one category, so a
  * player who only ever duels and a player who only ever walks are both dressed
- * by the end, in visibly different clothes.
+ * by the end, in visibly different clothes. Four of them are HARNESSES — tack
+ * for the horse — and they are spread the same way, one apiece off the road,
+ * the duels, the purse and the ladder.
+ *
+ * WHAT THIS LIST DELIBERATELY DOES NOT PAY OUT
+ * ---------------------------------------------------------------------------
+ * The clothing shop's stock. Everything marked `source: 'shop'` in the wardrobe
+ * hangs on no line in here and never will: it is the half of the wardrobe that
+ * is bought rather than earned, and the two must not overlap or the shop is
+ * selling something the ledger might hand over for free next week. The two
+ * lines below that mention the shop pay nothing at all.
  */
 
 import { EVENTS, emit, on } from '../core/events.js';
@@ -116,6 +126,21 @@ export const ACHIEVEMENTS = [
     category: 'beginnings',
     name: 'Paying Customer',
     description: 'Buy something over a counter.',
+    reward: null,
+  },
+  /**
+   * The clothing shop turns up once in a whole run, in a world the seed picks
+   * (see src/shops/tailor.js) — so this is the one line on the list that is
+   * mostly a matter of walking far enough to meet it. It pays nothing, on
+   * purpose: everything behind that door is already a reward, and an
+   * achievement that handed over a garment for finding the place that sells
+   * garments would be paying twice.
+   */
+  {
+    id: 'firstTailor',
+    category: 'beginnings',
+    name: 'Something Pressed',
+    description: 'Find the clothing shop.',
     reward: null,
   },
   {
@@ -241,7 +266,7 @@ export const ACHIEVEMENTS = [
     name: 'Stretching The Legs',
     description: 'Cover 50 miles of road.',
     test: (p) => p.miles >= 50,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'horse', id: 'drover' },
   },
   {
     id: 'miles250',
@@ -330,7 +355,7 @@ export const ACHIEVEMENTS = [
     name: 'Undertaker',
     description: 'Beat 10 world bosses.',
     test: (p) => p.bossesBeaten >= 10,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'horse', id: 'star' },
   },
   {
     id: 'flawless',
@@ -444,6 +469,18 @@ export const ACHIEVEMENTS = [
     name: 'Regular',
     description: 'Buy 25 things from shops.',
     test: (p) => p.itemsBought >= 25,
+    reward: { kind: 'clothing', slot: 'horse', id: 'brass' },
+  },
+  /**
+   * Bought, not earned — and it is the only line on the list that is about
+   * something you keep across runs. No reward for the same reason as
+   * `firstTailor`: the garment IS the reward, and it is already paid for.
+   */
+  {
+    id: 'boughtClothes',
+    category: 'fortune',
+    name: 'Off The Rail',
+    description: 'Buy something to wear.',
     reward: null,
   },
   {
@@ -483,7 +520,7 @@ export const ACHIEVEMENTS = [
     name: 'Hardened',
     description: 'Reach level 8.',
     test: (p) => p.level >= 8,
-    reward: null,
+    reward: { kind: 'clothing', slot: 'horse', id: 'iron' },
   },
 
   // --- Survival ----------------------------------------------------------
@@ -809,6 +846,15 @@ export function track(what, detail = {}) {
       unlock('firstBuy');
       break;
 
+    /**
+     * A garment over a counter. It is NOT counted as an item bought: the
+     * "Regular" line is about the road's shops, and a clothing shop that
+     * appears once a run cannot be a quarter of a twenty-five purchase count.
+     */
+    case 'clothingBought':
+      unlock('boughtClothes');
+      break;
+
     case 'itemSold':
       unlock('sold');
       break;
@@ -956,6 +1002,7 @@ export function initAchievements() {
   on(EVENTS.ENCOUNTER_REACHED, ({ type }) => {
     if (type === 'shop') unlock('firstShop');
     else if (type === 'forge') unlock('firstForge');
+    else if (type === 'tailor') unlock('firstTailor');
   });
 
   /**

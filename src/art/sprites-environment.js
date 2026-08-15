@@ -482,6 +482,96 @@ const FORGE = [
 ];
 
 /**
+ * THE CLOTHIER — 60 x 65, and the only building on the road you can see INTO.
+ *
+ * The shop, the inn and the forge are all frontages: a wall, a door and a word
+ * painted over it. This one has a plate-glass window with the stock standing
+ * behind it, because that is what a clothing store is and always has been — the
+ * whole business of the place is showing you what you could be wearing before
+ * you have decided to want it. From the road you read it in this order: an
+ * awning, two dressed figures in a lit window, and then the sign.
+ *
+ * The false front above the awning is the SHOP's, course for course. That is
+ * deliberate rather than lazy: these two are the same kind of building in the
+ * same street, put up by the same carpenter, and the pair of them being framed
+ * identically is what makes the window underneath read as the difference
+ * between them. It also means the sign is lettered off exactly the same board.
+ *
+ * `C` is the glass, and it is the one character in here that nothing else uses:
+ * the parallax renderer finds that rectangle with `TAILOR_GLASS` and lays a warm
+ * lamp glow over it as the building scrolls past, so the window is lit from
+ * inside rather than being a grey panel. Measuring it off the art means a course
+ * of clapboard can be added above without putting the lamp in the wall.
+ */
+const TAILOR = [
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '..kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk..',
+  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk..',
+  '..kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbkwXk..',
+  '..kXwkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkwXk..',
+  '..kXwWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWwXk..',
+  '..kXwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwXk..',
+  '..kXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXk..',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '..kddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddk..',
+  '..kbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbddbbk..',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '...kWkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkWk..',
+  '...kWkCCC.....kkkk.....CCCkkkkkkkkkkCCC.....kkkk.....CCCWk..',
+  '...kWkCCC....kTTTTk....CCCkWWWWWWWWkCCC....kzzzzk....CCCWk..',
+  '...kWkCCC...kTTTTTTk...CCCkWwwwwwwWkCCC...kzzzzzzk...CCCWk..',
+  '...kWkCCC..kkTTTTTTkk..CCCkWwwwwwwWkCCC..kkzzzzzzkk..CCCWk..',
+  '...kWkCCC.....kssk.....CCCkWwwwwwwWkCCC.....kssk.....CCCWk..',
+  '...kWkCCC.....ksskk....CCCkWwwwwwwWkCCC.....ksskk....CCCWk..',
+  '...kWkCCC....kkkkkk....CCCkWwwwwwwWkCCC....kkkkkk....CCCWk..',
+  '...kWkCCC...keeeeeek...CCCkWwwwwwwWkCCC...k000000k...CCCWk..',
+  '...kWkCCC..keeeqeeeek..CCCkWwwwwwwWkCCC..k000D0000k..CCCWk..',
+  '...kWkCCC..keeeqeeeek..CCCkWwwwwwwWkCCC..k000D0000k..CCCWk..',
+  '...kWkCCC..keeeqeeeek..CCCkWwwwwwwWkCCC..k000D0000k..CCCWk..',
+  '...kWkCCC..keeeqeeeek..CCCkWwwwwwwWkCCC..k000D0000k..CCCWk..',
+  '...kWkCCC..keeeeeeeek..CCCkWwwwwwwWkCCC..k00000000k..CCCWk..',
+  '...kWkCCC.keeeeeeeeeek.CCCkWwwwOwwWkCCC.k0000000000k.CCCWk..',
+  '...kWkCCC.kqqqqqqqqqqk.CCCkWwwwwwwWkCCC.kDDDDDDDDDDk.CCCWk..',
+  '...kWkCCC.kkkkkkkkkkkk.CCCkWwwwwwwWkCCC.kkkkkkkkkkkk.CCCWk..',
+  '...kWkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkWk..',
+  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk..',
+  '...kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk..',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '..kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk.',
+  '..kwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwk.',
+  '..kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk.',
+  '..kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk.',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwWwx.',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwWwx.',
+  '..WwxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxWwx.',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwWwx.',
+  '..WwxwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwWwx.',
+  '...kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk..',
+  '...kWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWk..',
+  '...kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxk..',
+  '..rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr..',
+  'ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss',
+];
+
+/**
  * The sign boards above are left blank in the art and lettered here, using the
  * game's own 5x7 font at 2x. Hand-drawn letters at this size come out as
  * approximations of the real typeface; borrowing the font means the sign over
@@ -500,6 +590,14 @@ const SIGNS = {
    * one has to be.
    */
   forge: { text: 'FORGE', spacing: 0, board: { x: 4, y: 24, w: 52, h: 16 } },
+  /**
+   * Four letters, because four at 2x is 40 source pixels and the board's cream
+   * panel is 44 wide — five would run off it into the frame (which is exactly
+   * what the first draft of this sign did). It is period slang for clothes, and
+   * the sign is not what tells you what this place is anyway: the window under
+   * it is, with two dressed figures standing in the light.
+   */
+  tailor: { text: 'DUDS', board: { x: 6, y: 6, w: 48, h: 16 } },
 };
 
 /** Painted, not carved: the letters get a highlight under them. */
@@ -532,6 +630,28 @@ export const FORGE_GLOW = (() => {
 
 /** Where the chimney comes out of the roof, for the smoke off it. */
 export const FORGE_CHIMNEY = { x: 12, y: 0 };
+
+/**
+ * The clothier's window, measured off its own art the same way — the `C`
+ * region. The renderer lays a lamp glow over exactly this rectangle as the
+ * building scrolls past, so the stock behind the glass looks lit rather than
+ * painted, and a clapboard added above it can never put the lamp in the wall.
+ */
+export const TAILOR_GLASS = (() => {
+  let x0 = Infinity;
+  let x1 = -1;
+  let y0 = Infinity;
+  let y1 = -1;
+  TAILOR.forEach((row, y) => {
+    const first = row.indexOf('C');
+    if (first < 0) return;
+    x0 = Math.min(x0, first);
+    x1 = Math.max(x1, row.lastIndexOf('C'));
+    y0 = Math.min(y0, y);
+    y1 = Math.max(y1, y);
+  });
+  return x1 < 0 ? { x: 0, y: 0, w: 0, h: 0 } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+})();
 
 function bakeBuilding(rows, sign, groundKey) {
   const canvas = bake({ key: groundKey ? { ...KEY, ...groundKey } : KEY, rows });
@@ -674,6 +794,7 @@ export function getEnvironmentSprites(biomeId = DEFAULT_BIOME) {
       shop: bakeBuilding(SHOP, SIGNS.shop, structureGround),
       inn: bakeBuilding(INN, SIGNS.inn, structureGround),
       forge: bakeBuilding(FORGE, SIGNS.forge, structureGround),
+      tailor: bakeBuilding(TAILOR, SIGNS.tailor, structureGround),
     },
     layers: { ...buildLayers(), storm: getStormLayer() },
     /**
