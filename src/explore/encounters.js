@@ -9,6 +9,7 @@
  *   - exactly `duels` duels, which is what the world's difficulty is measured in
  *   - shops and, quite separately, inns — as many of each as the length of the
  *     road is worth (`DUELS_PER_SERVICE`), or one fewer
+ *   - in ONE world of the whole run, the clothing shop — see `tailorWorldFor`
  *   - never two of those stops in a row: a fight always stands between them
  *   - SERVICE_GAP duels between any two of them wherever the road can pay for it
  *   - order and spacing shuffled freely inside those guarantees
@@ -76,7 +77,8 @@
  */
 
 import { makeRng, hashSeed } from '../core/rng.js';
-import { getWorld } from '../game/worlds.js';
+import { getWorld, FINAL_WORLD } from '../game/worlds.js';
+import { getState } from '../game/player.js';
 import { OVERRIDES } from '../admin/overrides.js';
 
 /**
@@ -227,6 +229,13 @@ const APPETITE = {
     0.4 + purse * 2 + (1 - belly) * 1.6 + (stocked ? 0 : 2.5) + (lastCall ? purse * 1.4 : 0),
   /** A smithy. Wanted when the purse could actually pay for the next rung. */
   forge: ({ canAffordRung, purse }) => 0.3 + (canAffordRung ? 2.2 : 0) + purse * 0.6,
+  /**
+   * The tailor. Wanted when there is money in hand and never urgently: nothing
+   * it sells will keep anybody alive, so it must not be able to elbow a bed or
+   * a counter out of the way. It is also never held back for the run-up to a
+   * boss — a garment is the last thing you want to be buying at that door.
+   */
+  tailor: ({ purse, lastCall }) => (0.5 + purse * 1.8) * (lastCall ? 0.4 : 1),
 };
 
 /**
@@ -246,6 +255,41 @@ export const OPENING_FIGHTS = 2;
 function rollServiceCount(rng, duels) {
   const full = Math.max(2, Math.round(duels / DUELS_PER_SERVICE));
   return rng.chance(SERVICE_PAIR_CHANCE) ? full : full - 1;
+}
+
+/**
+ * THE CLOTHING SHOP, WHICH HAPPENS ONCE
+ * ---------------------------------------------------------------------------
+ * There is exactly one tailor in a run. Not one per world, not one every so
+ * often — one, in a world the run's own seed picks, at whatever point in that
+ * world the road decides to deal it. Everything about that is deliberate:
+ *
+ *   - ONE, because what it sells is permanent (a bought garment is written to
+ *     the profile, not to the slot — see src/game/wardrobe.js). A shop selling
+ *     things you keep forever, on every road, would dress the player out of the
+ *     wardrobe in two runs and make the achievements that pay in clothes worth
+ *     nothing.
+ *   - RANDOM WORLD, because a fixed one would be a checkpoint. Somewhere in the
+ *     six is a door you did not plan for, and whether you have the gold when you
+ *     reach it is the decision the whole thing exists to create.
+ *   - IN ADDITION, never instead. The world that gets it has one more stop than
+ *     it would otherwise have: the tailor is added to the services list and the
+ *     duel count is untouched, so nobody loses a shop, a bed or a fight to it.
+ *     A world's difficulty is its duels, and its duels do not move.
+ *
+ * The choice is a pure function of the run seed, so it survives a reload, and
+ * it is the RUN's seed rather than the segment's — the segment seed is derived
+ * per world, and picking from it would put a tailor in every world or in none.
+ */
+export function tailorWorldFor(seed) {
+  return 1 + (hashSeed(`tailor:${seed >>> 0}`) % FINAL_WORLD);
+}
+
+/** True if this world is the one holding the run's single clothing shop. */
+function worldHasTailor(worldId) {
+  const seed = getState()?.seed;
+  if (seed == null) return false;
+  return tailorWorldFor(seed) === worldId;
 }
 
 /**
@@ -276,6 +320,12 @@ export function generateSegment(worldId, seed) {
      * in the first half of it. The forge is unmissable at one.
      */
     ...Array(worldId === 1 ? 1 : (rng.chance(0.8) ? 1 : 0)).fill('forge'),
+    /**
+     * And, in exactly one world of the run, the tailor. It is pushed on rather
+     * than rolled: this world is a stop longer than it would have been, and
+     * nothing else on the road gives anything up for it. See `tailorWorldFor`.
+     */
+    ...(worldHasTailor(worldId) ? ['tailor'] : []),
   ];
   rng.shuffle(services);
 
@@ -720,7 +770,13 @@ export function applyReveals(segment, types) {
 function dropDuplicate(services, rng) {
   const counts = services.reduce((acc, type) => ({ ...acc, [type]: (acc[type] || 0) + 1 }), {});
   const doubled = services.filter((type) => counts[type] > 1);
-  const victim = doubled.length ? rng.pick(doubled) : services[services.length - 1];
+  // The tailor is never the victim, even when everything else is already down
+  // to one: there is only one of it in the entire run, and a road that trimmed
+  // it would delete a building the player will not get another chance at.
+  const singles = services.filter((type) => type !== 'tailor');
+  const victim = doubled.length
+    ? rng.pick(doubled)
+    : singles[singles.length - 1] ?? services[services.length - 1];
   services.splice(services.lastIndexOf(victim), 1);
 }
 
@@ -789,6 +845,7 @@ export const ENCOUNTER_LABELS = {
   shop: 'Shop',
   inn: 'Inn',
   forge: 'Forge',
+  tailor: 'Clothier',
   boss: 'Boss',
   /** Still face down. The map draws a signpost with a question mark on it. */
   unknown: 'Unknown',

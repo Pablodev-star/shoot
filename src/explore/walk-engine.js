@@ -51,6 +51,24 @@ export function createWalkEngine() {
   let finished = false;
   /** Screen-space camera position (equals travelled, kept separate for clarity). */
   let cameraX = 0;
+  /**
+   * THE WALK THAT IS STOPPED WITHOUT LOOKING STOPPED
+   * -------------------------------------------------------------------------
+   * A quiet hold is everything `pause` does to the WORLD and nothing it does to
+   * the SCREEN: the odometer stops, the encounters stop coming, hunger and the
+   * clock and the weather's countdown stop being spent — and no event is fired,
+   * `isPaused()` still says false, and the traveller keeps walking, because
+   * every drawing surface in the game asks that one question to decide whether
+   * he is moving his legs.
+   *
+   * There is exactly one caller: the sigil (src/admin/access.js). Drawing three
+   * screen-high letters takes a few seconds, and an encounter landing between
+   * the P and the N throws the attempt away — but the road visibly stopping
+   * dead the moment a stroke is accepted is a tell that says "something is
+   * listening", which is the one thing this door cannot afford. So the road
+   * holds its breath and nothing on the screen admits it.
+   */
+  let quiet = false;
 
   /**
    * How the run is going, in the five numbers the road reads when it decides
@@ -125,7 +143,7 @@ export function createWalkEngine() {
     // paused flag) — the rain itself keeps falling either way, so opening the
     // saddlebag does not freeze the storm in mid-air.
     weather.update(dt, view);
-    if (paused || finished || !segment) return;
+    if (paused || quiet || finished || !segment) return;
 
     const step = (speed() * dt) / 1000;
     travelled += step;
@@ -207,10 +225,34 @@ export function createWalkEngine() {
   function resume() {
     if (!paused || finished) return;
     paused = false;
+    // A quiet hold outlives an ordinary pause: the panel can be opened and
+    // closed in the middle of one, and the clocks must stay stopped until the
+    // hold itself is given back.
+    if (!quiet) {
+      hunger.setPaused(false);
+      daynight.setPaused(false);
+      weather.setPaused(false);
+    }
+    emit(EVENTS.WALK_RESUMED, {});
+  }
+
+  /** Stop the world without telling the screen. See `quiet` above. */
+  function holdQuietly() {
+    if (quiet) return;
+    quiet = true;
+    hunger.setPaused(true);
+    daynight.setPaused(true);
+    weather.setPaused(true);
+  }
+
+  /** Give it back. The clocks only restart if the walk itself is running. */
+  function releaseQuietly() {
+    if (!quiet) return;
+    quiet = false;
+    if (paused || finished) return;
     hunger.setPaused(false);
     daynight.setPaused(false);
     weather.setPaused(false);
-    emit(EVENTS.WALK_RESUMED, {});
   }
 
   /** Still over the horizon further ahead than this. */
@@ -241,7 +283,7 @@ export function createWalkEngine() {
     const mounted = getState().hasHorse;
     const out = [];
     for (const event of segment.events) {
-      if (!['shop', 'inn', 'forge'].includes(event.type)) continue;
+      if (!['shop', 'inn', 'forge', 'tailor'].includes(event.type)) continue;
       // A stop that has been reached keeps the position it was reached at; the
       // ones still ahead are measured live, because the horse really does pull
       // them closer and the trigger uses the same figure. A stop resolved in
@@ -261,6 +303,9 @@ export function createWalkEngine() {
     start,
     pause,
     resume,
+    holdQuietly,
+    releaseQuietly,
+    isHeldQuietly: () => quiet,
     isPaused: () => paused,
     isFinished: () => finished,
     getSegment: () => segment,

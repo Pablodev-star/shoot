@@ -69,6 +69,7 @@ export const OddsTab = {
         appetite('inn', 'Beds', 'Wanted in proportion to how hurt you are'),
         appetite('shop', 'Counters', 'Wanted when there is gold, urgently when there is no food'),
         appetite('forge', 'Smithies', 'Wanted when the purse could pay for the next rung'),
+        appetite('tailor', 'Clothiers', 'Only ever in one world of the run, and only when there is gold'),
         row('Ignore spacing', switchField({
           checked: OVERRIDES.road.ignoreSpacing,
           onChange: (on) => {

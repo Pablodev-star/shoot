@@ -110,6 +110,7 @@ import {
   SKY_GLOW_SIZE,
   FORGE_GLOW,
   FORGE_CHIMNEY,
+  TAILOR_GLASS,
 } from '../art/sprites-environment.js';
 import { PLANE_RISE, planeBands, planeSpeed } from '../art/env-kit.js';
 import { PLAYER_SIZE } from '../art/sprites-character.js';
@@ -881,7 +882,44 @@ export function createParallax(options = {}) {
       const sy = gy + 4 * s - sprite.height * s;
       drawSprite(ctx, sprite, sx, sy, s);
       if (st.kind === 'forge') drawForgeLife(ctx, sx, sy, s);
+      else if (st.kind === 'tailor') drawWindowLight(ctx, sx, sy, s);
     }
+  }
+
+  /**
+   * THE ONE BUILDING ON THE ROAD YOU CAN SEE INTO
+   * -------------------------------------------------------------------------
+   * A clothier sells by showing, so its whole front is glass with the stock
+   * standing behind it — and unlit glass at this size is a grey panel, which
+   * is the one thing it must not read as. So a lamp is laid over exactly the
+   * window the art leaves (`TAILOR_GLASS`, measured off the character map) and
+   * a little of its light spills onto the boardwalk in front.
+   *
+   * It breathes rather than flickers: this is an oil lamp behind plate glass in
+   * a still room, not a furnace with a fire in it, and giving it the forge's
+   * jitter would make the two buildings read as the same building.
+   */
+  function drawWindowLight(ctx, sx, sy, s) {
+    if (!TAILOR_GLASS.w) return;
+    const t = performance.now();
+    const gx = sx + TAILOR_GLASS.x * s;
+    const gy2 = sy + TAILOR_GLASS.y * s;
+    const gw = TAILOR_GLASS.w * s;
+    const gh = TAILOR_GLASS.h * s;
+    const breath = 0.9 + Math.sin(t / 1400) * 0.06 + Math.sin(t / 310) * 0.02;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255, 214, 140, ${0.16 * breath})`;
+    ctx.fillRect(gx, gy2, gw, gh);
+    const r = gw * 0.9;
+    const g = ctx.createRadialGradient(gx + gw / 2, gy2 + gh, 0, gx + gw / 2, gy2 + gh, r);
+    g.addColorStop(0, `rgba(255, 206, 120, ${0.2 * breath})`);
+    g.addColorStop(0.55, `rgba(200, 140, 60, ${0.07 * breath})`);
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(gx + gw / 2 - r, gy2 + gh - r, r * 2, r * 2);
+    ctx.restore();
   }
 
   /**

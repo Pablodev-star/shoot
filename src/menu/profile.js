@@ -71,7 +71,7 @@ export const ProfileScreen = {
       el('span.avatar-edit', { 'aria-hidden': 'true' }, [uiIcon('pencil', 1.1)]),
     ]);
 
-    /** What is on, in four lines, straight off the wardrobe. */
+    /** What is on, one chip a slot, straight off the wardrobe. */
     const outfit = getOutfit();
     const wearing = el('div.profile-wearing', {}, OUTFIT_SLOTS.map((slot) => {
       const item = findItem(slot, outfit[slot]);

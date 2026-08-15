@@ -488,6 +488,33 @@ There is no level select. You walk, and the road decides what you meet.
   foot, or a panelled frame with brass on the posts, two pillows, a quilt and a
   rug. The room they are in is drawn too — a stone hearth with a live fire in
   it, a window with the night behind it, a rug, a chair pulled up to the heat.
+- **The clothing shop turns up once in a whole run.** One tailor, in a world the
+  run's seed picks, at whatever point in that world the road decides to deal it
+  — and the world that gets it is **one stop longer** than it would otherwise
+  have been, because the tailor is added to what that road holds rather than
+  taking the place of a shop, a bed or a fight. A world's difficulty is its
+  duels, and its duels do not move.
+
+  It sells **three garments** (four with a Trader's Ledger, five with two, like
+  every other counter), rolled from the clothes no achievement will ever hand
+  over, at prices that sit around what a rare item costs — a little less for a
+  hat, a little more for a harness, and about three garments' worth for one of
+  the **complete outfits**, which dress all four slots in one purchase. The
+  half-price flag comes up as often as it does at the general store, and a
+  Silver Tongue makes it likelier here exactly as it does there. Nothing already
+  in your wardrobe is ever on the rail: this shop happens once, and a hanger
+  spent on a hat you already own is a third of the whole event wasted.
+
+  **What you buy is yours for good.** A garment is written to the profile rather
+  than to the save slot, so it survives the run — see *The wardrobe*.
+
+  From the road it is a false front you can see *into*: the general store's own
+  frame above (same carpenter, same street), a green awning, and a plate-glass
+  window with two dressed figures standing in it under a lamp that is lit the
+  whole time you are walking past. Inside, the counter is the general store's
+  counter — same cards, same flags, same "N gold short" — in a papered room with
+  bolts of cloth stacked to the dado, rails of garments swaying on both walls,
+  dress forms on the floor and a cutting table for a counter.
 - **The forge** sells the only thing in the game you keep forever: the gun. Six
   improvements, each worth **half a life a shot** on top of the half the trail
   iron does, and each one a **different revolver** — the trail iron you rode in with, tempered steel, a brass
@@ -668,9 +695,15 @@ road, before the shooting, which is where a decision belongs.
 The Dusk Totem still refuses the game over, and it is now the only thing that
 does.
 
+**Three things outlive the slot**, because they belong to the device rather
+than to the run: the achievement ledger, the outfit you are wearing, and the
+receipts for anything bought at the clothing shop. A shirt paid for in a run
+that later died in the Bayou is still in the wardrobe tomorrow — which is the
+only thing that makes a shop appearing once a run worth stopping at.
+
 ## Achievements
 
-Sixty-four of them, in six sections, on the main menu where the credits used
+Sixty-six of them, in six sections, on the main menu where the credits used
 to be. They live **outside the save slots** — next to the profile and the
 settings, through the same storage driver — because a run can die and take its
 file with it, and the whole point of an achievement is that it survives that.
@@ -682,9 +715,11 @@ card is drained of its colour and shows a padlock where the medal goes, but it
 still says what it wants, because the list is meant to be usable as a set of
 things to go and do rather than a set of surprises.
 
-Every card carries a **reward slot**, and twenty-six of them now have clothes
-on the hanger: a picture of the garment, its slot and its name, on the locked
-cards as well as the earned ones. The link is written down in exactly one place
+Every card carries a **reward slot**, and thirty of them now have clothes on
+the hanger: a picture of the garment, its slot and its name, on the locked cards
+as well as the earned ones. Four of those are **harnesses** — tack for the
+horse — spread the same way everything else is, one apiece off the miles, the
+bosses, the purse and the ladder. The link is written down in exactly one place
 — `reward: { kind: 'clothing', slot, id }` on the achievement itself — and the
 wardrobe reads the list backwards to find out what each garment is waiting for.
 Move a reward from one line to another and nothing else has to be told. The
@@ -717,6 +752,12 @@ stack so two unlocks in the same instant are read one after the other, and the
 percentage on it — the notice is also the nudge towards the screen the rest of
 them live on. Nothing in that layer takes a click.
 
+**What it will never pay out** is anything the clothing shop sells. The bought
+half of the wardrobe hangs on no line in this list and never will: the two
+achievements that mention the shop at all — finding it, and buying something to
+wear — pay in bragging rights, because the garment is the reward and it has
+already been paid for once.
+
 One thing it does *not* do is measure damage off the life bar. "Untouched" asks
 the duel engine whether anything got through, because a bandage mid-fight or a
 totem putting lives back can leave a player who was shot twice ending on more
@@ -727,9 +768,10 @@ registered with the router — it simply has no door on the menu for now.
 
 ## The wardrobe
 
-Thirty garments across four slots — hat, shirt, trousers, boots — of which four
-are the clothes you start in and **twenty-six are paid for by an achievement**.
-The door is the avatar on the Profile screen: it is a button, with a pixel
+Fifty-six garments across five slots — hat, shirt, trousers, boots and the
+**horse's harness** — of which five are what you start in, **thirty are paid for
+by an achievement**, and **twenty-one are bought over a counter** at the clothing
+shop. The door is the avatar on the Profile screen: it is a button, with a pixel
 pencil hanging off its corner, and it opens a screen with the clothes on the
 left and the gunslinger himself on the right, breathing in the same idle loop
 the game uses everywhere else, wearing whatever is currently selected. Nothing
@@ -756,7 +798,33 @@ helpers in `src/art/sprites-wardrobe.js` *find* the legs in whatever pose they
 are in and hang fringe, seams, studs, cuffs and spurs off them. One description,
 five poses.
 
-**One outfit, everywhere.** Saving writes four ids to the profile — device-side,
+**The fifth slot is worn by the horse.** A **harness** is tack — a bridle, the
+reins, a breast collar, a girth, and whatever else the rig carries — stamped
+over the horse's own frames before they are baked, which means it animates with
+the animal for free: it walks, it gallops, and it leaves the road with him in
+the airborne frames without a line of code knowing what a bridle is. Two things
+make it unlike the other four slots. It comes **whole** — nobody has ever wanted
+one make of bridle with another make of girth, so a rig is one piece of art,
+earned or bought as one thing — and one of the nine is **nothing at all**: `No
+Tack` is a real choice with a real name, the animal in its own saddle, which is
+what the game looked like before any of this. The default rig is free, on from
+the first minute, and needs no achievement.
+
+Open that drawer and the mannequin is swapped for the horse, idling on the spot
+with the rider up in whatever else is being tried on. Tack cannot be judged on a
+man, and a bridle drawn on nothing is four brown pixels.
+
+**Half of it is bought, and that half is a shelf rather than a ladder.** The
+garments at the end of every drawer — more hats, shirts, trousers, boots and
+harnesses, plus two **complete outfits** sold as one purchase apiece — hang on
+no achievement and are only ever sold at the clothing shop (see *Story mode*).
+Nothing out there is stronger than anything else, because none of it does
+anything: what you are buying is a look. A bought garment is written to the
+**profile** the moment it is paid for, so it is in the wardrobe tomorrow and
+still there after the run it was bought in dies in the Bayou — which is the only
+way a shop that turns up once in a run could be worth stopping at.
+
+**One outfit, everywhere.** Saving writes five ids to the profile — device-side,
 outside the save slots, so a run dying cannot cost you a hat you beat the Basin
 for — and re-bakes the player. Everything that draws a gunslinger asks the rig
 for the current set, so the change reaches the profile portrait, the man waiting
@@ -767,8 +835,14 @@ the road behind the screen keeps wearing the saved outfit while you try things
 on in front of it.
 
 An equipped outfit is **validated on every read**: a profile that arrives from
-somewhere else claiming a Starcrown, with the ledger saying otherwise, walks out
-in the hat it started in.
+somewhere else claiming a Starcrown, with the ledger saying otherwise — or a
+Parade Rig with no receipt for it — walks out in the hat it started in.
+
+**The shadow under the mannequin is made of pixels.** It used to be
+`ctx.ellipse`: a vector oval with a soft edge, under a figure whose every edge
+is a hard square seven screen pixels across. The ellipse is rasterised onto the
+same grid the sprite is on now — one row per source pixel, each as wide as the
+circle is at that height — so everything on the plate steps by the same amount.
 
 ## Online
 
@@ -810,10 +884,11 @@ src/
                           chiselled and extruded, on a shot-up plank
     sprites-character.js  the fighter rig: player, rider, horse, the draw and
                           the revolver that comes out of it (Block 2a)
-    sprites-wardrobe.js   every garment the player can earn: hats stamped over
-                          the bare face, shirts with their own collar and belt,
-                          and the trouser/boot transforms that find the legs in
-                          whatever pose they are in (Block 2f)
+    sprites-wardrobe.js   every garment the player can earn or buy: hats stamped
+                          over the bare face, shirts with their own collar and
+                          belt, the trouser/boot transforms that find the legs
+                          in whatever pose they are in, and the harnesses,
+                          which are straps laid on the horse (Block 2f)
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact,
@@ -832,7 +907,9 @@ src/
     sprites-portraits.js  32 x 32 faces, for speech and for the cut-scene (2e)
     sprites-venue.js      what a shop and an inn are made of: the two beds,
                           and the crates, barrels, jars, hearth and window the
-                          rooms behind them are furnished with
+                          rooms behind them are furnished with (the clothier's
+                          bolts, rails and dress forms are drawn by its own
+                          scene — they are colour more than shape)
     sprites-forge.js      what a smithy is made of: the furnace and its mouth,
                           the anvil, the hammer, the bellows, the quench trough,
                           the tool wall and the finished work on the rack
@@ -847,16 +924,17 @@ src/
   menu/                  title, online, profile, wardrobe, settings,
                          achievements, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
-  shops/                 shop, inn and forge logic + screens, and the workshop
-                         scene the six upgrade rituals are performed in
+  shops/                 shop, inn, forge and clothier logic + screens, the
+                         workshop scene the six upgrade rituals are performed
+                         in, and the three rooms the counters stand in
   duel/                  duel engine, agents, scene, screen, boss entrances,
                          the performance an ability plays when it is cast, and
                          the real-time clock a world special runs on
   game/                  items, worlds, progression maths, player state,
                          enemies, world abilities, the seven-rung revolver
                          ladder, save slots, run controller, interstitials,
-                         the achievement ledger, and the wardrobe the ledger
-                         pays out in
+                         the achievement ledger, and the wardrobe — half of it
+                         paid out by that ledger, half of it sold by the tailor
   admin/                 the developer panel and the door into it: the stroke
                          recogniser, the per-slot lock, the one object every
                          override lives in, the road map that prints the real
@@ -975,6 +1053,12 @@ Balance lives in data, not in code:
   likes without the balance moving.
 - `src/shops/shop.js` — what a counter holds: `STOCK_DEPTH` for anything
   stackable, and the guaranteed heal in slot zero.
+- `src/game/wardrobe.js` — the garment catalogue, and the two ways a piece is
+  unlocked. Give one a `price` and `source: 'shop'` and it is on the clothing
+  shop's rail and nowhere else; name it in an achievement's `reward` instead and
+  it is earned. The tailor's own arithmetic — how many hangers, how likely the
+  half-price flag — is `src/shops/tailor.js`, and it is deliberately the general
+  store's, read off the same constants.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
   inventory, selling and the duel item bar pick it up. The twenty-four ability
   entries are generated into it from the catalogue above rather than written
@@ -1197,6 +1281,29 @@ letter the sequence is waiting for resets it. The recogniser is a cut-down $1
 unistroke matcher with the rotation invariance deliberately taken out (letters
 have an up) — `src/admin/sigil.js`.
 
+**Nothing is drawn, and nothing stops.** There is no ink: the strokes leave no
+trail, no flash on a letter that landed and no red on one that did not, because
+a stroke of light appearing under an idle thumb is the one thing that could get
+this door found by accident. And although the road **is** stopped between the
+letters — an encounter arriving between the P and the L used to throw about one
+attempt in three away — nothing on the screen says so. The traveller keeps
+walking, the sky keeps moving, the HUD does not change; underneath, the odometer
+is frozen, no encounter can fire and the clocks are not being spent. The hold
+lasts five seconds, every letter restarts it, and a stroke that **breaks** the
+sequence hands the road straight back rather than serving out the rest of it.
+There is no tell at any point: you either know it is there or you do not.
+
+**Once a slot is in, there is a button.** Making somebody draw three metre-high
+letters and type a word every time they want to look at the Basin's boss is not
+security, it is a toll — the slot is already an admin slot, permanently. So an
+unlocked slot gets a quiet `Admin` button on the road, next to the saddlebag,
+which opens the panel in one tap. It appears by itself the moment the passphrase
+is accepted, and it can be put away again from the panel's own footer for the
+one job it gets in the way of — a screenshot, or handing the game to somebody
+who should not be looking at the workbench. Hiding it is remembered against the
+slot, and the sigil still works with it hidden, which is what makes hiding it
+safe.
+
 Getting the sigil right opens a box with no title on it. What goes in the box
 is a passphrase, and **the passphrase is not written down anywhere** — not in
 this file, not in the source. What the source holds is a fingerprint of it
@@ -1217,9 +1324,9 @@ ignored, so a capital letter cannot cost you one of the three.
 | Tab | What it is for |
 | --- | --- |
 | **Run** | Lives, the bar, gold, level, exp, the gun, hunger, the horse — every number the run holds, editable. Invulnerability, free money, a frozen gauge. |
-| **Road** | Where you are and what is next: jump to any world, rewrite the stop in front of you, walk to it, turn the whole segment face up, set the weather and the hour, walk into a shop, an inn, a forge or the boss on demand. Underneath it, the map. |
+| **Road** | Where you are and what is next: jump to any world, rewrite the stop in front of you, walk to it, turn the whole segment face up, set the weather and the hour, walk into a shop, an inn, a forge, the clothier or the boss on demand. Underneath it, the map — which also prints which world this run hid the clothing shop in, since there is one in a whole run and it is chosen off the seed. |
 | **Gear** | The whole catalogue with a give and take on every line, abilities included, and both duel slots fillable with anything whether the run owns it or not. |
-| **Looks** | Every garment in the game worn on the spot, locked or not, drawn on the rig so you can see it move. Borrowed for the session only: the ledger is never touched and nothing is written to the profile. |
+| **Looks** | Every garment in the game worn on the spot, locked or not, drawn on the rig so you can see it move — including the harnesses, which are drawn on the horse with the rider up. Borrowed for the session only: the ledger is never touched, no receipt is written, and nothing reaches the profile. |
 | **Odds** | The dials behind everything that is decided by a roll — what the road wants, what a body pays, what a counter stocks and charges. |
 | **Enemy** | What the next rider is made of, and the head behind it: six policies (including a punchbag that only reloads and an oracle that always counters), the read and shield ceilings, and a scripted loop of moves for reproducing one exact fight. |
 | **Battle** | Build a fighter — name, look, lives, bullet, tricks, landmark, boss or not — and fight it now, in any world, with the consequences switched off or on. |

@@ -10,6 +10,14 @@
  *      and the slot is an admin slot from then on; get it wrong three times and
  *      that slot never opens again.
  *
+ * …AND, ONCE THOSE TWO HAVE BEEN GOT PAST, A BUTTON
+ * ---------------------------------------------------------------------------
+ * A lock is worth what it is worth the first time. An unlocked slot is unlocked
+ * for good, so from then on it also gets a one-tap button on the road, shown by
+ * default and hideable from inside the panel — see `shortcutShown` below. It is
+ * a shortcut past the ceremony, never past the lock: it refuses outright for a
+ * slot that has not already been through both of the above.
+ *
  * THREE ATTEMPTS, PER SLOT, FOREVER
  * ---------------------------------------------------------------------------
  * The count is kept against the SLOT NUMBER and not against the run in it, and
@@ -48,6 +56,16 @@ const GATE_KEY = 'admin.gate';
 /** Guesses a slot ever gets. */
 export const MAX_ATTEMPTS = 3;
 
+/**
+ * How long the road holds its breath after a letter lands, in milliseconds.
+ *
+ * Five seconds is a generous beat between two big strokes and nowhere near
+ * long enough to be worth anything to somebody who is not drawing the sigil —
+ * and the clock is restarted by every letter, so a whole sequence is one held
+ * breath rather than three. See `armSigil`.
+ */
+const HOLD_MS = 5000;
+
 /** The fingerprint of the passphrase, lower-cased and trimmed. See above. */
 const PHRASE_FINGERPRINT = '1d7s2pv-rpoffh';
 
@@ -80,18 +98,62 @@ async function writeGate(gate) {
 }
 
 function blankSlot() {
-  return { attempts: 0, unlocked: false, at: 0 };
+  return { attempts: 0, unlocked: false, at: 0, shortcut: true };
 }
 
 /** What a slot's door looks like right now. */
 export async function slotAccess(slot) {
   const gate = await readGate();
   const record = { ...blankSlot(), ...(gate.slots[slot] || {}) };
+  shortcuts.set(Number(slot), record.shortcut !== false);
   return {
     ...record,
+    shortcut: record.shortcut !== false,
     left: Math.max(0, MAX_ATTEMPTS - record.attempts),
     locked: !record.unlocked && record.attempts >= MAX_ATTEMPTS,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The button on the road
+// ---------------------------------------------------------------------------
+
+/**
+ * ONCE THE DOOR IS OPEN, IT DOES NOT HAVE TO BE PICKED AGAIN
+ * ---------------------------------------------------------------------------
+ * The sigil and the passphrase are a lock, and a lock is worth exactly as much
+ * as the first time it is opened. Making a tester draw three metre-high letters
+ * and type a word every time they want to look at the Basin's boss is not
+ * security, it is a toll — the slot is already an admin slot, permanently, and
+ * anybody who can reach that state can reach it again in twenty seconds.
+ *
+ * So an unlocked slot gets a button on the road that opens the panel directly.
+ * It shows up by itself the moment the passphrase is accepted, because that is
+ * the moment it becomes useful, and it can be put away from inside the panel
+ * for the one job it gets in the way of: taking a screenshot of the road, or
+ * handing the game to somebody who should not be looking at the workbench. The
+ * sigil still works with the button hidden, which is what makes hiding it safe.
+ *
+ * The preference is written against the SLOT, next to the unlock itself, so it
+ * survives a reload the way the unlock does — and it is mirrored in memory so
+ * that a screen can ask for it while it is building its own DOM.
+ */
+const shortcuts = new Map();
+
+/** What the last read of this slot said, without going to storage. */
+export function shortcutShown(slot) {
+  return shortcuts.get(Number(slot)) !== false;
+}
+
+/** Show or hide the road button for a slot. Written through immediately. */
+export async function setShortcutShown(slot, shown) {
+  shortcuts.set(Number(slot), !!shown);
+  const gate = await readGate();
+  const record = { ...blankSlot(), ...(gate.slots[slot] || {}) };
+  record.shortcut = !!shown;
+  gate.slots[slot] = record;
+  await writeGate(gate);
+  return !!shown;
 }
 
 /**
@@ -255,10 +317,10 @@ export function openPhrasePrompt(slot) {
  * Watch the exploration screen for the sigil, and open whatever the slot has
  * earned when it lands.
  *
- * The walk is paused around all of it — the box and the panel alike — because
- * an encounter firing while a tester is typing would put a duel on top of the
- * dialog. Everything here is loaded on demand: a player who never draws the
- * sigil never downloads a byte of the panel.
+ * The walk is held quietly while the letters are being drawn and properly
+ * paused once the panel is up — an encounter firing while a tester is typing
+ * would put a duel on top of the dialog. Everything here is loaded on demand: a
+ * player who never draws the sigil never downloads a byte of the panel.
  *
  * @param {object} opts
  * @param {object} opts.engine the walk engine, so the road can be held
@@ -268,7 +330,7 @@ export function openPhrasePrompt(slot) {
 export function armSigil({ engine, slot }) {
   let busy = false;
   /**
-   * THE ROAD HOLDS ITS BREATH BETWEEN THE LETTERS
+   * THE ROAD HOLDS ITS BREATH BETWEEN THE LETTERS, AND NOTHING SAYS SO
    * -------------------------------------------------------------------------
    * Drawing three letters takes a couple of seconds, and the walk does not stop
    * for it — which means an encounter can come up between the P and the L, the
@@ -276,12 +338,21 @@ export function armSigil({ engine, slot }) {
    * Measured across a few dozen attempts that is about one in three on a busy
    * stretch of road, which is not a door, it is a lottery.
    *
-   * So the first accepted letter pauses the walk, and it is handed back the
-   * moment the sequence completes, breaks, or simply stops arriving. Yes, that
-   * is technically a tell — but it only appears AFTER somebody has drawn a
-   * screen-high P correctly, which is not something anybody does by accident,
-   * and the walk pausing is something the player already sees every time they
-   * open the saddlebag.
+   * So the first accepted letter stops the road — but QUIETLY. The traveller
+   * keeps walking, the sky keeps moving, the HUD does not change and no toast
+   * appears; underneath, the odometer is frozen, the encounters are not coming
+   * and the clocks are not being spent (`holdQuietly` in
+   * src/explore/walk-engine.js). The old version simply paused, and a road that
+   * visibly stops dead the instant a stroke lands is a road that has just told
+   * a curious player that something is listening — which is the one thing a
+   * door nobody is supposed to find cannot afford.
+   *
+   * The hold lasts HOLD_MS from the last accepted letter and every letter
+   * restarts it, so P … N … L is one held breath. It ends the moment the
+   * sequence completes, and it ends IMMEDIATELY on a stroke that breaks it: a
+   * failed attempt does not leave the road standing still for five seconds
+   * with nothing to show for it, it hands the walk straight back and the next
+   * encounter arrives on the ordinary schedule.
    */
   let holding = false;
   let releaseTimer = 0;
@@ -292,24 +363,24 @@ export function armSigil({ engine, slot }) {
     let live = null;
     // The recogniser is small, but the panel behind it is not, so the import
     // is deferred to the moment somebody actually draws something.
-    import('./sigil.js').then(({ createSigilWatcher, STROKE_WINDOW }) => {
+    import('./sigil.js').then(({ createSigilWatcher }) => {
       live = createSigilWatcher({
-        host: document.getElementById('app'),
         enabled: () => !busy && !document.querySelector('#app > .modal-backdrop'),
         onProgress: ({ index }) => {
           clearTimeout(releaseTimer);
           if (index === 0) {
+            // Broken, or never started. Either way the road is the road again
+            // this instant — the five seconds are not served out.
             release();
             return;
           }
-          if (!holding && !engine.isPaused()) {
-            engine.pause();
+          if (!holding) {
+            engine.holdQuietly();
             holding = true;
           }
-          // A sequence that is never finished must not leave the road stopped,
-          // so the hold outlives the recogniser's own window by a moment and
-          // then gives up on its own.
-          releaseTimer = setTimeout(release, STROKE_WINDOW + 500);
+          // A sequence that is never finished must not leave the road held, so
+          // the hold gives up on its own once the letters stop arriving.
+          releaseTimer = setTimeout(release, HOLD_MS);
         },
         onComplete: open,
       });
@@ -317,27 +388,18 @@ export function armSigil({ engine, slot }) {
     return { dispose: () => live?.dispose() };
   }
 
-  /** Give the walk back, if this watcher was the one that took it. */
+  /** Give the walk back, if this watcher was the one holding it. */
   function release() {
     clearTimeout(releaseTimer);
     if (!holding) return;
     holding = false;
-    if (!busy && onTheRoad()) engine.resume();
-  }
-
-  function onTheRoad() {
-    return document.getElementById('screen-root')?.dataset.screen === 'explore';
+    engine.releaseQuietly();
   }
 
   async function open() {
+    release();
     if (busy) return;
     busy = true;
-    clearTimeout(releaseTimer);
-    // The hold counts as walking: the sigil stopped the road on the player's
-    // behalf, so closing the panel has to start it again.
-    const wasWalking = holding || !engine.isPaused();
-    holding = false;
-    engine.pause();
     try {
       const current = slot();
       const access = await slotAccess(current);
@@ -350,24 +412,56 @@ export function armSigil({ engine, slot }) {
           allowed = await openPhrasePrompt(current);
         }
       }
-      if (allowed) {
-        const { openAdminPanel } = await import('./panel.js');
-        await openAdminPanel({ engine, slot: current });
-      }
+      if (allowed) await showPanel({ engine, slot: current });
     } finally {
       busy = false;
-      // Whoever routed away — a custom battle, a jump to another world — owns
-      // the screen now, and resuming a walk that is no longer on screen would
-      // start the road running underneath it.
-      if (wasWalking && onTheRoad()) engine.resume();
     }
   }
 
   return {
     dispose: () => {
-      clearTimeout(releaseTimer);
-      holding = false;
+      release();
       watcher.dispose();
     },
   };
+}
+
+/** True while the exploration screen is the one on the screen. */
+function onTheRoad() {
+  return document.getElementById('screen-root')?.dataset.screen === 'explore';
+}
+
+/**
+ * Put the panel up over the road, and put the player back exactly where they
+ * were when it comes down.
+ *
+ * The walk is a real pause this time — an encounter firing while somebody is
+ * typing a number into a field would drop a duel on top of the panel — and it
+ * is only resumed if the road is still the screen underneath: anything that
+ * genuinely navigated (a custom battle, a jump to another world) owns the
+ * screen now, and resuming a walk that is no longer on it would start the road
+ * running underneath something else.
+ */
+async function showPanel({ engine, slot }) {
+  const wasWalking = !engine.isPaused();
+  engine.pause();
+  try {
+    const { openAdminPanel } = await import('./panel.js');
+    await openAdminPanel({ engine, slot });
+  } finally {
+    if (wasWalking && onTheRoad()) engine.resume();
+  }
+}
+
+/**
+ * Open the panel for a slot that has already been through the door, with no
+ * sigil and no passphrase. This is what the button on the road calls; it
+ * refuses outright for a slot that was never unlocked, so it is never a way
+ * past the lock, only a way past the ceremony.
+ */
+export async function openAdminDirect({ engine, slot }) {
+  const access = await slotAccess(slot);
+  if (!access.unlocked) return false;
+  await showPanel({ engine, slot });
+  return true;
 }

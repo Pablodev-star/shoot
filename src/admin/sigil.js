@@ -43,6 +43,20 @@
  *
  * Everything above `createSigilWatcher` is pure and DOM-free, so it can be run
  * and tested outside a browser.
+ *
+ * NOTHING IS DRAWN
+ * ---------------------------------------------------------------------------
+ * The sigil used to leave ink on the screen: a bright line under the finger and
+ * a ghost of it fading out afterwards, so you could see the shape you were
+ * making. It was a real convenience and it was also the one thing on this whole
+ * door that could be found by accident — a player who drags across the road
+ * once sees a stroke of light appear under their thumb, and from there it is a
+ * minute of idle scribbling before they know something is listening.
+ *
+ * So the watcher draws nothing at all, ever. There is no canvas, no ink, no
+ * flash on a letter that landed and no red on one that did not. A stroke that
+ * is a metre-tall P is a stroke somebody meant to make, and somebody who meant
+ * to make it does not need to be shown that they did.
  */
 
 /** Points every stroke is resampled to before it is compared. */
@@ -184,7 +198,6 @@ export const STROKE_WINDOW = 6000;
  * Watch a screen for the sigil.
  *
  * @param {object} opts
- * @param {HTMLElement} opts.host where the ink layer is appended (the app root)
  * @param {string[]} [opts.letters] the sequence, in order
  * @param {(state: {index: number, letters: string[]}) => void} [opts.onProgress]
  * @param {() => void} opts.onComplete
@@ -193,78 +206,11 @@ export const STROKE_WINDOW = 6000;
  */
 export function createSigilWatcher(opts) {
   const letters = opts.letters || ['P', 'N', 'L'];
-  const host = opts.host || document.body;
   const enabled = opts.enabled || (() => true);
 
   let index = 0;
   let lastAt = 0;
   let drawing = null;
-  let raf = 0;
-
-  /**
-   * The ink. It is drawn on its own canvas above everything, with no pointer
-   * events of its own, and it fades on a timer — so a stroke is visible while
-   * it is being made (you can see what you drew, which matters when the shape
-   * is the password) and gone a moment later, leaving nothing on screen for
-   * anybody who did not mean to draw it.
-   */
-  const canvas = document.createElement('canvas');
-  canvas.className = 'sigil-ink';
-  const ctx = canvas.getContext('2d');
-  /** Finished strokes, fading out. */
-  const ghosts = [];
-
-  function sizeCanvas() {
-    const dpr = Math.min(3, window.devicePixelRatio || 1);
-    canvas.width = Math.round(window.innerWidth * dpr);
-    canvas.height = Math.round(window.innerHeight * dpr);
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function paint() {
-    raf = 0;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const now = performance.now();
-    for (let i = ghosts.length - 1; i >= 0; i--) {
-      const ghost = ghosts[i];
-      const life = 1 - (now - ghost.at) / 520;
-      if (life <= 0) {
-        ghosts.splice(i, 1);
-        continue;
-      }
-      strokePath(ghost.points, life * 0.5, ghost.good);
-    }
-    if (drawing) strokePath(drawing.points, 0.85, null);
-    if (drawing || ghosts.length) raf = requestAnimationFrame(paint);
-    else canvas.remove();
-  }
-
-  function strokePath(points, alpha, good) {
-    if (points.length < 2) return;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = good === true ? '#ffe27a' : good === false ? '#8d1a18' : '#f2e3c6';
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (const p of points.slice(1)) ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function ensureCanvas() {
-    if (!canvas.isConnected) {
-      sizeCanvas();
-      host.append(canvas);
-    }
-    if (!raf) raf = requestAnimationFrame(paint);
-  }
 
   /**
    * Anything the player can actually press is not a drawing surface. The road
@@ -286,7 +232,6 @@ export function createSigilWatcher(opts) {
   const onDown = (e) => {
     if (!enabled() || !e.isPrimary || !isBackdrop(e.target)) return;
     drawing = { points: [{ x: e.clientX, y: e.clientY }], id: e.pointerId };
-    ensureCanvas();
   };
 
   const onMove = (e) => {
@@ -294,16 +239,13 @@ export function createSigilWatcher(opts) {
     const last = drawing.points[drawing.points.length - 1];
     if (Math.hypot(e.clientX - last.x, e.clientY - last.y) < 4) return;
     drawing.points.push({ x: e.clientX, y: e.clientY });
-    ensureCanvas();
   };
 
   const onUp = (e) => {
     if (!drawing || e.pointerId !== drawing.id) return;
     const points = drawing.points;
     drawing = null;
-    const verdict = judge(points);
-    if (verdict !== null) ghosts.push({ points, at: performance.now(), good: verdict });
-    ensureCanvas();
+    judge(points);
   };
 
   /**
@@ -325,7 +267,7 @@ export function createSigilWatcher(opts) {
     if (!match || match.letter !== wanted || match.score < MIN_SCORE) {
       const broke = index > 0;
       index = 0;
-      if (opts.onProgress) opts.onProgress({ index, letters });
+      if (opts.onProgress) opts.onProgress({ index, letters, missed: true });
       return broke ? false : null;
     }
 
@@ -334,7 +276,8 @@ export function createSigilWatcher(opts) {
     if (opts.onProgress) opts.onProgress({ index, letters });
     if (index >= letters.length) {
       index = 0;
-      // After the ink, so the last stroke is on screen as the panel arrives.
+      // A beat, so the panel does not arrive under the finger that is still on
+      // the screen finishing the L.
       setTimeout(() => opts.onComplete(), 60);
     }
     return true;
@@ -358,7 +301,6 @@ export function createSigilWatcher(opts) {
   window.addEventListener('pointermove', onMove, true);
   window.addEventListener('pointerup', onUp, true);
   window.addEventListener('pointercancel', onUp, true);
-  window.addEventListener('resize', sizeCanvas);
 
   return {
     reset,
@@ -367,9 +309,7 @@ export function createSigilWatcher(opts) {
       window.removeEventListener('pointermove', onMove, true);
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onUp, true);
-      window.removeEventListener('resize', sizeCanvas);
-      cancelAnimationFrame(raf);
-      canvas.remove();
+      drawing = null;
     },
   };
 }

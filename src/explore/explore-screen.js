@@ -41,7 +41,7 @@ import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
 import { getEngine, getSlot, quitToMenu } from '../game/run.js';
-import { armSigil } from '../admin/access.js';
+import { armSigil, slotAccess, openAdminDirect, shortcutShown } from '../admin/access.js';
 import { getState, getInventory, countOf } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { icon, iconButton } from '../ui/widgets.js';
@@ -198,14 +198,53 @@ export const ExploreScreen = {
      */
     const sigil = armSigil({ engine, slot: () => getSlot() });
 
+    /**
+     * …AND THE DOOR THAT IS ON THE SCREEN, ONCE THE FIRST ONE HAS BEEN OPENED
+     * -----------------------------------------------------------------------
+     * A slot that has been through the sigil and the passphrase is an admin
+     * slot for good, so it gets a button: one tap, no letters, no word to type.
+     * It is hidden by default in the only sense that matters — it does not
+     * exist at all until the slot is unlocked — and it can be put away again
+     * from inside the panel, which is what the `hidden` sync below reads.
+     *
+     * A player who has never opened the door has no way of knowing it is a
+     * button that could ever be here: the node is created hidden and only
+     * unhidden by an answer from storage that says this slot is already in.
+     */
+    let adminOpen = false;
+    const adminButton = el('button.btn.admin-shortcut', {
+      hidden: true,
+      onclick: () => openPanel(),
+      'data-tip': 'Open the workbench',
+    }, [el('span', { text: 'Admin' })]);
+
+    async function syncAdminButton() {
+      const access = await slotAccess(getSlot());
+      adminButton.hidden = !(access.unlocked && access.shortcut);
+    }
+
+    async function openPanel() {
+      if (adminOpen) return;
+      adminOpen = true;
+      try {
+        await openAdminDirect({ engine, slot: getSlot() });
+      } finally {
+        adminOpen = false;
+        // The panel is where the button is put away from, so its own state is
+        // re-read every time one comes down.
+        adminButton.hidden = !shortcutShown(getSlot());
+      }
+    }
+
     const screen = el('div.screen.explore-screen', {}, [
       band,
-      el('div.explore-actions', {}, [mapButton, bagButton]),
+      el('div.explore-actions', {}, [adminButton, mapButton, bagButton]),
     ]);
 
     root.append(screen);
     attachButtonSounds(screen);
     syncMapButton();
+    syncAdminButton();
 
     /**
      * Eating and patching up, drawn on the traveller rather than announced in

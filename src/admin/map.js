@@ -35,6 +35,7 @@ import {
   SERVICE_GAP,
   SERVICE_ADJACENT_GAP,
   OPENING_FIGHTS,
+  tailorWorldFor,
 } from '../explore/encounters.js';
 import { getWeatherState, WEATHER } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
@@ -108,6 +109,10 @@ function whereWeAre(ctx, segment, world, player) {
       ['Travelled', `${Math.round(ctx.engine?.getTravelled() ?? 0)} px`],
       ['Encounter', `${player.encounterIndex} of ${segment ? segment.events.length : '?'}`],
       ['Duels this world', String(world.encounters.duels)],
+      // Which world this run hid the clothing shop in. There is one in a whole
+      // run and it is chosen off the seed, so a tester chasing it would
+      // otherwise be reduced to walking six worlds and hoping.
+      ['Clothier world', String(tailorWorldFor(player.seed))],
       ['Mounted', player.hasHorse ? 'yes' : 'no'],
     ]),
   ], segment ? null : 'No segment loaded — the road has nothing on it yet.');

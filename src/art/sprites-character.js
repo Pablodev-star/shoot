@@ -119,6 +119,16 @@ const KEY = {
   C: PALETTE.wood,
   v: PALETTE.leatherDark,  // boot accent
   V: PALETTE.leather,
+  /**
+   * …and the fifth slot, which is not on the man at all. A harness is tack
+   * hung on the horse (see HARNESS in src/art/sprites-wardrobe.js) and it gets
+   * its own three characters for exactly the same reason the four above have
+   * theirs: the brass on a bridle and the brass on a hatband are allowed to be
+   * different brass, and neither may repaint the other.
+   */
+  j: PALETTE.leather,      // strap
+  J: PALETTE.leatherDark,  // strap shade
+  i: PALETTE.goldLight,    // buckle / conchos
 };
 
 // ---------------------------------------------------------------------------
@@ -916,6 +926,46 @@ const HORSE_FRAMES = {
 };
 
 /**
+ * PUTTING TACK ON IT
+ * ---------------------------------------------------------------------------
+ * A harness is one piece of art — a bridle, the reins, a breast collar, a
+ * girth, whatever else the rig carries — stamped over the horse's own frames
+ * before they are baked. It is one stamp rather than a per-frame drawing for a
+ * reason the animal makes for us: everything above the hocks is the SAME rows
+ * in every frame (only the legs and the tail are re-stamped), so a strap typed
+ * once lands on the same pixel of the same barrel in the walk, the gallop and
+ * the idle — and it rises off the road with the horse in the airborne frames,
+ * because the lift is applied at draw time to the whole sprite.
+ *
+ * The catalogue lives in src/art/sprites-wardrobe.js. This file only knows how
+ * to put a stamp on a horse, which is the same deal it has with hats.
+ *
+ * @param {{rows?: string[], key?: object}|null} harness
+ */
+export function composeHorse(harness = null) {
+  const key = harness?.key ? { ...KEY, ...harness.key } : KEY;
+  const frames = {};
+  for (const [name, list] of Object.entries(HORSE_FRAMES)) {
+    frames[name] = harness?.rows
+      ? list.map((rows) => stamp(rows, harness.rows, 0, 0))
+      : list;
+  }
+  return bakeSet(frames, key);
+}
+
+/** One standing horse in a given harness — what a wardrobe card is a picture of. */
+export function horseStill(harness = null) {
+  const key = harness?.key ? { ...KEY, ...harness.key } : KEY;
+  const rows = harness?.rows
+    ? stamp(HORSE_FRAMES.idle[0], harness.rows, 0, 0)
+    : HORSE_FRAMES.idle[0];
+  return bake({ key, rows });
+}
+
+/** The bare animal's rows, for anything that needs its silhouette. */
+export const HORSE_STILL_ROWS = HORSE_FRAMES.idle[0];
+
+/**
  * How far off the ground each frame sits, in source pixels.
  *
  * The lift is deliberately *not* baked into the sprites. The horse fills its
@@ -1101,12 +1151,19 @@ export const HORSE_SIZE = { w: 32, h: 24 };
 // Everything that draws the player calls `getCharacterSprites()` and gets
 // whatever is current, so a change of clothes reaches the menu backdrop, the
 // road, the saddle and the duel without any of them subscribing to anything.
-// The horse is cached on its own: a new hat is no reason to re-bake a horse.
+// The horse is cached per HARNESS: a new hat is no reason to re-bake a horse,
+// and a new bridle is.
 // ---------------------------------------------------------------------------
 
 let playerParts = null;
 let cache = null;
-let horseCache = null;
+/**
+ * Baked horses, one per harness. Keyed rather than single, because the horse is
+ * still the most expensive thing the rig bakes and a change of hat is still no
+ * reason to bake one again — but a change of TACK is, and there are only ever a
+ * handful of harnesses in a session.
+ */
+const horseCache = new Map();
 
 /**
  * Dress the player. Invalidates the baked set; the next draw re-bakes it.
@@ -1117,18 +1174,29 @@ export function setPlayerParts(parts) {
   cache = null;
 }
 
+/** The seated half of an outfit, baked on its own. See `composeFighter`. */
+export function composeRider(parts = {}) {
+  return bakeSet(
+    riderFrames(parts.head || HEAD, parts.torso || TORSO, parts.riderLegs),
+    parts.key ? { ...KEY, ...parts.key } : KEY,
+  );
+}
+
+/** The horse in a given harness, baked once per rig. */
+export function horseSprites(harness = null) {
+  const tackKey = harness?.id || 'bare';
+  if (!horseCache.has(tackKey)) horseCache.set(tackKey, composeHorse(harness));
+  return horseCache.get(tackKey);
+}
+
 /** Bake (once, per outfit) and return every character-side sprite set. */
 export function getCharacterSprites() {
   if (cache) return cache;
   const parts = playerParts || {};
-  if (!horseCache) horseCache = bakeSet(HORSE_FRAMES);
   cache = {
     player: composeFighter(parts),
-    rider: bakeSet(
-      riderFrames(parts.head || HEAD, parts.torso || TORSO, parts.riderLegs),
-      parts.key ? { ...KEY, ...parts.key } : KEY,
-    ),
-    horse: horseCache,
+    rider: composeRider(parts),
+    horse: horseSprites(parts.harness || null),
   };
   return cache;
 }

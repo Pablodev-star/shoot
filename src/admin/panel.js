@@ -38,6 +38,7 @@ import { toast } from '../ui/toast.js';
 import { getState } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { isOverridden, activeOverrides, resetOverrides, note } from './overrides.js';
+import { shortcutShown, setShortcutShown } from './access.js';
 import { chip } from './widgets.js';
 
 import { RunTab } from './tab-run.js';
@@ -149,9 +150,36 @@ export function openAdminPanel({ engine, slot }) {
       footChips.append(chip(`hunger ${Math.round(player.hunger)}`));
     }
 
+    /**
+     * The button on the road, and the switch that puts it away.
+     *
+     * It lives in the panel's own footer rather than in a tab because it is not
+     * a thing about the run — it is a thing about the workbench, and the moment
+     * anybody wants it is the moment they are looking at the workbench and
+     * about to hand the screen to somebody else. See the note in
+     * src/admin/access.js.
+     */
+    function renderShortcut() {
+      const shown = shortcutShown(slot);
+      shortcutBtn.textContent = shown ? 'Hide the road button' : 'Show the road button';
+      shortcutBtn.setAttribute('aria-pressed', String(shown));
+      shortcutBtn.dataset.tip = shown
+        ? 'The sigil still opens this panel with the button hidden'
+        : 'Put the one-tap button back on the road';
+    }
+
+    const shortcutBtn = el('button.btn.btn--sm.btn--ghost', {
+      onclick: async () => {
+        await setShortcutShown(slot, !shortcutShown(slot));
+        note(`road button ${shortcutShown(slot) ? 'shown' : 'hidden'}`);
+        renderShortcut();
+      },
+    }, ['']);
+
     function render() {
       renderTabs();
       renderChips();
+      renderShortcut();
       clearNode(body);
       try {
         body.append(active.render(ctx));
@@ -184,6 +212,7 @@ export function openAdminPanel({ engine, slot }) {
       el('div.admin-footer', {}, [
         footChips,
         el('div.admin-buttons', {}, [
+          shortcutBtn,
           el('button.btn.btn--sm.btn--danger', {
             onclick: () => {
               resetOverrides();

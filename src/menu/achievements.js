@@ -148,7 +148,11 @@ function card(achievement) {
       el('span.ach-reward-label', { text: 'Reward' }),
       reward
         ? el('span.ach-reward-value', {}, [
-          el('span.ach-reward-art', {}, [pixelImg(pieceThumb(reward.slot, reward.id), 2)]),
+          // Tack is a whole horse and every other reward is a crop off a man,
+          // so the horse is drawn at half the scale: same size on the card.
+          el('span.ach-reward-art', {}, [
+            pixelImg(pieceThumb(reward.slot, reward.id), reward.slot === 'horse' ? 1 : 2),
+          ]),
           el('span.ach-reward-text', {}, [
             el('span.ach-reward-name', { text: reward.name }),
             el('span.ach-reward-slot', { text: SLOT_LABELS[reward.slot].name }),

@@ -26,7 +26,16 @@
  * Same rule as the achievements screen it borrows from: every garment in the
  * game is on this screen from the first minute, a locked one greyed to a flat
  * mannequin with the line it is waiting for printed underneath. You cannot go
- * and earn something you have never been shown.
+ * and earn something you have never been shown — and now that half the drawer
+ * is bought rather than earned, you cannot go and BUY something you have never
+ * been shown either, so a locked card says which of the two it is waiting for.
+ *
+ * THE LAST DRAWER SHOWS A HORSE
+ * ---------------------------------------------------------------------------
+ * Tack is worn by the animal, so the mannequin is swapped for the animal while
+ * that drawer is open: same plate, same idle loop, the rider up in whatever
+ * else is being tried on. A harness cannot be judged on a man, and a bridle
+ * drawn on nothing is four brown pixels.
  */
 
 import { el, clearNode } from '../core/dom.js';
@@ -36,19 +45,32 @@ import { startMenuScene } from './menu-scene.js';
 import { backButton, uiIcon } from '../ui/widgets.js';
 import { toast } from '../ui/toast.js';
 import { getProfile } from '../core/settings.js';
-import { CHARACTER_TIMING } from '../art/sprites-character.js';
+import {
+  CHARACTER_TIMING,
+  HORSE_TIMING,
+  HORSE_FRAME_LIFT,
+  RIDER_OFFSET,
+} from '../art/sprites-character.js';
 import { pieceThumb, lockedThumb } from '../art/sprites-wardrobe.js';
 import { makeCanvas, drawSprite, frameAt, crisp } from '../art/pixel.js';
 import {
   OUTFIT_SLOTS,
   getOutfit,
   getWardrobe,
+  previewMount,
   previewSprites,
   saveOutfit,
 } from '../game/wardrobe.js';
 
 /** Source pixels per drawn pixel on the mannequin, and the room around him. */
 const STAGE = { scale: 7, w: 26, h: 30 };
+
+/**
+ * The horse needs a wider stage and a smaller pixel: it is 32 source pixels
+ * across against the man's 16, and drawn at the mannequin's own scale it would
+ * be standing half outside the plate.
+ */
+const MOUNT_STAGE = { scale: 5, w: 38, h: 34 };
 
 export const WardrobeScreen = {
   id: 'wardrobe',
@@ -62,10 +84,16 @@ export const WardrobeScreen = {
     let slot = 'hat';
 
     // --- the mannequin -----------------------------------------------------
-    const stage = makeCanvas(STAGE.w * STAGE.scale, STAGE.h * STAGE.scale);
+    // One canvas, sized to hold whichever of the two is bigger: the man on his
+    // own at seven pixels a pixel, or the horse and rider at five. Swapping the
+    // canvas when the drawer changes would restart the animation and resize the
+    // plate under it; swapping what is drawn on it does not.
+    const stageW = Math.max(STAGE.w * STAGE.scale, MOUNT_STAGE.w * MOUNT_STAGE.scale);
+    const stageH = Math.max(STAGE.h * STAGE.scale, MOUNT_STAGE.h * MOUNT_STAGE.scale);
+    const stage = makeCanvas(stageW, stageH);
     stage.canvas.className = 'pixel wardrobe-figure';
-    stage.canvas.style.width = `${STAGE.w * STAGE.scale}px`;
-    stage.canvas.style.height = `${STAGE.h * STAGE.scale}px`;
+    stage.canvas.style.width = `${stageW}px`;
+    stage.canvas.style.height = `${stageH}px`;
     stage.canvas.setAttribute('role', 'img');
     stage.canvas.setAttribute('aria-label', 'Your gunslinger');
     crisp(stage.ctx);
@@ -77,7 +105,8 @@ export const WardrobeScreen = {
     function frame(now) {
       elapsed += Math.min(64, Math.max(0, now - last));
       last = now;
-      drawFigure(stage, pending, elapsed);
+      if (slot === 'horse') drawMount(stage, pending, elapsed);
+      else drawFigure(stage, pending, elapsed);
       raf = requestAnimationFrame(frame);
     }
     raf = requestAnimationFrame(frame);
@@ -104,6 +133,10 @@ export const WardrobeScreen = {
           onclick: () => {
             if (slot === entry.slot) return;
             slot = entry.slot;
+            stage.canvas.setAttribute(
+              'aria-label',
+              slot === 'horse' ? 'Your horse' : 'Your gunslinger',
+            );
             renderTabs();
             renderGrid();
           },
@@ -134,7 +167,7 @@ export const WardrobeScreen = {
      */
     function choose(item) {
       if (!item.owned) {
-        toast(`Locked — ${item.requirement.description}`, 'bad');
+        toast(`Locked — ${item.lock ? item.lock.description : 'not yours yet'}`, 'bad');
         return;
       }
       if (pending[item.slot] === item.id) return;
@@ -191,7 +224,7 @@ export const WardrobeScreen = {
             tabRow,
             grid,
             el('p.field-hint', {
-              text: 'Most of this is earned. Every locked piece says what it is waiting for.',
+              text: 'Most of this is earned, and the rest is sold at a clothing shop. Every locked piece says which.',
             }),
           ]),
 
@@ -221,25 +254,29 @@ export const WardrobeScreen = {
 /** One garment. Owned ones are a picture of the thing; locked ones a mannequin. */
 function card(item, onClick) {
   const locked = !item.owned;
+  const lock = item.lock;
+  // The horse is drawn at half the scale of a garment crop: it is twice as wide
+  // as the man and the card is the same card.
+  const artScale = item.slot === 'horse' ? 2 : 4;
   return el('button.wardrobe-card', {
     class: `${item.equipped ? 'is-equipped' : ''} ${locked ? 'is-locked' : ''}`.trim(),
     role: 'option',
     'aria-selected': item.equipped ? 'true' : 'false',
     'aria-label': locked
-      ? `${item.name}. Locked. ${item.requirement.description}`
+      ? `${item.name}. Locked. ${lock ? lock.description : ''}`
       : `${item.name}. ${item.blurb}`,
     'data-sfx': locked ? 'error' : 'click',
     onclick: onClick,
   }, [
     el('div.wardrobe-card-art', {}, [
-      pixelSprite(locked ? lockedThumb(item.slot) : pieceThumb(item.slot, item.id), 4),
+      pixelSprite(locked ? lockedThumb(item.slot) : pieceThumb(item.slot, item.id), artScale),
       locked ? el('span.wardrobe-card-lock', {}, [uiIcon('lock', 1)]) : null,
       item.equipped ? el('span.wardrobe-card-tick', {}, [uiIcon('check', 0.9)]) : null,
     ]),
     el('div.wardrobe-card-text', {}, [
       el('span.wardrobe-card-name', { text: item.name }),
       locked
-        ? el('span.wardrobe-card-req', { text: item.requirement.name })
+        ? el('span.wardrobe-card-req', { text: lock ? lock.name : 'Locked' })
         : el('span.wardrobe-card-blurb', { text: item.blurb }),
     ]),
   ]);
@@ -281,13 +318,75 @@ function drawFigure(stage, outfit, elapsed) {
   const footY = canvas.height - 2 * s;
   const x = Math.round((canvas.width - sprite.width * s) / 2);
 
-  // A contact shadow, so he is standing on something rather than floating in a
-  // box. Centred a pixel above the soles, which is what stops it reading as a
-  // puddle he is hovering over.
-  ctx.fillStyle = 'rgba(12, 8, 5, 0.45)';
-  ctx.beginPath();
-  ctx.ellipse(canvas.width / 2, footY - s, 7 * s, 1.5 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-
+  pixelShadow(ctx, canvas.width / 2, footY - s, 7, 2, s);
   drawSprite(ctx, sprite, x, footY - sprite.height * s, s);
+}
+
+/**
+ * The horse, in the tack that is being tried on, with the rider up.
+ *
+ * It is the idle loop rather than a still for the same reason the man is: tack
+ * is judged moving. The animal shifts its weight and flicks its tail, the rider
+ * posts a pixel out of the saddle and back, and the straps go with them —
+ * which is the whole thing worth checking before you buy a harness.
+ */
+function drawMount(stage, outfit, elapsed) {
+  const { canvas, ctx } = stage;
+  const s = MOUNT_STAGE.scale;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const { horse, rider } = previewMount(outfit);
+  const frames = horse.idle;
+  const index = frameAt(frames, elapsed, HORSE_TIMING.idle);
+  const sprite = frames[index];
+  const lift = (HORSE_FRAME_LIFT.idle[index] ?? 0) * s;
+
+  const hoofY = canvas.height - 2 * s;
+  const x = Math.round((canvas.width - sprite.width * s) / 2);
+  const y = hoofY - sprite.height * s - lift;
+
+  pixelShadow(ctx, canvas.width / 2, hoofY - s, 13, 2, s);
+  drawSprite(ctx, sprite, x, y, s);
+
+  const riderFrames = rider.ride;
+  const seat = riderFrames[frameAt(riderFrames, elapsed, CHARACTER_TIMING.ride)];
+  drawSprite(ctx, seat, x + RIDER_OFFSET.x * s, y + RIDER_OFFSET.y * s, s);
+}
+
+/**
+ * THE SHADOW IS MADE OF PIXELS, LIKE EVERYTHING ELSE ON THE PLATE
+ * ---------------------------------------------------------------------------
+ * It used to be `ctx.ellipse` — a perfect vector oval with a soft anti-aliased
+ * edge, under a figure whose every edge is a hard square the size of seven
+ * screen pixels. At this scale that is not a subtle mismatch: the man is
+ * unmistakably drawn and the thing he is standing on is unmistakably not, and
+ * once you have seen it you cannot see anything else.
+ *
+ * So the ellipse is RASTERISED onto the same grid the sprite is on: one row per
+ * source pixel, each row as wide as the circle is at that height and rounded to
+ * a whole pixel, laid out from a snapped centre. Every edge on the plate is now
+ * the same size of step. Two tones, because a single flat pool reads as a hole
+ * — a darker core with a lighter rim is what makes it a shadow lying on a
+ * floor.
+ *
+ * @param {number} cx centre, in device pixels
+ * @param {number} cy the row the widest part of the shadow sits on
+ * @param {number} rx half-width, in SOURCE pixels
+ * @param {number} ry half-height, in SOURCE pixels
+ * @param {number} s device pixels per source pixel
+ */
+function pixelShadow(ctx, cx, cy, rx, ry, s) {
+  const centre = Math.round(cx / s) * s;
+  const top = Math.round(cy / s) * s;
+  const band = (radiusX, radiusY, alpha) => {
+    ctx.fillStyle = `rgba(12, 8, 5, ${alpha})`;
+    for (let row = -radiusY; row <= radiusY; row++) {
+      const t = radiusY === 0 ? 0 : row / radiusY;
+      const half = Math.round(radiusX * Math.sqrt(Math.max(0, 1 - t * t)));
+      if (half <= 0) continue;
+      ctx.fillRect(centre - half * s, top + row * s, half * 2 * s, s);
+    }
+  };
+  band(rx, ry, 0.38);
+  band(Math.max(1, rx - 3), Math.max(1, ry - 1), 0.42);
 }

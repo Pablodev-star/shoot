@@ -33,7 +33,7 @@ import { OVERRIDES, setOverride, note } from './overrides.js';
 import { renderAdminMap } from './map.js';
 import { section, row, numberField, selectField, buttons, action, switchField, sliderField } from './widgets.js';
 
-const STOP_KINDS = ['enemy', 'shop', 'inn', 'forge', 'boss'];
+const STOP_KINDS = ['enemy', 'shop', 'inn', 'forge', 'tailor', 'boss'];
 
 export const RoadTab = {
   id: 'road',
@@ -201,6 +201,9 @@ export const RoadTab = {
           action('A shop', () => leaveThen(() => go('shop', { encounter: { index: player.encounterIndex, worldId: player.world } }))),
           action('An inn', () => leaveThen(() => go('inn', { encounter: { index: player.encounterIndex, worldId: player.world } }))),
           action('A forge', () => leaveThen(() => go('forge', { encounter: { index: player.encounterIndex, worldId: player.world } }))),
+          action('A clothier', () => leaveThen(() => go('tailor', { encounter: { index: player.encounterIndex, worldId: player.world } })), {
+            tip: 'The run only ever holds one of these — this is the only way to see a second',
+          }),
           action('This world\'s boss', () => leaveThen(() => go('duel', {
             encounter: { index: player.encounterIndex, worldId: player.world, progress: 1 },
             isBoss: true,
