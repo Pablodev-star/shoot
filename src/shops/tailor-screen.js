@@ -25,6 +25,9 @@
  * turns up once in a whole run (see src/explore/encounters.js) and a shop that
  * rare selling something that perishable would be a cruel joke.
  *
+ * It is also the one purchase in the game that writes the SAVE as it happens,
+ * for the same reason — see the note in `buy`.
+ *
  * A complete outfit is four garments in one purchase and is written the same
  * way, in one call, because a half-written set is the one state the wardrobe
  * must never be left in.
@@ -35,7 +38,7 @@ import { attachButtonSounds, play, playMusic } from '../core/audio.js';
 import { setRenderer } from '../core/scene.js';
 import { getState, spendGold, canAfford } from '../game/player.js';
 import { generateRail, tailorSeed, DISCOUNT_RATE } from './tailor.js';
-import { finishEncounter } from '../game/run.js';
+import { finishEncounter, save as saveRun } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import { openTrailMapForRun } from '../ui/map-panel.js';
 import { icon } from '../ui/widgets.js';
@@ -72,9 +75,30 @@ export const TailorScreen = {
         card.classList.add('shake');
         return;
       }
+      /**
+       * THE GOLD AND THE GARMENT ARE WRITTEN DOWN TOGETHER
+       * ---------------------------------------------------------------------
+       * Everywhere else in the game a purchase is two halves of the same
+       * in-memory state — gold out, item in — and both reach the disk together
+       * at the next `finishEncounter`. Reload before that and you lose both,
+       * which is fair.
+       *
+       * Not here. The garment goes to the PROFILE the instant it is bought
+       * (that is the whole point of it: it outlives the run), while the gold
+       * only exists in the run until the slot is next written. A player who
+       * bought a coat and reloaded before leaving the shop would come back to
+       * the coat, the gold, and an unresolved tailor on the road — and since
+       * the rail never offers what you already own, they could walk in again
+       * and take the next thing for nothing.
+       *
+       * So the debit is flushed to the slot BEFORE the receipt is written. The
+       * two stores cannot be made atomic — one is the save file and the other
+       * is the device — but in this order the only window left is between two
+       * awaited writes, which is not something a player can aim at, and it
+       * fails towards the game rather than towards the exploit.
+       */
       spendGold(entry.price);
-      // The receipt goes down before anything else can go wrong with the
-      // screen: this is the one purchase in the game that outlives the run.
+      await saveRun();
       await grantClothing(entry.offer.pieces);
       entry.bought = true;
       trackAchievement('clothingBought', { id: entry.offer.id });

@@ -317,17 +317,22 @@ export function openPhrasePrompt(slot) {
  * Watch the exploration screen for the sigil, and open whatever the slot has
  * earned when it lands.
  *
- * The walk is held quietly while the letters are being drawn and properly
- * paused once the panel is up — an encounter firing while a tester is typing
- * would put a duel on top of the dialog. Everything here is loaded on demand: a
- * player who never draws the sigil never downloads a byte of the panel.
+ * The walk is held QUIETLY while the letters are being drawn — nothing on the
+ * screen may admit that anything is listening — and properly PAUSED from the
+ * moment the third letter lands, because from there on there is a dialog on the
+ * screen and an encounter arriving while a tester is typing would put a duel
+ * under it. Everything here is loaded on demand: a player who never draws the
+ * sigil never downloads a byte of the panel.
  *
  * @param {object} opts
  * @param {object} opts.engine the walk engine, so the road can be held
  * @param {() => number} opts.slot which permanent slot this run occupies
+ * @param {() => void} [opts.onAccessChanged] called whenever this door has been
+ *   through a whole open-and-close: the slot may have been unlocked by it, and
+ *   the road button's visibility may have been changed from inside the panel.
  * @returns {{dispose: () => void}}
  */
-export function armSigil({ engine, slot }) {
+export function armSigil({ engine, slot, onAccessChanged }) {
   let busy = false;
   /**
    * THE ROAD HOLDS ITS BREATH BETWEEN THE LETTERS, AND NOTHING SAYS SO
@@ -397,9 +402,26 @@ export function armSigil({ engine, slot }) {
   }
 
   async function open() {
-    release();
     if (busy) return;
     busy = true;
+    /**
+     * THE QUIET HOLD ENDS HERE AND A REAL PAUSE TAKES OVER
+     * -----------------------------------------------------------------------
+     * Everything from this point on is a dialog on top of the road — the
+     * passphrase box first, then the panel — and both of them have the same
+     * problem the quiet hold was never meant to solve: an encounter arriving
+     * while somebody is typing routes the run away, unmounts the exploration
+     * screen and leaves a modal floating over a shop.
+     *
+     * The quiet hold is for the seconds when the player must not be able to
+     * tell that anything is happening. Once a box is on the screen that
+     * secrecy is spent, so the road stops properly and is handed back at the
+     * end — if it was walking when we took it, and if the road is still the
+     * thing underneath (see `showPanel`).
+     */
+    const wasWalking = !engine.isPaused();
+    release();
+    engine.pause();
     try {
       const current = slot();
       const access = await slotAccess(current);
@@ -415,6 +437,10 @@ export function armSigil({ engine, slot }) {
       if (allowed) await showPanel({ engine, slot: current });
     } finally {
       busy = false;
+      if (wasWalking && onTheRoad()) engine.resume();
+      // The slot may have just been unlocked, and the button on the road is
+      // supposed to appear the moment it is — not at the next screen.
+      onAccessChanged?.();
     }
   }
 

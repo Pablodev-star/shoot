@@ -41,7 +41,7 @@ import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
 import { getEngine, getSlot, quitToMenu } from '../game/run.js';
-import { armSigil, slotAccess, openAdminDirect, shortcutShown } from '../admin/access.js';
+import { armSigil, slotAccess, openAdminDirect } from '../admin/access.js';
 import { getState, getInventory, countOf } from '../game/player.js';
 import { getWorld } from '../game/worlds.js';
 import { icon, iconButton } from '../ui/widgets.js';
@@ -196,7 +196,15 @@ export const ExploreScreen = {
      * the game with something to hold: the walk is paused for as long as the
      * panel is up.
      */
-    const sigil = armSigil({ engine, slot: () => getSlot() });
+    const sigil = armSigil({
+      engine,
+      slot: () => getSlot(),
+      // The sigil is the other way into the panel, and it is the way a slot
+      // gets unlocked in the first place — so when it closes, the button below
+      // asks storage again. Without this the button a tester has just earned
+      // does not appear until something else remounts this screen.
+      onAccessChanged: () => syncAdminButton(),
+    });
 
     /**
      * …AND THE DOOR THAT IS ON THE SCREEN, ONCE THE FIRST ONE HAS BEEN OPENED
@@ -232,7 +240,7 @@ export const ExploreScreen = {
         adminOpen = false;
         // The panel is where the button is put away from, so its own state is
         // re-read every time one comes down.
-        adminButton.hidden = !shortcutShown(getSlot());
+        syncAdminButton();
       }
     }
 
