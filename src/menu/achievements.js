@@ -45,7 +45,7 @@ import { attachButtonSounds } from '../core/audio.js';
 import { startMenuScene } from './menu-scene.js';
 import { backButton, uiIcon } from '../ui/widgets.js';
 import { CATEGORIES, getAchievementState } from '../game/achievements.js';
-import { SLOT_LABELS, rewardOf } from '../game/wardrobe.js';
+import { SLOT_LABELS, rewardsOf } from '../game/wardrobe.js';
 import { pieceThumb } from '../art/sprites-wardrobe.js';
 
 export const AchievementsScreen = {
@@ -127,12 +127,17 @@ function section(category, list) {
 
 function card(achievement) {
   const { unlocked, name, description } = achievement;
-  const reward = rewardOf(achievement);
+  /**
+   * A list, not a garment. Nearly every line pays one piece and one line pays
+   * five — see `rewardPieces` in src/game/wardrobe.js — and the card draws
+   * whatever it is handed rather than knowing which is which.
+   */
+  const rewards = rewardsOf(achievement);
 
   return el('div.ach-card', {
     class: unlocked ? 'is-unlocked' : 'is-locked',
     'aria-label': `${name}. ${description} ${unlocked ? 'Unlocked.' : 'Locked.'}`
-      + (reward ? ` Reward: ${reward.name}.` : ''),
+      + (rewards.length ? ` Reward: ${rewards.map((r) => r.name).join(', ')}.` : ''),
   }, [
     el('div.ach-card-top', {}, [
       el('div.ach-medal', {}, [uiIcon(unlocked ? 'star' : 'lock', 1.3)]),
@@ -144,21 +149,38 @@ function card(achievement) {
     ]),
 
     // The wardrobe hook. See the note at the top of this file.
-    el('div.ach-reward', { class: reward ? 'has-reward' : '' }, [
-      el('span.ach-reward-label', { text: 'Reward' }),
-      reward
-        ? el('span.ach-reward-value', {}, [
+    el('div.ach-reward', {
+      class: `${rewards.length ? 'has-reward' : ''} ${rewards.length > 1 ? 'is-set' : ''}`.trim(),
+    }, [
+      el('span.ach-reward-label', { text: rewards.length > 1 ? 'Outfit' : 'Reward' }),
+      ...(rewards.length
+        ? rewards.map((reward, i) => el('span.ach-reward-value', {}, [
           // Tack is a whole horse and every other reward is a crop off a man,
           // so the horse is drawn at half the scale: same size on the card.
           el('span.ach-reward-art', {}, [
             pixelImg(pieceThumb(reward.slot, reward.id), reward.slot === 'horse' ? 1 : 2),
           ]),
-          el('span.ach-reward-text', {}, [
-            el('span.ach-reward-name', { text: reward.name }),
-            el('span.ach-reward-slot', { text: SLOT_LABELS[reward.slot].name }),
-          ]),
-        ])
-        : el('span.ach-reward-empty', { text: 'Bragging rights' }),
+          /**
+           * Only the first piece of a set is named. Five names stacked under
+           * five thumbs is a wall of text on a card that is three lines tall,
+           * and the pieces of a set all share a name anyway — what the player
+           * wants off this card is "the Ember Reaver, and it is five pieces",
+           * which the thumbs say better than the words would.
+           */
+          rewards.length === 1 || i === 0
+            ? el('span.ach-reward-text', {}, [
+              el('span.ach-reward-name', {
+                text: rewards.length > 1 ? 'Ember Reaver' : reward.name,
+              }),
+              el('span.ach-reward-slot', {
+                text: rewards.length > 1
+                  ? `${rewards.length} pieces`
+                  : SLOT_LABELS[reward.slot].name,
+              }),
+            ])
+            : null,
+        ]))
+        : [el('span.ach-reward-empty', { text: 'Bragging rights' })]),
     ]),
   ]);
 }

@@ -40,6 +40,8 @@ import { createParallax, heroX as heroAnchorX } from './parallax.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
+import { createEmberAura } from '../art/ember-aura.js';
+import { emberIntensity, horseEmberIntensity } from '../game/wardrobe.js';
 import { getEngine, getSlot, quitToMenu } from '../game/run.js';
 import { armSigil, slotAccess, openAdminDirect } from '../admin/access.js';
 import { getState, getInventory, countOf } from '../game/player.js';
@@ -262,6 +264,24 @@ export const ExploreScreen = {
      */
     const pops = createVitalPops();
 
+    /**
+     * THE COAT THAT IS ON FIRE
+     * -----------------------------------------------------------------------
+     * Nothing at all unless the player is wearing the Ember Reaver, which is
+     * the reward for the hard road and the only garment in the game with live
+     * particles on it — see src/art/ember-aura.js. Two emitters rather than
+     * one: the man carries his own fire, and the barding carries the horse's,
+     * so a rider in the full set is burning at both ends and a rider who only
+     * bought the tack is not on fire himself.
+     *
+     * They are created unconditionally and left at zero intensity, because the
+     * outfit can change while this screen is up — the Admin Panel can put
+     * anything on a tester mid-crossing — and a renderer that only builds the
+     * emitter it needed at mount is a renderer that cannot.
+     */
+    const embers = createEmberAura({ intensity: 0 });
+    const horseEmbers = createEmberAura({ intensity: 0 });
+
     // --- live bindings -----------------------------------------------------
     const unsubs = [
       on(EVENTS.ITEM_USED, ({ effect, icon: iconName }) => pops.spawn(effect, iconName)),
@@ -278,6 +298,19 @@ export const ExploreScreen = {
     // --- canvas renderer ---------------------------------------------------
     let elapsed = 0;
     let lastView = null;
+    /**
+     * The last frame's length, stashed so the embers can be stepped from
+     * `render` rather than from `update`.
+     *
+     * Everything else on this screen advances in `update` because it knows
+     * where it is without being told. The fire does not: it clings to whatever
+     * is actually on the road, and the traveller's box is only settled inside
+     * `render` — it depends on the ground line, on the walk anchor and, in the
+     * saddle, on which airborne frame of the gallop is up. Stepping it a frame
+     * behind the sprite it is burning on would leave a trail of embers hanging
+     * where the horse was.
+     */
+    let frameDt = 16;
     const renderer = {
       onResize(view) {
         lastView = view;
@@ -285,7 +318,13 @@ export const ExploreScreen = {
 
       update(dt) {
         elapsed += dt;
+        frameDt = dt;
         engine.update(dt, lastView);
+        // Read every frame rather than held from mount: an outfit saved in the
+        // wardrobe, or forced on from the panel, has to reach the road on the
+        // next frame the same way a new hat does.
+        embers.setIntensity(emberIntensity());
+        horseEmbers.setIntensity(horseEmberIntensity());
         // The prairie's fluff and fireflies drift on regardless of the walk —
         // the same rule the weather follows. A world that stops the moment the
         // saddlebag opens is a world the player can tell is a backdrop.
@@ -343,16 +382,32 @@ export const ExploreScreen = {
           // than inside the sprite keeps the rider on the horse's back.
           const lift = HORSE_FRAME_LIFT[gait][frameIndex] ?? 0;
           const hy = gy - horse.height * s + 2 * s - lift * s;
+
+          // The fire clings to whatever is actually on the road: the animal's
+          // own box, and the rider's box sitting on top of it.
+          horseEmbers.update(frameDt, { x: heroX, y: hy, w: horse.width * s, h: horse.height * s, unit: s });
+          const rx = heroX + RIDER_OFFSET.x * s;
+          const ry = hy + RIDER_OFFSET.y * s;
+          embers.update(frameDt, { x: rx, y: ry, w: PLAYER_SIZE.w * s, h: PLAYER_SIZE.h * s, unit: s });
+
+          horseEmbers.draw(ctx, 'back');
+          embers.draw(ctx, 'back');
           drawSprite(ctx, horse, heroX, hy, s);
 
           const riderFrames = sprites.rider.ride;
           const rider = riderFrames[frameAt(riderFrames, elapsed, CHARACTER_TIMING.ride)];
-          washed(rider, heroX + RIDER_OFFSET.x * s, hy + RIDER_OFFSET.y * s);
+          washed(rider, rx, ry);
+          horseEmbers.draw(ctx, 'front');
+          embers.draw(ctx, 'front');
         } else {
           const frames = walking ? sprites.player.walk : sprites.player.idle;
           const timing = walking ? CHARACTER_TIMING.walk : CHARACTER_TIMING.idle;
           const frame = frames[frameAt(frames, elapsed, timing)];
-          washed(frame, heroX, gy - frame.height * s + 2 * s);
+          const fy = gy - frame.height * s + 2 * s;
+          embers.update(frameDt, { x: heroX, y: fy, w: frame.width * s, h: frame.height * s, unit: s });
+          embers.draw(ctx, 'back');
+          washed(frame, heroX, fy);
+          embers.draw(ctx, 'front');
         }
 
         // …and the plus or the carrot, which starts ON his chest and rises out

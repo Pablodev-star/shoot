@@ -6,15 +6,29 @@
  * database later means changing that driver, not this file.
  *
  * A slot payload is:
- *   { version, player, daynight, weather, travelled, segmentSeed, savedAt }
+ *   { version, difficulty, player, daynight, weather, travelled, segmentSeed,
+ *     savedAt }
  *
  * `version` lets future releases migrate old saves instead of discarding them.
+ *
+ * `difficulty` is chosen once, when the slot is created, and never again — see
+ * the note at the bottom of src/game/difficulty.js. It is on the SLOT rather
+ * than on the device because it is a property of the road this run is walking:
+ * two slots can hold two different games at once, and picking either of them
+ * back up has to put the same one under you.
  */
 
 import { read, write, remove } from '../core/storage.js';
+import { DEFAULT_DIFFICULTY } from './difficulty.js';
 
 export const SLOT_COUNT = 3;
-export const SAVE_VERSION = 1;
+/**
+ * Bumped for the difficulty field. Nothing about the migration below needs the
+ * number — it is additive, like every migration this file has ever done — but a
+ * payload that carries a new field and the old version stamp is a payload that
+ * cannot be told apart from a corrupt one later.
+ */
+export const SAVE_VERSION = 2;
 
 const slotKey = (slot) => `save.slot${slot}`;
 
@@ -49,6 +63,13 @@ function migrate(data) {
   if (!out.version) out.version = 1;
   if (!out.player) return null; // corrupt — treat the slot as empty
   if (typeof out.travelled !== 'number') out.travelled = 0;
+  /**
+   * A file written before there were two roads was written on the ordinary
+   * one, which is exactly what the default says — so every save in the wild
+   * comes back as the run it actually was rather than being told it is
+   * something new.
+   */
+  if (!out.difficulty) out.difficulty = DEFAULT_DIFFICULTY;
   return out;
 }
 
@@ -67,5 +88,7 @@ export function describeSlot(data) {
     savedAt: data.savedAt || 0,
     /** A finished run: the slot replays the ending instead of the road. */
     completed: !!data.completed,
+    /** Which of the two roads this slot is walking. See src/game/difficulty.js. */
+    difficulty: data.difficulty || DEFAULT_DIFFICULTY,
   };
 }

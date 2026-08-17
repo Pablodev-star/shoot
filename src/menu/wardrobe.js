@@ -53,10 +53,13 @@ import {
 } from '../art/sprites-character.js';
 import { pieceThumb, lockedThumb } from '../art/sprites-wardrobe.js';
 import { makeCanvas, drawSprite, frameAt, crisp } from '../art/pixel.js';
+import { createEmberAura } from '../art/ember-aura.js';
 import {
   OUTFIT_SLOTS,
+  emberIntensity,
   getOutfit,
   getWardrobe,
+  horseEmberIntensity,
   previewMount,
   previewSprites,
   saveOutfit,
@@ -102,11 +105,24 @@ export const WardrobeScreen = {
     let elapsed = 0;
     let last = performance.now();
 
+    /**
+     * The mannequin's fire.
+     *
+     * It burns on the PENDING outfit rather than the saved one, which is the
+     * whole reason the mannequin exists: pick the Reaver's coat and it is
+     * alight before your finger is off the card, and take it off again and the
+     * fire goes out. Two emitters, because the horse drawer swaps the man for
+     * the animal and the barding burns whether or not the rider is in the set.
+     */
+    const embers = createEmberAura({ intensity: 0 });
+    const horseEmbers = createEmberAura({ intensity: 0 });
+
     function frame(now) {
-      elapsed += Math.min(64, Math.max(0, now - last));
+      const dt = Math.min(64, Math.max(0, now - last));
+      elapsed += dt;
       last = now;
-      if (slot === 'horse') drawMount(stage, pending, elapsed);
-      else drawFigure(stage, pending, elapsed);
+      if (slot === 'horse') drawMount(stage, pending, elapsed, dt, embers, horseEmbers);
+      else drawFigure(stage, pending, elapsed, dt, embers);
       raf = requestAnimationFrame(frame);
     }
     raf = requestAnimationFrame(frame);
@@ -305,7 +321,7 @@ function pixelSprite(sprite, scale) {
  * changing a hat is not a re-render of anything — the next frame simply has a
  * different sprite in it.
  */
-function drawFigure(stage, outfit, elapsed) {
+function drawFigure(stage, outfit, elapsed, dt, embers) {
   const { canvas, ctx } = stage;
   const s = STAGE.scale;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -317,9 +333,21 @@ function drawFigure(stage, outfit, elapsed) {
   /** Where the soles land. The idle bob is inside the sprite, so this is fixed. */
   const footY = canvas.height - 2 * s;
   const x = Math.round((canvas.width - sprite.width * s) / 2);
+  const y = footY - sprite.height * s;
 
   pixelShadow(ctx, canvas.width / 2, footY - s, 7, 2, s);
-  drawSprite(ctx, sprite, x, footY - sprite.height * s, s);
+  /**
+   * The plate is seven device pixels to a source pixel, which is a very large
+   * ember — so the fire is sized against a third of that. It is the one place
+   * in the game where the figure is drawn bigger than the scene it is in, and
+   * particles on the sprite's own grid would come out as red bricks.
+   */
+  const unit = Math.max(2, Math.round(s / 3));
+  embers.setIntensity(emberIntensity(outfit));
+  embers.update(dt, { x, y, w: sprite.width * s, h: sprite.height * s, unit });
+  embers.draw(ctx, 'back');
+  drawSprite(ctx, sprite, x, y, s);
+  embers.draw(ctx, 'front');
 }
 
 /**
@@ -330,7 +358,7 @@ function drawFigure(stage, outfit, elapsed) {
  * posts a pixel out of the saddle and back, and the straps go with them —
  * which is the whole thing worth checking before you buy a harness.
  */
-function drawMount(stage, outfit, elapsed) {
+function drawMount(stage, outfit, elapsed, dt, embers, horseEmbers) {
   const { canvas, ctx } = stage;
   const s = MOUNT_STAGE.scale;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -344,13 +372,25 @@ function drawMount(stage, outfit, elapsed) {
   const hoofY = canvas.height - 2 * s;
   const x = Math.round((canvas.width - sprite.width * s) / 2);
   const y = hoofY - sprite.height * s - lift;
-
-  pixelShadow(ctx, canvas.width / 2, hoofY - s, 13, 2, s);
-  drawSprite(ctx, sprite, x, y, s);
+  const rx = x + RIDER_OFFSET.x * s;
+  const ry = y + RIDER_OFFSET.y * s;
 
   const riderFrames = rider.ride;
   const seat = riderFrames[frameAt(riderFrames, elapsed, CHARACTER_TIMING.ride)];
-  drawSprite(ctx, seat, x + RIDER_OFFSET.x * s, y + RIDER_OFFSET.y * s, s);
+
+  const unit = Math.max(2, Math.round(s / 2));
+  horseEmbers.setIntensity(horseEmberIntensity(outfit));
+  horseEmbers.update(dt, { x, y, w: sprite.width * s, h: sprite.height * s, unit });
+  embers.setIntensity(emberIntensity(outfit));
+  embers.update(dt, { x: rx, y: ry, w: seat.width * s, h: seat.height * s, unit });
+
+  pixelShadow(ctx, canvas.width / 2, hoofY - s, 13, 2, s);
+  horseEmbers.draw(ctx, 'back');
+  embers.draw(ctx, 'back');
+  drawSprite(ctx, sprite, x, y, s);
+  drawSprite(ctx, seat, rx, ry, s);
+  horseEmbers.draw(ctx, 'front');
+  embers.draw(ctx, 'front');
 }
 
 /**

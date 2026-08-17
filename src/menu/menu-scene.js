@@ -20,6 +20,8 @@ import { drawSprite, frameAt } from '../art/pixel.js';
 import { update as updateDayNight } from '../explore/daynight.js';
 import { PLANE_RISE, planeSpeed } from '../art/env-kit.js';
 import { makeRng } from '../core/rng.js';
+import { createEmberAura } from '../art/ember-aura.js';
+import { emberIntensity } from '../game/wardrobe.js';
 
 /** Menu camera drift, in source pixels per second. */
 const DRIFT = 9;
@@ -40,6 +42,19 @@ export function startMenuScene(options = {}) {
 
   let cameraX = 0;
   let elapsed = 0;
+  /**
+   * The lone silhouette at the end of the road is the player, in whatever they
+   * are actually wearing — so if that is the Ember Reaver, he is on fire behind
+   * the menu. It is the first place anybody sees the outfit after earning it,
+   * because the unlock notice and the wardrobe are both reached from a screen
+   * this is running behind.
+   *
+   * The dt is stashed for the same reason the road stashes one: the figure's
+   * box is only known inside `render`, and stepping the fire a frame behind the
+   * man leaves embers hanging where he was.
+   */
+  const embers = createEmberAura({ intensity: 0 });
+  let frameDt = 16;
 
   /**
    * Tumbleweeds: spawned off-screen right, rolling west across the road, at
@@ -98,6 +113,7 @@ export function startMenuScene(options = {}) {
   const renderer = {
     update(dt) {
       elapsed += dt;
+      frameDt = dt;
       cameraX += (DRIFT * dt) / 1000;
       updateDayNight(dt * 0.35); // menu time passes slower than travel time
       parallax.updateAmbient(dt);
@@ -136,7 +152,19 @@ export function startMenuScene(options = {}) {
       const idle = getCharacterSprites().player.idle;
       const frame = idle[frameAt(idle, elapsed, CHARACTER_TIMING.idle)];
       const heroX = view.w * 0.8;
-      drawSprite(ctx, frame, heroX, gy - frame.height * s + 2 * s, s, true);
+      const heroY = gy - frame.height * s + 2 * s;
+
+      embers.setIntensity(emberIntensity());
+      embers.update(frameDt, {
+        x: heroX,
+        y: heroY,
+        w: frame.width * s,
+        h: frame.height * s,
+        unit: s,
+      });
+      embers.draw(ctx, 'back');
+      drawSprite(ctx, frame, heroX, heroY, s, true);
+      embers.draw(ctx, 'front');
 
       // The near lane rolls past in front of him.
       drawWeeds(ctx, view, gy, true);

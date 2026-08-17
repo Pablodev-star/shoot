@@ -2,7 +2,8 @@
 
 **Shoot!** is a turn-based western duel in pixel art. Reload, shield yourself, or
 shoot before your rival. Walk the trail, manage hunger, buy at shops, rest at
-inns, and ride through five worlds to the final boss.
+inns, and ride through five worlds to the final boss. Beat him and the road
+opens a **harder one**, with something at the end of it that is on fire.
 
 Three years, four versions, one duel. This is the definitive one: plain
 HTML/CSS/JS modules, no build step, no binary assets, hosted on GitHub Pages.
@@ -695,15 +696,92 @@ road, before the shooting, which is where a decision belongs.
 The Dusk Totem still refuses the game over, and it is now the only thing that
 does.
 
-**Three things outlive the slot**, because they belong to the device rather
-than to the run: the achievement ledger, the outfit you are wearing, and the
-receipts for anything bought at the clothing shop. A shirt paid for in a run
-that later died in the Bayou is still in the wardrobe tomorrow — which is the
-only thing that makes a shop appearing once a run worth stopping at.
+**Four things outlive the slot**, because they belong to the device rather
+than to the run: the achievement ledger, the outfit you are wearing, the
+receipts for anything bought at the clothing shop, and whether the hard road is
+open. A shirt paid for in a run that later died in the Bayou is still in the
+wardrobe tomorrow — which is the only thing that makes a shop appearing once a
+run worth stopping at.
+
+## The hard road
+
+Beat the game once and the frame cuts to black.
+
+**The unlock is a cut-scene**, not a toast. The Stranger goes down, and before
+the victory card goes up the screen letterboxes, three lines are typed out of
+the dark, and a card slams into the middle of the frame with red embers coming
+off it. It is the boss entrance's grammar played backwards — a cut to black, a
+held beat, a slam — and it is skippable from the first frame, because a player
+on their fourth clear does not need to be told a fourth time. It plays exactly
+once per device: the flag is written before the scene starts, so closing the tab
+halfway through still leaves the road open. `src/ui/hard-mode-cutscene.js`.
+
+**The choice is made on an empty slot and never again.** A new run's card grows
+a Mode dropdown once the road is open — Normal or Hard, with the honest list of
+what changes printed under it — and the answer is written into the save payload.
+A slot is a Normal run or a Hard run for as long as it exists, it says which on
+its card, and picking it back up puts the same road under you. There is no
+difficulty setting in the options menu and there never will be: a run you can
+turn the difficulty down on halfway through is a run with no difficulty in it.
+
+**What actually changes** is a table of about twenty multipliers in
+`src/game/difficulty.js`, read at the point of use by the curve that already
+owns each number. There is no second `WORLDS`, no second item catalogue and no
+second price curve, because that is how hard modes rot: two ladders drift, the
+harness only ever measures one of them, and a retune of the Bayou quietly turns
+the other crossing of it into a formality or a wall. One road with a multiplier
+on it means `npm test` measures both.
+
+| | |
+| --- | --- |
+| the man across the road | reads a repeated move off **two**, not three; answers it more often; plays off a read more often. He still never looks at your cylinder. |
+| how much of him | more life on every rider and every boss, more of them carrying a trick, more of the back half of a world carrying the heavier gun |
+| every counter | the stall, the inn **and the forge** all ask about half again, and the half-price tag turns up half as often |
+| what you carry | the cheap bed puts back less, the expensive one no longer restores every life, and the bandage, the kit, the bottle, the meal and the totem are all worth less than they say |
+| the purse | **bigger** — a body is worth more out here, and it does not cover it |
+
+That last row is not a mistake. The version with the purse left alone had an
+expert reaching the Galaxy on 7% of runs, and nearly every one of those deaths
+was somebody standing at a counter unable to afford the thing that would have
+saved them. A hard mode where the correct decision is unavailable is not testing
+your decisions. Prices are up 40% and the purse is up 45%; what changed is that
+everything the gold buys is worth about a tenth less and the discount is rare.
+
+**It is measured, and it took five attempts.** `node tools/sim.mjs hard` runs
+the whole thing and `npm test` gates it. The first four passes were built by
+picking numbers that *sounded* hard — a quarter more life, prices up half, heals
+down a third — and every one of them came out between 0% and 8% for an expert,
+which is a mode with an outfit at the end of it that nobody will ever wear. Run
+knob-group by knob-group, the harness said why:
+
+| | expert reaches the Galaxy |
+| --- | --- |
+| the ordinary road | 59% |
+| the combat knobs alone | 35% |
+| the price knobs alone, purse matched | 45% |
+| **the item and bed knobs alone** | **19%** |
+
+What kills a run out there is not the man across the road and it is not the
+price tag: it is how little a bandage puts back, because that is what all fifty
+survival checks of a full clear are paid for out of. So the value knobs are the
+gentlest column in the table and the price knobs are the boldest — the exact
+opposite of the first four guesses. Where it landed:
+
+| | reaches the Galaxy | finishes |
+| --- | --- | --- |
+| mashes one button | 7% → **1%** | 0% → 0% |
+| plays reasonably | 17% → **2%** | 1% → 0% |
+| reads the cylinder, buys correctly | 59% → **23%** | 14% → **1.8%** |
+
+An expert on the hard road is having roughly the run an average player has on
+the ordinary one, and the ending is something they reach about once an evening
+rather than once a week.
+
+**And there is something at the end of it.** See the Ember Reaver, below.
 
 ## Achievements
 
-Sixty-six of them, in six sections, on the main menu where the credits used
+Sixty-nine of them, in six sections, on the main menu where the credits used
 to be. They live **outside the save slots** — next to the profile and the
 settings, through the same storage driver — because a run can die and take its
 file with it, and the whole point of an achievement is that it survives that.
@@ -715,11 +793,17 @@ card is drained of its colour and shows a padlock where the medal goes, but it
 still says what it wants, because the list is meant to be usable as a set of
 things to go and do rather than a set of surprises.
 
-Every card carries a **reward slot**, and thirty of them now have clothes on
+Every card carries a **reward slot**, and thirty-one of them now have clothes on
 the hanger: a picture of the garment, its slot and its name, on the locked cards
-as well as the earned ones. Four of those are **harnesses** — tack for the
+as well as the earned ones. Five of those are **harnesses** — tack for the
 horse — spread the same way everything else is, one apiece off the miles, the
-bosses, the purse and the ladder. The link is written down in exactly one place
+bosses, the purse and the ladder.
+
+Exactly **one line pays out five pieces at once**: finishing the game on the
+hard road hands over the whole Ember Reaver, hood to barding. The reward shape
+takes a `pieces` array for it rather than growing a second reward kind, so a
+card that pays one garment and a card that pays a whole outfit read identically
+to the wardrobe, to the screen and to the lock. The link is written down in exactly one place
 — `reward: { kind: 'clothing', slot, id }` on the achievement itself — and the
 wardrobe reads the list backwards to find out what each garment is waiting for.
 Move a reward from one line to another and nothing else has to be told. The
@@ -768,10 +852,10 @@ registered with the router — it simply has no door on the menu for now.
 
 ## The wardrobe
 
-Fifty-six garments across five slots — hat, shirt, trousers, boots and the
-**horse's harness** — of which five are what you start in, **thirty are paid for
-by an achievement**, and **twenty-one are bought over a counter** at the clothing
-shop. The door is the avatar on the Profile screen: it is a button, with a pixel
+Sixty-one garments across five slots — hat, shirt, trousers, boots and the
+**horse's harness** — of which five are what you start in (six, counting "No
+Tack", which is a real choice), **thirty-five are paid for by an achievement**,
+and **twenty are bought over a counter** at the clothing shop. The door is the avatar on the Profile screen: it is a button, with a pixel
 pencil hanging off its corner, and it opens a screen with the clothes on the
 left and the gunslinger himself on the right, breathing in the same idle loop
 the game uses everywhere else, wearing whatever is currently selected. Nothing
@@ -844,6 +928,53 @@ is a hard square seven screen pixels across. The ellipse is rasterised onto the
 same grid the sprite is on now — one row per source pixel, each as wide as the
 circle is at that height — so everything on the plate steps by the same amount.
 
+### The Ember Reaver
+
+The one thing at the end of the hard road, and the only garment in the game
+whose art is **not finished when the sprite is baked**.
+
+Five pieces — the Reaver's Hood, Coat, Greaves, Boots and the horse's Barding —
+handed over together by a single achievement, in black and red and nothing else.
+No brass, no bone, no gold: every other garment in the drawer uses an accent to
+break up its mass, and this one uses the absence of one, so it is the darkest
+shape on any road it walks down. The silhouette still has to carry it with the
+fire switched off, which is why the hood is the tallest headwear in the game — a
+peak clearing the crown by two rows, the cowl hanging ragged beside the jaw, and
+a slit of ember across the brow where a face should be.
+
+**And then it burns.** `src/art/ember-aura.js` is a particle emitter that clings
+to whatever box it is handed, and it runs on all four screens that draw a
+gunslinger: the road, the duel, the wardrobe's mannequin and the lone silhouette
+at the end of the road behind the menu. The barding burns the horse, so a rider
+in the full set is alight at both ends.
+
+Three rules make a square read as a flame, and none of them is the particle's
+shape:
+
+- **Colour over age.** An ember is born white-hot, spends most of its life red
+  and dies the colour of dried blood — quantised to four steps rather than
+  interpolated, because a continuous ramp on a four-colour palette is a dither
+  and a dither at this size is mud.
+- **A wobble on its own clock.** Every ember drifts sideways on a sine with its
+  own period and phase. A column of squares rising straight up is a lift; the
+  same column with each square wandering a pixel and a half either way is a
+  flame. One `Math.sin` per particle per frame, and it is the whole effect.
+- **A tail that is darker, not longer.** One dim square behind each hot one.
+  Fire drawn with streaks reads as rain going the wrong way.
+
+Everything is a `fillRect` of exactly one **scene** pixel — never the fighter's,
+which is the mistake the Stranger's aura made first: sized against a fighter
+drawn at twelve device pixels a pixel, the fire comes out as a scatter of
+squares the size of his eye. Sized against the view it magnifies with the camera
+exactly as the art does. Half the population is drawn *in front of* the figure,
+because behind a silhouette this solid a fire is only visible where it clears
+the outline, and every close-up would come out with no fire in it at all.
+
+**The fire scales with how much of the set is on** — a boolean would have made
+the four pieces interchangeable, so you could wear the hood and take the flames
+anywhere. One piece smoulders, three burn properly, and the full set is the
+thing the cut-scene promised.
+
 ## Online
 
 The online lobby is **built but not wired**: room browser, create-room dialog,
@@ -889,6 +1020,9 @@ src/
                           belt, the trouser/boot transforms that find the legs
                           in whatever pose they are in, and the harnesses,
                           which are straps laid on the horse (Block 2f)
+    ember-aura.js         the Ember Reaver's fire: square particles on the
+                          scene's own pixel grid, the one thing in the wardrobe
+                          that is not finished when the sprite is baked
     sprites-enemies.js    enemy archetypes — heads, torsos, legs and palettes
                           composed on the rig
     sprites-fx.js         muzzle flash, powder smoke, spent brass, impact,
@@ -919,8 +1053,9 @@ src/
                           painted, shaded and contoured off, the water, the
                           cracks, the markers, the cased road and the rose
   ui/                    shared widgets, saddlebag, trail map, toasts, dialogs,
-                         speech, and the achievement notice that outranks all
-                         of them
+                         speech, the achievement notice that outranks all of
+                         them, and the two scenes that are not screens — the
+                         Dusk Totem breaking, and the hard road opening
   menu/                  title, online, profile, wardrobe, settings,
                          achievements, credits
   explore/               walk engine, parallax, encounters, hunger, day/night, weather
@@ -935,6 +1070,9 @@ src/
                          ladder, save slots, run controller, interstitials,
                          the achievement ledger, and the wardrobe — half of it
                          paid out by that ledger, half of it sold by the tailor
+    difficulty.js         the two roads: one table of named knobs read at the
+                          point of use by every curve, and the lock the hard
+                          one sits behind
   admin/                 the developer panel and the door into it: the stroke
                          recogniser, the per-slot lock, the one object every
                          override lives in, the road map that prints the real
@@ -980,6 +1118,8 @@ node tools/sim.mjs duels     # win rates and attrition per world, per skill
 node tools/sim.mjs bosses    # the six bosses
 node tools/sim.mjs specials  # how often a landmark actually erupts
 node tools/sim.mjs runs      # full runs, permadeath on
+node tools/sim.mjs hard      # the same, on the hard road
+DIFF=hard node tools/sim.mjs duels   # any single report, on either road
 ```
 
 `tools/sim.mjs` imports the **real** duel engine, the real opponent, the real
@@ -1006,6 +1146,19 @@ fails if the game leaves it:
 Almost all of that spread is the **ledger**, not the trigger finger. Reading the
 opponent's chambers is worth about a fifth of the damage you take; buying food
 before you are hungry and bandages before you are hurt is worth the run.
+
+**Both roads are measured on every build.** `npm run sim` runs the full-run
+report twice — Normal and Hard — and gates each against its own bands, because
+the entire point of building the second road out of multipliers over the first
+(see *The hard road*) is that a retune of the Bayou moves both crossings of it.
+A second road that is only checked when somebody remembers to check it is the
+second set of tables that design exists to avoid, wearing a different hat.
+
+| | reaches the Galaxy, hard |
+| --- | --- |
+| mashes one button, spends badly | ~1% |
+| plays reasonably | ~2% |
+| reads the cylinder, buys correctly | ~23% |
 
 `node tools/sim.mjs asymmetry` is the other half of the harness and the one that
 would have caught the worst bug this game has had. It puts the two sides of the
@@ -1053,6 +1206,12 @@ Balance lives in data, not in code:
   likes without the balance moving.
 - `src/shops/shop.js` — what a counter holds: `STOCK_DEPTH` for anything
   stackable, and the guaranteed heal in slot zero.
+- `src/game/difficulty.js` — the whole of the hard road: about twenty named
+  knobs with the ordinary road written out beside them in full, so the two
+  columns can be diffed. Nothing else in the game holds a second copy of any
+  curve; every reader asks here which road it is standing on and multiplies.
+  The note over the `hard` column is the measurement log — which knob group
+  costs what, and why the four passes before it were walls.
 - `src/game/wardrobe.js` — the garment catalogue, and the two ways a piece is
   unlocked. Give one a `price` and `source: 'shop'` and it is on the clothing
   shop's rail and nowhere else; name it in an achievement's `reward` instead and

@@ -20,9 +20,11 @@ import { makeRng } from '../core/rng.js';
 import {
   innBasicHeal,
   innBasicPrice,
+  innPremiumHeal,
   innPremiumPrice,
 } from '../game/progression.js';
 import { getState } from '../game/player.js';
+import { tuning } from '../game/difficulty.js';
 import { BASE_DISCOUNT_CHANCE, DISCOUNT_RATE } from './shop.js';
 
 /**
@@ -33,7 +35,10 @@ import { BASE_DISCOUNT_CHANCE, DISCOUNT_RATE } from './shop.js';
 export function generateOffers(worldId, seed) {
   const rng = makeRng(seed >>> 0);
   const perks = getState().shopPerks || {};
-  const discountChance = Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
+  const discountChance = Math.min(
+    0.85,
+    (BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0)) * tuning().discountChanceMul,
+  );
 
   const build = (id, name, desc, fullPrice, heal) => {
     const discounted = rng.chance(discountChance);
@@ -51,6 +56,18 @@ export function generateOffers(worldId, seed) {
   };
 
   const basicHeal = innBasicHeal(worldId, getState().maxLives);
+  /**
+   * The good bed, which is not always the whole bar any more — see
+   * `innPremiumHeal`. The card has to say what it actually does: a room that
+   * promises "every life" and hands back three quarters of one is the kind of
+   * lie a player finds out about with a boss in front of them.
+   */
+  const premiumHeal = innPremiumHeal(getState().maxLives);
+  const premiumDesc = premiumHeal === Infinity
+    ? 'A real room, a real bath, a real breakfast. Restores every life.'
+    : `A real room, a real bath, a real breakfast. Restores ${premiumHeal} `
+      + `${premiumHeal === 1 ? 'life' : 'lives'} — out here nobody sleeps the whole night.`;
+
   return [
     build(
       'basic',
@@ -62,9 +79,9 @@ export function generateOffers(worldId, seed) {
     build(
       'premium',
       'Premium Bed',
-      'A real room, a real bath, a real breakfast. Restores every life.',
+      premiumDesc,
       innPremiumPrice(worldId),
-      Infinity,
+      premiumHeal,
     ),
   ];
 }

@@ -39,6 +39,7 @@ import {
   starvationIntervalMs,
 } from '../game/progression.js';
 import { getState, setHunger, loseLife, hasCanteen } from '../game/player.js';
+import { tuning } from '../game/difficulty.js';
 import { getWeatherState } from './weather.js';
 import { toast } from '../ui/toast.js';
 import { OVERRIDES } from '../admin/overrides.js';
@@ -81,11 +82,20 @@ export function drainMultiplier() {
      * than no gauge.
      */
     admin: OVERRIDES.walk.hungerMul,
+    /**
+     * …and so does the road's own. Hard mode burns rations a little faster,
+     * and it rides in the total with the other four for the same reason the
+     * admin dial does: the travel band draws this number, and a gauge that
+     * quietly empties faster than the badge says is a difficulty spike the
+     * player can only discover by starving to it.
+     */
+    mode: tuning().hungerDrainMul,
     total:
       (horse ? HUNGER_DRAIN_HORSE_MUL : 1) *
       (canteen ? HUNGER_DRAIN_CANTEEN_MUL : 1) *
       weather *
-      OVERRIDES.walk.hungerMul,
+      OVERRIDES.walk.hungerMul *
+      tuning().hungerDrainMul,
   };
 }
 

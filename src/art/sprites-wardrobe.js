@@ -357,6 +357,45 @@ export const HATS = {
     ],
   },
 
+  /**
+   * THE EMBER REAVER, AND WHY IT LOOKS LIKE NOTHING ELSE IN THE DRAWER
+   * -------------------------------------------------------------------------
+   * The one thing the hard road pays out, and the only garment in the game
+   * whose art is not finished when the sprite is baked — every piece of it
+   * carries live fire (`createEmberAura` in src/art/ember-aura.js), which is
+   * the half of it a sheet of pixels cannot hold.
+   *
+   * The pixels still have to do their own job, because the fire is drawn AROUND
+   * a silhouette and a silhouette that reads as "black hat" is a black hat with
+   * sparks near it. So the hood is the tallest headwear in the game — a peak
+   * that clears the crown by two rows — with the cowl's edges hanging ragged
+   * beside the jaw and a slit of ember across the brow where a face should be.
+   * You can tell it from across the road with the fire switched off, which is
+   * the test every garment in this file has to pass.
+   *
+   * Black and red, and only black and red. Two families out of the master
+   * palette (`ink`/`char` and the four reds) with nothing warm or metallic in
+   * between — no brass, no bone, no gold. Everything else in the wardrobe uses
+   * an accent to break up its mass; this one uses the absence of one, so it is
+   * the darkest shape on any road it walks down.
+   */
+  reaver: {
+    key: { h: PALETTE.ink, H: PALETTE.charDark, a: PALETTE.red, A: PALETTE.redLight },
+    rows: [
+      '......kkk.......',
+      '.....kkHkk......',
+      '....kHhhhHk.....',
+      '...kHhhhhhHk....',
+      '..kHhhhhhhhHk...',
+      '.kaAaaaaaaaAak..',
+      '.kkhhhhhhhhhkk..',
+      '..kh.......hk...',
+      '...kh.....hk....',
+      '...ka.....ak....',
+      '....k.....k.....',
+    ],
+  },
+
   // --- Bought, never earned ------------------------------------------------
   //
   // Everything from here down is sold over a counter and hangs on no
@@ -606,6 +645,29 @@ export const SHIRTS = {
     hem: 'PffffffffP',
   }),
 
+  /**
+   * The Reaver's coat: black to the collar, with a seam of fire running down
+   * the front of it and the hem still burning.
+   *
+   * The Cinder Coat (`ember`, off the Basin) is the nearest thing to it in the
+   * drawer and they are deliberately not the same idea. That one is char with
+   * heat trapped in the cracks — orange, scattered, a coat that has been in a
+   * fire. This one is black with a single unbroken line of red down the middle
+   * of the chest and a hem that is all flame, which reads as a coat that IS
+   * one. Ember is the aftermath; this is the event.
+   */
+  reaver: shirt({
+    key: {
+      p: PALETTE.charDark, P: PALETTE.ink, q: PALETTE.char,
+      w: PALETTE.redDeep, W: PALETTE.redDark,
+      f: PALETTE.red, F: PALETTE.redLight,
+      t: PALETTE.ink, T: PALETTE.shadow, l: PALETTE.redLight,
+    },
+    collar: 'pFffffFp',
+    chest: ['ppqqqqpp', 'qppPffPppq', 'ppPFffFPpp', 'ppPfFFfPpp', 'spPffffPps', 'PPffffPP'],
+    hem: 'PfffFFfffP',
+  }),
+
   // --- Bought, never earned ------------------------------------------------
 
   /** Mule-train wool: broad bands, worn over the head and never buttoned. */
@@ -715,6 +777,13 @@ export const PANTS = {
     transform: (rows, band) => outside(rows, band.lower, 'c'),
   },
 
+  /** Reaver's greaves: black leather, a red seam up the thigh, coals at the shin. */
+  reaver: {
+    key: { b: PALETTE.ink, c: PALETTE.red, C: PALETTE.redLight },
+    hip: hip('bcCccCcb'),
+    transform: (rows, band) => studs(seam(rows, band.thigh, 'c'), band.shin, 'C'),
+  },
+
   // --- Bought, never earned ------------------------------------------------
 
   /** Riveted denim, indigo, with copper at every seam that ever tore. */
@@ -790,6 +859,19 @@ export const BOOTS = {
   gilded: {
     key: { B: PALETTE.goldDark, v: PALETTE.goldLight },
     transform: (rows, band) => seam(bootTops(rows, band), [...band.shin, ...band.boot], 'v'),
+  },
+
+  /**
+   * Reaver's boots. Up past the calf in black, with the welt glowing and a
+   * flick of fire off the outside of each one — which is the only place in the
+   * outfit where the pixels do the thing the emitter does, on purpose: the
+   * boots are the part of the figure that is smallest on screen and lowest in
+   * the frame, and the live fire pools at exactly that height. Two red pixels
+   * baked into the sprite are what keep them from disappearing into it.
+   */
+  reaver: {
+    key: { B: PALETTE.ink, v: PALETTE.red },
+    transform: (rows, band) => outside(studs(bootTops(rows, band, 2), band.boot, 'v'), band.calf, 'v'),
   },
 
   // --- Bought, never earned ------------------------------------------------
@@ -926,6 +1008,28 @@ export const HARNESS = {
   /** Cut past the last horizon. The fittings are not reflecting anything. */
   star: harness(['bridle', 'reins', 'collar', 'girth', 'conchos', 'plume'], {
     j: PALETTE.voidRock, J: PALETTE.voidRockDark, i: PALETTE.star,
+  }),
+
+  /**
+   * The Reaver's barding, and the horse burns too.
+   *
+   * Every part in the rack at once — the only harness in the game that carries
+   * all six — in black leather with red iron on it and a plume the colour of
+   * the coat's hem. It is the heaviest silhouette an animal in this game can
+   * have, which is the right shape for the one rig you have to beat the hard
+   * road to put on: it should be obvious what is coming down the road before
+   * the rider is close enough to recognise.
+   */
+  reaver: harness(['bridle', 'reins', 'collar', 'plate', 'girth', 'conchos', 'plume'], {
+    /**
+     * Char rather than ink, and it is the note two rigs above this one being
+     * obeyed: a strap the colour of the coat it lies on is a strap nobody can
+     * see, and ink IS the outline colour — the first pass at this drew a black
+     * rig on a brown horse and every buckle of it vanished into the animal's
+     * own edges. Charcoal still reads as black at sixteen pixels and it is four
+     * values off the horse, so the bridle is a bridle from across the road.
+     */
+    j: PALETTE.charLight, J: PALETTE.charDark, i: PALETTE.redLight,
   }),
 
   // --- Bought, never earned ------------------------------------------------

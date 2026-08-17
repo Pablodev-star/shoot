@@ -23,6 +23,7 @@
  *   node tools/sim.mjs bosses    the same for the six bosses
  *   node tools/sim.mjs specials  how often a world's landmark actually erupts
  *   node tools/sim.mjs runs      full runs, permadeath on — the headline number
+ *   node tools/sim.mjs hard      the same, on the hard road
  *   node tools/sim.mjs all       everything (this is what CI runs)
  *
  *   RUNS=600 node tools/sim.mjs runs      more samples, slower
@@ -51,6 +52,8 @@ import { generateSegment, revealToHorizon, roadReading } from '../src/explore/en
 import { ITEMS } from '../src/game/items.js';
 import { makeRng } from '../src/core/rng.js';
 import { generateStock } from '../src/shops/shop.js';
+import { setDifficulty, tuning } from '../src/game/difficulty.js';
+import { ITEMS as CATALOGUE } from '../src/game/items.js';
 import * as P from '../src/game/progression.js';
 
 /**
@@ -59,6 +62,13 @@ import * as P from '../src/game/progression.js';
  * on a real clock — everything else in this game waits for the player.
  */
 const ROUND_MS = Number(process.env.ROUND_MS || 3800);
+/**
+ * Which road the single-report modes measure. `runs`, `hard` and `all` set it
+ * themselves; everything else (`duels`, `bosses`, `specials`, `asymmetry`)
+ * honours this, so `DIFF=hard node tools/sim.mjs duels` is how a knob gets
+ * diagnosed one world at a time instead of by watching the headline number.
+ */
+const DIFF = process.env.DIFF === 'hard' ? 'hard' : 'normal';
 const RUNS = Number(process.env.RUNS || 400);
 const DUELS = Number(process.env.DUELS || 400);
 
@@ -247,13 +257,32 @@ const SPENDING = {
  *   `enemyGunDamageAt`. The harness has to model it or it measures a road that
  *   is a good deal gentler than the one the player walks.
  */
+/**
+ * THE MODE IS APPLIED HERE TOO, AND IT HAS TO BE, LINE FOR LINE
+ * ---------------------------------------------------------------------------
+ * Almost nothing in this harness reimplements the game — the duel engine, the
+ * AI, the road generator, the price curve and the shop are all the shipped
+ * modules, and every one of them reads `tuning()` on its own. These two
+ * functions are the exception: enemy generation is the one thing the harness
+ * builds itself (it needs no sprites, no names and no seed order), and that
+ * makes it the one place where a difficulty knob can be silently missed.
+ *
+ * So they mirror `generateEnemy` and `generateBoss` in src/game/enemies.js
+ * knob for knob, `baseLives` included — a model that fattened the riders but
+ * paid out on the fat total would measure a hard road that funds itself.
+ */
+const scaleLives = (lives, mul) => (mul === 1 ? lives : Math.max(0.5, Math.floor(lives * mul * 2) / 2));
+
 function rollEnemy(worldId, rng, progress = 0) {
   const p = getWorld(worldId).enemy;
-  const lives = Number(rng.weighted(p.lives));
-  const heavier = rng.chance(P.ENEMY_DAMAGE_RAMP_CHANCE);
+  const t = tuning();
+  const rolled = Number(rng.weighted(p.lives));
+  const lives = scaleLives(rolled, t.enemyLivesMul);
+  const heavier = rng.chance(P.enemyRampChance());
+  const abilityChance = p.abilityChance * t.enemyAbilityChanceMul;
   const abilities = [];
-  if (rng.chance(p.abilityChance)) abilities.push(rng.pick(p.abilities));
-  if (worldId >= 4 && rng.chance(p.abilityChance * 0.5)) {
+  if (rng.chance(abilityChance)) abilities.push(rng.pick(p.abilities));
+  if (worldId >= 4 && rng.chance(abilityChance * 0.5)) {
     const extra = rng.pick(p.abilities);
     if (!abilities.includes(extra)) abilities.push(extra);
   }
@@ -261,11 +290,13 @@ function rollEnemy(worldId, rng, progress = 0) {
     name: 'rider',
     lives,
     maxLives: lives,
+    baseLives: rolled,
     bullets: 0,
-    accuracy: p.accuracy,
+    accuracy: p.accuracy + t.enemyAccuracyBonus,
     gunDamage: P.enemyGunDamageAt(worldId, progress, heavier),
     abilities,
-    special: rng.chance(p.specialChance || 0) ? p.special : null,
+    abilityChanceMul: t.enemyCastMul,
+    special: rng.chance((p.specialChance || 0) * t.enemySpecialChanceMul) ? p.special : null,
     isBoss: false,
   };
 }
@@ -274,16 +305,19 @@ function bossPhase(worldId, index = 0) {
   const b = getWorld(worldId).boss;
   const ph = b.phases ? b.phases[index] : b;
   if (!ph) return null;
+  const t = tuning();
+  const lives = scaleLives(ph.lives, t.bossLivesMul);
   return {
     name: ph.name || b.name,
-    lives: ph.lives,
-    maxLives: ph.lives,
+    lives,
+    maxLives: lives,
+    baseLives: ph.lives,
     bullets: ph.startBullets || 0,
-    accuracy: ph.accuracy ?? b.accuracy,
+    accuracy: (ph.accuracy ?? b.accuracy) + t.enemyAccuracyBonus,
     // A boss carries its world's ordinary bullet — see `generateBoss`.
     gunDamage: P.enemyGunDamage(worldId),
     abilities: ph.abilities || b.abilities,
-    abilityChanceMul: ph.abilityChanceMul || 1,
+    abilityChanceMul: (ph.abilityChanceMul || 1) * t.enemyCastMul,
     special: ph.special || b.special,
     isBoss: true,
   };
@@ -647,11 +681,13 @@ async function runOnce(seed, policy) {
   const rng = makeRng(seed >>> 0);
   const buy = SPENDING[policy];
   const player = {
-    level: 1, exp: 0, gold: 60, gun: 0,
+    level: 1, exp: 0, gold: tuning().startingGold, gun: 0,
     maxLives: P.STARTING_LIVES, lives: P.STARTING_LIVES,
     /** Gold lives off Potions. Spent before the bar, never healed back. */
     bonus: 0,
-    hunger: P.HUNGER_MAX, food: 44, heals: ['bandage', 'bandage'],
+    // Two carrots, sized through the same helper the bag uses — the hard road
+    // does not hand out the same lunch.
+    hunger: P.HUNGER_MAX, food: 2 * P.itemFood(CATALOGUE.carrot), heals: ['bandage', 'bandage'],
   };
 
   /**
@@ -693,7 +729,7 @@ async function runOnce(seed, policy) {
       // --- the road between here and there --------------------------------
       const secs = (ev.distance - travelled) / P.WALK_SPEED;
       travelled = ev.distance;
-      player.hunger -= P.HUNGER_DRAIN_PER_SEC * secs;
+      player.hunger -= P.HUNGER_DRAIN_PER_SEC * tuning().hungerDrainMul * secs;
       while (player.hunger < 35 && player.food > 0) {
         const bite = Math.min(player.food, 40);
         player.food -= bite;
@@ -767,8 +803,11 @@ async function runOnce(seed, policy) {
           player.lives = Math.max(0.5, r.livesLeft);
           player.bonus = r.bonusLeft;
         }
-        player.gold += P.goldForEnemy({ worldId, lives: enemy.maxLives, isBoss: enemy.isBoss });
-        player.exp += P.expForEnemy({ worldId, lives: enemy.maxLives, isBoss: enemy.isBoss });
+        // Paid on what the rider would have carried on the ordinary road — see
+        // `scaleLives` above and `resolveDuel` in src/game/run.js.
+        const paidOn = enemy.baseLives ?? enemy.maxLives;
+        player.gold += P.goldForEnemy({ worldId, lives: paidOn, isBoss: enemy.isBoss });
+        player.exp += P.expForEnemy({ worldId, lives: paidOn, isBoss: enemy.isBoss });
         levelUp();
       } else if (ev.type === 'forge') {
         const keep = buy.reserve(worldId);
@@ -788,10 +827,12 @@ async function runOnce(seed, policy) {
         const prem = P.innPremiumPrice(worldId);
         const basic = P.innBasicPrice(worldId);
         const heal = P.innBasicHeal(worldId, player.maxLives);
+        // The good bed is not always the whole bar — see `innPremiumHeal`.
+        const premHeal = P.innPremiumHeal(player.maxLives);
         const missing = player.maxLives - player.lives;
         if (missing > heal && player.gold >= prem && missing / player.maxLives >= buy.premiumAt) {
           player.gold -= prem;
-          player.lives = player.maxLives;
+          player.lives = Math.min(player.maxLives, player.lives + premHeal);
         } else if (missing >= 1 && player.gold >= basic) {
           player.gold -= basic;
           player.lives = Math.min(player.maxLives, player.lives + heal);
@@ -820,7 +861,7 @@ async function runOnce(seed, policy) {
           if (!line.item.food) continue;
           while (line.units > 0 && player.food < buy.foodTarget && player.gold >= line.price * 2) {
             player.gold -= line.price;
-            player.food += line.item.food;
+            player.food += P.itemFood(line.item);
             line.units -= 1;
           }
         }
@@ -851,7 +892,7 @@ async function runOnce(seed, policy) {
          * So it competes on the same ledger, at lives per gold, and the buyer
          * simply does something different with it.
          */
-        const livesFor = (item) => (item.bonusLives || P.itemHeal(item, player.maxLives));
+        const livesFor = (item) => (P.itemBonusLives(item) || P.itemHeal(item, player.maxLives));
         let budget = player.gold * buy.healBudget;
         const heals = stock
           .filter((line) => (line.item.heal || line.item.bonusLives) && line.units > 0)
@@ -860,7 +901,7 @@ async function runOnce(seed, policy) {
           while (line.units > 0 && budget >= line.price && player.heals.length < 16) {
             player.gold -= line.price;
             budget -= line.price;
-            if (line.item.bonusLives) player.bonus += line.item.bonusLives;
+            if (line.item.bonusLives) player.bonus += P.itemBonusLives(line.item);
             else player.heals.push(line.item.id);
             line.units -= 1;
           }
@@ -871,7 +912,8 @@ async function runOnce(seed, policy) {
   return { died: false, worldId: FINAL_WORLD, cause: 'victory', gun: player.gun, level: player.level };
 }
 
-async function reportRuns() {
+async function reportRuns(difficulty = 'normal') {
+  setDifficulty(difficulty);
   const rows = [];
   const detail = {};
   for (const policy of ['novice', 'average', 'expert']) {
@@ -900,12 +942,16 @@ async function reportRuns() {
       .slice(0, 6)
       .map(([where, n]) => ({ policy, where, runs: n, pct: pct(n, RUNS) }));
   }
-  console.log(`\n=== FULL RUNS (${RUNS} per skill, permadeath on) ===`);
+  console.log(`\n=== FULL RUNS · ${difficulty.toUpperCase()} (${RUNS} per skill, permadeath on) ===`);
   console.table(rows);
   console.log('\nWHERE RUNS END');
   console.table(Object.values(detail).flat());
+  setDifficulty('normal');
   return rows;
 }
+
+/** The hard road, measured the same way and gated against its own bands. */
+const reportHard = () => reportRuns('hard');
 
 // ---------------------------------------------------------------------------
 // The gate
@@ -922,6 +968,50 @@ const TARGETS = [
   { what: 'expert reaches the Galaxy', min: 42, max: 68 },
 ];
 
+/**
+ * THE HARD ROAD'S OWN BANDS, AND WHY THEY ARE WHERE THEY ARE
+ * ---------------------------------------------------------------------------
+ * A hard mode has exactly two ways to fail, and both of them are invisible in
+ * a diff. Too gentle and it is a label on a settings screen; too steep and it
+ * is a wall — nobody finishes it, the outfit at the end of it is never worn,
+ * and the whole feature is a cut-scene followed by a slot nobody plays twice.
+ *
+ * The design target is one sentence: **an expert on the hard road should be
+ * having about the run an average player has on the ordinary one.** Measured,
+ * that is a fifth to a quarter of hard runs reaching the Galaxy against three
+ * in five on the ordinary road, and it is what the whole `hard` column in
+ * src/game/difficulty.js was solved against.
+ *
+ * The bands are wide because they are here to catch a change that moved the
+ * mode by a third, not to freeze it — the same reasoning as TARGETS above. The
+ * ceilings matter as much as the floors: an expert clearing better than two
+ * runs in five has a hard mode that stopped being one.
+ *
+ * The two lower bands have a floor of ZERO, and that is deliberate rather than
+ * lazy. Somebody who mashes SHOOT and never reads a price tag is not supposed
+ * to see the last world out here, and a floor above zero would be a promise
+ * this road should not make.
+ */
+const HARD_TARGETS = [
+  { what: 'novice reaches the Galaxy (hard)', min: 0, max: 6 },
+  { what: 'average reaches the Galaxy (hard)', min: 0, max: 12 },
+  { what: 'expert reaches the Galaxy (hard)', min: 12, max: 38 },
+];
+
+/**
+ * Check a set of run rows against a set of bands. Returns the failures, and
+ * prints the table either way — a target that passed is worth seeing, because
+ * the number beside it is how much headroom the next change has.
+ */
+function gate(rows, targets) {
+  const checks = targets.map((t, i) => {
+    const value = rows[i].reachedGalaxyPct;
+    return { ...t, value, ok: value >= t.min && value <= t.max };
+  });
+  console.table(checks);
+  return checks.filter((c) => !c.ok);
+}
+
 async function reportAll() {
   const power = powerCurve();
   console.log('=== WHERE THE ECONOMY PUTS A PLAYER ===');
@@ -930,21 +1020,27 @@ async function reportAll() {
   await reportDuels();
   await reportBosses();
   await reportSpecials();
-  const runs = await reportRuns();
+  const runs = await reportRuns('normal');
+  /**
+   * BOTH ROADS, EVERY BUILD
+   * -------------------------------------------------------------------------
+   * The hard one is measured here rather than in a mode somebody has to
+   * remember to run, because the entire point of building it out of
+   * multipliers over the one road (see src/game/difficulty.js) is that a
+   * retune of the Bayou moves both crossings of it. A second road that is only
+   * checked when somebody thinks to check it is the second set of tables this
+   * design exists to avoid, wearing a different hat.
+   */
+  const hard = await reportHard();
 
   console.log('\n=== TARGETS ===');
-  const checks = TARGETS.map((t, i) => {
-    const value = runs[i].reachedGalaxyPct;
-    return { ...t, value, ok: value >= t.min && value <= t.max };
-  });
-  console.table(checks);
-  const failed = checks.filter((c) => !c.ok);
+  const failed = [...gate(runs, TARGETS), ...gate(hard, HARD_TARGETS)];
   if (failed.length) {
     console.error(`\n${failed.length} target(s) missed:`);
     for (const f of failed) console.error(`  ${f.what}: ${f.value}% (want ${f.min}–${f.max}%)`);
     process.exitCode = 1;
   } else {
-    console.log('\nAll targets met.');
+    console.log('\nAll targets met, on both roads.');
   }
 }
 
@@ -954,8 +1050,11 @@ const MODES = {
   bosses: reportBosses,
   specials: reportSpecials,
   runs: reportRuns,
+  hard: reportHard,
   all: reportAll,
 };
+
+setDifficulty(DIFF);
 
 const mode = process.argv[2] || 'all';
 if (!MODES[mode]) {

@@ -14,6 +14,7 @@
 
 import { MOVES } from './duel-engine.js';
 import { OVERRIDES } from '../admin/overrides.js';
+import { tuning } from '../game/difficulty.js';
 
 /** Human player: the duel screen calls `submit()` from its buttons. */
 export function createLocalAgent() {
@@ -109,6 +110,26 @@ export function createLocalAgent() {
  * is how weather reaches the fight.
  */
 
+/**
+ * THE FOUR NUMBERS, AND THE ONE THING THE HARD ROAD IS ALLOWED TO MOVE
+ * ---------------------------------------------------------------------------
+ * These are the ordinary road's values and they are the ones every note above
+ * is written about. Hard mode replaces them from `tuning()`, and by small
+ * amounts: the read ceiling and the shield share each move a couple of points,
+ * and the pattern reader trips on TWO repeats instead of three — which is the
+ * one that is actually felt, because it is the difference between a habit being
+ * punished and a habit being noticed.
+ *
+ * WHAT IT IS STILL NOT ALLOWED TO DO
+ * ---------------------------------------------------------------------------
+ * Look at your cylinder. Every word of the note at the top of this file holds
+ * on both roads: the read is a model of what this player has DONE, sampled
+ * rather than maximised, and the streak rule punishes repetition the player
+ * chose and can stop choosing. A harder opponent that knew your gun state would
+ * not be a harder opponent, it would be the cheat this agent was rewritten to
+ * stop being — and a hard mode built out of that is a hard mode nobody can
+ * learn, only endure.
+ */
 /** The most of its turns the AI can ever play off a read of the player. */
 const READ_SHARE = 0.62;
 /** Ceiling on the share of turns spent shielding, over the whole duel. */
@@ -151,12 +172,21 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
   const script = (Array.isArray(admin.script) ? admin.script : []).filter((m) => PLAYABLE.includes(m));
   let scriptAt = 0;
 
+  /**
+   * The road's own hand on the agent, read once when it is built. The admin
+   * panel still outranks it: a tester who has pinned the read share to a number
+   * is testing that number, whichever road they are standing on.
+   */
+  const hard = tuning();
+  const streakTrigger = hard.aiStreakTrigger ?? STREAK_TRIGGER;
+  const streakBonus = hard.aiStreakBonus ?? STREAK_BONUS;
+
   const accuracy = Math.max(
     0.05,
     (admin.accuracy ?? enemy.accuracy ?? 0.5) - (modifiers.enemyAccuracyPenalty || 0),
   );
-  const readCeiling = admin.readShare ?? READ_SHARE;
-  const shieldCeiling = admin.shieldShare ?? SHIELD_SHARE;
+  const readCeiling = admin.readShare ?? hard.aiReadCeiling ?? READ_SHARE;
+  const shieldCeiling = admin.shieldShare ?? hard.aiShieldCeiling ?? SHIELD_SHARE;
   /** How often it plays the counter instead of its own game. */
   const readChance = mode === 'oracle'
     ? 1
@@ -241,7 +271,7 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
    * last few turns, which they chose and can stop choosing.
    */
   function streakAnswer() {
-    if (playerStreak < STREAK_TRIGGER) return null;
+    if (playerStreak < streakTrigger) return null;
     if (playerLast === MOVES.SHOOT) return canShield() ? MOVES.SHIELD : null;
     if (playerLast === MOVES.RELOAD) return MOVES.SHOOT;
     return null; // a player who only shields is punishing themselves already
@@ -366,10 +396,14 @@ export function createAiAgent(enemy, modifiers = {}, options = {}) {
       // move here and not the third one in a row.
       if (view.self.lives === 1 && random() < 0.5 && canShield()) {
         move = MOVES.SHIELD;
-      } else if (view.foe.lives === 1 && view.self.bullets > 0 && random() < 0.5 + accuracy * 0.4) {
+      } else if (
+        view.foe.lives === 1
+        && view.self.bullets > 0
+        && random() < 0.5 + accuracy * 0.4 + hard.aiFinisherBonus
+      ) {
         // A finishing shot is never passed up.
         move = MOVES.SHOOT;
-      } else if (streak && random() < STREAK_BONUS) {
+      } else if (streak && random() < streakBonus) {
         // They have told it what they are going to do. It answers.
         move = streak === MOVES.SHOOT && view.self.bullets <= 0 ? MOVES.RELOAD : streak;
       } else if (random() < readChance) {

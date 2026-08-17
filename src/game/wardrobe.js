@@ -90,6 +90,7 @@ export const WARDROBE = {
     { id: 'tophat', name: "Gambler's Stovepipe", blurb: 'Silk, and a brim that has never been rained on.' },
     { id: 'horns', name: 'Basin Helm', blurb: 'Iron off the Brimstone floor, with the horns still on it.' },
     { id: 'starcrown', name: 'Starcrown', blurb: 'A circlet of void iron, and a ring of light that does not touch it.' },
+    { id: 'reaver', name: "Reaver's Hood", blurb: 'A peak of black cloth, ragged at the jaw, and a slit of fire where the eyes go.' },
     { id: 'bowler', name: 'Derby Bowler', blurb: 'Town hat. Out here it is a joke, and it knows it.', source: 'shop', price: 70 },
     { id: 'cavalry', name: 'Cavalry Campaign', blurb: 'Crossed sabres in brass, off a regiment that is not coming back.', source: 'shop', price: 90 },
     { id: 'nomad', name: 'Trader\'s Wrap', blurb: 'Cloth over the crown, and the tail of it left long down one side.', source: 'shop', price: 80 },
@@ -106,6 +107,7 @@ export const WARDROBE = {
     { id: 'ember', name: 'Cinder Coat', blurb: 'Char that never finished burning. The seams are still lit.' },
     { id: 'bones', name: 'Boneyard Shirt', blurb: 'Six of them are in the ground. This is what the seventh wears.' },
     { id: 'voidrobe', name: 'Horizon Cloth', blurb: 'Cut past the last horizon, with the sky still caught in the weave.' },
+    { id: 'reaver', name: "Reaver's Coat", blurb: 'Black to the throat, one seam of fire down the front, and a hem that never went out.' },
     { id: 'poncho', name: 'Mule-Train Poncho', blurb: 'Banded wool, pulled over the head. It has smelled of mules for years.', source: 'shop', price: 95 },
     { id: 'brocade', name: 'Cardsharp\'s Brocade', blurb: 'Gold thread on plum, over sleeves nobody paid for.', source: 'shop', price: 120 },
     { id: 'mourning', name: 'Undertaker\'s Frock', blurb: 'Buttoned to the throat. It is the only coat he owns and it fits.', source: 'shop', set: 'mourning' },
@@ -120,6 +122,7 @@ export const WARDROBE = {
     { id: 'iron', name: 'Riveted Greaves', blurb: 'Plate over the thighs. Heavy, and it looks it.' },
     { id: 'ash', name: 'Scorched Leggings', blurb: 'Basin char with the cracks still glowing through them.' },
     { id: 'star', name: 'Starfall Trousers', blurb: 'Cloth with a sky in it. The stars move when you do.' },
+    { id: 'reaver', name: "Reaver's Greaves", blurb: 'Black leather, a red seam up the thigh, and coals banked at the shin.' },
     { id: 'denim', name: 'Rivet Denim', blurb: 'Indigo, and a copper rivet at every seam that ever gave out.', source: 'shop', price: 75 },
     { id: 'hide', name: 'Buffalo Hide', blurb: 'Hair left on the outside. Heavy, warm, and nothing gets through it.', source: 'shop', price: 90 },
     { id: 'mourning', name: 'Sunday Blacks', blurb: 'Pressed, and one satin line down the outside of each leg.', source: 'shop', set: 'mourning' },
@@ -134,6 +137,7 @@ export const WARDROBE = {
     { id: 'ember', name: 'Emberwelt Boots', blurb: 'The melt never stopped running out of the welt.' },
     { id: 'gilded', name: 'Gilt Boots', blurb: 'Gold from the toe to the top. Loud, and meant to be.' },
     { id: 'star', name: 'Starfall Boots', blurb: 'They leave a little light wherever they land.' },
+    { id: 'reaver', name: "Reaver's Boots", blurb: 'Past the calf in black, and the welt has not stopped glowing since.' },
     { id: 'mule', name: 'Muleskinner Boots', blurb: 'Laced to the knee and re-soled twice. They will see you out.', source: 'shop', price: 70 },
     { id: 'hobnail', name: 'Hobnail Boots', blurb: 'Iron in the sole. You can hear the man coming before the horse.', source: 'shop', price: 85 },
     { id: 'mourning', name: 'Patent Blacks', blurb: 'Polished until the road shows up in them.', source: 'shop', set: 'mourning' },
@@ -155,6 +159,7 @@ export const WARDROBE = {
     { id: 'brass', name: 'Brass Show Rig', blurb: 'Oiled black leather under more brass than any horse needs.' },
     { id: 'iron', name: 'Basin Barding', blurb: 'A plate over the shoulder, off the same floor the helm came from.' },
     { id: 'star', name: 'Starfall Tack', blurb: 'The fittings are not reflecting anything. There is nothing to reflect.' },
+    { id: 'reaver', name: "Reaver's Barding", blurb: 'Every strap it can carry, in black, with red iron on the shoulder and a plume to match the hem.' },
     { id: 'silver', name: 'Silverwork Tack', blurb: 'Border saddlery. Conchos from the browband to the girth.', source: 'shop', price: 130 },
     { id: 'parade', name: 'Parade Rig', blurb: 'Scarlet webbing and a feather that stands straight up.', source: 'shop', price: 145 },
     { id: 'packer', name: 'Packer\'s Rig', blurb: 'Everything you own, and the horse is the one carrying it.', source: 'shop', price: 115 },
@@ -208,18 +213,40 @@ for (const slot of OUTFIT_SLOTS) {
  */
 let requirements = null;
 
+/**
+ * ONE LINE, ONE GARMENT — EXCEPT ONCE
+ * ---------------------------------------------------------------------------
+ * Thirty achievements hand over a single piece and say so in the shape the
+ * reward is written in: `{ kind: 'clothing', slot, id }`. Exactly one hands
+ * over five, and it is the one at the end of the hard road — a hat, a coat,
+ * trousers, boots and the horse's barding, all at once, because the Ember
+ * Reaver is a LOOK rather than a garment and handing it over in pieces would
+ * make the last four of them arrive with nothing to celebrate.
+ *
+ * Rather than a second reward kind, the same kind takes a `pieces` array and
+ * everything below normalises the two into one list. A reward that names one
+ * garment and a reward that names five then read identically to the wardrobe,
+ * to the achievements screen and to the lock — and adding a second complete
+ * outfit later is a line of data rather than a branch.
+ */
+function rewardPieces(reward) {
+  if (!reward || reward.kind !== 'clothing') return [];
+  if (Array.isArray(reward.pieces)) return reward.pieces;
+  return [{ slot: reward.slot, id: reward.id }];
+}
+
 function requirementIndex() {
   if (requirements) return requirements;
   requirements = new Map();
   for (const def of ACHIEVEMENTS) {
-    const reward = def.reward;
-    if (!reward || reward.kind !== 'clothing') continue;
-    const item = BY_ID.get(`${reward.slot}:${reward.id}`);
-    if (!item) {
-      console.warn(`[wardrobe] "${def.id}" rewards a garment that does not exist`);
-      continue;
+    for (const piece of rewardPieces(def.reward)) {
+      const item = BY_ID.get(`${piece.slot}:${piece.id}`);
+      if (!item) {
+        console.warn(`[wardrobe] "${def.id}" rewards a garment that does not exist`);
+        continue;
+      }
+      requirements.set(`${piece.slot}:${piece.id}`, def);
     }
-    requirements.set(`${reward.slot}:${reward.id}`, def);
   }
   return requirements;
 }
@@ -229,11 +256,16 @@ export function requirementFor(slot, id) {
   return requirementIndex().get(`${slot}:${id}`) || null;
 }
 
-/** The garment an achievement hands over, or null. */
+/** Every garment an achievement hands over, in the order it names them. */
+export function rewardsOf(achievement) {
+  return rewardPieces(achievement?.reward)
+    .map((piece) => BY_ID.get(`${piece.slot}:${piece.id}`))
+    .filter(Boolean);
+}
+
+/** The first garment an achievement hands over, or null. */
 export function rewardOf(achievement) {
-  const reward = achievement?.reward;
-  if (!reward || reward.kind !== 'clothing') return null;
-  return BY_ID.get(`${reward.slot}:${reward.id}`) || null;
+  return rewardsOf(achievement)[0] || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -451,8 +483,33 @@ export function getOutfit() {
   return out;
 }
 
+/**
+ * WHAT IS ACTUALLY ON, HELD RATHER THAN RECOMPUTED
+ * ---------------------------------------------------------------------------
+ * `getOutfit` is not free: it clones the profile, and then validates all five
+ * slots against the ledger and the receipts, each of which clones the profile
+ * again. That is exactly the right amount of work for a screen that asks once,
+ * and exactly the wrong amount for the Ember Reaver's fire, which asks on every
+ * frame of three different renderers — about thirty small allocations a frame,
+ * for an answer that changes when somebody presses Save.
+ *
+ * So the worn outfit is cached, and `applyOutfit` is the invalidation point.
+ * That works because it is genuinely the only funnel: boot dresses the rig
+ * through it, Save goes through it, and the Admin Panel's override goes through
+ * it. Anything that ever changes what the man is wearing without calling it
+ * would be a bug in its own right — the sprite cache would be stale too.
+ */
+let wornOutfit = null;
+
+/** The equipped outfit, cached. Callers must not mutate what comes back. */
+function worn() {
+  if (!wornOutfit) wornOutfit = getOutfit();
+  return wornOutfit;
+}
+
 /** Dress the rig. Everything that draws the player picks this up on its next frame. */
 export function applyOutfit(outfit = getOutfit()) {
+  wornOutfit = outfit;
   setPlayerParts(outfitParts(outfit));
   return outfit;
 }
@@ -475,6 +532,52 @@ export async function saveOutfit(outfit) {
 /** True if this outfit is anything other than what everybody starts in. */
 export function isDressedUp(outfit) {
   return OUTFIT_SLOTS.some((slot) => outfit[slot] !== DEFAULT_OUTFIT[slot]);
+}
+
+// ---------------------------------------------------------------------------
+// The one outfit that is on fire
+// ---------------------------------------------------------------------------
+
+/**
+ * WHAT BURNS, AND HOW MUCH OF IT
+ * ---------------------------------------------------------------------------
+ * The Ember Reaver is the only thing in the wardrobe with live particles on it
+ * (`createEmberAura` in src/art/ember-aura.js), and this is the one place that
+ * decides how much. Four screens ask — the road, the duel, the mannequin and
+ * the menu backdrop — and none of them knows the id of a garment.
+ *
+ * IT SCALES WITH HOW MUCH OF THE SET IS ON, WHICH IS THE WHOLE DESIGN
+ * ---------------------------------------------------------------------------
+ * A boolean would have been simpler and it would have made the four pieces
+ * interchangeable: put on the hood, get the fire, wear whatever you like below
+ * it. Scaling means the coat alone smoulders, three pieces burn properly and
+ * the full set is the thing the cut-scene promised — so a player who has just
+ * finished the hard road has a reason to wear all of it, and a player who likes
+ * one piece can still take exactly one piece of the fire with them.
+ *
+ * @param {object} [outfit]
+ * @returns {number} 0 to 1
+ */
+const EMBER_PIECE = 'reaver';
+const EMBER_SLOTS = ['hat', 'shirt', 'pants', 'boots'];
+
+export function emberIntensity(outfit = worn()) {
+  const count = EMBER_SLOTS.filter((slot) => outfit[slot] === EMBER_PIECE).length;
+  /**
+   * A floor of a fifth on the first piece rather than a straight quarter, so
+   * one garment is unmistakably alight instead of being a scatter of four
+   * particles nobody notices. The top of the range is what the full set is
+   * worth, and nothing gets there without all four.
+   */
+  return count === 0 ? 0 : 0.2 + (count / EMBER_SLOTS.length) * 0.8;
+}
+
+/**
+ * The horse's own fire, which is all or nothing: the barding is one piece of
+ * tack and there is no such thing as wearing a quarter of a bridle.
+ */
+export function horseEmberIntensity(outfit = worn()) {
+  return outfit.horse === EMBER_PIECE ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

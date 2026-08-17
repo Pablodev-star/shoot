@@ -25,7 +25,10 @@ import {
   gunDamageAt,
   gunUpgradeCost as gunUpgradeCostAt,
   itemHeal,
+  itemFood,
+  itemBonusLives,
 } from './progression.js';
+import { getDifficulty, tuning } from './difficulty.js';
 import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
 import { track as trackAchievement } from './achievements.js';
@@ -40,7 +43,8 @@ function blankState() {
 
     level: 1,
     exp: 0,
-    gold: 60,
+    /** What a run opens with. The hard road opens with rather less of it. */
+    gold: tuning().startingGold,
 
     /**
      * Permanent revolver tuning bought at forges. Level 0 is the trail iron
@@ -544,13 +548,15 @@ export function useItem(id, opts = {}) {
      * legendary of the tier unusable exactly when it is worth the most.
      */
     if (state.hunger >= HUNGER_MAX && !item.boon) return { ok: false, reason: 'Not hungry.' };
-    addHunger(item.food);
+    // What a meal is actually worth on this road — see `itemFood`.
+    const fills = itemFood(item);
+    addHunger(fills);
     if (item.boon) grantBoon(item.boon);
     removeItem(id, 1);
     play('eat');
     // Whoever is drawing the player right now shows it happening — see the
     // note on ITEM_USED in src/core/events.js.
-    emit(EVENTS.ITEM_USED, { id, effect: 'food', amount: item.food, icon: item.icon });
+    emit(EVENTS.ITEM_USED, { id, effect: 'food', amount: fills, icon: item.icon });
     return { ok: true, effect: 'food', boon: item.boon ? getBoon() : null };
   }
 
@@ -566,7 +572,7 @@ export function useItem(id, opts = {}) {
    * the run.
    */
   if (item.bonusLives) {
-    const amount = item.bonusLives;
+    const amount = itemBonusLives(item);
     if (opts.context !== 'duel') addBonusLives(amount);
     removeItem(id, 1);
     play('levelUp');
@@ -768,7 +774,14 @@ export function breakTotem() {
 export function setWorld(worldId) {
   state.world = worldId;
   state.encounterIndex = 0;
-  emit(EVENTS.WORLD_CHANGED, { world: worldId });
+  /**
+   * The road is on the payload rather than read off the module by whoever is
+   * listening. Two of the three subscribers care which one this is — the
+   * achievement ledger keeps a separate list of the worlds reached the hard way
+   * — and an event that carries the answer is one fewer system reaching into
+   * the difficulty module to ask.
+   */
+  emit(EVENTS.WORLD_CHANGED, { world: worldId, difficulty: getDifficulty() });
 }
 
 export function advanceEncounter() {

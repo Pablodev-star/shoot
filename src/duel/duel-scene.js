@@ -107,6 +107,8 @@ import { getHazardArt, HAZARD_W, HAZARD_H } from '../art/sprites-hazards.js';
 import { getShieldSprites } from '../art/sprites-ui.js';
 import { createCastFx } from './duel-cast.js';
 import { createVitalPops } from '../art/vital-pop.js';
+import { createEmberAura } from '../art/ember-aura.js';
+import { emberIntensity } from '../game/wardrobe.js';
 import { createParallax } from '../explore/parallax.js';
 import * as weather from '../explore/weather.js';
 import { PALETTE } from '../art/palette.js';
@@ -453,6 +455,24 @@ export function createDuelScene({
    */
   let auraLevel = 0;
   const aura = [];
+
+  /**
+   * THE PLAYER'S OWN FIRE, WHICH IS NOT THE STRANGER'S
+   * -------------------------------------------------------------------------
+   * The aura above is his: purple, two levels, and switched on by the boss
+   * entrance. This is the Ember Reaver burning on whoever is standing on the
+   * near side of the road, and it is a different object on purpose. They share
+   * a grammar (particles on the scene's own pixel grid, half of them drawn in
+   * front of the figure) and nothing else — one is a boss's aura authored into
+   * this file, the other is a garment's effect that also has to work on the
+   * road, on a mannequin and in a cut-scene, so it lives in
+   * src/art/ember-aura.js and this scene simply drives it.
+   *
+   * Zero intensity unless the outfit is carrying it, which for nearly every
+   * fight in the game means one `filter` over five strings per frame and no
+   * particles at all.
+   */
+  const playerEmbers = createEmberAura({ intensity: 0 });
 
   function setPose(side, pose) {
     const actor = actors[side];
@@ -1029,6 +1049,7 @@ export function createDuelScene({
       if (fx.card && fx.card.t < 1) fx.card.t = Math.min(1, fx.card.t + dt / 260);
 
       stepAura(dt);
+      stepPlayerEmbers(dt);
       stepHazard(dt);
       casts.update(dt);
 
@@ -1175,8 +1196,12 @@ export function createDuelScene({
       // Fire goes behind him; the sparks it throws go in front. Both are
       // world-space, so a close-up on his face is a close-up on the fire too.
       drawAura(ctx, 'back');
+      // The coat's fire goes down with the man wearing it — behind him first,
+      // then in front once he is drawn, exactly like the Stranger's.
+      playerEmbers.draw(ctx, 'back');
       drawFighter(ctx, 'player');
       drawFighter(ctx, 'enemy');
+      playerEmbers.draw(ctx, 'front');
 
       // --- shields ---
       if (actors.player.pose === 'shield') drawShield(ctx, shield, playerX, gy, fs, elapsed, false);
@@ -1350,6 +1375,34 @@ export function createDuelScene({
     1: { flames: 18, sparkRate: 0.02, arcRate: 0, rise: 0.9, spread: 0.55 },
     2: { flames: 34, sparkRate: 0.07, arcRate: 0.005, rise: 1.5, spread: 0.85 },
   };
+
+  /**
+   * Keep the Ember Reaver's fire on the player's own box.
+   *
+   * It reads the outfit every frame for the same reason the road does: the
+   * Admin Panel can change what a tester is wearing mid-fight, and a fire that
+   * was decided at mount would not follow. `layout` is null until the scene has
+   * drawn once, which is why this is a no-op on the first frame rather than a
+   * guess at where a fighter is going to stand.
+   */
+  function stepPlayerEmbers(dt) {
+    playerEmbers.setIntensity(emberIntensity());
+    if (!layout) return;
+    const L = layout.player;
+    playerEmbers.update(dt, {
+      x: L.originX,
+      y: L.topY,
+      w: FIGHTER_W * L.fs,
+      h: FIGHTER_H * L.fs,
+      /**
+       * The scene's pixel, not the fighter's — see the note at the top of
+       * src/art/ember-aura.js, and the same mistake the aura below made first.
+       * A fighter is drawn at up to twelve device pixels a pixel in a close-up
+       * and embers that size are squares the size of his eye.
+       */
+      unit: Math.max(1, lastView ? lastView.scale : 3),
+    });
+  }
 
   function stepAura(dt) {
     const cfg = AURA[auraLevel];
