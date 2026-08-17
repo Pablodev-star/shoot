@@ -16,6 +16,7 @@ import { startMenuScene } from '../menu/menu-scene.js';
 import { createGalaxyScene } from './galaxy-scene.js';
 import { getProfile } from '../core/settings.js';
 import { maybeShowFirstRunHelp } from '../ui/help.js';
+import { isHardUnlocked } from './difficulty.js';
 
 /** Shown when a new world starts. Auto-advances, or skip with a click/key. */
 export const WorldIntroScreen = {
@@ -94,19 +95,34 @@ export const WorldIntroScreen = {
 export const VictoryScreen = {
   id: 'victory',
 
-  mount(root) {
+  /**
+   * @param {object} [params]
+   * @param {'normal'|'hard'} [params.difficulty] which road was walked. It
+   *   comes in as a parameter rather than being read off the mode, because the
+   *   run controller has already put the road back to the ordinary one by the
+   *   time this mounts — and because this screen is also reached by picking a
+   *   FINISHED slot back up, which replays an ending that happened weeks ago.
+   */
+  mount(root, params = {}) {
     setRenderer(createGalaxyScene());
     playMusic('themeGalaxy');
     play('win');
 
     const player = getState();
     const profile = getProfile();
+    const hardRun = params.difficulty === 'hard';
 
     const screen = el('div.screen.screen--centered.ending-screen', {}, [
       el('div.panel.panel--braced.poster', {}, [
         el('div.result-banner.is-win', {}, [
           el('div.headline', { text: 'The Stranger Falls' }),
           el('div.muted', { text: `${profile.name} rode past the last horizon and came back` }),
+          /**
+           * Finishing the hard road is the largest thing anybody does in this
+           * game, and the card it ends on should say so rather than looking
+           * exactly like the ordinary clear.
+           */
+          hardRun ? el('span.chip.chip--hard', { text: 'Hard road' }) : null,
         ]),
         el('div.stat-grid', {}, [
           statTile('Level', player.level),
@@ -118,6 +134,17 @@ export const VictoryScreen = {
           style: { marginTop: 'var(--sp-4)' },
           text: 'Three years, four versions, one duel. Thanks for playing.',
         }),
+        /**
+         * The nudge, and only for somebody who has not taken it. A player who
+         * has already finished the hard road does not need to be told it
+         * exists, and a card that ends on a to-do list is a card that takes
+         * the ending off its own ending.
+         */
+        !hardRun && isHardUnlocked()
+          ? el('p.muted.center', {
+              text: 'The hard road is open. Start a new slot and pick it from the mode list.',
+            })
+          : null,
         el('div.row', { style: { justifyContent: 'center', marginTop: 'var(--sp-5)' } }, [
           el('button.btn.btn--primary', { onclick: () => go('title') }, ['Back to the menu']),
         ]),
@@ -155,7 +182,15 @@ export const GameOverScreen = {
       el('div.panel.panel--braced.poster', {}, [
         el('div.result-banner.is-loss', {}, [
           el('div.headline', { style: { color: 'var(--red-light)' }, text: 'You went down' }),
-          el('div.muted', { text: `Somewhere in ${world.name}` }),
+          el('div.muted', {
+            // A hard run that ends says which road it ended on. The card is the
+            // last thing the player sees of a slot that has just been erased,
+            // and "somewhere in the Bayou" reads very differently when the
+            // Bayou in question was the hard one.
+            text: params.difficulty === 'hard'
+              ? `Somewhere in ${world.name}, on the hard road`
+              : `Somewhere in ${world.name}`,
+          }),
         ]),
         el('div.stat-grid', {}, [
           statTile('Level reached', player.level),

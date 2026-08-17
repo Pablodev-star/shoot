@@ -40,10 +40,11 @@
 
 import { makeRng } from '../core/rng.js';
 import { getWorld } from './worlds.js';
-import { enemyGunDamage, enemyGunDamageAt, ENEMY_DAMAGE_RAMP_CHANCE } from './progression.js';
+import { enemyGunDamage, enemyGunDamageAt, enemyRampChance } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
 import { OVERRIDES } from '../admin/overrides.js';
+import { tuning } from './difficulty.js';
 
 /**
  * Everything the rest of the game needs to know about one enemy's look.
@@ -82,15 +83,18 @@ export function generateEnemy(worldId, seed, progress = 0) {
   const world = getWorld(worldId);
   const rng = makeRng(seed >>> 0);
   const profile = world.enemy;
+  const hard = tuning();
 
-  const lives = Number(rng.weighted(profile.lives));
+  const rolled = Number(rng.weighted(profile.lives));
+  const lives = scaleLives(rolled, hard.enemyLivesMul);
   // Rolled whether or not it can be used, so that a rider's whole hand comes
   // off one seed in one order and the road stays reproducible.
-  const heavier = rng.chance(ENEMY_DAMAGE_RAMP_CHANCE);
+  const heavier = rng.chance(enemyRampChance());
+  const abilityChance = profile.abilityChance * hard.enemyAbilityChanceMul;
   const abilities = [];
-  if (rng.chance(profile.abilityChance)) abilities.push(rng.pick(profile.abilities));
+  if (rng.chance(abilityChance)) abilities.push(rng.pick(profile.abilities));
   // Late worlds can roll a second ability.
-  if (worldId >= 4 && rng.chance(profile.abilityChance * 0.5)) {
+  if (worldId >= 4 && rng.chance(abilityChance * 0.5)) {
     const extra = rng.pick(profile.abilities);
     if (!abilities.includes(extra)) abilities.push(extra);
   }
@@ -103,15 +107,62 @@ export function generateEnemy(worldId, seed, progress = 0) {
     archetype,
     lives,
     maxLives: lives,
+    /**
+     * What this rider would have carried on the ordinary road, kept so the
+     * purse can be paid on it. See `baseLives` in the note above `scaleLives`.
+     */
+    baseLives: rolled,
     bullets: 0,
-    accuracy: profile.accuracy,
+    accuracy: profile.accuracy + hard.enemyAccuracyBonus,
     gunDamage: enemyGunDamageAt(worldId, progress, heavier),
     abilities,
+    abilityChanceMul: hard.enemyCastMul,
     /** The world's landmark ability, if this one happens to be carrying it. */
-    special: rng.chance(profile.specialChance || 0) ? profile.special || null : null,
+    special: rng.chance((profile.specialChance || 0) * hard.enemySpecialChanceMul)
+      ? profile.special || null
+      : null,
     isBoss: false,
     sprites,
   });
+}
+
+/**
+ * A LIFE TOTAL BENT BY THE MODE, AND A LIFE TOTAL THE PURSE IS PAID ON
+ * ---------------------------------------------------------------------------
+ * `goldForEnemy` and `expForEnemy` measure a kill in RIDERS — this one's life
+ * total over what a standard rider of that world carries (see `riderWeight` in
+ * src/game/progression.js). That is exactly the right shape, and it has one
+ * consequence nobody wants here: scale every rider up by a quarter and the
+ * whole economy scales up by a quarter with it, so the hard road would pay for
+ * its own difficulty and the forge ladder would be finished a world early.
+ *
+ * So a rider carries two numbers. `lives` is what you have to shoot through and
+ * `baseLives` is what the road pays out on, and the two are the same on the
+ * ordinary road because the multiplier is one. Nothing else in the game knows
+ * the difference: `resolveDuel` is the only reader, and the duel engine fights
+ * the bar that is actually in front of it.
+ *
+ * AND IT ROUNDS DOWN, WHICH IS THE DIFFERENCE BETWEEN HARD AND IMPOSSIBLE
+ * ---------------------------------------------------------------------------
+ * Every life figure in the game lands on the half-diamond grid, and on the
+ * shallow end of the road that grid is COARSE — src/game/progression.js has the
+ * same note over `toHalfDown` and it is the same trap. A Dust Flats rider
+ * carries one diamond; a quarter more of one, rounded to nearest, is one and a
+ * half. That is not "a quarter tougher", it is a fifty per cent longer fight
+ * against a gun that does half a life, on the shallowest bar the game ever has
+ * — measured, it took a world-one duel from a third of the bar to fifty-five
+ * per cent and ended ninety-five per cent of all hard runs in the first world.
+ *
+ * Rounding DOWN puts the error on the player's side at exactly the point where
+ * the grid is coarsest. The opening world comes out untouched, the Prairie
+ * gains half a diamond, and by the Galaxy — where a diamond is a twelfth of a
+ * rider rather than the whole of one — the multiplier lands almost exactly
+ * where it says it does. The mode gets harder as the numbers get big enough to
+ * express it, which is the only place it can afford to.
+ */
+function scaleLives(lives, mul) {
+  if (mul === 1) return lives;
+  return Math.max(0.5, Math.floor(lives * mul * 2) / 2);
 }
 
 /**
@@ -197,15 +248,19 @@ export function generateBoss(worldId) {
   const world = getWorld(worldId);
   const cfg = world.boss;
   const phase = cfg.phases ? cfg.phases[0] : cfg;
+  const hard = tuning();
+  const lives = scaleLives(phase.lives, hard.bossLivesMul);
   const { look, sprites, scale, portrait, aura } = appearance(phase.archetype || cfg.archetype);
   return applyOverrides({
     name: phase.name || cfg.name,
     look,
     archetype: phase.archetype || cfg.archetype,
-    lives: phase.lives,
-    maxLives: phase.lives,
+    lives,
+    maxLives: lives,
+    /** What the purse is paid on, whatever the mode put in front of you. */
+    baseLives: phase.lives,
     bullets: phase.startBullets || 0,
-    accuracy: phase.accuracy ?? cfg.accuracy,
+    accuracy: (phase.accuracy ?? cfg.accuracy) + hard.enemyAccuracyBonus,
     /**
      * A boss carries its world's ORDINARY bullet, not the ramped one.
      *
@@ -220,7 +275,7 @@ export function generateBoss(worldId) {
      */
     gunDamage: enemyGunDamage(worldId),
     abilities: phase.abilities || cfg.abilities || [],
-    abilityChanceMul: phase.abilityChanceMul || 1,
+    abilityChanceMul: (phase.abilityChanceMul || 1) * hard.enemyCastMul,
     /** A boss always has its world's special. It is the fight's centrepiece. */
     special: phase.special || cfg.special || null,
     isBoss: true,
@@ -247,15 +302,18 @@ export function nextBossPhase(boss) {
   // whole point of the Stranger taking the cloak off — and it can be a
   // different *size*, which is the point of him growing when he does.
   const look = phase.archetype ? appearance(phase.archetype) : null;
+  const hard = tuning();
+  const lives = scaleLives(phase.lives, hard.bossLivesMul);
   return {
     ...boss,
     name: phase.name,
-    lives: phase.lives,
-    maxLives: phase.lives,
+    lives,
+    maxLives: lives,
+    baseLives: phase.lives,
     bullets: phase.startBullets || 0,
-    accuracy: phase.accuracy,
+    accuracy: phase.accuracy + hard.enemyAccuracyBonus,
     abilities: phase.abilities || boss.abilities,
-    abilityChanceMul: phase.abilityChanceMul || 1,
+    abilityChanceMul: (phase.abilityChanceMul || 1) * hard.enemyCastMul,
     special: phase.special || boss.special || null,
     phaseIndex: index,
     ...(look

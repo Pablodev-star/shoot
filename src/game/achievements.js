@@ -252,6 +252,59 @@ export const ACHIEVEMENTS = [
     test: (p) => p.gamesFinished >= 1,
     reward: { kind: 'clothing', slot: 'shirt', id: 'voidrobe' },
   },
+  /**
+   * THE HARD ROAD, IN THREE STEPS
+   * -------------------------------------------------------------------------
+   * Written as a ladder rather than as one all-or-nothing line, and the reason
+   * is the same one the whole list is built on: every rung has to be something
+   * an ordinary player reaches by playing. Starting a hard run is a decision;
+   * getting a hard run as far as the Galaxy is a very good run that may still
+   * die on the last corridor; finishing one is the largest thing anybody does
+   * in this game, and it is the only line on the list that pays out five
+   * garments at once.
+   *
+   * The first two pay in bragging rights on purpose. A player who is handed
+   * clothes for merely CHOOSING hard mode has been paid for an intention.
+   */
+  {
+    id: 'hardRoad',
+    category: 'road',
+    name: 'Nothing On Your Side',
+    description: 'Set out on the hard road.',
+    test: (p) => p.hardRuns >= 1,
+    reward: null,
+  },
+  {
+    id: 'hardGalaxy',
+    category: 'road',
+    name: 'The Long Way Round',
+    description: 'Reach the Galaxy on the hard road.',
+    test: (p) => p.hardWorlds.includes(FINAL_WORLD),
+    reward: null,
+  },
+  /**
+   * The Ember Reaver. Five pieces off one line — see `rewardPieces` in
+   * src/game/wardrobe.js for why that shape exists and why it exists exactly
+   * once. The outfit is the only thing in the wardrobe with live fire on it
+   * (src/art/ember-aura.js), and this is the only way to get any of it.
+   */
+  {
+    id: 'hardFinished',
+    category: 'road',
+    name: 'Ember Reaver',
+    description: 'Finish the game on the hard road.',
+    test: (p) => p.hardFinishes >= 1,
+    reward: {
+      kind: 'clothing',
+      pieces: [
+        { slot: 'hat', id: 'reaver' },
+        { slot: 'shirt', id: 'reaver' },
+        { slot: 'pants', id: 'reaver' },
+        { slot: 'boots', id: 'reaver' },
+        { slot: 'horse', id: 'reaver' },
+      ],
+    },
+  },
   {
     id: 'allBosses',
     category: 'road',
@@ -655,8 +708,19 @@ function blankProgress() {
     maxLives: 3,
     gunLevel: 0,
     gamesFinished: 0,
+    /**
+     * The hard road, counted separately from everything above it. A hard run
+     * is a run and a hard clear is a clear, so those counters move too — these
+     * three are the ones the hard-road lines test against, and they exist
+     * because "did this happen on the hard road" is not recoverable from a
+     * total after the fact.
+     */
+    hardRuns: 0,
+    hardFinishes: 0,
     /** Sets, stored as arrays because JSON has no set. */
     worldsReached: [],
+    /** Worlds reached on the hard road, kept apart from `worldsReached`. */
+    hardWorlds: [],
     bossWorlds: [],
     weatherSeen: [],
     slotsUsed: [],
@@ -685,7 +749,7 @@ export async function loadAchievements() {
   };
   // Sets that arrived from an older file as anything but an array are dropped
   // rather than trusted — every reader below calls `.includes` on them.
-  for (const key of ['worldsReached', 'bossWorlds', 'weatherSeen', 'slotsUsed']) {
+  for (const key of ['worldsReached', 'hardWorlds', 'bossWorlds', 'weatherSeen', 'slotsUsed']) {
     if (!Array.isArray(state.progress[key])) state.progress[key] = [];
   }
   loaded = true;
@@ -824,6 +888,7 @@ export function track(what, detail = {}) {
       beginRun(0);
       bump('runs');
       include('slotsUsed', detail.slot);
+      if (detail.difficulty === 'hard') bump('hardRuns');
       unlock('firstRun');
       break;
 
@@ -838,6 +903,9 @@ export function track(what, detail = {}) {
 
     case 'gameFinished':
       bump('gamesFinished');
+      // …and the hard road's own count, which is what the Ember Reaver hangs
+      // on. A hard clear counts as both, because it is both.
+      if (detail.difficulty === 'hard') bump('hardFinishes');
       break;
 
     // --- shops, inns, forges --------------------------------------------
@@ -991,12 +1059,13 @@ export function initAchievements() {
   wired = true;
 
   // --- the road --------------------------------------------------------
-  on(EVENTS.WORLD_CHANGED, ({ world }) => {
+  on(EVENTS.WORLD_CHANGED, ({ world, difficulty }) => {
     include('worldsReached', world);
+    if (difficulty === 'hard') include('hardWorlds', world);
   });
 
-  on(EVENTS.GAME_COMPLETED, () => {
-    track('gameFinished');
+  on(EVENTS.GAME_COMPLETED, ({ difficulty } = {}) => {
+    track('gameFinished', { difficulty });
   });
 
   on(EVENTS.ENCOUNTER_REACHED, ({ type }) => {

@@ -21,7 +21,7 @@ import { el, clearNode, appendAll } from '../core/dom.js';
 import { attachButtonSounds, play } from '../core/audio.js';
 import { framedIconURL } from '../art/sprites-items.js';
 import { getInventory, sellItem, useItem, getState, isEquipped } from '../game/player.js';
-import { sellPrice } from '../game/progression.js';
+import { sellPrice, itemEffectNote } from '../game/progression.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from './toast.js';
 import { rarityChip, emptyState, icon, closeButton, goldChip } from './widgets.js';
@@ -154,6 +154,7 @@ export function openInventory(opts = {}) {
         ]),
       ]),
       el('p.inv-desc', { text: item.desc }),
+      noteFor(item),
       blocked ? el('p.field-hint', { text: blocked }) : null,
       el('div.inv-actions', {}, [
         blocked
@@ -279,4 +280,10 @@ export function openInventory(opts = {}) {
   if (opts.onOpen) opts.onOpen();
 
   return { close, refresh: renderAll };
+}
+
+/** What this road pays for the thing, when that is not what the card says. */
+function noteFor(item) {
+  const note = itemEffectNote(item, getState().maxLives);
+  return note ? el('p.inv-desc.inv-desc--mode', { text: note }) : null;
 }

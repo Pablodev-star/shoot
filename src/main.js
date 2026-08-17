@@ -15,8 +15,9 @@ import { initRouter, register, go } from './core/router.js';
 import { initToasts } from './ui/toast.js';
 import { initAchievementNotices } from './ui/achievement-notice.js';
 import { loadSettings } from './core/settings.js';
-import { loadAchievements, initAchievements } from './game/achievements.js';
+import { loadAchievements, initAchievements, isUnlocked } from './game/achievements.js';
 import { applyOutfit } from './game/wardrobe.js';
+import { unlockHardMode } from './game/difficulty.js';
 
 import { TitleScreen } from './menu/title.js';
 import { OnlineScreen } from './menu/online.js';
@@ -70,6 +71,25 @@ async function boot() {
    */
   await loadAchievements();
   initAchievements();
+  /**
+   * ANYBODY WHO ALREADY FINISHED THE GAME ALREADY HAS THE HARD ROAD
+   * -------------------------------------------------------------------------
+   * The unlock is a flag on the profile written when the Stranger goes down
+   * (see `finishGame` in src/game/run.js), and it did not exist until this
+   * release — so every player who beat the game before today would be told to
+   * go and do it again. The ledger has said "The Stranger Falls" since the day
+   * achievements shipped, so it is the honest record to migrate from.
+   *
+   * It runs here rather than inside `isHardUnlocked` because the difficulty
+   * table is imported by the price curve, which is imported by nearly
+   * everything: an edge from there to the achievement ledger would close a
+   * cycle through half the game. Boot is the one place that already has both.
+   *
+   * Writing the flag also spends the first-time bit that decides whether the
+   * announcement plays — which is correct. Somebody who finished the game last
+   * month is not shown a cut-scene about a thing they are already holding.
+   */
+  if (isUnlocked('finished')) await unlockHardMode();
   /**
    * Dress the gunslinger before anything draws one. It goes here rather than
    * inside the rig because a garment is locked behind an achievement, so the

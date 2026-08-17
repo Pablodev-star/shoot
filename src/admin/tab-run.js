@@ -26,6 +26,7 @@ import {
   announce,
 } from '../game/player.js';
 import { save as saveRun } from '../game/run.js';
+import { DIFFICULTIES, getDifficulty, setDifficulty } from '../game/difficulty.js';
 import {
   HUNGER_MAX,
   GUN_MAX_LEVEL,
@@ -245,10 +246,40 @@ export const RunTab = {
         ]),
       ]),
 
+      /**
+       * WHICH ROAD THIS RUN IS ON, AND THE ONE PLACE IT CAN BE CHANGED
+       * ---------------------------------------------------------------------
+       * A slot picks its difficulty once, when it is created, and the game
+       * offers no way to change it afterwards — that is the whole point of it
+       * being on the save (see the note at the bottom of
+       * src/game/difficulty.js). Which makes testing the hard road otherwise a
+       * matter of playing to the end of the game to unlock it and then playing
+       * five worlds to reach the interesting part of it.
+       *
+       * So the panel can move it, live, mid-run. It behaves exactly like every
+       * other override in here: it takes effect on the next thing that reads a
+       * price or rolls a rider, and it is NOT written to the slot unless the
+       * tester presses the button below — so a road bent for one fight is put
+       * back by the next load, and a road that is meant to stick can be made
+       * to.
+       */
+      section('The road', [
+        row('Difficulty', selectField({
+          value: getDifficulty(),
+          options: DIFFICULTIES.map((d) => ({ value: d.id, label: d.name })),
+          onChange: (id) => {
+            setDifficulty(id);
+            note(`difficulty set to ${id}`);
+            refresh();
+          },
+        }), 'Live. Prices, riders and beds all follow on the next read'),
+      ], 'A slot chooses this once and the game never offers it again. Here it is a dial — write the save below to make it stick.'),
+
       section('The slot', [
         readout([
           ['Slot', String(ctx.slot)],
           ['Run seed', String(player.seed)],
+          ['Road', DIFFICULTIES.find((d) => d.id === getDifficulty()).name],
           ['Distance walked', `${Math.round(player.distance)} px`],
           ['Duels', `${player.stats.duelsWon} won · ${player.stats.duelsLost} lost`],
         ]),

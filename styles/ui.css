@@ -522,6 +522,13 @@
   text-shadow: 0 0 10px rgba(255, 226, 122, 0.5);
 }
 .chip--gold { border-color: var(--gold-dark); color: var(--gold-light); }
+/* The hard road. Red, and the only chip in the game that glows a colour the
+   life bar also uses — which is the point: it is a warning, not a badge. */
+.chip--hard {
+  border-color: var(--red);
+  color: var(--red-light);
+  text-shadow: 0 0 10px rgba(240, 87, 79, 0.55);
+}
 .chip--live { border-color: var(--green); color: #b7e9a0; }
 
 /* The level chip wears its exp along the bottom of the pill. The number alone
@@ -1507,4 +1514,215 @@ input[type='range']::-moz-range-thumb {
 @media (prefers-reduced-motion: reduce) {
   .totem-prompt.is-shown,
   .totem-prompt.is-struck { animation: none; opacity: 1; }
+}
+
+/* ===========================================================================
+   THE HARD MODE ANNOUNCEMENT
+   ---------------------------------------------------------------------------
+   The scene is in src/ui/hard-mode-cutscene.js and everything that MOVES is on
+   its canvas — the heat, the speed lines and the embers. What is here is the
+   frame around them: the black, the two letterbox bars, and the type.
+
+   The type is DOM rather than canvas on purpose. It is the one part of the
+   scene a player might need to read with a screen reader or at 200% browser
+   zoom, and a sentence rasterised onto a canvas can do neither. The bars close
+   on a custom property the loop writes once a frame (`--bars`), so the canvas
+   and the frame around it are driven by the same clock without the CSS having
+   to guess at a duration.
+   ========================================================================= */
+
+.cutscene-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: #000;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 1;
+  transition: opacity 300ms var(--ease-in-out);
+  --bars: 0;
+}
+
+.cutscene-veil.is-leaving { opacity: 0; }
+
+.cutscene-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* The letterbox. Not decoration — it is the one piece of grammar that says
+   "this is a film now" without a word, and it is the same 12% the boss
+   entrance uses (`fx.bars` in src/duel/duel-scene.js). */
+.cutscene-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(12% * var(--bars));
+  background: #000;
+  pointer-events: none;
+}
+
+.cutscene-bar.is-top { top: 0; }
+.cutscene-bar.is-bottom { bottom: 0; }
+
+.cutscene-stage {
+  position: absolute;
+  inset: 12% var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  text-align: center;
+  pointer-events: none;
+  /* Nothing leaves the letterbox. The card is a clamp on the viewport and the
+     list under it is six lines, so a short landscape phone is the one shape
+     where the block of type is taller than the frame it is in — and a
+     cut-scene that spills over its own bars is worse than one that crops. */
+  overflow: hidden;
+}
+
+/* On a short frame the terms are the part that gives: the card is the thing
+   being announced and the prize is the reason to care, so the list of costs
+   between them is what shrinks. */
+@media (max-height: 620px) {
+  .cutscene-line { min-height: 2.4em; font-size: var(--text-md); }
+  .cutscene-stage { gap: var(--sp-2); }
+  .cutscene-terms { font-size: var(--text-xs); }
+}
+
+/* One line at a time, typed in by the loop. It holds its own height so the
+   block of type does not jump a line when a sentence wraps. */
+.cutscene-line {
+  min-height: 3.2em;
+  max-width: 34ch;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  color: var(--bone);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8), 0 0 18px rgba(240, 87, 79, 0.35);
+  opacity: 0;
+  transition: opacity 420ms var(--ease-in-out);
+}
+
+.cutscene-line.is-shown { opacity: 1; }
+
+/* The card. It arrives at 130% and settles, which is the only animation in the
+   scene that is not made of particles — a title that fades in is a title
+   nobody remembers. */
+.cutscene-card {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.cutscene-card.is-shown {
+  display: flex;
+  animation: cutscene-slam 420ms var(--ease-out) 1;
+}
+
+.cutscene-card-title {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 14vw, 7rem);
+  line-height: 1;
+  letter-spacing: var(--tracking-wider);
+  color: var(--red-light);
+  text-shadow:
+    0 0 4px #000,
+    0 4px 0 var(--red-deep),
+    0 0 34px rgba(240, 87, 79, 0.75);
+}
+
+.cutscene-card-sub {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--bone-dark);
+}
+
+/* What it costs, and then what it pays. The list is deliberately plain: five
+   lines of red type under a burning card is a poster, and a poster is not
+   readable. */
+.cutscene-terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 46ch;
+  font-size: var(--text-sm);
+  color: var(--bone-dark);
+  opacity: 0;
+  transition: opacity 600ms var(--ease-in-out);
+}
+
+.cutscene-terms.is-shown { opacity: 1; }
+
+.cutscene-prize {
+  max-width: 42ch;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--gold-light);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 600ms var(--ease-in-out) 260ms;
+}
+
+.cutscene-prize.is-shown { opacity: 1; }
+
+.cutscene-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: max(env(safe-area-inset-bottom), 4%);
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--bone-dark);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 700ms var(--ease-in-out);
+  pointer-events: none;
+}
+
+.cutscene-prompt.is-shown {
+  opacity: 1;
+  animation: totem-breathe 1.8s var(--ease-in-out) infinite;
+}
+
+@keyframes cutscene-slam {
+  0% { transform: scale(1.3); opacity: 0.2; }
+  60% { transform: scale(0.97); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cutscene-card.is-shown { animation: none; }
+  .cutscene-prompt.is-shown { animation: none; opacity: 1; }
+}
+
+/* WHAT THIS ROAD ACTUALLY PAYS FOR THE THING
+   ---------------------------------------------------------------------------
+   A second line under an item's description, and only on a road where the
+   description has stopped being true — see `itemEffectNote` in
+   src/game/progression.js. It is deliberately not styled as a warning: the
+   number is not a problem, it is the price of the mode, and a red flag under
+   every heal on the counter would be a shop that looks broken. */
+.shop-desc--mode,
+.inv-desc--mode {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-tight);
+  color: var(--red-light);
+  opacity: 0.9;
 }

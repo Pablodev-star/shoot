@@ -31,6 +31,7 @@ import { finishEncounter } from '../game/run.js';
 import { openInventory } from '../ui/inventory-panel.js';
 import { openTrailMapForRun } from '../ui/map-panel.js';
 import { icon, rarityChip } from '../ui/widgets.js';
+import { itemEffectNote } from '../game/progression.js';
 import { trailBand } from '../ui/statusbar.js';
 import { EVENTS, on } from '../core/events.js';
 import { toast } from '../ui/toast.js';
@@ -118,6 +119,9 @@ export const ShopScreen = {
                 })
               : null,
             el('p.shop-desc', { text: entry.item.desc }),
+            // What this road actually pays for it, when that is not what the
+            // line above says. Null on the ordinary road — see `itemEffectNote`.
+            noteFor(entry.item),
 
             el('div.card-foot', {}, [
               el('div.shop-price', {}, [
@@ -186,3 +190,14 @@ export const ShopScreen = {
     };
   },
 };
+
+/**
+ * The second line under a description: what this road is actually paying for
+ * the thing, when that differs from what its card has always said. Returns
+ * null on the ordinary road, and `el` drops a null child, so the card is
+ * unchanged for anybody who has never opened the hard one.
+ */
+function noteFor(item) {
+  const note = itemEffectNote(item, getState().maxLives);
+  return note ? el('p.shop-desc.shop-desc--mode', { text: note }) : null;
+}

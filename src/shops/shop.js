@@ -22,6 +22,7 @@ import { getWorld } from '../game/worlds.js';
 import { itemPrice } from '../game/progression.js';
 import { getState } from '../game/player.js';
 import { OVERRIDES } from '../admin/overrides.js';
+import { tuning } from '../game/difficulty.js';
 
 export const BASE_SLOTS = 3;
 export const BASE_DISCOUNT_CHANCE = 0.2;
@@ -115,7 +116,10 @@ export function generateStock(worldId, seed) {
   const slots = Math.max(1, BASE_SLOTS + Math.floor(perks.extraSlots || 0) + (admin.extraSlots || 0));
   const discountChance = admin.discountChance != null
     ? admin.discountChance
-    : Math.min(0.85, BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0));
+    : Math.min(
+        0.85,
+        (BASE_DISCOUNT_CHANCE + (perks.discountBonus || 0)) * tuning().discountChanceMul,
+      );
   const rarity = admin.rarity || world.rarity;
 
   /**

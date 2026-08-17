@@ -41,6 +41,13 @@ import { bumpStat } from '../core/settings.js';
 import { track as trackAchievement } from './achievements.js';
 import { resetOverrides } from '../admin/overrides.js';
 import { setOutfitOverride } from './wardrobe.js';
+import {
+  DEFAULT_DIFFICULTY,
+  getDifficulty,
+  setDifficulty,
+  unlockHardMode,
+} from './difficulty.js';
+import { playHardModeUnlock } from '../ui/hard-mode-cutscene.js';
 
 const run = {
   engine: null,
@@ -86,18 +93,33 @@ function clearAdminState() {
   setOutfitOverride(null);
 }
 
-export async function startNewRun(slot) {
+/**
+ * @param {number} slot
+ * @param {object} [opts]
+ * @param {'normal'|'hard'} [opts.difficulty] which road this slot walks. Picked
+ *   once, here, and written into the save from the first frame — see the note
+ *   at the bottom of src/game/difficulty.js.
+ */
+export async function startNewRun(slot, opts = {}) {
   run.slot = slot;
   run.dead = false;
   run.inBattle = false;
   clearAdminState();
+  /**
+   * BEFORE `newRun`, AND THAT ORDER IS LOAD-BEARING
+   * -------------------------------------------------------------------------
+   * The opening purse is a difficulty knob (`startingGold`), and a blank state
+   * built before the road is set is a hard run that starts with the ordinary
+   * road's gold in its pocket.
+   */
+  setDifficulty(opts.difficulty || DEFAULT_DIFFICULTY);
   newRun();
   daynight.reset(0.32);
   weather.force('clear');
   hunger.reset();
   run.engine = createWalkEngine();
   run.started = true;
-  trackAchievement('runStarted', { slot });
+  trackAchievement('runStarted', { slot, difficulty: getDifficulty() });
   resetStack();
   await beginWorld(1, { intro: true });
 }
@@ -107,6 +129,8 @@ export async function loadRun(slot, data) {
   run.dead = false;
   run.inBattle = false;
   clearAdminState();
+  // The road the slot was created on, before anything reads a price off it.
+  setDifficulty(data.difficulty || DEFAULT_DIFFICULTY);
   restorePlayer(data.player);
   /**
    * Before a single step is taken. The ledger measures the road in
@@ -123,7 +147,10 @@ export async function loadRun(slot, data) {
   if (data.completed) {
     run.started = false;
     resetStack();
-    await go('victory', {});
+    // The ending card says which road was walked, and a finished slot is the
+    // one place that answer has to come off the FILE rather than off the mode
+    // — this run ended weeks ago and the game has been back to the menu since.
+    await go('victory', { difficulty: data.difficulty });
     return;
   }
 
@@ -238,15 +265,50 @@ on(EVENTS.TOTEM_TRIGGERED, async () => {
  */
 on(EVENTS.SEGMENT_CLEARED, async ({ worldId }) => {
   if (!run.started) return;
-  if (worldId >= FINAL_WORLD) {
-    run.started = false;
-    await save({ completed: true });
-    emit(EVENTS.GAME_COMPLETED, {});
-    await go('victory', {});
-  } else {
-    await beginWorld(worldId + 1);
-  }
+  if (worldId >= FINAL_WORLD) await finishGame();
+  else await beginWorld(worldId + 1);
 });
+
+/**
+ * THE END OF THE GAME, IN ONE PLACE
+ * ---------------------------------------------------------------------------
+ * There are two ways to reach it — the Stranger going down, and the safety net
+ * above catching a walker who ran off the end of the last segment — and they
+ * used to do the same five things in two copies. They do not any more, because
+ * the fifth thing is new and easy to forget: the road you just finished may
+ * have just unlocked the other one.
+ *
+ * THE ORDER MATTERS AND IT IS NOT THE OBVIOUS ONE
+ * ---------------------------------------------------------------------------
+ * The slot is written FIRST, before anything can be watched or awarded, because
+ * a player who closes the tab during a cut-scene has still finished the game.
+ * Then the ledger, so an unlock notice can land while the announcement plays.
+ * Then the announcement itself, which is awaited — the victory card is the
+ * curtain call and it does not go up over the top of the thing it follows.
+ */
+async function finishGame() {
+  run.started = false;
+  // Flagged as finished so the slot picker offers the ending rather than
+  // dropping the player onto a segment with nothing left in it.
+  await save({ completed: true });
+  const difficulty = getDifficulty();
+  emit(EVENTS.GAME_COMPLETED, { difficulty });
+
+  /**
+   * Beating the game is what opens the hard road, and the announcement plays
+   * exactly once — `unlockHardMode` returns false every time after the first,
+   * so a second and third clear go straight to the victory card. A run that was
+   * ALREADY on the hard road cannot be the one that unlocks it, but it is
+   * allowed to be the first clear a device has ever had (a slot started before
+   * the lock existed, a profile that was reset), so this asks rather than
+   * assuming.
+   */
+  const firstTime = await unlockHardMode();
+  if (firstTime) await playHardModeUnlock();
+
+  leaveRoad();
+  await go('victory', { difficulty });
+}
 
 /**
  * Called by shop/inn/duel screens when the player is done with the encounter.
@@ -279,8 +341,15 @@ export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
   // A boon is counted in fights, and this is the end of one however it went.
   spendBoonDuel();
   if (won) {
-    const gold = goldForEnemy({ worldId, lives: enemy.maxLives, isBoss });
-    const exp = expForEnemy({ worldId, lives: enemy.maxLives, isBoss });
+    /**
+     * The purse is paid on what this rider would have carried on the ordinary
+     * road, not on the bar that was actually in front of you — see `scaleLives`
+     * in src/game/enemies.js. A kill is measured in riders, so paying out on the
+     * bent total would have the hard road funding its own difficulty.
+     */
+    const paidOn = enemy.baseLives ?? enemy.maxLives;
+    const gold = goldForEnemy({ worldId, lives: paidOn, isBoss });
+    const exp = expForEnemy({ worldId, lives: paidOn, isBoss });
     addGold(gold);
     addExp(exp);
     getState().stats.duelsWon += 1;
@@ -291,16 +360,8 @@ export async function resolveDuel({ won, enemy, isBoss, worldId: from }) {
     if (isBoss) {
       bumpStat('worldsCleared');
       advanceEncounter();
-      if (worldId >= FINAL_WORLD) {
-        run.started = false;
-        // Flagged as finished so the slot picker offers the ending rather than
-        // dropping the player onto a segment with nothing left in it.
-        await save({ completed: true });
-        emit(EVENTS.GAME_COMPLETED, {});
-        await go('victory', {});
-      } else {
-        await beginWorld(worldId + 1);
-      }
+      if (worldId >= FINAL_WORLD) await finishGame();
+      else await beginWorld(worldId + 1);
       return;
     }
   } else {
@@ -341,8 +402,23 @@ async function die(worldId) {
   run.inBattle = false;
   run.dead = true;
   run.engine?.pause();
+  const difficulty = getDifficulty();
   await deleteSlot(run.slot);
-  await go('gameOver', { world: worldId ?? getState().world, slot: run.slot });
+  leaveRoad();
+  await go('gameOver', { world: worldId ?? getState().world, slot: run.slot, difficulty });
+}
+
+/**
+ * Put the road back to the ordinary one on the way out of a run.
+ *
+ * Every door out of a run comes through here, for exactly the reason the Admin
+ * Panel's overrides are cleared at every door IN (see `clearAdminState`): the
+ * mode is module state, the wardrobe screen and the clothing shop both quote
+ * prices, and a menu that is quietly charging hard-mode rates because the last
+ * run happened to be one is a bug nobody would ever think to look for.
+ */
+function leaveRoad() {
+  setDifficulty(DEFAULT_DIFFICULTY);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +443,14 @@ export async function save(extra = {}) {
     travelled: engineState.travelled ?? 0,
     segmentSeed: engineState.seed,
     segmentTypes: engineState.types ?? [],
+    /**
+     * Written on every save rather than only on the first, so a slot that was
+     * somehow created without one still picks the right road up on the next
+     * load. The game itself never moves it between the two doors into a run —
+     * the only thing that can is the Admin Panel, and a tester who bends the
+     * road and then writes the save has said what they meant.
+     */
+    difficulty: getDifficulty(),
     savedAt: Date.now(),
     ...extra,
   });
@@ -391,6 +475,7 @@ export async function quitToMenu() {
   await save();
   run.started = false;
   if (run.engine) run.engine.pause();
+  leaveRoad();
   resetStack();
   await go('title');
   return true;

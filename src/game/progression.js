@@ -8,6 +8,16 @@
 import { getWorld } from './worlds.js';
 import { SELL_RATIO } from './items.js';
 import { OVERRIDES } from '../admin/overrides.js';
+/**
+ * THE SECOND HAND ON EVERY CURVE IN THIS FILE
+ * ---------------------------------------------------------------------------
+ * Read exactly like `OVERRIDES` above, and for the same reason: these are pure
+ * functions of their arguments, and threading "which road is this" through
+ * forty call sites would change forty signatures to say one thing. On the
+ * ordinary road every knob below is 1 and every line reading one is a
+ * multiplication by one — see src/game/difficulty.js for the whole table.
+ */
+import { tuning } from './difficulty.js';
 
 // ---------------------------------------------------------------------------
 // Experience & levels
@@ -360,6 +370,16 @@ export const ENEMY_DAMAGE_STEP = 0.5;
  */
 export const ENEMY_DAMAGE_RAMP_CHANCE = 1 / 3;
 
+/**
+ * …and what it actually is right now, which is the same number on the ordinary
+ * road and one in two on the hard one. Every caller that FLIPS the coin goes
+ * through here; the constant above is kept as the ordinary road's value and as
+ * the thing the note is written about.
+ */
+export function enemyRampChance() {
+  return tuning().enemyRampChance;
+}
+
 export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
   const base = enemyGunDamage(worldId);
   const late = (Number(progress) || 0) >= ENEMY_DAMAGE_RAMP_AT;
@@ -417,7 +437,9 @@ export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
   // The admin multiplier is folded in here rather than at the one caller, so
   // that anything else which ever pays exp — a future bounty, the harness —
   // is bent by the same dial. It is 1 unless a tester has moved it.
-  return Math.round(base * world.expMul * (isBoss ? 3.2 : 1) * OVERRIDES.economy.expMul);
+  return Math.round(
+    base * world.expMul * (isBoss ? 3.2 : 1) * OVERRIDES.economy.expMul * tuning().expMul,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +459,9 @@ export function expForEnemy({ worldId, lives = 1, isBoss = false }) {
 export function goldForEnemy({ worldId, lives = 1, isBoss = false }) {
   const world = getWorld(worldId);
   const base = 36 + riderWeight(worldId, lives) * 20;
-  return Math.round(base * world.goldMul * (isBoss ? 4 : 1) * OVERRIDES.economy.goldMul);
+  return Math.round(
+    base * world.goldMul * (isBoss ? 4 : 1) * OVERRIDES.economy.goldMul * tuning().goldMul,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +505,7 @@ export const SHOP_MARKUP = 2;
 export function itemPrice(item, worldId) {
   const world = getWorld(worldId);
   const raw = item.basePrice * SHOP_MARKUP * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul
-    * OVERRIDES.economy.priceMul;
+    * OVERRIDES.economy.priceMul * tuning().priceMul;
   return Math.max(1, Math.round(raw / 5) * 5); // round to a tidy 5
 }
 
@@ -555,8 +579,30 @@ export const INN_PREMIUM_BASE = 175;
 export const INN_BASIC_FRACTION = 0.5;
 
 export function innBasicHeal(worldId, maxLives = STARTING_LIVES) {
-  const scaled = maxLives * INN_BASIC_FRACTION + (worldId - 1) * 0.15;
+  const scaled = maxLives * tuning().innBasicFraction + (worldId - 1) * 0.15;
   return Math.max(1, Math.round(scaled * 2) / 2);
+}
+
+/**
+ * WHAT THE EXPENSIVE BED IS WORTH, AND THE ONE PROMISE HARD MODE TAKES BACK
+ * ---------------------------------------------------------------------------
+ * Infinity, on the ordinary road, and that is not a placeholder — the premium
+ * bed has restored EVERY life since the day inns existed, the card says so, and
+ * the number the caller wants for "all of it" is a number no bar can exceed.
+ *
+ * On the hard road it is three quarters of the bar, and it is the single most
+ * consequential line in the whole mode. A bed that fills the bar makes gold and
+ * lives the same resource: a run with a full purse walks into every boss at
+ * full, and every other system that exists to make you ration something — the
+ * bandage, the totem, the vest, the decision to walk past a fight — is arguing
+ * with a shop that sells the argument away. Take the last quarter off and the
+ * bar only ever comes all the way back at a world border, which is exactly how
+ * far apart the game's own difficulty ladder assumes those moments are.
+ */
+export function innPremiumHeal(maxLives = STARTING_LIVES) {
+  const fraction = tuning().innPremiumFraction;
+  if (fraction >= 1) return Infinity;
+  return Math.max(1, Math.round(maxLives * fraction * 2) / 2);
 }
 
 /**
@@ -577,18 +623,120 @@ export function innBasicHeal(worldId, maxLives = STARTING_LIVES) {
  */
 export function itemHeal(item, maxLives = STARTING_LIVES) {
   if (!item) return 0;
-  if (!item.healFraction) return item.heal || 0;
-  return Math.max(1, Math.ceil(maxLives * item.healFraction));
+  const raw = item.healFraction
+    ? Math.max(1, Math.ceil(maxLives * item.healFraction))
+    : item.heal || 0;
+  return scaleToBar(raw, tuning().itemHealMul);
+}
+
+/**
+ * The gauge a meal fills, and the gold diamonds a bottle hangs on the end of
+ * the bar. Both are read through here for one reason: hard mode nerfs what is
+ * in the bag, and "what is in the bag" is three fields on three items rather
+ * than one number anybody could have multiplied at the call site.
+ *
+ * They round DOWN to whole units and never to nothing — a bottle that hands
+ * over zero lives is an item that does not work, which is a bug wearing a
+ * difficulty setting.
+ */
+export function itemFood(item) {
+  if (!item || !item.food) return 0;
+  /**
+   * A FULL POT IS A FULL POT ON BOTH ROADS
+   * -------------------------------------------------------------------------
+   * The stew and the Traveller's Feast are not "a bigger apple" — their whole
+   * identity is that they fill the gauge to the TOP, which is what a meal is
+   * worth when the next counter is eleven duels away (see the note over them in
+   * src/game/items.js). `food: 100` is a fill rather than a quantity, and the
+   * cards say so in as many words.
+   *
+   * Multiplying it left a shop selling "fills the hunger gauge to the top,
+   * whatever was left in it" directly above a line reading "on this road: 90%
+   * hunger", which is not a nerf, it is a contradiction. So the multiplier
+   * applies to the things measured in percentages — the carrot and the apple,
+   * which is where hunger pressure actually comes from — and the two meals that
+   * promise the whole gauge keep the promise.
+   */
+  if (item.food >= HUNGER_MAX) return item.food;
+  return Math.max(1, Math.round(item.food * tuning().foodMul));
+}
+
+export function itemBonusLives(item) {
+  if (!item || !item.bonusLives) return 0;
+  return Math.max(1, Math.round(item.bonusLives * tuning().bonusLivesMul));
+}
+
+/**
+ * Anything measured in diamonds, bent by a difficulty knob and put back on the
+ * half-diamond grid the interface can actually draw. Never below half a
+ * diamond, for the same reason `toHalf` is not: a heal the bar cannot show is a
+ * heal the player will report as broken.
+ */
+function scaleToBar(value, mul) {
+  if (!value || mul === 1) return value;
+  return Math.max(0.5, Math.round(value * mul * 2) / 2);
+}
+
+/**
+ * THE COUNTER IS NOT ALLOWED TO LIE ABOUT WHAT IT IS SELLING
+ * ---------------------------------------------------------------------------
+ * Every `desc` in src/game/items.js states a number — "restores 20% hunger",
+ * "patches you up for 2 lives", "three extra lives in gold" — and on the hard
+ * road three of those numbers are no longer true. The alternative to this
+ * function was rewriting forty description strings to be vague, which would
+ * have made the ordinary road's shop worse in order to make the hard one
+ * honest.
+ *
+ * So the description stays exactly as written and a second line goes under it
+ * saying what this road actually pays. It returns null whenever the item is
+ * worth what its card says, which on the ordinary road is always — so nothing
+ * changes for a player who never unlocks the other mode.
+ *
+ * @returns {string|null}
+ */
+export function itemEffectNote(item, maxLives = STARTING_LIVES) {
+  if (!item) return null;
+  /**
+   * It speaks only when the number ACTUALLY MOVED, which is not the same as
+   * "the multiplier is not one". Everything here lands on a grid — half a
+   * diamond for lives, a whole point for the gauge — and on the shallow end of
+   * the road those grids are coarse enough to swallow a tenth whole: a Med Kit
+   * on a three-diamond bar is two lives on either road, so a line under it
+   * announcing two lives is a line that says nothing except "something is
+   * different", which is the most alarming thing a card can say.
+   */
+  if (item.food) {
+    const now = itemFood(item);
+    return now === item.food ? null : `On this road: ${now}% hunger.`;
+  }
+  if (item.bonusLives) {
+    const now = itemBonusLives(item);
+    if (now === item.bonusLives) return null;
+    return `On this road: ${now} gold ${now === 1 ? 'life' : 'lives'}.`;
+  }
+  if (item.heal || item.healFraction) {
+    const now = itemHeal(item, maxLives);
+    const ordinary = item.healFraction
+      ? Math.max(1, Math.ceil(maxLives * item.healFraction))
+      : item.heal || 0;
+    if (now === ordinary) return null;
+    return `On this road: ${now} ${now === 1 ? 'life' : 'lives'} back.`;
+  }
+  return null;
 }
 
 export function innBasicPrice(worldId) {
   const world = getWorld(worldId);
-  return Math.round((INN_BASIC_BASE * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul) / 5) * 5;
+  const raw = INN_BASIC_BASE * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul
+    * tuning().innPriceMul;
+  return Math.round(raw / 5) * 5;
 }
 
 export function innPremiumPrice(worldId) {
   const world = getWorld(worldId);
-  return Math.round((INN_PREMIUM_BASE * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul) / 5) * 5;
+  const raw = INN_PREMIUM_BASE * Math.pow(PRICE_GROWTH, worldId - 1) * world.priceMul
+    * tuning().innPriceMul;
+  return Math.round(raw / 5) * 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -707,7 +855,8 @@ export const GUN_COST_ESCALATION = 0.05;
 
 export function gunUpgradeCost(level) {
   if (level >= GUN_MAX_LEVEL) return Infinity;
-  const raw = GUN_COST_BASE * Math.pow(GUN_COST_GROWTH, level) * (1 + level * GUN_COST_ESCALATION);
+  const raw = GUN_COST_BASE * Math.pow(GUN_COST_GROWTH, level) * (1 + level * GUN_COST_ESCALATION)
+    * tuning().gunCostMul;
   return Math.max(5, Math.round(raw / 5) * 5); // round to a tidy 5, like every other price
 }
 
@@ -801,7 +950,15 @@ export function starvationIntervalMs(maxLives = STARTING_LIVES) {
  * `gunDamageAt`.
  */
 export function totemReviveLives(maxLives) {
-  return Math.max(2, Math.round(maxLives) / 2);
+  /**
+   * The floor moves with the mode as well as the ceiling. Two diamonds on the
+   * ordinary road is "enough to reach the next shop"; on the hard one the
+   * totem gives back less of the bar, and a floor that stayed at two would
+   * quietly make the nerf invisible for the first four worlds — which is most
+   * of where a totem is ever bought.
+   */
+  const mul = tuning().totemReviveMul;
+  return Math.max(mul >= 1 ? 2 : 1.5, Math.round(Math.round(maxLives) / 2 * mul * 2) / 2);
 }
 
 // ---------------------------------------------------------------------------
