@@ -729,14 +729,28 @@ async function runOnce(seed, policy) {
       // --- the road between here and there --------------------------------
       const secs = (ev.distance - travelled) / P.WALK_SPEED;
       travelled = ev.distance;
-      player.hunger -= P.HUNGER_DRAIN_PER_SEC * tuning().hungerDrainMul * secs;
+      /**
+       * ONE RATE, USED BOTH WAYS
+       * -------------------------------------------------------------------
+       * The gauge is emptied at this rate and the overshoot below zero is
+       * turned back into SECONDS at it, so the two have to be the same number.
+       * They were not: the drain picked up the mode's multiplier and the
+       * conversion below kept the base constant, which meant a hard run that
+       * ran the gauge `d` points into the red was modelled as having starved
+       * for `d / base` seconds instead of `d / (base * 1.05)` — five per cent
+       * too long, and sometimes a whole extra damage tick. The harness exists
+       * to measure the shipped hunger loop, and the shipped loop counts real
+       * time after the gauge hits zero whatever is draining it.
+       */
+      const drainPerSec = P.HUNGER_DRAIN_PER_SEC * tuning().hungerDrainMul;
+      player.hunger -= drainPerSec * secs;
       while (player.hunger < 35 && player.food > 0) {
         const bite = Math.min(player.food, 40);
         player.food -= bite;
         player.hunger = Math.min(P.HUNGER_MAX, player.hunger + bite);
       }
       if (player.hunger < 0) {
-        const starving = -player.hunger / P.HUNGER_DRAIN_PER_SEC;
+        const starving = -player.hunger / drainPerSec;
         const ticks = Math.floor((starving * 1000) / P.starvationIntervalMs(player.maxLives));
         hurt(ticks * P.STARVATION_LIFE_PER_TICK);
         player.hunger = 0;
