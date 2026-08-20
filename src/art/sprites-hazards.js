@@ -2,7 +2,8 @@
  * SHOOT! — Hazard landmarks.
  *
  * The thing a world special puts on the horizon: the volcano, the twister, the
- * hornet tree, the hanging cornice, the drowned cypress and the rift.
+ * hornet tree, the hanging cornice, the drowned cypress, the gallows and the
+ * rift.
  *
  * WHY THESE ARE BUILT AND NOT TYPED
  * ---------------------------------------------------------------------------
@@ -968,7 +969,187 @@ function buildCypressGlow() {
 }
 
 // ---------------------------------------------------------------------------
-// 6 · The rift
+// 6 · The gallows
+// ---------------------------------------------------------------------------
+
+/**
+ * A FRAME, A ROPE AND A BELL — AND THE BELL IS THE LANDMARK
+ * ---------------------------------------------------------------------------
+ * The obvious way to draw a gallows is a post, a beam and a noose, and the
+ * obvious way is not enough: at sixty-four pixels that is two lines and a
+ * loop, which reads as scaffolding. What makes this one a landmark is the
+ * thing hung beside the noose — a bell, big, dark and dented — because the
+ * bell is what the special actually DOES (see `toll` in
+ * src/duel/duel-hazard.js), and a hazard whose warning is a sound has to have
+ * something on the horizon that could make one.
+ *
+ * The rest of the silhouette is doing one job: standing on a bare skyline
+ * without any of it being straight. Every post leans a degree or two, the beam
+ * sags in the middle, and the brace is out of square — old timber that nobody
+ * has been back to fix. A gallows drawn plumb reads as a swing set.
+ */
+const GAL_X = 20;
+const GAL_TOP = 4;
+const GAL_FOOT = HAZARD_H - 5;
+const BEAM_END = 52;
+/** Where the bell hangs off the beam, and the noose beyond it. */
+const BELL_X = 42;
+const ROPE_X = 27;
+
+/** One weathered timber, drawn along its length with a lit edge and a grain. */
+function timber(ctx, x0, y0, x1, y1, thick, rng) {
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+  const vertical = Math.abs(y1 - y0) >= Math.abs(x1 - x0);
+  for (let i = 0; i <= steps; i++) {
+    const k = i / steps;
+    const x = Math.round(x0 + (x1 - x0) * k);
+    const y = Math.round(y0 + (y1 - y0) * k);
+    const w = vertical ? thick : 1;
+    const h = vertical ? 1 : thick;
+    px(ctx, x, y, PALETTE.gravewood, w, h);
+    // Light from the top left, so a post is lit down its left face and a beam
+    // along its top — the one rule every sprite in this game keeps.
+    px(ctx, x, y, PALETTE.gravewoodLight, vertical ? 1 : w, vertical ? h : 1);
+    px(
+      ctx,
+      vertical ? x + thick - 1 : x,
+      vertical ? y : y + thick - 1,
+      PALETTE.gloamDeep,
+      vertical ? 1 : 1,
+      1,
+    );
+    // Split grain: short breaks along the timber, never a full-length line.
+    if (rng.chance(0.22)) {
+      px(ctx, x + (vertical ? rng.int(1, Math.max(1, thick - 2)) : 0), y, PALETTE.gloamDark);
+    }
+  }
+}
+
+function buildGallows() {
+  const { canvas, ctx } = sheet();
+  const rng = makeRng(0x80cc);
+
+  // The two uprights and the sagging beam. The far post is thinner and a step
+  // darker: it is behind the near one, and nothing else in the sprite says so.
+  timber(ctx, GAL_X, GAL_TOP + 2, GAL_X - 1, GAL_FOOT, 4, rng);
+  timber(ctx, BEAM_END - 2, GAL_TOP + 4, BEAM_END - 1, GAL_FOOT, 3, rng);
+  for (let x = GAL_X - 2; x <= BEAM_END; x++) {
+    const k = (x - GAL_X) / (BEAM_END - GAL_X);
+    // A beam this old has a set in it: a shallow sag, deepest under the bell.
+    const y = GAL_TOP + Math.round(Math.sin(k * Math.PI) * 1.6);
+    px(ctx, x, y, PALETTE.gravewood, 1, 3);
+    px(ctx, x, y, PALETTE.gravewoodLight, 1, 1);
+    px(ctx, x, y + 2, PALETTE.gloamDeep, 1, 1);
+  }
+  // The brace, and it is deliberately not at forty-five degrees.
+  timber(ctx, GAL_X + 3, GAL_TOP + 5, GAL_X + 11, GAL_TOP + 12, 2, rng);
+
+  /**
+   * The noose. A rope drawn as a straight line is a wire — this one has a
+   * slack in it, and the loop at the bottom is an ELLIPSE seen nearly edge on,
+   * which is the only way a hanging loop reads at this size.
+   */
+  const ropeTop = GAL_TOP + 3;
+  const ropeBottom = ropeTop + 19;
+  for (let y = ropeTop; y < ropeBottom; y++) {
+    const k = (y - ropeTop) / (ropeBottom - ropeTop);
+    px(ctx, ROPE_X + Math.round(Math.sin(k * 2.2) * 1.2), y, PALETTE.pall);
+  }
+  // The loop is drawn as a ring rather than a disc: filled, then the rim laid
+  // back over it in a lighter tone, so the hole in the middle stays a hole.
+  ellipse(ctx, ROPE_X + 1, ropeBottom + 2, 4, 3, PALETTE.gloamDeep);
+  for (let a = 0; a < 32; a++) {
+    const t = (a / 32) * Math.PI * 2;
+    px(ctx, Math.round(ROPE_X + 1 + Math.cos(t) * 4), Math.round(ropeBottom + 2 + Math.sin(t) * 3), PALETTE.pall);
+  }
+  // The knot, which is the heaviest thing on the rope and hangs to one side.
+  px(ctx, ROPE_X + 4, ropeBottom - 2, PALETTE.pallMid, 3, 4);
+  px(ctx, ROPE_X + 4, ropeBottom - 2, PALETTE.pall, 3, 1);
+
+  /**
+   * The bell. Cast iron: a crown, a shoulder that flares, and a lip that
+   * flares harder — the silhouette of a bell is entirely in how fast it widens
+   * on the way down, so the profile is a power curve rather than a triangle.
+   */
+  const bellTop = GAL_TOP + 5;
+  const BELL_H = 15;
+  px(ctx, BELL_X, bellTop - 2, PALETTE.gloamDark, 2, 3);
+  for (let y = 0; y < BELL_H; y++) {
+    const k = y / (BELL_H - 1);
+    const w = Math.round(3 + Math.pow(k, 2.1) * 11) + (y >= BELL_H - 2 ? 2 : 0);
+    const left = BELL_X + 1 - Math.floor(w / 2);
+    px(ctx, left, bellTop + y, PALETTE.gloam, w, 1);
+    px(ctx, left, bellTop + y, PALETTE.pallMid, 1, 1);
+    px(ctx, left + w - 1, bellTop + y, PALETTE.gloamDeep, 1, 1);
+    // Two dents, because nobody has taken care of this bell either.
+    if (y === 6) px(ctx, left + 2, bellTop + y, PALETTE.gloamDark, 3, 1);
+    if (y === 10) px(ctx, left + w - 5, bellTop + y, PALETTE.gloamDark, 2, 1);
+  }
+  px(ctx, BELL_X - 6, bellTop + BELL_H, PALETTE.gloamDeep, 14, 1);
+
+  /**
+   * The ground it stands on: a low mound with the two things this world has
+   * instead of scenery on it — boards driven in at angles, and the ends of
+   * what they are marking.
+   */
+  for (let x = 0; x < HAZARD_W; x++) {
+    const lift = Math.round(Math.sin((x / HAZARD_W) * Math.PI) * 3);
+    px(ctx, x, GAL_FOOT - lift, PALETTE.gloam, 1, HAZARD_H - GAL_FOOT + lift);
+    px(ctx, x, GAL_FOOT - lift, PALETTE.pallMid, 1, 1);
+  }
+  for (const [mx, mh, lean] of [[6, 5, -1], [12, 4, 0], [57, 5, 1], [50, 3, -1]]) {
+    for (let i = 0; i < mh; i++) {
+      px(ctx, mx + Math.round((i / mh) * lean), GAL_FOOT - 1 - i, PALETTE.gravewood, 2, 1);
+    }
+    px(ctx, mx - 1, GAL_FOOT - mh, PALETTE.gravewoodLight, 4, 1);
+  }
+  return canvas;
+}
+
+/**
+ * WHAT IS LIT ON A GALLOWS
+ * ---------------------------------------------------------------------------
+ * Nothing, most of the time — which is why the glow layer here is the smallest
+ * in the file and why it is worth having anyway. Three frames of corpse-light
+ * gathering in the mouth of the bell and running down the rope, and that is
+ * all: it is the only warm — well, the only saturated — thing in the whole
+ * world (see the note on the palette), so four lit pixels on the horizon is
+ * legible from anywhere on the road.
+ *
+ * The rope lights from the LOOP upward. Whatever is answering the bell is
+ * coming up the rope, and the direction of the light is the only place the
+ * sprite can say so.
+ */
+function buildGallowsGlow() {
+  const bellTop = GAL_TOP + 5;
+  const ropeBottom = GAL_TOP + 22;
+  return [0, 1, 2].map((frame) => {
+    const { canvas, ctx } = sheet();
+    const rng = makeRng(0x81cc + frame * 907);
+    // In the mouth of the bell, brighter every frame.
+    const mouth = bellTop + 12;
+    for (let i = 0; i < 5 + frame * 3; i++) {
+      px(ctx, BELL_X - 4 + rng.int(0, 8), mouth + rng.int(0, 2), rng.chance(0.5) ? PALETTE.corpse : PALETTE.corpseLight);
+    }
+    px(ctx, BELL_X - 3, mouth + 2, PALETTE.corpseDeep, 8, 1);
+    // Up the rope, as far as the frame has got.
+    for (let i = 0; i < 4 + frame * 2; i++) {
+      const y = ropeBottom + 2 - i * 2;
+      px(ctx, ROPE_X + 1 + rng.int(-1, 1), y, frame >= 2 ? PALETTE.corpseLight : PALETTE.corpse);
+    }
+    // And the loop itself, once it is properly awake.
+    if (frame >= 1) {
+      for (let a = 0; a < 20; a++) {
+        const t = (a / 20) * Math.PI * 2;
+        px(ctx, Math.round(ROPE_X + 1 + Math.cos(t) * 4), Math.round(ropeBottom + 2 + Math.sin(t) * 3), PALETTE.corpse);
+      }
+    }
+    return canvas;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 7 · The rift
 // ---------------------------------------------------------------------------
 
 /**
@@ -1132,6 +1313,7 @@ const BUILDERS = {
   hornetTree: () => ({ body: buildHornetTree(), glow: buildHornetTreeGlow(), plume: null }),
   cornice: () => ({ body: buildCornice(), glow: buildCorniceGlow(), plume: null }),
   blackdamp: () => ({ body: buildCypress(), glow: buildCypressGlow(), plume: 'gas' }),
+  gallows: () => ({ body: buildGallows(), glow: buildGallowsGlow(), plume: null }),
   rift: () => ({
     body: buildRift(),
     glow: buildRiftGlow(),

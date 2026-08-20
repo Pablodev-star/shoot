@@ -75,7 +75,7 @@ const PIXELS_PER_MILE = 100;
 /** The sections of the list, in the order the screen draws them. */
 export const CATEGORIES = [
   { id: 'beginnings', name: 'Beginnings', blurb: 'The first time you do anything.' },
-  { id: 'road', name: 'The Road', blurb: 'Six worlds, and the miles between them.' },
+  { id: 'road', name: 'The Road', blurb: 'Seven worlds, and the miles between them.' },
   { id: 'duelling', name: 'Duelling', blurb: 'What happens at ten paces.' },
   { id: 'fortune', name: 'Fortune', blurb: 'Gold, guns, and everything bought with them.' },
   { id: 'survival', name: 'Survival', blurb: 'Hunger, weather, and staying upright.' },
@@ -236,8 +236,30 @@ export const ACHIEVEMENTS = [
     test: (p) => p.worldsReached.includes(5),
     reward: { kind: 'clothing', slot: 'hat', id: 'horns' },
   },
+  /**
+   * THE SIXTH LINE MOVED, AND THE SEVENTH IS NEW
+   * -------------------------------------------------------------------------
+   * `world6` used to mean the Galaxy, because the Galaxy used to be world six.
+   * Gallows Hollow is world six now and the Galaxy is world seven, so this line
+   * is about the Hollow and `world7` below is about the Galaxy.
+   *
+   * The id is deliberately NOT renamed. Ids are what profiles are made of: a
+   * player who unlocked `world6` on the old road keeps the tick, and what it
+   * says over it changes. That is the honest trade — the alternative is
+   * silently un-earning a line somebody already earned — and it costs nothing,
+   * because both versions of `world6` mean the same thing in the only sense the
+   * player cares about: they got past the Basin.
+   */
   {
     id: 'world6',
+    category: 'road',
+    name: 'Gallows Hollow',
+    description: 'Ride into world 6, where they stopped filling the holes in.',
+    test: (p) => p.worldsReached.includes(6),
+    reward: { kind: 'clothing', slot: 'hat', id: 'shroud' },
+  },
+  {
+    id: 'world7',
     category: 'road',
     name: 'Past The Last Horizon',
     description: 'Reach the Galaxy.',
@@ -309,7 +331,7 @@ export const ACHIEVEMENTS = [
     id: 'allBosses',
     category: 'road',
     name: 'Six Feet Under',
-    description: 'Defeat the boss of all six worlds — across as many runs as it takes.',
+    description: 'Defeat the boss of all seven worlds — across as many runs as it takes.',
     test: (p) => p.bossWorlds.length >= FINAL_WORLD,
     reward: { kind: 'clothing', slot: 'shirt', id: 'bones' },
   },

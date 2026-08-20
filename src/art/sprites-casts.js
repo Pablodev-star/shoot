@@ -87,6 +87,19 @@ const KEY = {
   J: PALETTE.iceDark,
   n: PALETTE.snowLight,
   N: PALETTE.snowShade,
+  // The hollow. Letters ran out four biomes ago, so these are the same
+  // punctuation the biome art uses in src/art/env-kit.js — one character, one
+  // colour, across every file that draws this world.
+  '*': PALETTE.pall,
+  '(': PALETTE.pallMid,
+  ')': PALETTE.gloam,
+  '[': PALETTE.gloamDark,
+  ']': PALETTE.gloamDeep,
+  '{': PALETTE.gravewood,
+  '}': PALETTE.gravewoodLight,
+  '|': PALETTE.corpseLight,
+  ',': PALETTE.corpse,
+  '"': PALETTE.corpseDeep,
   // the void
   u: PALETTE.purple,
   U: PALETTE.purpleDark,
@@ -547,6 +560,117 @@ const TEAR = [
 ];
 
 /** The ground coming apart, with what is under it showing through. */
+
+/**
+ * A hand out of the ground, opening and then closing.
+ *
+ * The bayou's `grasp` drags somebody under and lets go; this one takes hold of
+ * a wrist and is still holding it three rounds later, so the last frame is a
+ * FIST rather than an open hand. Three frames, and the third is the one that
+ * stays on screen.
+ */
+const BONE_HAND = [
+  [
+    '.*...*...*.',
+    '*(*.*(*.*(*',
+    '*(*.*(*.*(*',
+    '.*(*.*(*.*.',
+    '..*(*(*(*..',
+    '..*(((((*..',
+    '...*(((*...',
+    '...k[[[k...',
+    '....k[k....',
+  ],
+  [
+    '..*.*.*....',
+    '.*((*((*(..',
+    '.*((*((*(..',
+    '..*(((((*..',
+    '..*(((((*..',
+    '...*(((*...',
+    '...*(((*...',
+    '...k[[[k...',
+    '....k[k....',
+  ],
+  [
+    '...........',
+    '...***.....',
+    '..*(((*....',
+    '..*(*((*...',
+    '..*((((*...',
+    '...*(((*...',
+    '...*((*....',
+    '...k[[[k...',
+    '....k[k....',
+  ],
+];
+
+/**
+ * A bone cup, thrown to be spilled. It is the Hollow's answer to the bayou's
+ * gourd and it is deliberately the same size and the same weight — what
+ * changes between the two worlds is what comes out of it.
+ */
+const OSSUARY = [
+  [
+    '.kkkkkkk.',
+    'k*(((((*k',
+    'k*(,,,(*k',
+    'k.*(((*.k',
+    '..*(((*..',
+    '...*(*...',
+    '..k*(*k..',
+    '..k(((k..',
+    '...kkk...',
+  ],
+  [
+    '.........',
+    'k.,...,.k',
+    '.k.,.,.k.',
+    '..k*(*k..',
+    '.k*(((*k.',
+    '.k*(((*k.',
+    '..k*(*k..',
+    '...kkk...',
+    '.........',
+  ],
+];
+
+/**
+ * A grave marker: a board, a crosspiece and a point on the end of it, driven
+ * into the road in front of somebody. Two frames — arriving, and then standing
+ * with the mark on it lit.
+ */
+const MARKER = [
+  [
+    '..kkkkk..',
+    '.k}{{{}k.',
+    '.k{{{{{k.',
+    'kk{{{{{kk',
+    'k}{{{{{}k',
+    'kk{{{{{kk',
+    '.k{{{{{k.',
+    '.k{{{{{k.',
+    '.k[{{{[k.',
+    '..k{{{k..',
+    '...k{k...',
+    '....k....',
+  ],
+  [
+    '..kkkkk..',
+    '.k}{{{}k.',
+    '.k{|||{k.',
+    'kk{|{|{kk',
+    'k}{|||{}k',
+    'kk{|{|{kk',
+    '.k{|||{k.',
+    '.k{{{{{k.',
+    '.k[{{{[k.',
+    '..k{{{k..',
+    '...k{k...',
+    '....k....',
+  ],
+];
+
 const FISSURE = [
   [
     '......X......',
@@ -791,6 +915,11 @@ const DEFS = {
   brand: { rows: BRAND, anchor: [4, 4] },
   tear: { rows: TEAR, anchor: [4, 5] },
   fissure: { rows: FISSURE, anchor: [6, 2] },
+  // The hollow. `boneHand` and `marker` are `base`-pivoted — both come out of
+  // or go into the ground — and the cup is aimed at its middle like the gourd.
+  boneHand: { rows: BONE_HAND, anchor: [5, 8] },
+  ossuary: { rows: OSSUARY, anchor: [4, 4] },
+  marker: { rows: MARKER, anchor: [4, 11] },
 };
 
 const BUILT = {
@@ -812,6 +941,18 @@ const BUILT = {
   }),
   swarm: () => ({
     frames: buildCloud([PALETTE.ink, PALETTE.goldDark, PALETTE.gold], 0x9004),
+    anchor: [CLOUD_W / 2, CLOUD_H / 2],
+  }),
+  /**
+   * The Hollow's dread: the same cloud primitive the grit, the flurry, the
+   * miasma and the swarm are built from, in the one colour ramp that does not
+   * describe a substance. There is nothing in it — that is the point of the
+   * ability it belongs to — so it is drawn as the ground's own tones with the
+   * corpse-light on the top edge, which reads as the air going wrong rather
+   * than as something arriving in it.
+   */
+  dread: () => ({
+    frames: buildCloud([PALETTE.gloamDeep, PALETTE.gloam, PALETTE.corpseLight], 0x9005),
     anchor: [CLOUD_W / 2, CLOUD_H / 2],
   }),
 };

@@ -5,7 +5,7 @@
  * here so balancing is a matter of editing constants in one file.
  */
 
-import { getWorld } from './worlds.js';
+import { getWorld, FINAL_WORLD } from './worlds.js';
 import { SELL_RATIO } from './items.js';
 import { OVERRIDES } from '../admin/overrides.js';
 /**
@@ -30,7 +30,7 @@ import { tuning } from './difficulty.js';
  * ---------------------------------------------------------------------------
  * A level is worth one life — one more maximum and one more in the bar to go
  * with it — and the curve pays out about three of them every two worlds, so
- * the bar reads 3, 4, 6, 7, 9, 10 at the six borders.
+ * the bar reads 3, 4, 6, 7, 9, 10, 12 at the seven borders.
  *
  * That is a much flatter climb than this game used to have, and it changes
  * what levelling IS. On four lives a level the bar tripled across a run and
@@ -51,10 +51,11 @@ import { tuning } from './difficulty.js';
  * are meant to be read together, and `tools/sim.mjs asymmetry` fails the build
  * if they stop agreeing:
  *
- *   level 2 |     45 · the first fight     level 6 | 1,255 · middle of world 4
- *   level 3 |    230 · end of world 1      level 7 | 1,851 · world 5
- *   level 4 |    478 · middle of world 2   level 8 | 2,650 · middle of world 5
- *   level 5 |    810 · world 3             level 9 | 3,721 · world 6
+ *   level 2 |     45 · the first fight     level  6 | 1,255 · middle of world 4
+ *   level 3 |    230 · end of world 1      level  7 | 1,851 · world 5
+ *   level 4 |    478 · middle of world 2   level  8 | 2,650 · middle of world 5
+ *   level 5 |    810 · world 3             level  9 | 3,721 · the Hollow
+ *                                          level 10 | 5,157 · the Galaxy
  *
  */
 export const EXP_BASE = 138;
@@ -175,6 +176,16 @@ export const EXPECTED_POWER = {
   4: { lives: 7, damage: 3.5 },
   5: { lives: 9, damage: 3.5 },
   6: { lives: 10, damage: 3.5 },
+  /**
+   * The seventh row, and it is the reason the Galaxy could be moved up a rung
+   * without the ending becoming a wall. A player who has crossed the Hollow
+   * arrives at the last world on twelve diamonds rather than ten — the level
+   * curve pays out about three levels every two worlds and the Hollow is
+   * another world — against riders who carry two more than they used to. The
+   * two sides moved together, which is the only way this file allows either of
+   * them to move at all.
+   */
+  7: { lives: 12, damage: 3.5 },
 };
 
 /** Rounded to the half-diamond grid the whole game lives on. */
@@ -303,6 +314,25 @@ export const BOSS_LIVES_MUL = 1.5;
  */
 export const ENEMY_LIVES_BASE = 1;
 export const ENEMY_LIVES_PER_WORLD = 2;
+/**
+ * …and the last rung of it is ONE, not two.
+ *
+ * The kink is not a fudge, it is the forge ladder arriving in the arithmetic.
+ * A rider's life total climbs by two a world while the player's gun climbs by
+ * half a life a rung — and the gun STOPS, at three and a half, somewhere in the
+ * Basin. Every world after that costs an extra shot per duel, and the harness
+ * bounds that drift hard (1.5 to 3.5 of your shots to kill a rider; see
+ * `HITS_PER_SHOT_ON_THEM`). On six worlds a straight +2 ladder finished at 3.2
+ * and fitted. On seven it finishes at 3.7 and does not: the last world's duels
+ * become a war of attrition that no amount of shopping can shorten, because
+ * there is nothing left in the shop to buy.
+ *
+ * Two ways out of that. Give the forge an eighth rung — which makes every world
+ * after the Basin easier as well, and the late game's only remaining difficulty
+ * curve is precisely that the gun has stopped. Or let the RIDERS' ladder take a
+ * smaller last step, which changes exactly one world. This is the second.
+ */
+export const ENEMY_LIVES_FINAL_STEP = 1;
 
 /**
  * WHAT A RIDER'S BULLET COSTS YOU: THE BAR, OVER SIX
@@ -388,8 +418,10 @@ export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
 
 /** How much life a rider of a given world carries, before its own spread. */
 export function enemyLives(worldId) {
-  const world = Math.max(1, Math.min(6, worldId || 1));
-  return ENEMY_LIVES_BASE + (world - 1) * ENEMY_LIVES_PER_WORLD;
+  const world = Math.max(1, Math.min(FINAL_WORLD, worldId || 1));
+  const fullSteps = Math.min(world, FINAL_WORLD - 1) - 1;
+  return ENEMY_LIVES_BASE + fullSteps * ENEMY_LIVES_PER_WORLD
+    + (world === FINAL_WORLD ? ENEMY_LIVES_FINAL_STEP : 0);
 }
 
 /** How much life that world's boss carries: half again its riders, always. */
@@ -419,7 +451,7 @@ export function bossLives(worldId) {
  */
 function riderWeight(worldId, lives) {
   const standard = enemyLives(worldId) || 1;
-  const size = 1 + (Math.max(1, Math.min(6, worldId)) - 1) * 0.65;
+  const size = 1 + (Math.max(1, Math.min(FINAL_WORLD, worldId)) - 1) * 0.65;
   return (Math.max(0.5, lives) / standard) * size;
 }
 
@@ -886,6 +918,15 @@ export const HUNGER_DRAIN_HORSE_MUL = 1.15;
 export const HUNGER_DRAIN_SANDSTORM_MUL = 1.5;
 export const HUNGER_DRAIN_SNOW_MUL = 1.4;
 export const HUNGER_DRAIN_ASH_MUL = 1.3;
+/**
+ * The gloom, and it is the odd one out: nothing is blowing, nothing is cold and
+ * there is nothing in the air to breathe through. What it costs is the walking
+ * — a road you cannot see the far end of is a road taken slowly and doubled
+ * back on — so it is the lightest of the four, and it is on the list at all
+ * because a sky that changes the duel and the view but not the ledger is a sky
+ * the player has no reason to be afraid of.
+ */
+export const HUNGER_DRAIN_GLOOM_MUL = 1.2;
 /**
  * The only multiplier that pulls the other way: water on the saddle.
  *

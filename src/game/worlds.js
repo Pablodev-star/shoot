@@ -1,7 +1,7 @@
 /**
  * SHOOT! — World definitions (Block 5a).
  *
- * Five themed worlds plus the final "Galaxy". Each world is a single data
+ * Six themed worlds plus the final "Galaxy". Each world is a single data
  * object that every other system reads:
  *
  *   biome       which landscape you walk through — see src/game/biomes.js
@@ -31,8 +31,8 @@
  * names were describing the art, not the journey. Each world now names a place
  * the ride could plausibly reach, and points at the biome that draws it.
  *
- * All six of those biomes are now drawn: `desert`, `meadow`, `snow`, `swamp`,
- * `inferno` and `void`.
+ * All seven of those biomes are now drawn: `desert`, `meadow`, `snow`, `swamp`,
+ * `inferno`, `hollow` and `void`.
  *
  * WHAT A TINT IS FOR, NOW THAT IT IS NOT A PLACEHOLDER
  * ---------------------------------------------------------------------------
@@ -42,18 +42,19 @@
  * is already the right colour does nothing but drain it — the pass is white
  * because it is drawn white.
  *
- * Three worlds keep one, and for the opposite reason: the *sky* over them is
+ * Four worlds keep one, and for the opposite reason: the *sky* over them is
  * not Earth's. The sky is deliberately shared by the whole game (see the note
- * in src/explore/parallax.js) — the sun setting the same way in all six worlds
- * is part of what makes the journey one journey — so the only way to say "the
- * air here is not air" is to put the world's own colour over the top of it.
- * A bayou needs the blue taken down, the basin should not have a summer sky at
- * all, and the Galaxy has no sky in the first place.
+ * in src/explore/parallax.js) — the sun setting the same way in all seven
+ * worlds is part of what makes the journey one journey — so the only way to say
+ * "the air here is not air" is to put the world's own colour over the top of
+ * it. A bayou needs the blue taken down, the basin should not have a summer sky
+ * at all, the Hollow's light is wrong in a way nothing on the ground can say by
+ * itself, and the Galaxy has no sky in the first place.
  */
 
 import { getBiome } from './biomes.js';
 
-export const FINAL_WORLD = 6;
+export const FINAL_WORLD = 7;
 
 export const WORLDS = [
   {
@@ -77,10 +78,10 @@ export const WORLDS = [
      * in src/explore/encounters.js (`bill`) collapses the gap to one and the
      * world comes out as a parade of doors.
      *
-     * The six of them are 8, 11, 10, 11, 8 and 6 — near enough double, and the
-     * number of counters and beds went up with them (`DUELS_PER_SERVICE`), so
-     * a longer road is a road with more on it rather than a road with the same
-     * two shops spread thinner.
+     * The seven of them are 8, 11, 10, 11, 8, 6 and 6 — near enough double,
+     * and the number of counters and beds went up with them
+     * (`DUELS_PER_SERVICE`), so a longer road is a road with more on it rather
+     * than a road with the same two shops spread thinner.
      *
      * The Dust Flats gets the smallest share of that, and the reason is the bar
      * rather than the road: three diamonds is the shallowest this game ever is,
@@ -297,7 +298,106 @@ export const WORLDS = [
     },
   },
   {
+    /**
+     * SIX · GALLOWS HOLLOW — the world that is not trying to kill you with
+     * weather.
+     * -----------------------------------------------------------------------
+     * Every stretch of this road so far has had a *hazard* for a personality:
+     * the flats blow sand, the pass drops snow, the basin is on fire. This one
+     * has nothing. It is a dry, grey, quiet valley of fence posts and turned
+     * earth with the light going out of it, and what it does to the player is
+     * done in the head rather than to the life bar.
+     *
+     * That is why it sits exactly here. It is the last place on the journey
+     * that is still ON Earth — the Galaxy after it has no ground, no sky and no
+     * dead to bury — and putting the game's quietest world immediately before
+     * its loudest is what makes the border between them read as leaving.
+     *
+     * It is also the world with the SCARE in it (src/explore/scare.js), and
+     * every number and every prop below is chosen to set that up: the roadside
+     * is full of skulls on stakes that never move, the sky is usually too dark
+     * to see the far end of the road, and there is exactly one moment on the
+     * crossing where the road is empty for a long time. Nothing here is
+     * jump-scare furniture — it is a real world with real riders on it — but
+     * the whole of it is teaching the player one lesson so that it can be
+     * broken once.
+     */
     id: 6,
+    name: 'Gallows Hollow',
+    subtitle: 'Nothing down here stayed buried',
+    biome: 'hollow',
+    /**
+     * The fourth wash, and the only one over a landscape that is genuinely on
+     * this planet. The Hollow's ground is already grey; what the wash says is
+     * that the LIGHT is wrong — a green-grey cast over the sun, the sky and the
+     * traveller alike, so a man walking through it is the same colour as the
+     * ground he is walking on. Kept light (a fifth) because the world is
+     * painted nearly right already: much past this and the fence posts stop
+     * separating from the field behind them.
+     */
+    tint: { color: '#48544a', alpha: 0.22 },
+    priceMul: 2.15,
+    goldMul: 4.6,
+    expMul: 4.2,
+    /**
+     * SIX, WHICH IS WHERE THE CORRIDOR HAS NARROWED TO
+     * -----------------------------------------------------------------------
+     * Two fewer than the Basin and the same as the Galaxy, and it is the same
+     * arithmetic that shortened both of those: past the top of the forge ladder
+     * a rider takes a third shot, so a fight out here costs half again what a
+     * Bayou fight costs and a world has to get shorter to cost the same
+     * (see EXPECTED_POWER in src/game/progression.js).
+     *
+     * It was written at seven first, and seven is what the harness threw out.
+     * The Hollow's riders carry eleven diamonds against a gun that stopped at
+     * three and a half — the same arithmetic the Galaxy used to be the only
+     * world with — and at seven fights this world was killing two experts in
+     * five who reached it, on top of the last world doing the same thing
+     * afterwards. Two consecutive worlds of that is not a climb, it is a wall
+     * with a wall behind it: end to end, one expert run in twenty-five finished
+     * the game. At six the Hollow costs about what the Basin costs and the
+     * whole road holds its shape (`node tools/sim.mjs all`).
+     */
+    encounters: { duels: 6 },
+    rarity: { common: 24, rare: 44, legendary: 32 },
+    enemy: {
+      lives: { 10: 30, 11: 40, 12: 25, 13: 5 },
+      abilityChance: 0.36,
+      /**
+       * Four tricks, and not one of them does damage in the way the basin's do.
+       * A rope on the arm, a life pulled out of you and into him, a mark that
+       * makes everything else land harder, and the one that takes your shield
+       * away — the Hollow's riders fight by removing the things you were
+       * relying on rather than by hitting you with something. See the block in
+       * src/game/world-abilities.js.
+       */
+      abilities: ['gravesGrip', 'marrowDrain', 'deathMark', 'coldSweat'],
+      accuracy: 0.55,
+      roster: ['hangman', 'gravedigger', 'pallbearer', 'revenant', 'bonemarshal'],
+      /** The gallows on the rise, and the bell on it. */
+      special: 'gallows',
+      specialChance: 0.16,
+    },
+    /**
+     * THE SEXTON.
+     *
+     * The man whose job it was to dig the holes, still doing it. He is the
+     * only boss in the game with no gun in the art — the shovel is the
+     * silhouette — and he carries the world's whole hand rather than the usual
+     * three, because a fight against something that takes your defences away
+     * has to actually take all of them away or the theme is a costume.
+     */
+    boss: {
+      name: 'The Sexton',
+      archetype: 'bossSexton',
+      lives: 16.5,
+      abilities: ['deathMark', 'coldSweat', 'marrowDrain'],
+      accuracy: 0.65,
+      special: 'gallows',
+    },
+  },
+  {
+    id: 7,
     name: 'Galaxy',
     subtitle: 'Past the last horizon',
     /** The walk is the void; the intro card is still the galaxy scene. */
@@ -306,16 +406,28 @@ export const WORLDS = [
      * The heaviest wash in the game, and the only one doing structural work:
      * out here the "sky" is a blue gradient with a sun crossing it, and this
      * is what makes it space. It goes over the sun as well, which is correct —
-     * whatever that is, it is not the star the first five worlds walked under.
+     * whatever that is, it is not the star the first six worlds walked under.
      */
     tint: { color: '#4c2f80', alpha: 0.45 },
+    /**
+     * A WORLD FURTHER OUT THAN IT USED TO BE
+     * -----------------------------------------------------------------------
+     * The Galaxy is the seventh stop now rather than the sixth, and the three
+     * multipliers moved with it. `priceMul` did not have to: the exponential in
+     * `itemPrice` already charges 42% more for standing one world further down
+     * the road, so 2.4 on top of that is the same jump over the Hollow that the
+     * Hollow is over the Basin. The two that DID have to move are the purse and
+     * the exp — those are flat per-world multipliers with no curve underneath
+     * them, so leaving them where they were would have made the last world's
+     * income a step DOWN against its own prices.
+     */
     priceMul: 2.4,
-    goldMul: 5,
-    expMul: 4.5,
+    goldMul: 6,
+    expMul: 5.2,
     /**
      * The Galaxy is short and brutal: a corridor straight to the boss. Six is
      * the fewest fights in the game and still half again the corridor it used
-     * to be — out here a rider carries eleven diamonds against a gun that
+     * to be — out here a rider carries twelve diamonds against a gun that
      * stopped at three and a half, and a single duel costs better than a third
      * of the bar. It is the one world whose length is held DOWN while the rest
      * of the road was let out, and the reason is the ending: at eight, the
@@ -324,8 +436,28 @@ export const WORLDS = [
      */
     encounters: { duels: 6 },
     rarity: { common: 18, rare: 42, legendary: 40 },
+    /**
+     * EVERYTHING OUT HERE MOVED UP A RUNG WHEN THE HOLLOW ARRIVED
+     * -----------------------------------------------------------------------
+     * This is the point of putting a world in FRONT of the last one rather than
+     * after it. The player who walks out of the Hollow has a world more of
+     * levels, a world more of gold and a world more of kit than the player who
+     * used to walk in here out of the Basin — so if the Galaxy had stayed
+     * exactly as it was, adding a world would have made the ending EASIER,
+     * which is the one thing the ending must not get.
+     *
+     * So the last world is a rung further along every ladder it has. Its riders
+     * carry twelve diamonds rather than eleven (which is simply `enemyLives(7)`
+     * — and see the note on `ENEMY_LIVES_FINAL_STEP` for why the last rung of
+     * that ladder is one rather than two), they reach for a trick more than
+     * half the time, one in four of them is standing under a rift, and the
+     * tricks themselves are the strongest versions of their mechanics in the
+     * game. Nothing here is a
+     * number invented to punish the player for the new world: it is the same
+     * curve, read one step further along.
+     */
     enemy: {
-      lives: { 10: 30, 11: 40, 12: 22, 13: 8 },
+      lives: { 11: 30, 12: 40, 13: 22, 14: 8 },
       abilityChance: 0.48,
       abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
       accuracy: 0.6,
@@ -334,17 +466,21 @@ export const WORLDS = [
       specialChance: 0.22,
     },
     /**
-     * Two phases — see src/duel/duel-engine.js `phases` — nine diamonds each,
-     * a shade over the eight and a half his world's riders derive. Eighteen
-     * across the pair is the largest bar in the game and it is the last fight
-     * in it; ten each was tried and took the completion rate of everybody but
-     * an expert to almost nothing, which is a wall rather than an ending.
+     * Two phases — see src/duel/duel-engine.js `phases` — ten diamonds each,
+     * against the twelve his world's riders now carry. Twenty across the pair is
+     * the largest bar in the game and it is the last fight in it.
+     *
+     * Ten each was tried once BEFORE the Hollow existed and took the completion
+     * rate of everybody but an expert to almost nothing. What makes it right
+     * now is the world in front of it: the player arrives here off a seventh
+     * crossing's worth of levels and purse, so the same twenty diamonds is a
+     * smaller share of the bar pointed at them than eighteen was.
      */
     boss: {
       name: 'THE STRANGER',
-      lives: 9,
+      lives: 9.5,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
-      accuracy: 0.72,
+      accuracy: 0.73,
       archetype: 'bossStranger',
       /** He opens the rift himself. The phase change does not close it. */
       special: 'rift',
@@ -371,7 +507,7 @@ export const WORLDS = [
        */
       intro: {
         lines: [
-          { who: 'enemy', shot: 'low', text: 'Six worlds. Six roads. I laid every one of them for you.' },
+          { who: 'enemy', shot: 'low', text: 'Seven worlds. Seven roads. I laid every one of them for you.' },
           { who: 'enemy', shot: 'bust', text: 'You buried the men I sent. You ate, you slept, you grew.' },
           { who: 'enemy', shot: 'face', text: 'A gun is a small thing to carry that far.', shake: 260, rumble: true },
           { who: 'player', shot: 'bust', text: 'I did not walk it to stand still at the end of it.', cut: true },
@@ -383,8 +519,8 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 9,
-          accuracy: 0.72,
+          lives: 9.5,
+          accuracy: 0.73,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
         },
@@ -392,13 +528,13 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 9,
-          accuracy: 0.74,
+          lives: 9.5,
+          accuracy: 0.75,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',
           /** Phase two starts with a bullet already chambered and fires faster. */
           startBullets: 2,
-          abilityChanceMul: 1.3,
+          abilityChanceMul: 1.15,
         },
       ],
     },

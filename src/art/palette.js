@@ -112,6 +112,36 @@ export const PALETTE = {
   sulfur: '#d9c34b',
   sulfurLight: '#f4e281',
 
+  // --- The hollow (Gallows Hollow) ----------------------------------------
+  // The sixth world, and the only one whose ramp is a colour DRAINING rather
+  // than a colour. Grey with the last of a green in it: dead grass, turned
+  // earth that has been turned too often, and old timber gone silver.
+  //
+  // It sits deliberately between the bayou and the basin without touching
+  // either. The bog is dark teal and WET; the char is violet and BURNT; this
+  // is dry, pale and lightless, which is what a place looks like when nothing
+  // has happened in it for a long time.
+  pall: '#a7ac9c',
+  pallMid: '#7d8375',
+  gloam: '#5a6055',
+  gloamDark: '#3b4039',
+  gloamDeep: '#242822',
+  // Grave timber: fence rail, coffin lid, gallows post. Warmer than the ground
+  // so a stake standing in it reads as a made thing rather than as a shadow.
+  gravewood: '#4b423a',
+  gravewoodLight: '#6d6156',
+  // THE ONE LIVE COLOUR IN THE WORLD, AND THE ONE IT DOES NOT HAVE
+  // -------------------------------------------------------------------------
+  // Corpse light: the green in a lantern nobody lit, in the eye sockets on the
+  // road, in the gallows when it wakes. It is the ONLY saturated thing the
+  // Hollow is allowed, and that is a rule with a reason — there is no red
+  // anywhere in this world's art, in its props, in its riders or in its sky.
+  // So when two red pixels open on the road (see src/explore/scare.js), they
+  // are the first red the player has seen since they left the basin.
+  corpseLight: '#b8f2c8',
+  corpse: '#6bd6a4',
+  corpseDeep: '#2f7a5c',
+
   // --- The void (the Galaxy) ----------------------------------------------
   // Broken violet stone lit by nothing in particular, and the cold aquamarine
   // that everything alive out here glows in. The two are opposites on the

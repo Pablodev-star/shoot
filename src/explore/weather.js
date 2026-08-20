@@ -84,6 +84,7 @@ import {
   HUNGER_DRAIN_SANDSTORM_MUL,
   HUNGER_DRAIN_SNOW_MUL,
   HUNGER_DRAIN_ASH_MUL,
+  HUNGER_DRAIN_GLOOM_MUL,
 } from '../game/progression.js';
 import { getSky } from './daynight.js';
 
@@ -187,6 +188,37 @@ export const WEATHER = {
     duel: { enemyAccuracyPenalty: 0.16, misfireChance: 0.05 },
     hungerMul: HUNGER_DRAIN_ASH_MUL,
     blurb: 'Ash is falling across the basin',
+    tone: 'bad',
+  },
+
+  gloom: {
+    id: 'gloom',
+    label: 'Gloom',
+    /**
+     * THE ONLY WEATHER IN THE GAME THAT IS NOT MADE OF ANYTHING
+     * -----------------------------------------------------------------------
+     * Every other sky here is a substance: water, sand, flakes, smoke, rock.
+     * The Hollow's is an ABSENCE — the light goes out of the afternoon and
+     * does not come back for a while — so it has no particles at all, only
+     * banks of dark drifting through a scene that has been turned down.
+     *
+     * That is also why it is the heaviest visibility penalty outside a
+     * sandstorm while being the mildest thing to walk through. You can breathe
+     * in it perfectly well. You just cannot see who is standing at the side of
+     * the road.
+     */
+    visibility: 0.44,
+    /** It settles in and stays. The longest weather in the game. */
+    minMs: 28000,
+    maxMs: 62000,
+    /**
+     * Neither of you can read the other, and BOTH of you are guessing — the
+     * accuracy penalty is the largest in the game because the dark is the one
+     * thing that takes a duel away from the man who is better at reading it.
+     */
+    duel: { enemyAccuracyPenalty: 0.2 },
+    hungerMul: HUNGER_DRAIN_GLOOM_MUL,
+    blurb: 'The light is going out of the day',
     tone: 'bad',
   },
 
@@ -324,6 +356,10 @@ const SHEETS = {
   // Smoke, not haze: fewer, deeper, darker, and the only sheets in the game
   // that take light *out* of the scene rather than putting a veil over it.
   ash: { count: 5, h: [10, 30], vx: [-2.6, -0.8], alpha: [0.1, 0.24], color: 'rgb(96, 88, 96)' },
+  // The gloom's banks are fog's, in the dark and moving slower still: four of
+  // them, deep, and drawn in the ground's own colour so they read as the
+  // landscape going out rather than as something passing over it.
+  gloom: { count: 4, h: [14, 40], vx: [-1.1, -0.3], alpha: [0.12, 0.26], color: 'rgb(36, 40, 34)' },
 };
 
 const rng = makeRng(0xc0ffee);
@@ -444,6 +480,7 @@ export function getGroundWind() {
     ash: -1.1,
     rain: -1.5,
     fog: -0.4,
+    gloom: -0.25,
   }[id] || 0;
   return -drive * 60 * state.intensity;
 }
@@ -567,6 +604,13 @@ function stepParticles(dt, view) {
   // travelling fast enough to be a grain of anything.
   if (id === 'fog') {
     stepSheets(dt, W, H, SHEETS.fog, pt);
+    return;
+  }
+
+  // …and the gloom has less than fog does: it is the same primitive with the
+  // light taken out of it. See the note on the state itself.
+  if (id === 'gloom') {
+    stepSheets(dt, W, H, SHEETS.gloom, pt);
     return;
   }
 
@@ -1017,6 +1061,28 @@ export function render(ctx, view) {
     // little there is cools the frame rather than dimming it.
     bandWash(ctx, view, 'rgb(38, 24, 72)', 0, view.h, 0.24 * k, 0.1 * k);
     drawMeteors(ctx, view, k);
+    return;
+  }
+
+  if (id === 'gloom') {
+    /**
+     * The dark, and it is built exactly like the fog with one thing reversed:
+     * fog is a PALE veil laid over the scene and this is the same three washes
+     * in the Hollow's own deepest tone, so instead of the world whiting out it
+     * goes down towards the ground's colour and stops being separable from it.
+     *
+     * The one bright note in it is the horizon, which is left alone. A dusk
+     * with nothing lighter anywhere in it is a screen with the brightness
+     * turned down; leaving the far edge of the frame a shade cleaner than the
+     * rest is what makes it read as light going out of a PLACE.
+     */
+    bandWash(ctx, view, 'rgb(20, 24, 20)', 0, view.h, 0.34 * k, 0.5 * k);
+    bandWash(ctx, view, 'rgb(28, 33, 28)', view.h * 0.3, pt, 0, 0.46 * k);
+    drawSheets(ctx, view, k, SHEETS.gloom.color);
+    // Heaviest at the verge and thinning towards the camera — the same
+    // arrangement the fog uses, and for the same reason: what you cannot see
+    // is the road twenty paces off, never your own boots.
+    bandWash(ctx, view, 'rgb(28, 33, 28)', pt, view.h, 0.46 * k, 0.2 * k);
     return;
   }
 

@@ -1611,7 +1611,7 @@ export function createDuelScene({
    *   the pool     is it real? — light thrown down onto the road under it
    *   the tells    warning rings that leave the thing every second while it
    *                winds up
-   *   the drift    what it has in the air: rock, grit, hornets, gas, embers
+   *   the drift    what it has in the air: rock, grit, hornets, gas, bone
    *   the strike   the piece with somebody's name on it — motif-shaped, with a
    *                tail, and it BURSTS where it lands
    *   the beam     and, for a charge special, the shot at the end of the
@@ -1637,7 +1637,11 @@ export function createDuelScene({
    * warning rings and the beam are all centred on it — so a rock comes out of
    * the crater rather than out of the middle of the mountain.
    */
-  const HAZARD_CORE = { rock: 0.2, flake: 0.26, mote: 0.44, shard: 0.43, hornet: 0.6, gas: 0.84 };
+  const HAZARD_CORE = {
+    rock: 0.2, flake: 0.26, mote: 0.44, shard: 0.43, hornet: 0.6, gas: 0.84,
+    /** The mouth of the bell, two thirds of the way down the gallows frame. */
+    bone: 0.55,
+  };
 
   /** Anything past this and the oldest loose particle is dropped. */
   const DEBRIS_CAP = 340;
@@ -1669,6 +1673,9 @@ export function createDuelScene({
     const s = lastView ? lastView.scale : 3;
     const core = hazardCore(hz);
     if (hz.motif === 'gas') return { x: tx, y: groundLine + s * 4, ms: 320 };
+    // A gallows strike comes up out of the road at their boots, not out of the
+    // sky: what the bell wakes is underneath the person it is tolling for.
+    if (hz.motif === 'bone') return { x: tx + (Math.random() - 0.5) * s * 8, y: groundLine + s * 6, ms: 300 };
     if (hz.motif === 'mote' || hz.motif === 'hornet') {
       return { x: core ? core.x : tx + 200, y: core ? core.y : ty - s * 4, ms: 340 };
     }
@@ -1782,6 +1789,29 @@ export function createDuelScene({
           color: pick,
           t: 0,
           life: 2600 + Math.random() * 1400,
+        });
+        break;
+      case 'bone':
+        /**
+         * Out of the ground under the gallows, up, over and down — the only
+         * debris in the game that is THROWN rather than dropped, spat or blown.
+         * It uses the rock's physics because that is what a piece of somebody
+         * does once it is in the air; what makes it read as bone rather than as
+         * rock is that it comes off the foot of the landmark instead of out of
+         * a crater, and it turns end over end on the way (`spin`).
+         */
+        add({
+          kind: 'rock',
+          x: box.x + box.w * (0.2 + Math.random() * 0.6),
+          y: groundLine ? groundLine - s * 2 : crest,
+          vx: (hz.owner === 'enemy' ? -1 : 1) * (0.04 + Math.random() * 0.1) * s,
+          vy: -(0.13 + Math.random() * 0.07) * s,
+          g: 0.00018 * s,
+          size: Math.max(2, Math.round(s * (Math.random() < 0.35 ? 1.5 : 0.9))),
+          color: pick,
+          spin: (Math.random() - 0.5) * 0.02,
+          t: 0,
+          life: 9000,
         });
         break;
       case 'gas':

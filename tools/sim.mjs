@@ -939,7 +939,8 @@ async function reportRuns(difficulty = 'normal') {
     rows.push({
       policy,
       finishedPct: pct(wins, RUNS),
-      reachedGalaxyPct: pct(reached[6] || 0, RUNS),
+      reachedGalaxyPct: pct(reached[FINAL_WORLD] || 0, RUNS),
+      reachedHollowPct: pct(reached[6] || 0, RUNS),
       reachedBasinPct: pct(reached[5] || 0, RUNS),
       reachedBayouPct: pct(reached[4] || 0, RUNS),
       reachedPassPct: pct(reached[3] || 0, RUNS),
@@ -977,9 +978,39 @@ const reportHard = () => reportRuns('hard');
  * out of any of them.
  */
 const TARGETS = [
-  { what: 'novice reaches the Galaxy', min: 3, max: 14 },
-  { what: 'average reaches the Galaxy', min: 12, max: 30 },
-  { what: 'expert reaches the Galaxy', min: 42, max: 68 },
+  /**
+   * TWO RUNGS, NOT ONE, BECAUSE THE ROAD IS SEVEN WORLDS LONG NOW
+   * ---------------------------------------------------------------------------
+   * These bands used to be three lines about one thing: how often each skill
+   * band ever sees the last world. That was the right shape for a six-world
+   * road where the last world was also the first hard one.
+   *
+   * Gallows Hollow changed what the question means. There are two "late" worlds
+   * now — the Hollow and the Galaxy — and they measure different things:
+   *
+   *   REACHING THE HOLLOW is the old question, one stop earlier. It is "did the
+   *   run survive the ordinary road", and the bands are the OLD ones, unchanged
+   *   and unmoved. That is deliberate: worlds one to five were not touched by
+   *   any of this, so if these three numbers drift, something in the first five
+   *   worlds drifted and the build should fail.
+   *
+   *   REACHING THE GALAXY is the new question, and it is a harder one than the
+   *   old road ever asked, because there is a whole world in front of it. The
+   *   bands below are what the road actually delivers with the Hollow costing
+   *   about what the Basin costs — roughly two runs in three of the ones that
+   *   get there.
+   *
+   * The ceilings matter as much as the floors on both. A Hollow that everybody
+   * walks through is a world that is not there, and an expert clearing better
+   * than half of all runs into the Galaxy has a last world that stopped being
+   * one.
+   */
+  { what: 'novice reaches the Hollow', field: 'reachedHollowPct', min: 3, max: 14 },
+  { what: 'average reaches the Hollow', field: 'reachedHollowPct', min: 12, max: 30 },
+  { what: 'expert reaches the Hollow', field: 'reachedHollowPct', min: 42, max: 68 },
+  { what: 'novice reaches the Galaxy', field: 'reachedGalaxyPct', min: 0, max: 8 },
+  { what: 'average reaches the Galaxy', field: 'reachedGalaxyPct', min: 1, max: 16 },
+  { what: 'expert reaches the Galaxy', field: 'reachedGalaxyPct', min: 28, max: 56 },
 ];
 
 /**
@@ -1007,9 +1038,15 @@ const TARGETS = [
  * this road should not make.
  */
 const HARD_TARGETS = [
-  { what: 'novice reaches the Galaxy (hard)', min: 0, max: 6 },
-  { what: 'average reaches the Galaxy (hard)', min: 0, max: 12 },
-  { what: 'expert reaches the Galaxy (hard)', min: 12, max: 38 },
+  { what: 'novice reaches the Hollow (hard)', field: 'reachedHollowPct', min: 0, max: 6 },
+  { what: 'average reaches the Hollow (hard)', field: 'reachedHollowPct', min: 0, max: 12 },
+  { what: 'expert reaches the Hollow (hard)', field: 'reachedHollowPct', min: 12, max: 38 },
+  /**
+   * And the last world on the hard road, which is the smallest number this
+   * harness prints. A floor of two rather than zero: the Ember Reaver is behind
+   * this door and an outfit nobody can reach is an outfit that does not exist.
+   */
+  { what: 'expert reaches the Galaxy (hard)', field: 'reachedGalaxyPct', min: 2, max: 22 },
 ];
 
 /**
@@ -1018,9 +1055,18 @@ const HARD_TARGETS = [
  * the number beside it is how much headroom the next change has.
  */
 function gate(rows, targets) {
-  const checks = targets.map((t, i) => {
-    const value = rows[i].reachedGalaxyPct;
-    return { ...t, value, ok: value >= t.min && value <= t.max };
+  /**
+   * A target names the column it reads and the policy it reads it from, so the
+   * list above can gate two different worlds without the order of the rows
+   * having to mean anything. The policy is taken off the front of `what` — the
+   * three rows are novice, average and expert, in that order, and every target
+   * line starts with one of those words.
+   */
+  const policyOf = (what) => ['novice', 'average', 'expert'].find((p) => what.startsWith(p));
+  const checks = targets.map((t) => {
+    const row = rows.find((r) => r.policy === policyOf(t.what)) || rows[0];
+    const value = row[t.field || 'reachedGalaxyPct'];
+    return { what: t.what, min: t.min, max: t.max, value, ok: value >= t.min && value <= t.max };
   });
   console.table(checks);
   return checks.filter((c) => !c.ok);

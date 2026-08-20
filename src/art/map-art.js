@@ -49,7 +49,8 @@
  * its own props on its own ground.
  *
  * Every world has its own landscape now, so every world has its own map: sand,
- * grass, snow, black water, basalt and the shelf out past the last horizon.
+ * grass, snow, black water, basalt, grave earth, and the shelf out past the
+ * last horizon.
  * What differs between them is only the TERRAIN entry below and the props the
  * bundle hands over — no map code is aware of any particular place. The three
  * things that separate one world's sheet from another's are all data: which
@@ -532,6 +533,40 @@ const TERRAIN = {
     embers: { count: 220, colors: [PALETTE.magma, PALETTE.emberGlow, PALETTE.sulfur] },
   },
 
+
+  /**
+   * The Hollow. The flattest sheet the panel draws and the least contrast of
+   * any of them, which is the whole picture: from above this valley is a
+   * uniform grey field with a track through it and no water, no rock and no
+   * colour to break it up.
+   *
+   * What it has instead is `craters` — reused from the void, where they are
+   * meteor scars, and here they are the settled ground over the diggings. It is
+   * exactly the same routine (a rim, a floor, a shadow), and it is the one
+   * detail pass on this map that means anything: a field with two hundred
+   * shallow round dips in it is a graveyard seen from the air, and nothing else
+   * on the sheet says so.
+   */
+  hollow: {
+    ramp: [PALETTE.pall, PALETTE.pallMid, PALETTE.gloam, PALETTE.gloamDark, PALETTE.gloamDeep],
+    base: 0.3,
+    spread: 1.1,
+    relief: 0.85,
+    contour: { every: 0.12, color: PALETTE.gloamDeep, alpha: 0.18 },
+    grit: [PALETTE.gloam, PALETTE.gloamDark],
+    road: { worn: PALETTE.pallMid, dash: PALETTE.gloamDeep, lit: PALETTE.pall },
+    clearing: PALETTE.pallMid,
+    range: { body: PALETTE.gloamDark, light: PALETTE.gloam, dark: PALETTE.gloamDeep },
+    edge: PALETTE.gloamDeep,
+    /** No standing water anywhere. Nothing collects out here, including rain. */
+    ponds: 0,
+    blades: true,
+    /** The diggings, and the only thing on the sheet with a shape to it. */
+    craters: { count: 34, rim: PALETTE.pall, floor: PALETTE.gloamDark, shade: PALETTE.gloamDeep },
+    outcrops: { count: 8, body: PALETTE.gravewood, light: PALETTE.gravewoodLight, dark: PALETTE.gloamDeep },
+    /** Ground fog lying in the low places, which out here is most of them. */
+    mist: { color: PALETTE.pallMid, count: 34, alpha: 0.16 },
+  },
   /**
    * The void. No ponds at all — there is nothing out there to hold a liquid —
    * and the "range" along the top edge is the far shelf, drawn in the same

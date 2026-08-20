@@ -129,6 +129,17 @@ export const KEY = {
   $: PALETTE.charDark,
   '#': PALETTE.sulfur,
   '@': PALETTE.sulfurLight,
+  // The hollow: dead ground, grave timber, and the light nobody lit
+  '*': PALETTE.pall,
+  '(': PALETTE.pallMid,
+  ')': PALETTE.gloam,
+  '[': PALETTE.gloamDark,
+  ']': PALETTE.gloamDeep,
+  '{': PALETTE.gravewood,
+  '}': PALETTE.gravewoodLight,
+  '|': PALETTE.corpseLight,
+  ',': PALETTE.corpse,
+  '"': PALETTE.corpseDeep,
   // Void stone, then the light in it
   '!': PALETTE.voidRockLight,
   '?': PALETTE.voidRock,

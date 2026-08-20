@@ -20,7 +20,7 @@
  * entire reason a special is worth a shop slot — it does not make the enemy
  * better at duelling, it makes the duel a place you cannot stand around in.
  *
- * SIX SPECIALS THAT ERUPT SIX DIFFERENT WAYS
+ * SEVEN SPECIALS THAT ERUPT SEVEN DIFFERENT WAYS
  * ---------------------------------------------------------------------------
  * They used to erupt one way. Every special spread `strikes` evenly across its
  * window and took `damage` off you each time, so a volcano and a hornet tree
@@ -35,6 +35,7 @@
  *   sweep      an even beat crossing the road, no jitter       (the twister)
  *   swarm      a tight flurry at the front of the window       (the hornets)
  *   lingering  slow, evenly spaced, all the way to the end     (the blackdamp)
+ *   toll       a bell, and every beat sooner than the last     (the gallows)
  *   charge     it winds up in front of you and lands ONE hit   (the rift)
  *
  * `charge` is the one that changes what a special IS. Nothing is thrown for
@@ -117,6 +118,20 @@ const PATTERNS = {
   lingering: (n, ms, rng) => spread(n, ms * 0.24, ms * 0.96, rms(rng, 0.25)),
 
   /**
+   * The gallows. A bell does not toll evenly for long: it is swung, and every
+   * beat comes a little sooner than the one before it until the whole eruption
+   * is on top of itself and stops.
+   *
+   * The curve is what does it. `spread` puts the blows at even fractions of the
+   * window; this one eases them the other way — `1 - (1 - k)^p` — so the first
+   * gap is about two and a half times the last and the eruption ends in a
+   * clatter. It is the only pattern in the table whose beats accelerate, and
+   * the reason it is worth having is that a player counting the rhythm of this
+   * one is counting wrong on purpose.
+   */
+  toll: (n, ms, rng) => accelerate(n, ms * 0.14, ms * 0.9, 1.8, rms(rng, 0.2)),
+
+  /**
    * The rift, and the reason this table exists.
    *
    * Nothing at all for the whole window — the landmark is winding up in plain
@@ -150,6 +165,26 @@ function spread(n, from, to, jitter) {
   for (let i = 0; i < n; i++) {
     const at = from + step * i + jitter(step);
     out.push({ at: Math.min(to, Math.max(from, at)), hits: 1 });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * `spread`, with the beats crowding towards the end of the window.
+ *
+ * `power` is how hard they crowd: 1 is `spread` exactly, and 1.8 — the bell's —
+ * puts the first gap at about two and a half times the last. Everything else is the same
+ * machinery, including the clamp and the sort, because a pattern that produced
+ * blows outside its own window would be a pattern that spends lives after the
+ * eruption is over.
+ */
+function accelerate(n, from, to, power, jitter) {
+  const span = to - from;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const k = n === 1 ? 1 : i / (n - 1);
+    const at = from + span * (1 - Math.pow(1 - k, power));
+    out.push({ at: Math.max(from, Math.min(to, at + jitter(span / Math.max(1, n)))) });
   }
   return out.sort((a, b) => a.at - b.at);
 }
