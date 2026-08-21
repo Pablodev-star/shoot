@@ -15,7 +15,7 @@
  *
  * The sky, the sun, the moon and the storm deck are deliberately NOT biome
  * data. They are the same sky over every place in the game, and one of the
- * things holding the six worlds together as one journey is that the sun
+ * things holding the seven worlds together as one journey is that the sun
  * setting looks identical in all of them.
  *
  * COORDINATES

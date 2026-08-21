@@ -1363,7 +1363,7 @@ function paintRange(ctx, w, band, rng, colors) {
 function paintRoad(ctx, samples, terrain, rng) {
   // Verge, casing, surface. The casing is the load-bearing one: a light band on
   // pale ground and a dark band on dark ground both vanish, and a light band
-  // with a dark line either side of it reads on all six of them. It is the
+  // with a dark line either side of it reads on all seven of them. It is the
   // oldest trick in road cartography and the map needed it — this is the one
   // line on the sheet that has to be findable at a glance.
   // Every other sample is enough for the bands: the route is sampled every two
@@ -1450,7 +1450,7 @@ function paintCross(ctx, x, y, rng) {
   const arm = 31;
   // Ink under the red, one pixel proud of it all the way round. Red on sand is
   // the loudest mark on the map and red on the basin's red-brown ground is
-  // nearly invisible; the outline is what makes it the same mark on all six.
+  // nearly invisible; the outline is what makes it the same mark on all seven.
   for (const pass of [
     { grow: 1, ink: true },
     { grow: 0, ink: false },

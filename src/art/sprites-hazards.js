@@ -988,13 +988,20 @@ function buildCypressGlow() {
  * sags in the middle, and the brace is out of square — old timber that nobody
  * has been back to fix. A gallows drawn plumb reads as a swing set.
  */
-const GAL_X = 20;
+const GAL_X = 13;
 const GAL_TOP = 4;
 const GAL_FOOT = HAZARD_H - 5;
-const BEAM_END = 52;
-/** Where the bell hangs off the beam, and the noose beyond it. */
-const BELL_X = 42;
-const ROPE_X = 27;
+const BEAM_END = 57;
+/**
+ * Where the bell hangs off the beam, and the noose at the other end of it.
+ *
+ * They are pushed out to the ends on purpose: a landmark stands behind the
+ * fighter who called it (`HAZARD_X` in src/duel/duel-scene.js), so anything
+ * hung in the middle of this frame spends the whole duel behind somebody's
+ * hat. The two things worth seeing hang either side of him.
+ */
+const BELL_X = 47;
+const ROPE_X = 22;
 
 /** One weathered timber, drawn along its length with a lit edge and a grain. */
 function timber(ctx, x0, y0, x1, y1, thick, rng) {
@@ -1055,16 +1062,29 @@ function buildGallows() {
     const k = (y - ropeTop) / (ropeBottom - ropeTop);
     px(ctx, ROPE_X + Math.round(Math.sin(k * 2.2) * 1.2), y, PALETTE.pall);
   }
-  // The loop is drawn as a ring rather than a disc: filled, then the rim laid
-  // back over it in a lighter tone, so the hole in the middle stays a hole.
+  /**
+   * The loop, and it is the one shape in this sprite that had to be redrawn.
+   *
+   * A bright ring on a dark ground does not read as a rope with a hole in it —
+   * it reads as a ring, which at this size is a portal, a wheel or a lens. What
+   * makes it a noose is that the inside is DARKER than the ground behind it
+   * (it is a hole you are looking through into nothing) and that the rim is
+   * only lit on the top-left arc, like everything else in this game.
+   */
   ellipse(ctx, ROPE_X + 1, ropeBottom + 2, 4, 3, PALETTE.gloamDeep);
   for (let a = 0; a < 32; a++) {
     const t = (a / 32) * Math.PI * 2;
-    px(ctx, Math.round(ROPE_X + 1 + Math.cos(t) * 4), Math.round(ropeBottom + 2 + Math.sin(t) * 3), PALETTE.pall);
+    const lit = Math.cos(t) < 0.2 && Math.sin(t) < 0.2;
+    px(
+      ctx,
+      Math.round(ROPE_X + 1 + Math.cos(t) * 4),
+      Math.round(ropeBottom + 2 + Math.sin(t) * 3),
+      lit ? PALETTE.pall : PALETTE.pallMid,
+    );
   }
   // The knot, which is the heaviest thing on the rope and hangs to one side.
-  px(ctx, ROPE_X + 4, ropeBottom - 2, PALETTE.pallMid, 3, 4);
-  px(ctx, ROPE_X + 4, ropeBottom - 2, PALETTE.pall, 3, 1);
+  px(ctx, ROPE_X + 4, ropeBottom - 3, PALETTE.pallMid, 3, 4);
+  px(ctx, ROPE_X + 4, ropeBottom - 3, PALETTE.pall, 3, 1);
 
   /**
    * The bell. Cast iron: a crown, a shoulder that flares, and a lip that
@@ -1132,17 +1152,22 @@ function buildGallowsGlow() {
       px(ctx, BELL_X - 4 + rng.int(0, 8), mouth + rng.int(0, 2), rng.chance(0.5) ? PALETTE.corpse : PALETTE.corpseLight);
     }
     px(ctx, BELL_X - 3, mouth + 2, PALETTE.corpseDeep, 8, 1);
-    // Up the rope, as far as the frame has got.
-    for (let i = 0; i < 4 + frame * 2; i++) {
-      const y = ropeBottom + 2 - i * 2;
+    /**
+     * Up the rope, as far as the frame has got — a few pixels only.
+     *
+     * The first pass lit the whole loop as well, and it turned the noose into a
+     * glowing green ring hanging in the middle of the road, which is a magic
+     * portal rather than a rope. What is lit now is the INSIDE of the loop and
+     * a couple of specks climbing the line above it: something is coming up
+     * through the hole, which is the only thing the glow layer here has to say.
+     */
+    for (let i = 0; i < 3 + frame; i++) {
+      const y = ropeBottom + 2 - i * 3;
       px(ctx, ROPE_X + 1 + rng.int(-1, 1), y, frame >= 2 ? PALETTE.corpseLight : PALETTE.corpse);
     }
-    // And the loop itself, once it is properly awake.
     if (frame >= 1) {
-      for (let a = 0; a < 20; a++) {
-        const t = (a / 20) * Math.PI * 2;
-        px(ctx, Math.round(ROPE_X + 1 + Math.cos(t) * 4), Math.round(ropeBottom + 2 + Math.sin(t) * 3), PALETTE.corpse);
-      }
+      ellipse(ctx, ROPE_X + 1, ropeBottom + 2, 2 + frame * 0.5, 1.5, PALETTE.corpseDeep);
+      px(ctx, ROPE_X, ropeBottom + 2, frame >= 2 ? PALETTE.corpseLight : PALETTE.corpse, 2, 1);
     }
     return canvas;
   });

@@ -115,7 +115,7 @@ const SYNTH = {
    *      layers summing into one flat click
    *
    * Nothing else in the game is allowed near this volume, and that is the
-   * point: the player has spent five worlds learning how loud this game gets.
+   * point: the player has spent six worlds learning how loud this game gets.
    */
   scare: [
     { noise: true, dur: 0.55, gain: 0.62 },

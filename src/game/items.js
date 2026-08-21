@@ -31,7 +31,7 @@
  *
  * ABILITIES ARE ITEMS, AND THAT IS THE WHOLE INTEGRATION
  * ---------------------------------------------------------------------------
- * The twenty-four things a player can buy out of src/game/world-abilities.js
+ * The thirty things a player can buy out of src/game/world-abilities.js
  * are not a parallel system with a parallel shop, a parallel save format and a
  * parallel grid. They are generated into this table at load (`buildAbilityItems`
  * at the bottom), so a volcano goes in the saddlebag next to a carrot: shops
@@ -427,7 +427,7 @@ const CATALOGUE = {
  * One per themed ability and one per world special, priced off the same two
  * base numbers for every world — the exponential curve in
  * src/game/progression.js is what makes the basin's kit cost eight times the
- * flats', not a number written out twenty-four times here.
+ * flats', not a number written out thirty times here.
  *
  * The id carries its kind (`ab-` / `sp-`) because ids are what saves are made
  * of: a file written today has to still say what it meant a year from now, and

@@ -111,7 +111,7 @@ function whereWeAre(ctx, segment, world, player) {
       ['Duels this world', String(world.encounters.duels)],
       // Which world this run hid the clothing shop in. There is one in a whole
       // run and it is chosen off the seed, so a tester chasing it would
-      // otherwise be reduced to walking six worlds and hoping.
+      // otherwise be reduced to walking seven worlds and hoping.
       ['Clothier world', String(tailorWorldFor(player.seed))],
       ['Mounted', player.hasHorse ? 'yes' : 'no'],
     ]),

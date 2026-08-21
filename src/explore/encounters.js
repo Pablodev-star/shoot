@@ -620,7 +620,7 @@ function planReveal(segment, event, state) {
    * THE LAST BED IS SAVED FOR THE DOOR OF THE BOSS
    * -------------------------------------------------------------------------
    * Seven runs in ten ended at a boss, and the fights themselves were not the
-   * problem — measured at a full bar the six of them sit between two thirds
+   * problem — measured at a full bar they sit between two thirds
    * and nine tenths winnable. What killed the runs was arriving on half a bar,
    * because the world had spent both its inns in its opening stretch.
    *

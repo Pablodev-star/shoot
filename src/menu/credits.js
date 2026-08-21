@@ -29,7 +29,7 @@ const ERAS = [
   {
     year: 'Version 4 — This one',
     text:
-      'Rebuilt from nothing on the open web. No level select: you walk, and the desert decides what you meet. Hunger, a horse, weather, a day that turns to night, a real inventory, five worlds and whatever is waiting past the last one.',
+      'Rebuilt from nothing on the open web. No level select: you walk, and the desert decides what you meet. Hunger, a horse, weather, a day that turns to night, a real inventory, seven worlds and whatever is waiting past the last one.',
   },
 ];
 

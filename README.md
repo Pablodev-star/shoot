@@ -2,7 +2,7 @@
 
 **Shoot!** is a turn-based western duel in pixel art. Reload, shield yourself, or
 shoot before your rival. Walk the trail, manage hunger, buy at shops, rest at
-inns, and ride through five worlds to the final boss. Beat him and the road
+inns, and ride through seven worlds to the final boss. Beat him and the road
 opens a **harder one**, with something at the end of it that is on fire.
 
 Three years, four versions, one duel. This is the definitive one: plain
@@ -60,14 +60,24 @@ still kill you. See `EXPECTED_POWER` in `src/game/progression.js`.
 | Whitecrown Pass | 6 lives, 2.5 | 0.5 | 5 | 2 shots |
 | Blackwater Bayou | 7 lives, 3.5 | 1 | 7 | 2 shots |
 | Brimstone Basin | 9 lives, 3.5 | 1 | 9 | 2.6 shots |
-| Galaxy | 10 lives, 3.5 | 1 | 11 | 3.2 shots |
+| Gallows Hollow | 10 lives, 3.5 | 1 | 11 | 3.2 shots |
+| Galaxy | 12 lives, 3.5 | 1 | 12 | 3.5 shots |
 
-Six to twelve hits to kill you and two to three to kill them. The headroom
-grows on purpose: **the last two worlds are where the forge ladder runs out** —
-the gun stops at three and a half and the riders keep climbing — so a fight out
-there takes a third shot and runs half again as long, which needs a deeper bar
-to cost the same third of itself. You cannot out-buy the road any more, and the
-Galaxy is shorter to pay for it.
+Six to twelve hits to kill you and two to three and a half to kill them. The
+headroom grows on purpose: **the last three worlds are where the forge ladder
+runs out** — the gun stops at three and a half and the riders keep climbing —
+so a fight out there takes a third shot and runs half again as long, which
+needs a deeper bar to cost the same third of itself. You cannot out-buy the
+road any more, and the last two worlds are shorter to pay for it.
+
+The last rung of the rider ladder is **one** diamond rather than two, and that
+kink is the forge running out arriving in the arithmetic. A straight +2 ladder
+finished the seventh world at 3.7 of your shots to kill a rider, past the 3.5
+the harness allows — out there the duel becomes a war of attrition that nothing
+in the shop can shorten, because there is nothing left in the shop to buy. The
+alternative was an eighth forge rung, which would have made every world after
+the Basin easier as well. See `ENEMY_LIVES_FINAL_STEP` in
+`src/game/progression.js`.
 
 **And the road gets worse as you walk it.** From the halfway point of a world,
 half the riders carry the next rung of the ladder: the Dust Flats open on
@@ -77,7 +87,7 @@ hits deep becomes four. You can see it coming — the heavier bullet comes with 
 heavier gun in the man's hand (`ENEMY_GUNS` in `src/game/gun-tiers.js`), so a
 longbarrel on the road ahead is a warning. Your own level-up lands in the same
 stretch, which is the other half of the deal: the world gets meaner and you get
-bigger, once per world, six times.
+bigger, once per world, seven times.
 
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
@@ -146,9 +156,16 @@ Ten of them never touch the life bar at all:
 | **doubleTap** | your next shots cost them one extra |
 | **reflect** | the next shot that would hit you goes back at them |
 
-Nineteen abilities across the six worlds are built from those, two to four per
-world, and the numbers rise as the road does: Dust Snatch takes one round out of
-a gun, Gravity Pull takes the whole cylinder and keeps two.
+Twenty-three abilities across the seven worlds are built from those, two to four
+per world, and the numbers rise as the road does: Dust Snatch takes one round
+out of a gun, Gravity Pull takes the whole cylinder and keeps three.
+
+**The later world always sells the better version.** Every one of Gallows
+Hollow's four is the strongest form of a mechanic that already exists a world or
+two back — a three-round jam against the Prairie's two, a whole life drained
+against the Bayou's half, a four-round mark against the fever's three — which is
+the only upgrade path the shop has: to buy a better version of an effect you
+have to reach the world that stocks one.
 
 **Poison and Dynamite are world abilities now, not shop staples.** They used to
 be throwables any shop in the game would sell. Poison belongs to the Blackwater
@@ -189,7 +206,8 @@ raises something behind the road that is there for the rest of the fight:
 | Whitecrown Pass | **Hanging Cornice** | The slab comes off — all of it inside half a second. 2 lives |
 | Blackwater Bayou | **Blackdamp** | The bog breathes out slowly, still arriving when you think it is over. 2 lives, and it leaves you poisoned |
 | Brimstone Basin | **Volcano** | Throws rock across an eight-second eruption. 3 lives, and the lava stays on the road |
-| Galaxy | **The Rift** | **Charges** for five seconds and then fires **once**: 3 lives in a single shot, and it takes a round with it |
+| Gallows Hollow | **The Gallows** | A bell, tolling, and **every beat sooner than the last**. 3 lives, and it leaves you poisoned |
+| Galaxy | **The Rift** | **Charges** for five seconds and then fires **once**: 4 lives in a single shot, and it takes a round with it |
 
 An eruption costs about a fifth of your life bar wherever you are, which is why
 the first two throw half-weight blows: two lives is a fifth of the Stranger's
@@ -206,28 +224,29 @@ blocks things aimed at you, and a mountain is not aiming.
 **The first quiet is shorter than the ones after it, and that is what makes any
 of this true.** A landmark goes up around round two and a duel is over in twenty
 to thirty seconds; with a full cycle of quiet in front of the first eruption,
-the volcano erupted in 0% of measured boss fights and the rift in 0% — six
-landmarks, six eruption patterns, an art file each, and five of the six were
-scenery. `firstCycleMs` is about a third of `cycleMs`, and the six of them now
-go off in four fights out of five. It also means hiding is not defence: a shield
+the volcano erupted in 0% of measured boss fights and the rift in 0% — seven
+landmarks, seven eruption patterns, an art file each, and nearly all of them
+were scenery. `firstCycleMs` is about a third of `cycleMs`, and they now go off
+in four fights out of five. It also means hiding is not defence: a shield
 buys one round and costs one, and a fight dragged out four rounds longer walks
 into another eruption, which nothing blocks.
 
 **They do not all erupt the same way.** They used to: every special spread the
-same number of hits evenly across its window, so six landmarks were one
-metronome in six colours and surviving one taught you all of them. Each names a
-*pattern* now — an even sweep, one flurry, the whole slab at once, a slow drip,
-a barrage — and the Galaxy's is the one that changes what a special is. The Rift
+same number of hits evenly across its window, so the landmarks were one
+metronome in several colours and surviving one taught you all of them. Each
+names a *pattern* now — an even sweep, one flurry, the whole slab at once, a
+slow drip, a barrage, a bell whose beats crowd together as it goes — and the
+Galaxy's is the one that changes what a special is. The Rift
 throws nothing at all. It opens, and then it spends five seconds visibly drawing
 the road into itself while a percentage counts up on the chip, and at the end of
-that it fires a single shot worth the entire eruption. Three lives together, not
-three lives eventually — so it is a countdown you have to fight around rather
+that it fires a single shot worth the entire eruption. Four lives together, not
+four lives eventually — so it is a countdown you have to fight around rather
 than weather you sit through. Then it goes quiet and starts charging again.
 
 Whatever the rhythm, an eruption is worth the same total it always was: the
 pattern decides how the cost is spent, never how much it is.
 
-**The Dust Devil turns.** The twister was the one landmark of the six that was
+**The Dust Devil turns.** The twister was the one landmark that was
 supposed to be moving and was not. It was built as a stack of ellipse outlines
 with grit scattered round them, and the scatter was re-rolled from a
 frame-seeded generator on every frame — so it did not spin, it BOILED: four
@@ -283,7 +302,7 @@ glance.
    answer to the oldest complaint about this game: that abilities were the only
    thing doing real damage and the gun was decoration.
 3. **The cost is the size of what it takes away** — turns, not damage, written
-   as one rule rather than nineteen opinions:
+   as one rule rather than twenty-three opinions:
 
    ```
    charge ≈ 2 × (3 + 1.5 × what it takes away, in lives or in turns)
@@ -312,18 +331,21 @@ There is no level select. You walk, and the road decides what you meet.
   only ever see your character walking.
 - **Every world is a place, and every place is drawn.** The road opens in the
   **Dust Flats** and crosses the **Wildgrass Prairie**, **Whitecrown Pass**, the
-  **Blackwater Bayou** and **Brimstone Basin** before the Galaxy. Six worlds,
-  six biomes, no reskins: sand and saguaro, then grass and wildflowers, then a
-  snow-capped pass above the treeline, then a mud causeway through black water,
-  then a basalt floor with the fire still under it, and finally a shelf of
-  broken violet stone hanging in open space. Each one has its own props, its own
-  five depth layers, its own floor, its own weather and its own life in the air
-  — circling vultures and tumbleweeds rolling past at three depths in the flats,
-  a flock crossing the prairie, an aurora over the pass in green, violet or a
-  rare high red, will-o'-the-wisps over the bayou, embers rising through falling
-  ash in the basin, dust that falls upward in the void.
+  **Blackwater Bayou**, **Brimstone Basin** and **Gallows Hollow** before the
+  Galaxy. Seven worlds, seven biomes, no reskins: sand and saguaro, then grass
+  and wildflowers, then a snow-capped pass above the treeline, then a mud
+  causeway through black water, then a basalt floor with the fire still under
+  it, then a grey valley of turned earth under a lid of cloud, and finally a
+  shelf of broken violet stone hanging in open space. Each one has its own
+  props, its own five depth layers, its own floor, its own weather and its own
+  life in the air — circling vultures and tumbleweeds rolling past at three
+  depths in the flats, a flock crossing the prairie, an aurora over the pass in
+  green, violet or a rare high red, will-o'-the-wisps over the bayou, embers
+  rising through falling ash in the basin, grave dust hanging still in the
+  Hollow with corpse-light coming and going behind it, dust that falls upward in
+  the void.
 - **Guided randomness**: a world's difficulty is a number of duels, and its
-  shops, inns and forge are rolled around them. A world is **eight to eleven
+  shops, inns and forge are rolled around them. A world is **six to eleven
   fights** long — near enough double what it used to be — and the number of
   counters and beds is rolled off that length rather than fixed, about one stop
   for every four fights, so a longer road is a road with more on it rather than
@@ -664,13 +686,68 @@ There is no level select. You walk, and the road decides what you meet.
 - **Bosses hit harder than they last.** A boss is three or four shots deep with
   the revolver you should be carrying by then — long enough for its landmark to
   erupt once or twice, short enough that it is a fight rather than a siege. That
-  window is narrow on purpose: measured at a full bar the six of them sit
-  between two thirds and nine tenths winnable, and every point of the difference
-  is whether you walked up to the door with a full life bar.
+  window is narrow on purpose: measured at a full bar they sit between two
+  thirds and nine tenths winnable, and every point of the difference is whether
+  you walked up to the door with a full life bar.
 
 Speech is a general system, not part of that one scene: a portrait, a name
 plate and a line typing itself out, for anybody on either side of the road.
 Tapping catches the typing up; tapping again moves on.
+
+## The one scare
+
+There is exactly one jump scare in this game. It is in **Gallows Hollow**, it
+fires at most once per run, and everything about the world it lives in is built
+to set it up.
+
+A scare is not a loud noise. What makes one work is a rule the player has been
+taught, believes, and has stopped consciously checking — and then one
+counter-example. So the Hollow spends a whole world teaching one rule. Its
+commonest roadside prop by a distance is a **skull on a stake**, in profile,
+facing away up the road; there are dozens of them on a crossing, on the near
+verge and on the bank behind it, and every one of them is scenery. Nothing in
+six worlds of this game has ever suggested a piece of roadside art could do
+anything. By the middle of the world nobody is looking at them any more.
+
+Then one of them is not scenery.
+
+Five rules, and the whole effect is in them:
+
+1. **It is the same object.** Not a similar one, not a bigger one — the scare
+   draws the biome's own `stakeSkull` at the prop band's own lane, scale and
+   bedding. If it were drawn a pixel differently there would be something to
+   notice, and something to notice is a warning.
+2. **Nothing is tweened.** Everything else in this game eases: the sky fades
+   between weathers over two and a half seconds, a landmark warns for two, a
+   boss gets a name card. This is one frame. The skull is facing away, and on
+   the next frame it is facing you with red in its sockets, the screen is red,
+   and the camera is moving.
+3. **It is the loudest thing in the game** — a stack of three envelopes at
+   roughly twice the gain of any other cue, and the one noise cue with no
+   lowpass rolling it off.
+4. **Red is reserved.** There is no red anywhere in the Hollow: not in the
+   ground, not in a prop, not on a rider, not in the sky. The two pixels in the
+   sockets are the first red you have seen since Brimstone Basin.
+5. **And then it falls over.** The one part that *is* animated, and the most
+   important second of it: the stake goes over, the light goes out of the
+   sockets, dust comes off the road and it lies there while you walk past.
+   Without that the player is left holding a live threat and spends the rest of
+   the world braced.
+
+**Nothing is due when it happens.** A player on this road is braced almost all
+the time, because the road is built to be read — every stretch is a stretch
+towards a stop. So one gap in the back half of the Hollow is lengthened, and the
+scare stands a third of the way into it, with the better part of ten seconds of
+empty road on the far side. It is deliberately a modest lull: at three times an
+ordinary gap, a player on their second run would learn that the long walk means
+something.
+
+The quiet stretch is cut into the road **whether or not the scare is still in
+hand**, because the segment generator has to stay a pure function of the world
+and the seed — the odometer that comes back off a save is measured against the
+road the seed rebuilds. Only the scare itself knows whether it has been spent.
+
+See `src/explore/scare.js`, and `SCARE_LULL` in `src/explore/encounters.js`.
 
 ## Saving, and losing
 
@@ -1032,11 +1109,11 @@ src/
     sprites-casts.js      what an ability actually throws: the stick of
                           dynamite, the gourd, the rope, the rock — typed for
                           the hard things, built for fire, ice and smoke
-    sprites-hazards.js    the six landmarks a special raises, built not typed
+    sprites-hazards.js    the seven landmarks a special raises, built not typed
     env-kit.js            the colour key + the shared layer generators
     biomes/               one file per landscape — desert, meadow, snow, swamp,
-                          inferno, void: props, layers, ground, the far band,
-                          the near fringe, the litter and the ambient life
+                          inferno, hollow, void: props, layers, ground, the far
+                          band, the near fringe, the litter and the ambient life
     sprites-environment.js the biome registry + sky, buildings, storm deck (2b)
     sprites-portraits.js  32 x 32 faces, for speech and for the cut-scene (2e)
     sprites-venue.js      what a shop and an inn are made of: the two beds,
@@ -1058,7 +1135,8 @@ src/
                          Dusk Totem breaking, and the hard road opening
   menu/                  title, online, profile, wardrobe, settings,
                          achievements, credits
-  explore/               walk engine, parallax, encounters, hunger, day/night, weather
+  explore/               walk engine, parallax, encounters, hunger, day/night,
+                         weather, and the one scare the road has
   shops/                 shop, inn, forge and clothier logic + screens, the
                          workshop scene the six upgrade rituals are performed
                          in, and the three rooms the counters stand in
@@ -1182,9 +1260,9 @@ Balance lives in data, not in code:
   face-down stop turns out to be.
 - `src/game/biomes.js` — per-biome weather tables (which skies a place can have
   and how it moves between them).
-- `src/game/world-abilities.js` — the fourteen mechanics, the nineteen
+- `src/game/world-abilities.js` — the fourteen mechanics, the twenty-three
   abilities built from them (numbers, charge cost, and the `weight` that says
-  how often an enemy reaches for it) and the six specials. An ability that
+  how often an enemy reaches for it) and the seven specials. An ability that
   hurts too much is one number on the ability; a special is `strikes` and
   `damage`; how many enemies carry a special at all is `specialChance` in
   `worlds.js`. Player and enemy fire the same numbers — the asymmetry is the
@@ -1219,7 +1297,7 @@ Balance lives in data, not in code:
   half-price flag — is `src/shops/tailor.js`, and it is deliberately the general
   store's, read off the same constants.
 - `src/game/items.js` — the item catalogue. Adding an entry is enough; shops,
-  inventory, selling and the duel item bar pick it up. The twenty-four ability
+  inventory, selling and the duel item bar pick it up. The thirty ability
   entries are generated into it from the catalogue above rather than written
   out, so an ability is an ordinary thing in the saddlebag. Three fields there
   are worth knowing: `food` is hunger restored (`100` fills the gauge), `boon`
@@ -1234,7 +1312,7 @@ A biome is a landscape; a world is a difficulty curve with a name. They are
 separate on purpose, so several worlds can share one landscape and retheming a
 world never rebalances it.
 
-1. Write `src/art/biomes/<id>.js` exporting the same shape the six existing
+1. Write `src/art/biomes/<id>.js` exporting the same shape the seven existing
    ones do: `props` (pixel strings), `buildLayers()`, `manifest`, `scatter`,
    `groundFill`, `dust`, and optionally `scatterCell`, `structureGround` and an
    `ambient` factory.
@@ -1376,15 +1454,16 @@ new ability that reuses one is pure data:
 A **special** is the same shape with a landmark on the end of it: an entry in
 `SPECIALS` (cycle, warning, active window, strikes, damage, the `pattern` it
 erupts in, the colour the sky goes, and what it throws), a builder in
-`src/art/sprites-hazards.js` for the thing on the horizon, and `special` /
+`src/art/sprites-hazards.js` for the thing on the horizon, a `motif` case in
+`spawnDebris` if it throws something no other landmark throws, and `special` /
 `specialChance` on the world. The clock, the damage and the drawing are all
 generic — nothing in `duel-hazard.js`, `duel-engine.js` or `duel-scene.js` knows
 what a volcano is.
 
 A **pattern** is one entry in the table at the top of `duel-hazard.js`: given
 the number of blows and the length of the window, it says when each one lands.
-Six exist (`barrage`, `volley`, `sweep`, `swarm`, `lingering`, `charge`) and a
-seventh is a few lines there and a name on a special. A pattern may not change
+Seven exist (`barrage`, `volley`, `sweep`, `swarm`, `lingering`, `toll`,
+`charge`) and an eighth is a few lines there and a name on a special. A pattern may not change
 what an eruption costs — the total is always `strikes * damage`, which is what
 keeps `specialDamage` honest for the shop card and the tooltip.
 

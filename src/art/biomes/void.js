@@ -17,7 +17,7 @@
  *
  * The day/night cycle still runs — the sun still crosses, because the sky is
  * shared by the whole game and taking it away here would break the one thing
- * holding the six worlds together — but the ground barely responds to it. The
+ * holding the seven worlds together — but the ground barely responds to it. The
  * ambient light in this file is written so the biome looks like itself at noon
  * and at midnight, which is exactly what a place with no atmosphere should do.
  *

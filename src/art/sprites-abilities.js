@@ -12,7 +12,7 @@
  * ---------------------------------------------------------------------------
  * Because the point of a themed ability is that the player recognises the
  * *world* in it before they read anything. A green flask says "poison" in all
- * six worlds and says nothing else; a hornet, a frost crystal, a lungful of
+ * seven worlds and says nothing else; a hornet, a frost crystal, a lungful of
  * marsh gas and an ember under a collar all cost the same life three rounds
  * later, and each one tells you where you are standing while it does it.
  *

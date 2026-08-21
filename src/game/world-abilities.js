@@ -92,7 +92,7 @@
  * POISON AND DYNAMITE ARE WORLD ABILITIES, NOT SHOP STAPLES
  * ---------------------------------------------------------------------------
  * They used to be throwables anybody could buy anywhere, which made two of the
- * six worlds' signatures into general stock. Poison belongs to the Blackwater
+ * seven worlds' signatures into general stock. Poison belongs to the Blackwater
  * Bayou and dynamite to Brimstone Basin: they are sold in that world's shop and
  * nowhere else, they are carried by that world's riders and nobody else's, and
  * both were rewritten to be worth the trip — poison bites every round for three
@@ -201,7 +201,7 @@ const fx = (motion, colors, extra = {}) => ({ motion, colors, count: 26, ...extr
  * and it is a nerf: a trick is no longer something both sides get to use in
  * every fight, it is something one of you gets to use in a LONG fight. See the
  * note over PLAYER_SPECIAL at the bottom of this file for the whole argument —
- * it applies to all nineteen of these.
+ * it applies to all twenty-three of these.
  */
 export const ABILITIES = {
   // --- 1 · Dust Flats -------------------------------------------------------
@@ -1211,7 +1211,7 @@ export const ABILITIES = {
  * the note on the rift at the bottom of this table.
  *
  * The two extras — `steal` (rounds knocked out of the cylinder) and `poisons` —
- * are what keep the totals from being the same three lives in six colours.
+ * are what keep the totals from being the same three lives in seven colours.
  *
  * The volcano is the reference implementation and the numbers it was specified
  * with: twenty seconds quiet, then rocks, and three lives across the eruption.
@@ -1573,7 +1573,8 @@ export function specialDamage(spec) {
  * WHY THE NUMBERS ARE ON THE ABILITY AND NOT IN A BAND TABLE
  * ---------------------------------------------------------------------------
  * They used to be tuned three times over, once per pair of worlds, because the
- * same four effects turned up in all six. Each ability is its own mechanic now
+ * same four effects turned up in all of them. Each ability is its own mechanic
+ * now
  * and belongs to exactly one world, so "it gets better as you go" is simply
  * that the later entries are stronger — Dust Snatch takes one round, Gravity
  * Pull takes the whole cylinder. One number, in one place, on the thing it

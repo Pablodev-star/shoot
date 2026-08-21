@@ -363,10 +363,11 @@ const HEADS = {
     'kHHHHHHHHHHHHHk.',
     'kkkkkkkkkkkkkkk.',
     '...kwwwwwwwk....',
-    '...kwzKKzwwk....',
-    '...kwKKKKKwk....',
+    '..kwKzwwzKwwk...',
+    '...kwwwKwwwk....',
     '..kwwKwKwKwwk...',
   ],
+
 
   /**
    * THE STRANGER, phase one.
@@ -1169,8 +1170,14 @@ export const ARCHETYPES = {
     scale: 1.2,
     holster: null,
     key: palette({
-      hat: PALETTE.gloamDeep, hatLit: PALETTE.gravewood,
+      hat: PALETTE.gloamDeep, hatLit: PALETTE.gravewoodLight,
       cloth: PALETTE.gravewood, clothDark: PALETTE.gloamDeep, clothLit: PALETTE.gravewoodLight,
+      /**
+       * The skull is the LIGHTEST thing on him and the brim is the darkest,
+       * which is the whole silhouette: a black bar with a pale head hanging
+       * under it. It was drawn the other way round first — a dark skull under
+       * a dark brim — and at duel distance the boss had no face at all.
+       */
       accent: PALETTE.pall, accentDark: PALETTE.pallMid, shade: PALETTE.gloamDeep,
       glow: PALETTE.corpseLight,
       trouser: PALETTE.gloamDeep, boot: PALETTE.gravewood,
