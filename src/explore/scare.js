@@ -52,16 +52,22 @@
  */
 
 import { play } from '../core/audio.js';
+import { getSettings } from '../core/settings.js';
 import { getState, spendScare } from '../game/player.js';
 import { getEnvironmentSprites } from '../art/sprites-environment.js';
 import { drawSprite } from '../art/pixel.js';
 import { SKULL_EYES } from '../art/biomes/hollow.js';
 import { PALETTE } from '../art/palette.js';
 
-/** The world the scare belongs to. Gallows Hollow, and nowhere else, ever. */
-export const SCARE_WORLD = 6;
-
-/** The prop it wears, which is the prop the whole world is covered in. */
+/**
+ * The prop it wears, which is the prop the whole world is covered in.
+ *
+ * WHICH world is not decided here. `SCARE_WORLD` lives in ./encounters.js, next
+ * to the quiet stretch it cuts into the road, and the two belong together: the
+ * road has to know where to leave the gap whether or not this file ever fires.
+ * Keeping the constant there also keeps this module — which reaches the whole
+ * art chain — out of the balance harness's import graph.
+ */
 const PROP = 'stakeSkull';
 
 /**
@@ -177,6 +183,14 @@ export function createScare() {
    */
   function shakeOffset() {
     if (t === null || t >= SHAKE_MS) return null;
+    /**
+     * The one accessibility switch this effect answers to, and it is the same
+     * one the duel, the totem and the hard-road cut-scene answer to. A player
+     * who has turned the camera off still gets the turn, the eyes, the noise
+     * and the wash — everything the scare IS — without the frame moving under
+     * them, which is what that setting is for.
+     */
+    if (!getSettings().screenShake) return null;
     const k = 1 - t / SHAKE_MS;
     const amp = 7 * k * k;
     return {

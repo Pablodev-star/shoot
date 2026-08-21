@@ -78,7 +78,6 @@
 
 import { makeRng, hashSeed } from '../core/rng.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
-import { SCARE_WORLD } from './scare.js';
 import { getState } from '../game/player.js';
 import { OVERRIDES } from '../admin/overrides.js';
 
@@ -147,6 +146,8 @@ export const BOSS_GAP = 900;
  */
 export const SCARE_LULL = 400;
 export const SCARE_LEAD = 300;
+/** The world it belongs to. Gallows Hollow, and nowhere else, ever. */
+export const SCARE_WORLD = 6;
 
 /**
  * How many shops (and, rolled again, how many inns) a world gets: the full
@@ -620,8 +621,8 @@ function planReveal(segment, event, state) {
    * THE LAST BED IS SAVED FOR THE DOOR OF THE BOSS
    * -------------------------------------------------------------------------
    * Seven runs in ten ended at a boss, and the fights themselves were not the
-   * problem — measured at a full bar they sit between two thirds
-   * and nine tenths winnable. What killed the runs was arriving on half a bar,
+   * problem — measured at a full bar they sit between two thirds and nine
+   * tenths winnable. What killed the runs was arriving on half a bar,
    * because the world had spent both its inns in its opening stretch.
    *
    * So while a world still has one bed in hand and the player is carrying any
