@@ -121,14 +121,36 @@ export function igniteCard(card, { intensity = 1 } = {}) {
    */
   let columns = [];
 
+  /**
+   * MEASURED WHEN THE CARD CHANGES SIZE, NEVER PER FRAME
+   * ---------------------------------------------------------------------------
+   * The first version called this from inside the animation frame, which is two
+   * mistakes at sixty a second: `getBoundingClientRect` forces the browser to
+   * settle layout before it can answer, and assigning `canvas.width` reallocates
+   * the backing store and wipes it even when the number written is the one
+   * already there. Three burning cards made that three forced layouts and three
+   * allocations a frame, for a size that changes when the window does and at no
+   * other time.
+   *
+   * So the size is pushed IN — by the observer below, once per actual change —
+   * and the loop only ever draws. The guard is still here rather than in the
+   * caller because a card that has just been appended can measure zero, and a
+   * fire on a zero-sized card has nothing to burn along.
+   */
   function measure() {
     const rect = card.getBoundingClientRect();
     if (!rect.width || !rect.height) return false;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    w = Math.round(rect.width);
-    h = Math.round(rect.height);
+    const nextDpr = Math.min(2, window.devicePixelRatio || 1);
+    const nextW = Math.round(rect.width);
+    const nextH = Math.round(rect.height);
+    if (nextW === w && nextH === h && nextDpr === dpr) return true;
+    dpr = nextDpr;
+    w = nextW;
+    h = nextH;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
+    // Nearest-neighbour goes with the backing store, so it has to be set again
+    // every time the store is replaced.
     crisp(ctx);
     const count = Math.ceil(w / UNIT) + 1;
     if (columns.length !== count) {
@@ -244,7 +266,9 @@ export function igniteCard(card, { intensity = 1 } = {}) {
     if (!card.isConnected) return stop();
     const dt = Math.min(64, Math.max(0, now - last));
     last = now;
-    if (measure() || w) {
+    // No measuring in here — see the note over `measure`. `w` is zero only
+    // until the card has a size, and a fire with nowhere to burn draws nothing.
+    if (w) {
       advance(dt);
       draw();
     }
@@ -252,9 +276,29 @@ export function igniteCard(card, { intensity = 1 } = {}) {
     return undefined;
   }
 
+  /**
+   * The only thing that measures: one callback per real size change. A card
+   * grows when its dropdown is switched to the road with seven lines of terms
+   * on it, and the grid reflows when the window does; between those, nothing
+   * here touches layout at all.
+   */
+  const observer = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => {
+        if (measure() && still) draw();
+      })
+    : null;
+  observer?.observe(card);
+  /** …and the fallback for anything without one: the window's own resize. */
+  const onResize = observer ? null : () => {
+    if (measure() && still) draw();
+  };
+  if (onResize) window.addEventListener('resize', onResize);
+
   function stop() {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
+    observer?.disconnect();
+    if (onResize) window.removeEventListener('resize', onResize);
     embers.clear();
     canvas.remove();
   }
