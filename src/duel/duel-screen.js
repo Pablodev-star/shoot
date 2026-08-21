@@ -47,11 +47,11 @@ import { totemReviveLives } from '../game/progression.js';
 import { gunTier, enemyGunLook } from '../game/gun-tiers.js';
 import { playTotemRevival } from '../ui/totem.js';
 import { getWorld, FINAL_WORLD } from '../game/worlds.js';
-import { generateEnemy, generateBoss, nextBossPhase } from '../game/enemies.js';
+import { generateEnemy, generateBoss, nextBossPhase, enemySeedFor } from '../game/enemies.js';
 import { getAbility, getSpecial, specialDamage } from '../game/world-abilities.js';
 import { createDuel, MOVES } from './duel-engine.js';
 import { createLocalAgent, createAiAgent } from './duel-ai.js';
-import { createDuelScene } from './duel-scene.js';
+import { createDuelScene, FALL_MS } from './duel-scene.js';
 import { playBossIntro } from './boss-intro.js';
 import { getPortrait } from '../art/sprites-portraits.js';
 import { CHARACTER_TIMING } from '../art/sprites-character.js';
@@ -152,7 +152,13 @@ export const DuelScreen = {
       ? generateBoss(worldId)
       : generateEnemy(
           worldId,
-          (player.seed ^ ((params.encounter?.index ?? 0) * 2246822519)) >>> 0,
+          /**
+           * The same seed the ROAD rolled him from — see `enemySeedFor`. The
+           * player has just spent six seconds walking towards a particular man
+           * standing at the end of the stretch, and this is the line that makes
+           * him the man they arrive at.
+           */
+          enemySeedFor(params.encounter?.index ?? 0),
           // How deep into the world this fight is. Past halfway, riders start
           // carrying the next rung of the ladder — and the gun to show it.
           params.encounter?.progress ?? 0,
@@ -1411,6 +1417,24 @@ export const DuelScreen = {
       setControlsEnabled(false);
       syncAbilityBar();
       const won = result.winner === 'player';
+
+      /**
+       * SOMEBODY GOES DOWN BEFORE ANYBODY IS TOLD ANYTHING
+       * ---------------------------------------------------------------------
+       * The loser falls, and the screen waits for it. This used to be a banner
+       * over a man still breathing in his idle loop: the bar hit zero, YOU WIN
+       * went up, and the overview slid over the top of a fighter who was
+       * visibly fine. The one thing a duel is about had no picture of itself.
+       *
+       * The fall is five frames off the rig (see FALL_FRAME_MS in
+       * src/art/sprites-character.js), composed from that fighter's own head,
+       * torso and legs — so the Sexton goes down as the Sexton and a wraith
+       * goes down in its rags, without a line of art for either. The last frame
+       * is a body flat on the road, and it HOLDS: it is still lying there under
+       * the overview, and it is still lying there on the road afterwards (see
+       * `fallenFoe` in src/game/run.js).
+       */
+      scene.setPose(won ? 'enemy' : 'player', 'fall');
       play(won ? 'win' : 'lose');
       scene.fx.banner = won ? 'YOU WIN' : 'YOU LOSE';
       scene.fx.bannerTimer = 1600;
@@ -1470,7 +1494,12 @@ export const DuelScreen = {
         abilitiesCast,
       });
 
-      await wait(720);
+      /**
+       * Long enough for the whole fall plus a beat of the body lying still.
+       * The old wait was 720ms of nothing; this is the same pause with
+       * something in it.
+       */
+      await wait(FALL_MS + 260);
       showOverview(won, sides);
     }
 

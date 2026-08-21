@@ -167,6 +167,52 @@ function shiftX(rows, dx) {
     dx > 0 ? ('.'.repeat(dx) + r).slice(0, w) : (r.slice(-dx) + '.'.repeat(-dx)));
 }
 
+/**
+ * Lean a whole figure over, pivoting on its last row.
+ *
+ * Each row is slid sideways by its distance from the floor times `k`, so the
+ * feet stay planted and the head travels furthest — which is what a body
+ * pivoting on its heels actually does. Rows that slide off the edge are lost;
+ * that is correct, because a man going over is on his way out of his own
+ * bounding box.
+ */
+function lean(rows, k) {
+  const floor = rows.length - 1;
+  const w = rows[0].length;
+  return rows.map((row, i) => {
+    const dx = Math.round((floor - i) * k);
+    if (!dx) return row;
+    return dx > 0
+      ? ('.'.repeat(dx) + row).slice(0, w)
+      : (row.slice(-dx) + '.'.repeat(-dx));
+  });
+}
+
+/**
+ * Turn a figure a quarter-turn anticlockwise: it ends up lying with its head
+ * to the LEFT and the side that was facing away from us underneath it.
+ *
+ * Anticlockwise rather than clockwise, and it matters for both fighters at once.
+ * A fighter faces right in its own space, so its head going left is its head
+ * going BACKWARDS — knocked over by whatever hit it. The duellist on the far
+ * side of the road is drawn mirrored, so the same rotation reads as backwards
+ * for him too, and one transform serves both.
+ *
+ * The result is `width` rows of `height` characters: a 16 x 24 man becomes a
+ * 24 x 16 body.
+ */
+function rotateCCW(rows) {
+  const h = rows.length;
+  const w = rows[0].length;
+  const out = [];
+  for (let i = 0; i < w; i++) {
+    let line = '';
+    for (let j = 0; j < h; j++) line += rows[j][w - 1 - i];
+    out.push(line);
+  }
+  return out;
+}
+
 /** Swap palette characters — used for the hit flash and the empty holster. */
 export function recolor(rows, map) {
   return rows.map((r) => r.replace(/./g, (c) => map[c] ?? c));
@@ -365,6 +411,40 @@ const DRAW_POSES = {
     gun: { art: 'raised', hand: { x: 14, y: 12 } },
   },
 };
+
+/**
+ * THE FALL
+ * ---------------------------------------------------------------------------
+ * What a fighter does when the last diamond goes. It used to be nothing: the
+ * bar hit zero, a banner said YOU WIN and the man across the road was still
+ * standing in his idle loop underneath it, breathing, while the overview slid
+ * up over him. The one thing a duel is about had no picture of itself.
+ *
+ * It is five frames, and every one of them is built out of the SAME head,
+ * torso and legs the fighter has been wearing all fight — which is what makes
+ * it adaptive without a line of art per archetype. The Sexton goes down as the
+ * Sexton, in his own apron and his own brim; a wraith goes down in its rags.
+ * Nobody had to draw either.
+ *
+ * The shape of it, and why:
+ *
+ *   `hit`     one frame of the stagger that already exists. A fall that starts
+ *             from a standing idle reads as a sprite being switched
+ *   `buckle`  the knees go: the whole body drops onto the last three rows of
+ *             its own legs, which is a crouch for a man and a slump for
+ *             anything with a hem
+ *   `tip`     past the point of no return — the body leans a third of the way
+ *             over, pivoting on the heels (`lean`)
+ *   `over`    two thirds, and lifted a pixel: the feet have left the road
+ *   `down`    the quarter-turn (`rotateCCW`). Head to the left, flat out, and
+ *             this is the frame that holds — it is what is lying on the road
+ *             when the player walks back out of the overview
+ *
+ * The gun is not in any of them. `GUN_TRACK.fall` is five nulls, so it leaves
+ * the hand the moment the fall starts, which is the one detail that says the
+ * fight is over rather than paused.
+ */
+export const FALL_FRAME_MS = [110, 130, 100, 100, 520];
 
 /** The order the poses play in. `fire` runs once and hands back to `level`. */
 const AIM_SEQUENCE = ['ready', 'clear', 'rising', 'level'];
@@ -598,6 +678,8 @@ export const GUN_TRACK = {
   hit: [null, null],
   aim: AIM_SEQUENCE.map((name) => DRAW_POSES[name].gun),
   fire: FIRE_SEQUENCE.map((name) => DRAW_POSES[name].gun),
+  /** Nothing. A falling man is not holding his revolver any more. */
+  fall: [null, null, null, null, null],
 };
 
 // ---------------------------------------------------------------------------
@@ -1061,6 +1143,47 @@ export function composeFighter(parts = {}) {
       // Stagger: weight thrown onto the trailing foot.
       holstered(ground(low, legs.contactB)),
     ],
+    /**
+     * Going down. See the note over FALL_FRAME_MS.
+     *
+     * `buckle` drops the body onto the last three rows of its own legs and
+     * pads the top back out, so the figure stays 24 rows tall and loses three
+     * rows of shin — which is a fighter whose knees have gone, in whatever
+     * that fighter has instead of knees.
+     */
+    fall: (() => {
+      const buckled = ['................', '................', '................',
+        ...upper, ...legs.stand.slice(0, 3)];
+      /**
+       * DOWN, AND IT IS STACKED RATHER THAN TURNED
+       * ---------------------------------------------------------------------
+       * The obvious way to lay a fighter out is to rotate the whole frame a
+       * quarter turn, and the obvious way is wrong. It was tried: a hat brim is
+       * thirteen pixels WIDE, so a rotated hat is a thirteen-pixel vertical
+       * bar, the boots become two blocks, and the result reads as a cart. Turn
+       * a sprite that was drawn from one angle and you get a sprite drawn from
+       * no angle at all.
+       *
+       * So the body is COLLAPSED instead of turned, in the same three-quarter
+       * view it has been in all fight: the legs fold out along the road, the
+       * torso comes down on top of them, and the head lolls back over the
+       * shoulder — three stamps of the fighter's own parts, at three offsets,
+       * on the ground. Everything stays the way round it was drawn, so a hat is
+       * still a hat, a ribcage is still a ribcage, and every archetype in the
+       * game collapses in its own clothes without a line of art for any of them.
+       */
+      let heap = Array.from({ length: 24 }, () => '.'.repeat(16));
+      heap = stamp(heap, legs.contactB.slice(1), 2, 19);
+      heap = stamp(heap, flare, 0, 15);
+      heap = stamp(heap, head, -3, 9);
+      return [
+        shiftX(recolor(holstered(standing(upper)), { P: 'p', p: 'q', q: 'w' }), -1),
+        buckled,
+        lean(buckled, 0.22),
+        lean(buckled, 0.5),
+        heap,
+      ];
+    })(),
   };
 
   const baked = bakeSet(frames, key);

@@ -38,6 +38,7 @@ import {
 } from '../art/sprites-character.js';
 import { createParallax, heroX as heroAnchorX } from './parallax.js';
 import { createScare } from './scare.js';
+import { createRoadCast } from './road-cast.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
@@ -294,6 +295,12 @@ export const ExploreScreen = {
     const scare = createScare();
     scare.setPosition(engine.getScareAt());
 
+    /**
+     * The riders on the road: the one waiting at the end of this stretch, and
+     * the ones already lying where they fell. See src/explore/road-cast.js.
+     */
+    const cast = createRoadCast();
+
     // --- live bindings -----------------------------------------------------
     const unsubs = [
       on(EVENTS.ITEM_USED, ({ effect, icon: iconName }) => pops.spawn(effect, iconName)),
@@ -323,6 +330,8 @@ export const ExploreScreen = {
      * where the horse was.
      */
     let frameDt = 16;
+    /** Whoever is standing or lying within sight, refreshed every tick. */
+    let foes = [];
     const renderer = {
       onResize(view) {
         lastView = view;
@@ -350,6 +359,7 @@ export const ExploreScreen = {
          * same space the quiet stretch was cut in.
          */
         scare.update(dt, engine.getTravelled());
+        foes = engine.visibleFoes();
       },
 
       render(ctx, view) {
@@ -403,6 +413,10 @@ export const ExploreScreen = {
         // is twice as wide as a man and throws twice the shadow.
         const mounted = getState().hasHorse;
         parallax.drawGroundShadow(ctx, view, heroX, (mounted ? HORSE_SIZE.w : PLAYER_SIZE.w) * s, gy);
+        // …and everyone else's, before any of them are drawn, so a body lying
+        // in front of a man standing does not have his shadow across it.
+        cast.shadows(parallax, ctx, view, { foes, cameraX, groundY: gy, heroX, worldId: player.world });
+        cast.draw(ctx, view, { foes, cameraX, groundY: gy, heroX, worldId: player.world, elapsed });
 
         /**
          * A meal or a bandage washes over whoever is on the road — the man on

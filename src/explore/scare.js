@@ -11,41 +11,48 @@
  * consciously checking — and then one counter-example.
  *
  * The Hollow spends a whole world teaching one rule. Its commonest roadside
- * prop by a distance is `stakeSkull` (see src/art/biomes/hollow.js): a skull on
- * a stake, in profile, facing away up the road. There are dozens of them on a
- * crossing, on the near verge and on the bank behind it, and every single one
- * of them is scenery. They do not turn, they do not react, and nothing in six
- * worlds of this game has ever suggested that a piece of roadside art could.
- * By the middle of the world the player is not looking at them any more.
+ * prop by a distance is `stakedBody` (see src/art/biomes/hollow.js): a whole
+ * skeleton run through by a single stake, hanging off it head-down with its
+ * arms at its sides. There are dozens of them on a crossing, on the near verge
+ * and on the bank behind it, and every single one of them is scenery. They do
+ * not move, they do not react, and nothing in six worlds of this game has ever
+ * suggested that a piece of roadside art could. By the middle of the world the
+ * player is not looking at them any more.
  *
  * Then one of them is not scenery.
  *
  * THE FIVE RULES THE MOMENT ITSELF OBEYS
  * ---------------------------------------------------------------------------
  * 1. IT IS THE SAME OBJECT. Not a similar one, not a bigger one: this file
- *    draws `stakeSkull` out of the biome's own prop bundle, at the prop band's
- *    own lane, scale and sink. If it were drawn a pixel differently the player
- *    would have something to notice, and something to notice is a warning.
- * 2. NOTHING IS TWEENED. Every other effect in this game eases: the sky fades
- *    between weathers over two and a half seconds, a hazard warns for two, a
- *    boss gets a name card. This is one frame. The skull is facing away, and
- *    on the next frame it is facing the player with red in its sockets, the
- *    screen is red, and the camera is moving. There is no approach and no
- *    build-up, because an approach is the thing the player would have caught.
+ *    draws the biome's own prop out of the biome's own bundle, at the prop
+ *    band's own lane, scale and sink. If it were drawn a pixel differently the
+ *    player would have something to notice, and something to notice is a
+ *    warning.
+ * 2. NOTHING IS TWEENED ON THE WAY UP. Every other effect in this game eases:
+ *    the sky fades between weathers over two and a half seconds, a hazard warns
+ *    for two, a boss gets a name card. This is one frame. The head is hanging,
+ *    and on the next frame it is level — teeth showing, a neck under it, both
+ *    sockets red — the arms are up, the screen is red and the camera is moving.
+ *    There is no approach and no build-up, because an approach is the thing the
+ *    player would have caught.
  * 3. IT IS THE LOUDEST THING IN THE GAME. `scare` in src/core/audio.js is a
  *    stack of three envelopes at roughly twice the gain of anything else. It
  *    is the one place the game raises its voice.
- * 4. RED IS RESERVED. There is no red anywhere in the Hollow — not in the
- *    ground, not in the props, not on a rider, not in the sky (see the palette
- *    note). The two pixels in the sockets and the wash over the frame are the
- *    first red the player has seen since they left Brimstone Basin.
- * 5. AND THEN IT FALLS OVER. The one part that IS animated, and it is the most
- *    important second of the whole thing: the stake goes over, the skull hits
- *    the road, dust comes off it, and it lies there while the player walks
- *    past. Without that the player is left holding a live threat and spends the
- *    rest of the world braced. With it, the moment is closed — something
- *    happened, it is over, and the game has told them so without a line of
- *    text.
+ * 4. RED IS RESERVED, AND THERE ARE TWO OF THEM. There is no red anywhere in
+ *    the Hollow — not in the ground, not in the props, not on a rider, not in
+ *    the sky (see the palette note) — so the sockets and the wash are the first
+ *    red the player has seen since they left Brimstone Basin. Both sockets
+ *    light, never one: one lit eye is a wink, and two is something looking at
+ *    you.
+ * 5. AND THEN IT GOES SLACK AGAIN. The one part that IS animated, and the most
+ *    important second of the whole thing: the head drops back between the
+ *    shoulders, the arms come down through one halfway frame, the light goes
+ *    out of the sockets, and it hangs there exactly as it was while the player
+ *    walks past it. The stake never falls — nothing about the prop has changed
+ *    and nothing on the road is different afterwards, which is worse than
+ *    wreckage would be. Without this the player is left holding a live threat
+ *    and spends the rest of the world braced; with it the moment is closed and
+ *    the game has said so without a line of text.
  *
  * It is fired once per run and it is never re-armed. See `scared` on the run
  * state in src/game/player.js.
@@ -56,7 +63,7 @@ import { getSettings } from '../core/settings.js';
 import { getState, spendScare } from '../game/player.js';
 import { getEnvironmentSprites } from '../art/sprites-environment.js';
 import { drawSprite } from '../art/pixel.js';
-import { SKULL_EYES } from '../art/biomes/hollow.js';
+import { SKELETON } from '../art/biomes/hollow.js';
 import { PALETTE } from '../art/palette.js';
 
 /**
@@ -68,16 +75,21 @@ import { PALETTE } from '../art/palette.js';
  * Keeping the constant there also keeps this module — which reaches the whole
  * art chain — out of the balance harness's import graph.
  */
-const PROP = 'stakeSkull';
+const POSES = {
+  slack: 'stakedBody',
+  mid: 'stakedBodyMid',
+  risen: 'stakedBodyRisen',
+};
 
 /**
  * How close the traveller has to be, in source pixels, for it to go off.
  *
- * Positive is "still ahead of him". Twelve puts it just off his shoulder — near
- * enough that it fills the same part of the screen he is looking at, far enough
- * that his own sprite is not covering the sockets on the frame that matters.
+ * Positive is "still ahead of him". Twenty is the traveller's own width plus a
+ * pace: near enough that it fills the same part of the screen he is looking at,
+ * and just far enough that his hat is not across the sockets on the one frame
+ * that matters.
  */
-const TRIGGER_LEAD = 12;
+const TRIGGER_LEAD = 20;
 
 /**
  * The clock, in milliseconds from the frame it fires.
@@ -88,12 +100,19 @@ const TRIGGER_LEAD = 12;
 const RED_HOLD = 90;      // full red, flat
 const RED_OUT = 420;      // and then off, fast — a strobe, not a fade
 const SHAKE_MS = 620;     // the camera keeps going a beat after the red stops
-const FALL_AT = 620;      // when the stake lets go
-const FALL_MS = 780;      // and how long it takes to reach the road
-const DUST_MS = 700;      // the puff it lands in
-
-/** Radians. A stake that has gone over lies flat, plus a little past it. */
-const FALL_ANGLE = Math.PI / 2 + 0.12;
+/**
+ * The way back down. It holds risen for most of a second — long enough that the
+ * player has looked at it — then spends one frame with the arms out and settles
+ * back to exactly what it was.
+ *
+ * The halfway frame is deliberately SHORT. Arms falling through three even
+ * beats is a wave; arms that hang at the top, snap through the middle and stop
+ * is something letting go.
+ */
+const HOLD_MS = 780;      // how long it stays risen
+const MID_MS = 190;       // the one frame on the way down
+const SETTLE_AT = HOLD_MS + MID_MS;
+const DUST_MS = 620;      // what shakes loose off the shoulders when it drops
 
 /**
  * The scare, as a small machine with three questions: where is it, has it gone
@@ -110,10 +129,10 @@ export function createScare() {
   let t = null;
   /** True once it has fired in this session, so it can never fire twice. */
   let fired = false;
-  /** Dust, spawned on the frame the skull hits the road. */
+  /** What comes off it when the arms drop. */
   let dust = [];
   /** True once that has happened, so it only ever happens once. */
-  let landed = false;
+  let shed = false;
   /**
    * Where the sprite was drawn this frame, so the flash can put it back on top
    * of itself. See `drawFlash`.
@@ -143,7 +162,6 @@ export function createScare() {
         d.t += dt;
         d.x += d.vx * dt;
         d.y += d.vy * dt;
-        d.vy += 0.00006 * dt;
       }
       dust = dust.filter((d) => d.t < DUST_MS);
       return;
@@ -200,46 +218,15 @@ export function createScare() {
   }
 
   /**
-   * How lit the sockets are, 0 to 1.
-   *
-   * Full from the frame it fires until the stake lets go, and then out over the
-   * first half of the fall — so it is dark before it lands. That is the beat
-   * that closes the whole thing: it looked at you, and then it went out. A
-   * skull still burning on the road behind the player is an unfinished threat,
-   * and the player would spend the rest of the world waiting for the second
-   * half of it.
-   */
-  function eyeLevel() {
-    if (t === null) return 0;
-    if (t < FALL_AT) return 1;
-    return Math.max(0, 1 - (t - FALL_AT) / (FALL_MS * 0.5));
-  }
-
-  /** How far over it has gone, in radians. */
-  function fallAngle() {
-    if (t === null || t < FALL_AT) return 0;
-    const k = Math.min(1, (t - FALL_AT) / FALL_MS);
-    /**
-     * Accelerating, because it is falling rather than being lowered — the angle
-     * goes as the square of the time, which is what gravity does to a post
-     * pivoting on its own foot. The last tenth is a small bounce off the road:
-     * a heavy thing that stops dead has landed in mud.
-     */
-    const swing = k * k;
-    const bounce = k > 0.88 ? Math.sin((k - 0.88) / 0.12 * Math.PI) * 0.11 : 0;
-    return FALL_ANGLE * swing - bounce;
-  }
-
-  /**
    * THE CAMERA KICK, AS ONE THING BOTH PASSES SHARE
    * ---------------------------------------------------------------------------
-   * The scene is drawn through this and so is the skull that goes on top of the
-   * red wash, and it lives here rather than in the screen because those two
+   * The scene is drawn through this and so is the skeleton that goes on top of
+   * the red wash, and it lives here rather than in the screen because those two
    * have to agree to the pixel. They did not, once: the screen applied the kick,
    * drew the world, restored it and then called `drawFlash`, which painted the
-   * skull again at its UNSHAKEN position — so for half a second there were two
-   * skulls a few pixels apart, one moving with the road and one standing still,
-   * and the wash is not opaque enough to hide the one underneath.
+   * body again at its UNSHAKEN position — so for half a second there were two of
+   * it a few pixels apart, one moving with the road and one standing still, and
+   * the wash is not opaque enough to hide the one underneath.
    *
    * The zoom is not decoration. Translating the scene leaves a strip of empty
    * canvas on two sides of the frame — the parallax draws exactly the view and
@@ -268,6 +255,36 @@ export function createScare() {
   }
 
   /**
+   * How lit the sockets are, 0 to 1.
+   *
+   * Full from the frame it fires until the arms let go, and then out across the
+   * halfway frame — so it is dark by the time the head is back down. That is
+   * the beat that closes the whole thing: it looked at you, and then it went
+   * out. A skeleton still burning on the road behind the player is an
+   * unfinished threat, and the player would spend the rest of the world waiting
+   * for the second half of it.
+   */
+  function eyeLevel() {
+    if (t === null) return 0;
+    if (t < HOLD_MS) return 1;
+    return Math.max(0, 1 - (t - HOLD_MS) / MID_MS);
+  }
+
+  /**
+   * Which of the three poses is up.
+   *
+   * `slack` before it fires and again once it is over — the same string, the
+   * same prop, nothing on the road changed. `risen` is everything in between
+   * except the one short frame on the way down.
+   */
+  function poseName() {
+    if (t === null) return 'slack';
+    if (t < HOLD_MS) return 'risen';
+    if (t < SETTLE_AT) return 'mid';
+    return 'slack';
+  }
+
+  /**
    * Draw it, at the prop band's own geometry.
    *
    * @param {object} o
@@ -278,97 +295,87 @@ export function createScare() {
    */
   function draw(ctx, view, { cameraX, groundY, heroX, biome }) {
     if (worldX === null) return;
-    // Nothing left to draw once it has finished falling and gone off screen —
-    // but it is NOT removed while it is lying there: the player walks past the
-    // thing on the road, and that is the point of knocking it over.
+    // Nothing to draw at all until it is armed, and nothing to STOP drawing
+    // once it is over: it goes back to being one more thing on the verge, and
+    // the player walks past it exactly as they walked past the others.
     if (!armed() && t === null) return;
 
-    const sprite = getEnvironmentSprites(biome).props[PROP];
+    const pose = poseName();
+    const sprite = getEnvironmentSprites(biome).props[POSES[pose]];
     if (!sprite) return;
 
     const s = view.scale;
     const w = sprite.width * s;
-    // The pivot: the foot of the stake, which is the middle of the sprite's
-    // bottom edge. Everything about the fall is this one transform — the art
-    // itself never changes — so getting the pivot right is the difference
-    // between a post going over and a picture sliding sideways.
-    const footX = heroX + (worldX - cameraX) * s + w / 2;
+    const x = heroX + (worldX - cameraX) * s;
     // The same bedding the scatter band gives every prop: one source pixel of
-    // the base below its own line, so it stands IN the road rather than on it.
-    const footY = groundY + s;
-    if (footX < -w * 2 || footX > view.w + w * 2) return;
+    // the base below its own line, so the stake stands IN the road rather than
+    // on it.
+    const y = groundY + s - sprite.height * s;
+    if (x < -w * 2 || x > view.w + w * 2) return;
 
-    box = { sprite, footX, footY, s, w };
-    const angle = fallAngle();
-    // The frame it arrives: spawned here rather than on a clock, because this
-    // is the only place that knows where the sprite actually is.
-    if (t !== null && !landed && t >= FALL_AT + FALL_MS * 0.86) {
-      landed = true;
-      spawnDust(footX + w, footY, s);
+    box = { sprite, x, y, s, pose };
+    // The moment the arms let go, something comes off the shoulders. Spawned
+    // here rather than on a clock because this is the only place that knows
+    // where the shoulders actually are.
+    if (t !== null && !shed && t >= HOLD_MS) {
+      shed = true;
+      spawnDust(x + w / 2, y + sprite.height * s * 0.4, s);
     }
 
-    paint(ctx, angle);
+    paint(ctx);
     if (dust.length) drawDust(ctx, s);
   }
 
   /**
-   * Put the sprite down, once, at whatever angle it has reached.
+   * Put the sprite down, once, in whatever pose is up.
    *
    * Split out because it is drawn TWICE on the frames that matter — once with
    * the scenery, where it belongs, and again on top of the red wash, where it
    * has to be visible. See `drawFlash`.
    */
-  function paint(ctx, angle) {
-    const { sprite, footX, footY, s, w } = box;
-    ctx.save();
-    ctx.translate(Math.round(footX), Math.round(footY));
-    if (angle) ctx.rotate(angle);
-    /**
-     * FACING.
-     *
-     * Scenery faces right, away from a traveller walking up behind it. From
-     * the frame it fires it is mirrored, and the mirror is the whole of the
-     * "it looked at you" — there is no turn, no in-between frame and no easing,
-     * because a head that visibly rotates is a head the player watched rotate.
-     */
-    drawSprite(ctx, sprite, -w / 2, -sprite.height * s, s, t !== null);
-    drawEyes(ctx, sprite, s, -w / 2);
-    ctx.restore();
+  function paint(ctx) {
+    const { sprite, x, y, s, pose } = box;
+    drawSprite(ctx, sprite, x, y, s);
+    drawEyes(ctx, x, y, s, pose);
   }
 
   /**
-   * The two red pixels, laid into the sockets the art leaves.
+   * The red in the sockets. BOTH of them, always.
    *
-   * `SKULL_EYES` is measured off the prop in src/art/biomes/hollow.js rather
-   * than guessed here, and the x is mirrored along with the sprite, because the
-   * skull is facing the other way now.
+   * `SKELETON.eyes` is measured off the prop in src/art/biomes/hollow.js rather
+   * than guessed here, and it is per POSE, because the head is a row higher
+   * when it is up than when it is hanging.
    */
-  function drawEyes(ctx, sprite, s, x0) {
+  function drawEyes(ctx, x, y, s, pose) {
     const lit = eyeLevel();
     if (lit <= 0) return;
+    const spec = SKELETON.eyes[pose] || SKELETON.eyes.slack;
+    const { w, h } = SKELETON.eye;
     ctx.globalAlpha = lit;
-    const { x, y, w, h } = SKULL_EYES;
-    const top = -sprite.height * s + y * s;
-    const left = x0 + (sprite.width - x - w) * s;
-    // A hot core inside a darker ring, which is how every glow in this game is
-    // drawn (see the note in biomes/inferno.js) — three flat steps, no blur.
-    ctx.fillStyle = PALETTE.redDeep;
-    ctx.fillRect(left - s, top - s, w * s + s * 2, h * s + s * 2);
-    ctx.fillStyle = PALETTE.red;
-    ctx.fillRect(left, top, w * s, h * s);
-    ctx.fillStyle = PALETTE.redLight;
-    ctx.fillRect(left, top, w * s, Math.max(1, Math.round(h * s * 0.6)));
+    for (const col of spec.x) {
+      const left = x + col * s;
+      const top = y + spec.y * s;
+      // A hot core inside a darker ring, which is how every glow in this game
+      // is drawn (see the note in biomes/inferno.js) — three flat steps, no
+      // blur.
+      ctx.fillStyle = PALETTE.redDeep;
+      ctx.fillRect(left - s, top - s, w * s + s * 2, h * s + s * 2);
+      ctx.fillStyle = PALETTE.red;
+      ctx.fillRect(left, top, w * s, h * s);
+      ctx.fillStyle = PALETTE.redLight;
+      ctx.fillRect(left, top, w * s, Math.max(1, Math.round(h * s * 0.6)));
+    }
     ctx.globalAlpha = 1;
   }
 
-  /** The road it lands in, thrown up on the frame it hits. */
-  function spawnDust(sx, base, s) {
-    for (let i = 0; i < 16; i++) {
+  /** What shakes loose off it when the arms drop. */
+  function spawnDust(cx, cy, s) {
+    for (let i = 0; i < 14; i++) {
       dust.push({
-        x: sx + (Math.random() - 0.2) * 14 * s,
-        y: base - Math.random() * 3 * s,
-        vx: (Math.random() - 0.35) * 0.06 * s,
-        vy: -Math.random() * 0.05 * s,
+        x: cx + (Math.random() - 0.5) * 16 * s,
+        y: cy + (Math.random() - 0.5) * 6 * s,
+        vx: (Math.random() - 0.5) * 0.03 * s,
+        vy: (0.01 + Math.random() * 0.03) * s,
         // Chosen once, at spawn. Rolling it per frame is the difference between
         // dust and a shower of static.
         color: Math.random() < 0.3 ? PALETTE.pall : PALETTE.pallMid,
@@ -379,7 +386,7 @@ export function createScare() {
 
   function drawDust(ctx, s) {
     for (const d of dust) {
-      ctx.globalAlpha = 0.5 * (1 - d.t / DUST_MS);
+      ctx.globalAlpha = 0.45 * (1 - d.t / DUST_MS);
       ctx.fillStyle = d.color;
       ctx.fillRect(Math.round(d.x), Math.round(d.y), s, s);
     }
@@ -422,12 +429,12 @@ export function createScare() {
      *
      * It is the same call the scene made a moment ago (`paint`), inside the
      * same camera kick the scene was drawn through (`beginKick`), so there is
-     * no chance of the two disagreeing about where it is, which way it is
-     * facing, or how far the camera has thrown it.
+     * no chance of the two disagreeing about where it is, which pose is up, or
+     * how far the camera has thrown it.
      */
     if (!box) return;
     beginKick(ctx, view);
-    paint(ctx, fallAngle());
+    paint(ctx);
     endKick(ctx);
   }
 

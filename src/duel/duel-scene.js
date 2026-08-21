@@ -91,6 +91,7 @@ import {
   getTieredRevolver,
   getVestSprites,
   CHARACTER_TIMING,
+  FALL_FRAME_MS,
   FIRE_FRAME_MS,
   GUN_TRACK,
   VEST_TRACK,
@@ -120,6 +121,15 @@ const FIGHTER_H = 24;
 
 /** How long the whole `fire` pose runs before the arm settles back on line. */
 const FIRE_MS = FIRE_FRAME_MS.reduce((a, b) => a + b, 0);
+
+/**
+ * How long a fighter takes to go down, and how long after that the body has
+ * been lying still. The screen waits this out before it puts the overview up —
+ * see `endDuel` in src/duel/duel-screen.js.
+ */
+export const FALL_MS = FALL_FRAME_MS.reduce((a, b) => a + b, 0);
+/** The frame the body actually lands on, measured off the same table. */
+const FALL_LAND_AT = FALL_FRAME_MS.slice(0, -1).reduce((a, b) => a + b, 0);
 
 /** Milliseconds a puff of powder smoke hangs, and a spent case is in the air. */
 const SMOKE_LIFE = 810;
@@ -479,12 +489,41 @@ export function createDuelScene({
     if (actor.pose === pose) return;
     actor.pose = pose;
     actor.t = 0;
+    actor.landed = false;
+  }
+
+  /**
+   * What comes up off the road when a body hits it.
+   *
+   * The biome's own dust colour rather than a grey, for the same reason the
+   * traveller's footfall uses it: a puff of pale sand thrown up off black
+   * basalt is the giveaway that the ground and the thing standing on it were
+   * drawn by two systems that had never met.
+   */
+  function spawnFallDust(side) {
+    if (!layout || !groundLine) return;
+    const { originX, fs } = layout[side];
+    for (let i = 0; i < 14; i++) {
+      debris.push({
+        kind: 'mote',
+        x: originX + (Math.random() * 1.4 - 0.1) * FIGHTER_W * fs,
+        y: groundLine - Math.random() * 3 * fs,
+        vx: (Math.random() - 0.5) * 0.06 * fs,
+        vy: -(0.01 + Math.random() * 0.03) * fs,
+        g: 0.00004 * fs,
+        size: Math.max(1, Math.round(fs * 0.8)),
+        color: parallax.dust,
+        t: 0,
+        life: 620 + Math.random() * 320,
+      });
+    }
   }
 
   /** Which frame list a pose plays, and how it is timed. */
   function poseFrames(set, pose) {
     if (pose === 'aim' || pose === 'fire') return set[pose];
     if (pose === 'hit') return set.hit;
+    if (pose === 'fall') return set.fall;
     return set.idle;
   }
 
@@ -501,6 +540,19 @@ export function createDuelScene({
       return FIRE_FRAME_MS.length - 1;
     }
     if (pose === 'hit') return Math.min(frameCount - 1, Math.floor(t / CHARACTER_TIMING.hit));
+    /**
+     * The fall is a one-shot with per-frame timings, exactly like the shot —
+     * and it HOLDS on its last frame forever, because that frame is a body on
+     * the ground and a body on the ground does not get up.
+     */
+    if (pose === 'fall') {
+      let acc = 0;
+      for (let i = 0; i < FALL_FRAME_MS.length; i++) {
+        acc += FALL_FRAME_MS[i];
+        if (t < acc) return Math.min(frameCount - 1, i);
+      }
+      return frameCount - 1;
+    }
     return Math.floor(elapsed / CHARACTER_TIMING.idle) % frameCount;
   }
 
@@ -1011,6 +1063,17 @@ export function createDuelScene({
         if (actor.pose === 'fire' && actor.t >= FIRE_MS) {
           actor.pose = 'aim';
           actor.t = CHARACTER_TIMING.aim * 3;
+        }
+        /**
+         * The moment a body reaches the road. Fired once, off the same table
+         * the pose is timed by, so the thud can never drift out of step with
+         * the frame it belongs to: the road takes the weight, the camera moves
+         * a little, and what was under him comes up.
+         */
+        if (actor.pose === 'fall' && !actor.landed && actor.t >= FALL_LAND_AT) {
+          actor.landed = true;
+          fx.shake = Math.max(fx.shake, 260);
+          spawnFallDust(side);
         }
       }
 

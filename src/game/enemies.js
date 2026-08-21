@@ -39,6 +39,7 @@
  */
 
 import { makeRng } from '../core/rng.js';
+import { getState } from './player.js';
 import { getWorld } from './worlds.js';
 import { enemyGunDamage, enemyGunDamageAt, enemyRampChance } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
@@ -79,6 +80,25 @@ function appearance(archetypeId, rng) {
  * @param {number} seed
  * @param {number} [progress] 0..1 along the world's road
  */
+/**
+ * THE SEED A ROAD ENCOUNTER'S RIDER IS ROLLED FROM
+ * ---------------------------------------------------------------------------
+ * One line, in one place, because two screens ask for it now. The duel rolls
+ * the man it is about to fight; the road rolls the man it is about to draw
+ * standing at the end of the stretch (see src/explore/road-cast.js), and if
+ * those two ever disagreed the player would walk towards one rider and fight a
+ * different one.
+ *
+ * It is the run's seed folded with the encounter's index, so it is stable
+ * across a save, across a reload, and across the two callers — and it changes
+ * for every stop on the road.
+ *
+ * @param {number} index the encounter's index within its world's segment
+ */
+export function enemySeedFor(index) {
+  return (getState().seed ^ ((index ?? 0) * 2246822519)) >>> 0;
+}
+
 export function generateEnemy(worldId, seed, progress = 0) {
   const world = getWorld(worldId);
   const rng = makeRng(seed >>> 0);
