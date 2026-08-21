@@ -38,6 +38,7 @@ import {
   applyReveals,
   roadReading,
 } from './encounters.js';
+import { BATTLE_DISTANCE } from './road-cast.js';
 import * as hunger from './hunger.js';
 import * as daynight from './daynight.js';
 import * as weather from './weather.js';
@@ -297,6 +298,43 @@ export function createWalkEngine() {
     return out;
   }
 
+  /**
+   * The riders near the traveller: the one still standing at the end of this
+   * stretch, and every one already beaten who is still close enough to see.
+   *
+   * A FIGHT IS A STOP LIKE ANY OTHER NOW
+   * -------------------------------------------------------------------------
+   * This is `visibleStructures` for people, and the resemblance is the point: a
+   * duel used to be the one encounter with nothing to walk towards. The rider
+   * stands BATTLE_DISTANCE beyond the point the walk stops at, so he is drawn
+   * from as far off as a shop is, he grows as the player closes on him, and
+   * when the fight opens there is still a stand-off of road between them.
+   *
+   * A beaten one is not dropped from the list, for the same reason a shop is
+   * not: he is still there. He keeps `placedAt`, so he lies exactly where he
+   * went down while the player walks away from him.
+   */
+  function visibleFoes() {
+    if (!segment) return [];
+    const mounted = getState().hasHorse;
+    const out = [];
+    for (const event of segment.events) {
+      if (event.type !== 'enemy' && event.type !== 'boss') continue;
+      const stopAt = event.placedAt ?? effectiveDistance(event, mounted, HORSE_TIME_MUL);
+      const worldX = stopAt + BATTLE_DISTANCE;
+      const gap = worldX - travelled;
+      if (gap > AHEAD_WINDOW || gap < -BEHIND_WINDOW) continue;
+      out.push({
+        worldX,
+        index: event.index,
+        type: event.type,
+        progress: event.progress,
+        resolved: event.resolved,
+      });
+    }
+    return out;
+  }
+
   return {
     loadSegment,
     update,
@@ -328,6 +366,7 @@ export function createWalkEngine() {
     nextIndex,
     distanceToNext,
     visibleStructures,
+    visibleFoes,
     /**
      * The five numbers the road is currently reading off the run. It is the
      * engine's own `reading()` — the same call `revealToHorizon` is given — so

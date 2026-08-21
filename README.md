@@ -89,6 +89,26 @@ longbarrel on the road ahead is a warning. Your own level-up lands in the same
 stretch, which is the other half of the deal: the world gets meaner and you get
 bigger, once per world, seven times.
 
+**Somebody goes down before anybody is told anything.** When the last diamond
+goes, the loser *falls* — a stagger, the knees buckling, the body leaning past
+the point of no return, and then a heap on the road — and only when it has
+landed does the overview come up. It used to be a banner over a man still
+breathing in his idle loop: the one thing a duel is about had no picture of
+itself.
+
+The fall is five frames off the rig, composed from that fighter's own head,
+torso and legs (see `FALL_FRAME_MS` in `src/art/sprites-character.js`), so the
+Sexton goes down as the Sexton in his own apron and a wraith goes down in its
+rags — without a line of art for either. It is stacked rather than *turned*: a
+hat brim is thirteen pixels wide, so a rotated hat is a thirteen-pixel vertical
+bar and the result reads as a cart. Turn a sprite drawn from one angle and you
+get a sprite drawn from no angle at all. So the legs fold out along the road,
+the torso comes down on top of them and the head lolls back over the shoulder —
+three stamps of the fighter's own parts, still the way round they were drawn.
+
+And the body stays. It is lying there under the overview, and it is still lying
+there on the road when you walk back out — see below.
+
 A round is played out rather than announced. Both fighters go for their guns —
 hand to the holster, barrel out of leather, arm up, levelled — and only then
 does anyone fire: the flash blooming down the bore in four beats, burning
@@ -344,6 +364,26 @@ There is no level select. You walk, and the road decides what you meet.
   rising through falling ash in the basin, grave dust hanging still in the
   Hollow with corpse-light coming and going behind it, dust that falls upward in
   the void.
+- **A fight is a stop you walk towards, like every other one.** Every building
+  on this road is *approached* — it comes up over the horizon, gets bigger for
+  six seconds, and you stop at its door. A duel was the one stop with none of
+  that: an empty road, a counter quietly ticking over, and then a cut to a man
+  who had not existed a frame earlier.
+
+  He exists now. The rider is standing at the far end of the stretch, drawn from
+  as far off as a shop is, growing as you close on him, and the fight opens when
+  you are **`BATTLE_DISTANCE`** from him rather than when you reach him: you
+  stop a stand-off apart, which is where a duel is fought from, so the cut to
+  the duel screen is the camera moving rather than the world changing.
+
+  He is the *same* man in both places, and that is free rather than plumbed:
+  `generateEnemy` is a pure function of the world, a seed and how far into the
+  world the stop is, and both screens derive the seed the same way
+  (`enemySeedFor`). Neither tells the other anything.
+
+  **And the ones you have beaten are still there.** A rider you put down is left
+  lying exactly where he went down, in the pose the duel left him in, and you
+  walk past him. See `src/explore/road-cast.js`.
 - **Guided randomness**: a world's difficulty is a number of duels, and its
   shops, inns and forge are rolled around them. A world is **six to eleven
   fights** long — near enough double what it used to be — and the number of
@@ -1091,8 +1131,8 @@ src/
     pixel.js, font.js     baking helpers + a built-in 5x7 pixel font
     logo.js               the title wordmark: hand-drawn display letterforms,
                           chiselled and extruded, on a shot-up plank
-    sprites-character.js  the fighter rig: player, rider, horse, the draw and
-                          the revolver that comes out of it (Block 2a)
+    sprites-character.js  the fighter rig: player, rider, horse, the draw, the
+                          fall, and the revolver that comes out of it (Block 2a)
     sprites-wardrobe.js   every garment the player can earn or buy: hats stamped
                           over the bare face, shirts with their own collar and
                           belt, the trouser/boot transforms that find the legs
@@ -1137,7 +1177,8 @@ src/
   menu/                  title, online, profile, wardrobe, settings,
                          achievements, credits
   explore/               walk engine, parallax, encounters, hunger, day/night,
-                         weather, and the one scare the road has
+                         weather, the people standing and lying on the road, and
+                         the one scare it has
   shops/                 shop, inn, forge and clothier logic + screens, the
                          workshop scene the six upgrade rituals are performed
                          in, and the three rooms the counters stand in
