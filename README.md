@@ -714,25 +714,26 @@ Then one of them is not scenery.
 Five rules, and the whole effect is in them:
 
 1. **It is the same object.** Not a similar one, not a bigger one — the scare
-   draws the biome's own `stakeSkull` at the prop band's own lane, scale and
+   draws the biome's own `stakedBody` at the prop band's own lane, scale and
    bedding. If it were drawn a pixel differently there would be something to
    notice, and something to notice is a warning.
-2. **Nothing is tweened.** Everything else in this game eases: the sky fades
-   between weathers over two and a half seconds, a landmark warns for two, a
-   boss gets a name card. This is one frame. The skull is facing away, and on
-   the next frame it is facing you with red in its sockets, the screen is red,
-   and the camera is moving.
+2. **Nothing is tweened on the way up.** Everything else in this game eases:
+   the sky fades between weathers over two and a half seconds, a landmark warns
+   for two, a boss gets a name card. This is one frame. The head is hanging, and
+   on the next frame it is level with both sockets red, the arms are up, the
+   screen is red and the camera is moving.
 3. **It is the loudest thing in the game** — a stack of three envelopes at
    roughly twice the gain of any other cue, and the one noise cue with no
    lowpass rolling it off.
-4. **Red is reserved.** There is no red anywhere in the Hollow: not in the
-   ground, not in a prop, not on a rider, not in the sky. The two pixels in the
-   sockets are the first red you have seen since Brimstone Basin.
-5. **And then it falls over.** The one part that *is* animated, and the most
-   important second of it: the stake goes over, the light goes out of the
-   sockets, dust comes off the road and it lies there while you walk past.
-   Without that the player is left holding a live threat and spends the rest of
-   the world braced.
+4. **Red is reserved, and there are two of them.** There is no red anywhere in
+   the Hollow: not in the ground, not in a prop, not on a rider, not in the sky.
+   The sockets are the first red you have seen since Brimstone Basin — and both
+   light, never one. One lit eye is a wink; two is something looking at you.
+5. **And then it goes slack again.** The one part that *is* animated, and the
+   most important second of it: the head drops back between the shoulders, the
+   arms fall through one halfway frame, the light goes out, and it hangs there
+   exactly as it was. Without that the player is left holding a live threat and
+   spends the rest of the world braced.
 
 **Nothing is due when it happens.** A player on this road is braced almost all
 the time, because the road is built to be read — every stretch is a stretch

@@ -10,7 +10,7 @@
  * drawn to be LEARNED — and the thing it is teaching is a single sentence:
  * *the skulls on the stakes do not move.*
  *
- * `stakeSkull` is the commonest prop on this road by a distance, and it is
+ * `stakedBody` is the commonest prop on this road by a distance, and it is
  * placed on both the near verge and the far band, so the player passes dozens
  * of them on a crossing. Every one of them faces right, away from the traveller
  * walking up behind it. Every one of them is completely inert. And then,
@@ -59,49 +59,182 @@ import {
 } from '../env-kit.js';
 
 /**
- * Where the eye sockets are inside `stakeSkull`, in the prop's own source
- * pixels, and how big they are.
+ * THE THING ON THE STAKE, AS THREE POSES OF ONE BODY
+ * ---------------------------------------------------------------------------
+ * A whole skeleton — skull, ribs, arms, pelvis, legs — run through from the
+ * crown to below the heels by a single stake, which is the only thing holding
+ * it up. Not crucified: there is no crossbar and there are no nails. It is the
+ * shape a body makes when somebody drove a post through it and pushed the post
+ * into the ground.
  *
- * Exported because the scare needs to put two red pixels in exactly those
- * holes (see src/explore/scare.js). It is measured off the art below rather
- * than guessed, and if the skull is ever redrawn this is the one line that has
- * to be redrawn with it — which is precisely why it lives next to the art and
- * not in the file that uses it.
+ * It hangs in three poses, and they are the whole of the scare:
+ *
+ *   `slack`  what it always is. The head has dropped between the shoulders,
+ *            there is no neck showing, and the arms hang straight down at the
+ *            sides. Everything about it is what gravity did to it.
+ *   `risen`  what it is for a fraction of a second. The head is up — the neck
+ *            appears, which is the tell — the arms are raised, and both eye
+ *            sockets are lit.
+ *   `mid`    one frame between the two, arms out sideways, used only on the way
+ *            BACK down. The way up has no in-between at all.
+ *
+ * THE LOWER BODY IS IDENTICAL IN ALL THREE
+ * ---------------------------------------------------------------------------
+ * From the ribs down, every row is the same string in every pose. That is not
+ * economy, it is the point: the thing is impaled and cannot move, so what the
+ * player sees change is exactly a head and two arms on a body that stays nailed
+ * where it is. A pose that shifted the pelvis would read as the whole prop
+ * being swapped for a different one.
+ *
+ * It faces the camera rather than up the road, because the scare needs BOTH
+ * sockets — one lit eye is a wink and two is something looking at you.
  */
-export const SKULL_EYES = { x: 5, y: 3, w: 2, h: 2 };
+export const SKELETON = {
+  w: 15,
+  h: 30,
+  /**
+   * Where the two sockets are, in the prop's own source pixels, per pose. Read
+   * by src/explore/scare.js to put the red in the right holes; measured off the
+   * art below rather than guessed, so if the skull is ever redrawn this is the
+   * one line that has to be redrawn with it.
+   */
+  eyes: {
+    slack: { y: 6, x: [4, 9] },
+    mid: { y: 6, x: [4, 9] },
+    risen: { y: 4, x: [4, 9] },
+  },
+  eye: { w: 2, h: 2 },
+};
 
 export const HOLLOW_PROPS = {
   /**
-   * THE PROP THIS WHOLE WORLD IS BUILT AROUND.
+   * THE PROP THIS WHOLE WORLD IS BUILT AROUND — the slack pose, which is the
+   * only one the road ever shows.
    *
-   * A skull on a stake, in profile, facing RIGHT — which is away from a
-   * traveller walking up the road behind it. The profile matters more than the
-   * detail does: a front-on skull is a face, and a face is a thing that could
-   * conceivably look at you. One in profile is an object. It has already
-   * decided not to be interested in you, and nine screens of them is the
-   * lesson this road teaches.
+   * A skeleton hanging off a stake that goes through the crown of its skull and
+   * out below its heels: head dropped between the shoulders with no neck
+   * showing, arms hanging straight down, feet clear of the ground. It has been
+   * there a long time and it is not doing anything.
    *
-   * Read the note at the top of the file for what is done with that lesson.
+   * There are dozens of them on a crossing, and that is deliberate — read the
+   * note at the top of the file for what is done with the fact that not one of
+   * them has ever moved.
    */
-  stakeSkull: [
-    '..kkkkk...',
-    '.k*****kk.',
-    'k**(((**kk',
-    'k**((]]**k',
-    'k*(((]]**k',
-    'k*((((**kk',
-    '.k*((((*k.',
-    '.k*kkkk*k.',
-    '.k*(((((k.',
-    '..kkkkkk..',
-    '...k{}k...',
-    '...k{}k...',
-    '...k{}k...',
-    '...k{}k...',
-    '...k{}k...',
-    '..k{{}}k..',
-    '..k[]][k..',
-    '..kkkkkk..',
+  stakedBody: [
+    '......k{}k.....',
+    '......k{}k.....',
+    '....kkkkkkk....',
+    '...k*******k...',
+    '..k*(((((((*k..',
+    '..k*(((((((*k..',
+    '..k*]]*(*]]*k..',
+    '..k*]]*(*]]*k..',
+    '...k*(((((*k...',
+    '....kkkkkkk....',
+    '...............',
+    '..kk*******kk..',
+    'k*k.k*****k.k*k',
+    'k*k.k*]*]*k.k*k',
+    'k*k.k]]*]]k.k*k',
+    'k*k.k*]*]*k.k*k',
+    'k*k.k]]*]]k.k*k',
+    'k*k..kkkkk..k*k',
+    'k(k....k....k(k',
+    'kkk...k*k...kkk',
+    '.....kkkkk.....',
+    '....k*****k....',
+    '....kk*k*kk....',
+    '.....k*k*k.....',
+    '.....k*k*k.....',
+    '.....k(k(k.....',
+    '.....kkkkk.....',
+    '......k{}k.....',
+    '......k{}k.....',
+    '......k[]k.....',
+  ],
+
+  /**
+   * The same body with its head up and its arms raised. Never on the road — the
+   * scare is the only thing that ever asks for it (src/explore/scare.js).
+   *
+   * Two things changed and nothing else did. The skull moved up one row and a
+   * NECK appeared under it, which is the whole of "the head came up": at this
+   * size a tilt would be two pixels nobody sees, and a neck that was not there
+   * a frame ago is unmistakable. And the arms left the sides and went up, which
+   * is the half you catch out of the corner of your eye.
+   */
+  stakedBodyRisen: [
+    '......k{}k.....',
+    '....kkkkkkk....',
+    '...k*******k...',
+    '..k*(((((((*k..',
+    '..k*]]*(*]]*k..',
+    '..k*]]*(*]]*k..',
+    '...k*(((((*k...',
+    '...k*k*k*k*k...',
+    '....kkkkkkk....',
+    'k*k...k*k...k*k',
+    'k*k..k{}k...k*k',
+    'k*kk*******kk*k',
+    '....k*****k....',
+    '....k*]*]*k....',
+    '....k]]*]]k....',
+    '....k*]*]*k....',
+    '....k]]*]]k....',
+    '.....kkkkk.....',
+    '.......k.......',
+    '......k*k......',
+    '.....kkkkk.....',
+    '....k*****k....',
+    '....kk*k*kk....',
+    '.....k*k*k.....',
+    '.....k*k*k.....',
+    '.....k(k(k.....',
+    '.....kkkkk.....',
+    '......k{}k.....',
+    '......k{}k.....',
+    '......k[]k.....',
+  ],
+
+  /**
+   * One frame between the two, and it is only ever played on the way DOWN.
+   *
+   * The head is already back between the shoulders and the arms are caught
+   * halfway, straight out at the sides. Going up there is no in-between at all
+   * — that is the rule the whole effect is built on — but coming down there has
+   * to be one, or the thing does not fall, it teleports.
+   */
+  stakedBodyMid: [
+    '......k{}k.....',
+    '......k{}k.....',
+    '....kkkkkkk....',
+    '...k*******k...',
+    '..k*(((((((*k..',
+    '..k*(((((((*k..',
+    '..k*]]*(*]]*k..',
+    '..k*]]*(*]]*k..',
+    '...k*(((((*k...',
+    '....kkkkkkk....',
+    '...............',
+    '..kk*******kk..',
+    'k***k*****k***k',
+    'kkkkk*]*]*kkkkk',
+    '....k]]*]]k....',
+    '....k*]*]*k....',
+    '....k]]*]]k....',
+    '.....kkkkk.....',
+    '.......k.......',
+    '......k*k......',
+    '.....kkkkk.....',
+    '....k*****k....',
+    '....kk*k*kk....',
+    '.....k*k*k.....',
+    '.....k*k*k.....',
+    '.....k(k(k.....',
+    '.....kkkkk.....',
+    '......k{}k.....',
+    '......k{}k.....',
+    '......k[]k.....',
   ],
 
 
@@ -817,7 +950,7 @@ export const HOLLOW_ART = {
   /**
    * THE TABLE THE SCARE IS BUILT ON
    * -------------------------------------------------------------------------
-   * `stakeSkull` is weighted at nearly a third of the roll, which is more than
+   * `stakedBody` is weighted at nearly a third of the roll, which is more than
    * any single prop gets in any other biome and is deliberately overdone. The
    * player has to pass enough of them that "skull on a stake" stops being a
    * thing they look at and becomes a thing they look PAST — that is the whole
@@ -827,7 +960,7 @@ export const HOLLOW_ART = {
    * and earth, none of them skull-shaped and none of them lit.
    */
   scatter: [
-    { name: 'stakeSkull', weight: 26 },
+    { name: 'stakedBody', weight: 26 },
     { name: 'graveBoard', weight: 14 },
     { name: 'graveStub', weight: 12 },
     { name: 'fencePost', weight: 11 },
@@ -864,7 +997,7 @@ export const HOLLOW_ART = {
     haze: PALETTE.pallMid,
     hazeA: 0.34,
     scatter: [
-      { name: 'stakeSkull', weight: 20 },
+      { name: 'stakedBody', weight: 20 },
       { name: 'deadTree', weight: 16 },
       { name: 'fencePost', weight: 12 },
       { name: 'graveBoard', weight: 9 },
