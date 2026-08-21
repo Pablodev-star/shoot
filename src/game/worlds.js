@@ -331,11 +331,17 @@ export const WORLDS = [
      * this planet. The Hollow's ground is already grey; what the wash says is
      * that the LIGHT is wrong — a green-grey cast over the sun, the sky and the
      * traveller alike, so a man walking through it is the same colour as the
-     * ground he is walking on. Kept light (a fifth) because the world is
-     * painted nearly right already: much past this and the fence posts stop
-     * separating from the field behind them.
+     * ground he is walking on.
+     *
+     * It is the second heaviest in the game and it has to be. The ground here
+     * is already the right colour, so the wash is doing all of its work on the
+     * SKY — and a summer blue over a graveyard is the single thing that could
+     * undo the whole world. At a fifth it was still a blue sky with a haze on
+     * it; at a third the daylight has gone out of it and the sun is a grey
+     * coin. Much past this and the fence posts stop separating from the field
+     * behind them, which is the ceiling every wash in this game runs into.
      */
-    tint: { color: '#48544a', alpha: 0.22 },
+    tint: { color: '#41493f', alpha: 0.42 },
     priceMul: 2.15,
     goldMul: 4.6,
     expMul: 4.2,

@@ -68,10 +68,7 @@ import {
  * to be redrawn with it — which is precisely why it lives next to the art and
  * not in the file that uses it.
  */
-export const SKULL_EYES = { x: 4, y: 3, w: 2, h: 2 };
-
-/** How tall `stakeSkull` is, and how far down it the skull ends. */
-export const STAKE_SKULL = { w: 9, h: 18, skullRows: 9 };
+export const SKULL_EYES = { x: 5, y: 3, w: 2, h: 2 };
 
 export const HOLLOW_PROPS = {
   /**
@@ -87,25 +84,27 @@ export const HOLLOW_PROPS = {
    * Read the note at the top of the file for what is done with that lesson.
    */
   stakeSkull: [
-    '..kkkk...',
-    '.k****kk.',
-    'k*(((**(k',
-    'k*((]]**k',
-    'k**(]]**k',
-    'k*****(*k',
-    '.k***(((k',
-    '.k*k*k*kk',
-    '..kkkkk..',
-    '...k{}k..',
-    '...k{}k..',
-    '...k{}k..',
-    '...k{}k..',
-    '...k{}k..',
-    '...k{}k..',
-    '..k{{}}k.',
-    '..k[]][k.',
-    '..kkkkk..',
+    '..kkkkk...',
+    '.k*****kk.',
+    'k**(((**kk',
+    'k**((]]**k',
+    'k*(((]]**k',
+    'k*((((**kk',
+    '.k*((((*k.',
+    '.k*kkkk*k.',
+    '.k*(((((k.',
+    '..kkkkkk..',
+    '...k{}k...',
+    '...k{}k...',
+    '...k{}k...',
+    '...k{}k...',
+    '...k{}k...',
+    '..k{{}}k..',
+    '..k[]][k..',
+    '..kkkkkk..',
   ],
+
+
 
   /**
    * A grave board: a plank driven in at whatever angle the ground allowed,
@@ -114,21 +113,21 @@ export const HOLLOW_PROPS = {
    * history, and what it needs to be is a place with a backlog.
    */
   graveBoard: [
-    '..kkkkk..',
-    '.k}{{{}k.',
-    '.k{{{{{k.',
-    'kk{{{{{kk',
-    'k}{{{{{}k',
-    'kk{{{{{kk',
-    '.k{{{{{k.',
-    '.k{[[[{k.',
-    '.k{{{{{k.',
+    '...kkk...',
+    '..k}{}k..',
     '..k{{{k..',
+    'kkk{{{kkk',
+    'k}}}}}}}k',
+    'k{{{{{{{k',
+    'kkk{{{kkk',
+    '..k{{{k..',
+    '..k{[{k..',
     '..k{{{k..',
     '..k[{{k..',
     '..k[[{k..',
-    '.k)]][)k.',
+    '.k)]])k..',
   ],
+
 
   /** Its neighbour, leaning, with the crosspiece long since off it. */
   graveStub: [
@@ -741,16 +740,37 @@ export const HOLLOW_ART = {
    */
   buildLayers: () => ({
     /**
-     * Not a cloud deck. This is the overcast the Hollow lives under: one low,
-     * flat, unbroken sheet with almost no sag in it, in the ground's own tones
-     * rather than in white. A sky with fluffy cumulus in it is a nice day.
+     * NOT A CLOUD DECK — A LID
+     * -----------------------------------------------------------------------
+     * Every other biome's cloud layer is weather passing over a sky. This one
+     * is the sky: eleven overlapping puffs at nearly twice the radius any other
+     * biome uses, so the tile is close to solid and what shows through it is
+     * gaps rather than the other way round.
+     *
+     * That is doing a job the world tint cannot. A `multiply` wash can darken a
+     * blue sky but it cannot make it stop being blue — the blue channel starts
+     * too high — so at any alpha the road can afford, a clear day in the Hollow
+     * came out as a slightly murky summer afternoon. Covering the sky with the
+     * GROUND'S OWN TONES fixes it at the source: the lid is grey-green, it is
+     * lit by the same sun as everything else, and the strips of sky between the
+     * puffs read as the last of the daylight rather than as the weather.
+     *
+     * It is also why the tones run pale at the top and dark at the belly, which
+     * is upside down for a cloud. Cloud is lit from above; a ceiling is lit
+     * from the room.
      */
     clouds: makeCloudLayer({
       seed: 7373,
-      height: 54,
-      count: 5,
-      size: [7, 14],
-      sag: 1,
+      /**
+       * Deeper than any other biome's and hung lower (see the manifest), so
+       * the lid comes right down onto the far ridge. What is left of the sky is
+       * a band along the horizon, which is exactly the shape a heavy overcast
+       * leaves and the one place daylight ever gets into this valley.
+       */
+      height: 74,
+      count: 13,
+      size: [12, 22],
+      sag: 2,
       tones: [PALETTE.pallMid, PALETTE.gloam, PALETTE.gloamDark],
     }),
     far: makeRidgeLayer({
@@ -786,7 +806,7 @@ export const HOLLOW_ART = {
   }),
 
   manifest: [
-    { name: 'clouds', speed: 0.05, y: -110 },
+    { name: 'clouds', speed: 0.05, y: -98 },
     { name: 'far', speed: 0.15, y: -84 },
     { name: 'mid', speed: 0.4, y: -58 },
     { name: 'verge', speed: 0.7, y: -40, near: true },

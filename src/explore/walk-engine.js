@@ -309,6 +309,19 @@ export function createWalkEngine() {
     isPaused: () => paused,
     isFinished: () => finished,
     getSegment: () => segment,
+    /**
+     * Where the world's one scare stands, in the same units the odometer is in,
+     * or null in the six worlds that do not have one.
+     *
+     * It goes through `effectiveDistance` exactly like an encounter does, so a
+     * player who bought a horse meets it in the middle of the same quiet
+     * stretch a player on foot does rather than a few paces off the end of it.
+     * See SCARE_LULL in ./encounters.js.
+     */
+    getScareAt() {
+      if (!segment?.scare) return null;
+      return effectiveDistance(segment.scare, getState().hasHorse, HORSE_TIME_MUL);
+    },
     getTravelled: () => travelled,
     getCameraX: () => cameraX,
     nextEvent,

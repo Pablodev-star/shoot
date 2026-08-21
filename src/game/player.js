@@ -111,6 +111,22 @@ function blankState() {
      */
     boon: null,
 
+    /**
+     * WHETHER THE ONE SCARE IN THIS GAME HAS ALREADY HAPPENED
+     * -----------------------------------------------------------------------
+     * There is exactly one jump scare on the whole road (Gallows Hollow — see
+     * src/explore/scare.js) and it fires at most once per RUN. It is a field on
+     * the run rather than on the profile for one reason: a scare that only ever
+     * worked once per player would be a thing almost nobody experienced, since
+     * most runs never reach the sixth world at all. A run is the right unit —
+     * it is the same unit the rest of this state is in, it survives a save and
+     * a reload, and it resets when a new one starts.
+     *
+     * Nothing outside the Hollow reads it, and nothing ever sets it back to
+     * false.
+     */
+    scared: false,
+
     stats: { duelsWon: 0, duelsLost: 0, goldEarned: 0, itemsBought: 0, distance: 0 },
   };
 }
@@ -770,6 +786,14 @@ export function breakTotem() {
 // ---------------------------------------------------------------------------
 // World position
 // ---------------------------------------------------------------------------
+
+/**
+ * Spend the run's one scare. Idempotent, and there is no way back — see
+ * `scared` in `blankState`.
+ */
+export function spendScare() {
+  state.scared = true;
+}
 
 export function setWorld(worldId) {
   state.world = worldId;

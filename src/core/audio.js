@@ -38,6 +38,7 @@ export const AUDIO_MANIFEST = {
   heartbeat: 'heartbeat.wav',     // the cut-scene's pulse under a held shot
   rumble: 'rumble.wav',           // something very large moving
   toll: 'bell-toll.wav',          // the beat a boss arrives on
+  scare: 'scare.wav',             // the one jump scare in the game
   themeMenu: 'theme-menu.ogg',    // looping music
   themeWalk: 'theme-walk.ogg',
   themeDuel: 'theme-duel.ogg',
@@ -95,13 +96,49 @@ const SYNTH = {
   rumble: { noise: true, dur: 1.4, gain: 0.26, lowpass: 180 },
   /** The beat a boss arrives on. */
   toll: { type: 'triangle', freq: 96, dur: 1.5, gain: 0.28, slide: -40 },
+
+  /**
+   * THE LOUDEST THING IN THE GAME, AND IT HAPPENS ONCE
+   * -------------------------------------------------------------------------
+   * The Hollow's scare (src/explore/scare.js). It is a STACK rather than a
+   * single envelope, because everything that makes a stinger frightening is a
+   * thing one oscillator cannot do at once:
+   *
+   *   1. a wall of unfiltered noise, at more gain than any other cue in the
+   *      file. No lowpass at all — every other noise cue in this game is rolled
+   *      off somewhere between 180 and 1800 Hz to sit under the art, and this
+   *      one is the sound of that restraint being dropped
+   *   2. a shriek: a sawtooth starting very high and falling a long way, which
+   *      is the one interval the ear reads as something coming towards it
+   *   3. a floor under both, so it is felt as well as heard, arriving four
+   *      hundredths of a second late — the delay is what stops the three
+   *      layers summing into one flat click
+   *
+   * Nothing else in the game is allowed near this volume, and that is the
+   * point: the player has spent five worlds learning how loud this game gets.
+   */
+  scare: [
+    { noise: true, dur: 0.55, gain: 0.62 },
+    { type: 'sawtooth', freq: 1760, dur: 0.5, gain: 0.34, slide: -1500 },
+    { type: 'square', freq: 70, dur: 0.9, gain: 0.4, slide: -40, delay: 0.04 },
+  ],
 };
 
 function playSynth(cue) {
   const ctx = context();
   const spec = SYNTH[cue];
   if (!ctx || !spec) return;
-  const now = ctx.currentTime;
+  // A cue may be a STACK of envelopes rather than one — see `scare`. Each layer
+  // is an ordinary spec and may carry its own `delay` in seconds.
+  if (Array.isArray(spec)) {
+    for (const layer of spec) playLayer(ctx, layer);
+    return;
+  }
+  playLayer(ctx, spec);
+}
+
+function playLayer(ctx, spec) {
+  const now = ctx.currentTime + (spec.delay || 0);
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(spec.gain * state.master, now);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + spec.dur);
