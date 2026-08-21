@@ -231,6 +231,43 @@ export function createScare() {
   }
 
   /**
+   * THE CAMERA KICK, AS ONE THING BOTH PASSES SHARE
+   * ---------------------------------------------------------------------------
+   * The scene is drawn through this and so is the skull that goes on top of the
+   * red wash, and it lives here rather than in the screen because those two
+   * have to agree to the pixel. They did not, once: the screen applied the kick,
+   * drew the world, restored it and then called `drawFlash`, which painted the
+   * skull again at its UNSHAKEN position — so for half a second there were two
+   * skulls a few pixels apart, one moving with the road and one standing still,
+   * and the wash is not opaque enough to hide the one underneath.
+   *
+   * The zoom is not decoration. Translating the scene leaves a strip of empty
+   * canvas on two sides of the frame — the parallax draws exactly the view and
+   * not a pixel more — so the whole thing is pushed in far enough to cover the
+   * largest offset the shake can reach. It reads as the camera flinching
+   * towards the thing, which is what a camera would do.
+   *
+   * Always paired with `endKick`, and always safe to call: with nothing
+   * happening it is a bare `save()`.
+   */
+  function beginKick(ctx, view) {
+    ctx.save();
+    const kick = shakeOffset();
+    if (!kick) return;
+    const s = view.scale;
+    const z = 1 + (Math.max(Math.abs(kick.x), Math.abs(kick.y)) * 2 * s) / Math.min(view.w, view.h);
+    ctx.translate(view.w / 2, view.h / 2);
+    ctx.scale(z, z);
+    ctx.translate(-view.w / 2, -view.h / 2);
+    ctx.translate(Math.round(kick.x * s), Math.round(kick.y * s));
+  }
+
+  /** Give the camera back. */
+  function endKick(ctx) {
+    ctx.restore();
+  }
+
+  /**
    * Draw it, at the prop band's own geometry.
    *
    * @param {object} o
@@ -383,11 +420,15 @@ export function createScare() {
      * world is erased and the thing that erased it is the only object left in
      * the frame.
      *
-     * It is the same call the scene made a moment ago (`paint`), so there is no
-     * chance of the two disagreeing about where it is or which way it is
-     * facing.
+     * It is the same call the scene made a moment ago (`paint`), inside the
+     * same camera kick the scene was drawn through (`beginKick`), so there is
+     * no chance of the two disagreeing about where it is, which way it is
+     * facing, or how far the camera has thrown it.
      */
-    if (box) paint(ctx, fallAngle());
+    if (!box) return;
+    beginKick(ctx, view);
+    paint(ctx, fallAngle());
+    endKick(ctx);
   }
 
   return {
@@ -395,7 +436,8 @@ export function createScare() {
     update,
     draw,
     drawFlash,
-    shakeOffset,
+    beginKick,
+    endKick,
     /** True from the frame it fires. Nothing outside needs to know more. */
     isFiring: () => t !== null,
   };

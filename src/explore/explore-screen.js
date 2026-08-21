@@ -359,35 +359,22 @@ export const ExploreScreen = {
         /**
          * THE FLINCH
          * -------------------------------------------------------------------
-         * The whole scene is drawn through a translate for the six hundred
-         * milliseconds after the scare fires, and nothing else in this file
+         * The whole scene is drawn through the scare's camera kick for the six
+         * hundred milliseconds after it fires, and nothing else in this file
          * knows about it: the shake belongs to the CAMERA, so it has to move
          * the ground, the traveller, the weather and the props together, and
          * the only place all four of those are drawn is here.
          *
-         * The red wash is deliberately outside it (see the end of this
-         * function). A flash that shakes with the scene is a red rectangle
-         * sliding about; a flash that stays still while the world moves under
-         * it is the screen itself being hit.
+         * The transform itself lives in `src/explore/scare.js` because the red
+         * wash at the end of this function draws through it too, and the two
+         * passes have to agree to the pixel. Outside the scare it is a bare
+         * `save()` and costs nothing.
+         *
+         * The wash itself is deliberately NOT inside it. A flash that shakes
+         * with the scene is a red rectangle sliding about; a flash that stays
+         * still while the world moves under it is the screen itself being hit.
          */
-        const kick = scare.shakeOffset();
-        ctx.save();
-        if (kick) {
-          /**
-           * The zoom is not decoration, it is what stops the shake showing the
-           * edge of the world. Translating the scene leaves a strip of empty
-           * canvas on two sides of the frame — the parallax draws exactly the
-           * view and not a pixel more — so the whole thing is pushed in far
-           * enough to cover the largest offset the shake can reach. It reads as
-           * the camera flinching towards the thing, which is what a camera
-           * would do.
-           */
-          const z = 1 + (Math.max(Math.abs(kick.x), Math.abs(kick.y)) * 2 * s) / Math.min(view.w, view.h);
-          ctx.translate(view.w / 2, view.h / 2);
-          ctx.scale(z, z);
-          ctx.translate(-view.w / 2, -view.h / 2);
-          ctx.translate(Math.round(kick.x * s), Math.round(kick.y * s));
-        }
+        scare.beginKick(ctx, view);
         const gy = parallax.groundY(view);
         // The rain needs to know where the road is before it can break on it —
         // both edges of it, so a downpour lands across the depth of the floor
@@ -508,7 +495,7 @@ export const ExploreScreen = {
 
         // The scene is finished; the camera stops being thrown here, so
         // everything after this is drawn on a screen that is not moving.
-        ctx.restore();
+        scare.endKick(ctx);
 
         // Starving: a red pulse creeping in from the edges.
         const starve = getState().hunger <= 0 ? starvationProgress() : 0;
