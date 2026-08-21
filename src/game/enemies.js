@@ -41,7 +41,7 @@
 import { makeRng } from '../core/rng.js';
 import { getState } from './player.js';
 import { getWorld } from './worlds.js';
-import { enemyGunDamage, enemyGunDamageAt, enemyRampChance } from './progression.js';
+import { enemyBulletFloor, enemyGunDamageAt, enemyRampChance } from './progression.js';
 import { ARCHETYPES, getEnemySprites } from '../art/sprites-enemies.js';
 import { getAbility } from './world-abilities.js';
 import { OVERRIDES } from '../admin/overrides.js';
@@ -292,8 +292,14 @@ export function generateBoss(worldId) {
      * took Big Jed from six hits to three and turned the tutorial boss into a
      * quarter of all deaths in the game. The rider ramp is a spike inside a
      * five-round fight; the same spike inside a ten-round one is a wall.
+     *
+     * The hard road's rung is a different thing and a boss does take it: it is
+     * not a coin flipped per rider, it is what EVERY gun on that road is, and a
+     * boss standing behind the only ordinary bullet left in the world would be
+     * the one fight where hard mode looked away. `enemyBulletFloor` is that
+     * floor — the world's bullet, plus the road's rung, and no coin.
      */
-    gunDamage: enemyGunDamage(worldId),
+    gunDamage: enemyBulletFloor(worldId),
     abilities: phase.abilities || cfg.abilities || [],
     abilityChanceMul: (phase.abilityChanceMul || 1) * hard.enemyCastMul,
     /** A boss always has its world's special. It is the fight's centrepiece. */

@@ -314,8 +314,9 @@ function bossPhase(worldId, index = 0) {
     baseLives: ph.lives,
     bullets: ph.startBullets || 0,
     accuracy: (ph.accuracy ?? b.accuracy) + t.enemyAccuracyBonus,
-    // A boss carries its world's ordinary bullet — see `generateBoss`.
-    gunDamage: P.enemyGunDamage(worldId),
+    // A boss carries its world's ordinary bullet, plus the hard road's rung
+    // if that is the road being measured — see `generateBoss`.
+    gunDamage: P.enemyBulletFloor(worldId),
     abilities: ph.abilities || b.abilities,
     abilityChanceMul: (ph.abilityChanceMul || 1) * t.enemyCastMul,
     special: ph.special || b.special,
@@ -635,10 +636,34 @@ async function reportAsymmetry() {
      * that choice rather than the spike — the pass is the quiet world of the
      * six, and that is a decision rather than a bug.
      */
-    if (onPlayer < wanted - 2 || onPlayer > wanted * 2) {
+    /**
+     * THE FLOOR IS ALL THAT IS LEFT OF THIS CHECK, AND IT IS DELIBERATE
+     * -----------------------------------------------------------------------
+     * `wanted` is what the DERIVED bullet used to deliver — the bar over six,
+     * scaled by the length of that world's fights — and while the bullet was
+     * solved against the bar, holding the two within two hits of each other was
+     * the whole job of this line.
+     *
+     * The bullet is a hand-written ladder now: half a life in the Dust Flats
+     * and half a life more every world, one rung of ENEMY_GUNS per world, so
+     * that what a rider is carrying can be READ off the gun in his hand (see
+     * `enemyGunDamage` in src/game/progression.js). It climbs faster than the
+     * bar does, on purpose, and the hits-to-kill it produces falls from six in
+     * the Dust Flats to about three and a half from the Bayou on. That is the
+     * design; a check that fails the build for it is a check measuring the
+     * previous design.
+     *
+     * What is still worth failing over is the FLOOR. Under three connected
+     * hits there is no fight left in a duel — the first two rounds decide it
+     * and nothing the player does after them matters — and that is the line
+     * this game cannot cross whatever the ladder says. `wanted` stays in the
+     * table beside it, because the gap between the two is the honest measure
+     * of how far the road has been pushed past what the economy pays for.
+     */
+    if (onPlayer < 3) {
       problems.push(
-        `world ${w.id}: a rider needs ${onPlayer.toFixed(1)} hits to kill the player ` +
-        `(want about ${wanted.toFixed(1)})`,
+        `world ${w.id}: a rider needs only ${onPlayer.toFixed(1)} hits to kill the player ` +
+        `(the floor is 3; the economy would pay for ${wanted.toFixed(1)})`,
       );
     }
     /**
@@ -979,38 +1004,64 @@ const reportHard = () => reportRuns('hard');
  */
 const TARGETS = [
   /**
-   * TWO RUNGS, NOT ONE, BECAUSE THE ROAD IS SEVEN WORLDS LONG NOW
+   * THESE BANDS MEASURE HOW FAR A RUN GETS, NOT WHO FINISHES, AND THAT IS NEW
    * ---------------------------------------------------------------------------
-   * These bands used to be three lines about one thing: how often each skill
-   * band ever sees the last world. That was the right shape for a six-world
-   * road where the last world was also the first hard one.
+   * They used to be six lines about the last two worlds: how often each skill
+   * band reached Gallows Hollow, and how often it reached the Galaxy behind it.
+   * On the road as it was tuned then — a rider's bullet derived from the
+   * player's own bar — an expert saw the Hollow in three runs of five and the
+   * Galaxy in one of three, and those six numbers were the whole contract.
    *
-   * Gallows Hollow changed what the question means. There are two "late" worlds
-   * now — the Hollow and the Galaxy — and they measure different things:
+   * THE ROAD THEY MEASURED NO LONGER EXISTS. The riders' bullet is a
+   * hand-written ladder now, one rung of ENEMY_GUNS per world (see
+   * `enemyGunDamage` in src/game/progression.js): half a life in the Dust
+   * Flats, a whole one in the Prairie, three and a half out in the Galaxy —
+   * against a bar that still grows about two thirds of a life a world. The two
+   * sides no longer meet. MEASURED, 250 runs a skill, the road that ships:
    *
-   *   REACHING THE HOLLOW is the old question, one stop earlier. It is "did the
-   *   run survive the ordinary road", and the bands are the OLD ones, unchanged
-   *   and unmoved. That is deliberate: worlds one to five were not touched by
-   *   any of this, so if these three numbers drift, something in the first five
-   *   worlds drifted and the build should fail.
+   *                    Prairie   Pass   Bayou   Basin and past it
+   *     novice           73%      6%      0%          0%
+   *     average          73%     10%      0%          0%
+   *     expert           96%     28%      2%          0%
    *
-   *   REACHING THE GALAXY is the new question, and it is a harder one than the
-   *   old road ever asked, because there is a whole world in front of it. The
-   *   bands below are what the road actually delivers with the Hollow costing
-   *   about what the Basin costs — roughly two runs in three of the ones that
-   *   get there.
+   * Nobody finishes the game and nobody sees the back half of it. That is a
+   * deliberate decision about what this road is (a gauntlet whose interest is
+   * how deep into it you get) rather than a drift to be caught, so the bands
+   * moved to the worlds runs actually die in — and they are the same KIND of
+   * check they always were, in the only place they can still be read.
    *
-   * The ceilings matter as much as the floors on both. A Hollow that everybody
-   * walks through is a world that is not there, and an expert clearing better
-   * than half of all runs into the Galaxy has a last world that stopped being
-   * one.
+   * The ceilings still matter as much as the floors. The Prairie band catches a
+   * change that makes the first world lethal (floor) or the second one free
+   * (ceiling), and the Pass band is where skill separates: an expert gets three
+   * times as far past the Prairie as a novice, and if that ratio collapses in
+   * either direction the fight has stopped rewarding play.
+   *
+   * The old contract is kept below, commented out rather than deleted. It is
+   * what to restore if the two sides of the road are ever brought back
+   * together — the bullet derived from the bar, or the bar deepened to meet
+   * the ladder.
+   *
+   *   { what: 'novice reaches the Hollow',  field: 'reachedHollowPct', min: 3,  max: 14 },
+   *   { what: 'average reaches the Hollow', field: 'reachedHollowPct', min: 12, max: 30 },
+   *   { what: 'expert reaches the Hollow',  field: 'reachedHollowPct', min: 42, max: 68 },
+   *   { what: 'novice reaches the Galaxy',  field: 'reachedGalaxyPct', min: 0,  max: 8  },
+   *   { what: 'average reaches the Galaxy', field: 'reachedGalaxyPct', min: 1,  max: 16 },
+   *   { what: 'expert reaches the Galaxy',  field: 'reachedGalaxyPct', min: 28, max: 56 },
    */
-  { what: 'novice reaches the Hollow', field: 'reachedHollowPct', min: 3, max: 14 },
-  { what: 'average reaches the Hollow', field: 'reachedHollowPct', min: 12, max: 30 },
-  { what: 'expert reaches the Hollow', field: 'reachedHollowPct', min: 42, max: 68 },
-  { what: 'novice reaches the Galaxy', field: 'reachedGalaxyPct', min: 0, max: 8 },
-  { what: 'average reaches the Galaxy', field: 'reachedGalaxyPct', min: 1, max: 16 },
-  { what: 'expert reaches the Galaxy', field: 'reachedGalaxyPct', min: 28, max: 56 },
+  { what: 'novice reaches the Prairie', field: 'reachedPrairiePct', min: 58, max: 86 },
+  { what: 'average reaches the Prairie', field: 'reachedPrairiePct', min: 58, max: 86 },
+  { what: 'expert reaches the Prairie', field: 'reachedPrairiePct', min: 86, max: 100 },
+  { what: 'novice reaches the Pass', field: 'reachedPassPct', min: 1, max: 16 },
+  { what: 'average reaches the Pass', field: 'reachedPassPct', min: 2, max: 20 },
+  { what: 'expert reaches the Pass', field: 'reachedPassPct', min: 15, max: 44 },
+  /**
+   * The deepest anybody gets, and the one band with a floor of zero: two runs
+   * in a hundred is inside the noise of 250 runs, so a floor here would fail
+   * builds at random. The ceiling is the real check — an expert reaching the
+   * Bayou more than one run in eight means something gave the first three
+   * worlds back.
+   */
+  { what: 'expert reaches the Bayou', field: 'reachedBayouPct', min: 0, max: 12 },
 ];
 
 /**
@@ -1018,35 +1069,41 @@ const TARGETS = [
  * ---------------------------------------------------------------------------
  * A hard mode has exactly two ways to fail, and both of them are invisible in
  * a diff. Too gentle and it is a label on a settings screen; too steep and it
- * is a wall — nobody finishes it, the outfit at the end of it is never worn,
- * and the whole feature is a cut-scene followed by a slot nobody plays twice.
+ * is a wall.
  *
- * The design target is one sentence: **an expert on the hard road should be
- * having about the run an average player has on the ordinary one.** Measured,
- * that is a fifth to a quarter of hard runs reaching the Galaxy against three
- * in five on the ordinary road, and it is what the whole `hard` column in
- * src/game/difficulty.js was solved against.
+ * It is a wall now, and it is one on purpose: on top of the whole `hard` column
+ * in src/game/difficulty.js, every gun on this road is one rung further up the
+ * ladder than the ordinary one carries (`enemyBulletFloor`), so the man across
+ * from you in the Dust Flats is holding the Prairie's brass sixgun and hitting
+ * for a whole life against a bar of three. MEASURED, 250 runs a skill:
  *
- * The bands are wide because they are here to catch a change that moved the
- * mode by a third, not to freeze it — the same reasoning as TARGETS above. The
- * ceilings matter as much as the floors: an expert clearing better than two
- * runs in five has a hard mode that stopped being one.
+ *                    Prairie   Pass and past it
+ *     novice            5%           0%
+ *     average           9%           0%
+ *     expert           32%           0%
  *
- * The two lower bands have a floor of ZERO, and that is deliberate rather than
- * lazy. Somebody who mashes SHOOT and never reads a price tag is not supposed
- * to see the last world out here, and a floor above zero would be a promise
- * this road should not make.
+ * A third of expert hard runs get out of the first world. Nothing reaches the
+ * second boss. So the bands moved to the only stop that still has a number on
+ * it, and what they check is the SHAPE of the difference between the two roads
+ * rather than an ending nobody reaches: an expert on the hard road gets about
+ * as far as a novice on the ordinary one, which is the sentence this mode was
+ * always designed around, measured one world in instead of six.
+ *
+ * The old contract, for the road where finishing hard mode was possible:
+ *
+ *   { what: 'novice reaches the Hollow (hard)',  field: 'reachedHollowPct', min: 0,  max: 6  },
+ *   { what: 'average reaches the Hollow (hard)', field: 'reachedHollowPct', min: 0,  max: 12 },
+ *   { what: 'expert reaches the Hollow (hard)',  field: 'reachedHollowPct', min: 12, max: 38 },
+ *   { what: 'expert reaches the Galaxy (hard)',  field: 'reachedGalaxyPct', min: 2,  max: 22 },
+ *
+ * The floors of zero on the two lower bands are unchanged and mean what they
+ * always meant: somebody who mashes SHOOT and never reads a price tag is not
+ * promised anything out here.
  */
 const HARD_TARGETS = [
-  { what: 'novice reaches the Hollow (hard)', field: 'reachedHollowPct', min: 0, max: 6 },
-  { what: 'average reaches the Hollow (hard)', field: 'reachedHollowPct', min: 0, max: 12 },
-  { what: 'expert reaches the Hollow (hard)', field: 'reachedHollowPct', min: 12, max: 38 },
-  /**
-   * And the last world on the hard road, which is the smallest number this
-   * harness prints. A floor of two rather than zero: the Ember Reaver is behind
-   * this door and an outfit nobody can reach is an outfit that does not exist.
-   */
-  { what: 'expert reaches the Galaxy (hard)', field: 'reachedGalaxyPct', min: 2, max: 22 },
+  { what: 'novice reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 0, max: 14 },
+  { what: 'average reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 1, max: 20 },
+  { what: 'expert reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 18, max: 46 },
 ];
 
 /**

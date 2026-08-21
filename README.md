@@ -41,34 +41,55 @@ bar: three lives that were never yours, spent before the red and healed by
 nothing.
 
 **You start on three diamonds and the trail iron takes half of one a shot, so a
-rider needs six clean hits to finish you.** That number is the feel of this
-game, and it is the one thing the balance harness refuses to let drift: a
-version of this once shipped where it had quietly grown to *twelve* in the Dust
-Flats and *fourteen* by the second world, because the player's life bar and the
-rider's bullet were two numbers in two files growing at different rates.
+rider needs six clean hits to finish you.** That is the Dust Flats, and it is
+the deepest the bar is ever going to feel: the road climbs half a life a world
+and your bar does not keep up, so six becomes four in the Prairie and settles at
+three and a half from the Bayou on. The harness watches the floor of it — under
+three connected hits there is no fight left in a duel — and it once caught the
+opposite failure, a version where the number had quietly grown to *twelve* in
+the Dust Flats and *fourteen* by the second world because the player's life bar
+and the rider's bullet were two numbers in two files growing at different rates.
 
-A rider carries two diamonds more every world — that ladder is written down by
-hand. Everything else is tuned around it: a bar that starts at three and grows
-one life a level at about three levels every two worlds, a forge ladder worth
-half a life a rung, and a rider's bullet derived from the bar so that six hits
-still kill you. See `EXPECTED_POWER` in `src/game/progression.js`.
+**Two ladders are written down by hand.** A rider carries two diamonds more
+every world, and a rider's bullet goes up half a life every world — one rung of
+the enemy gun ladder per world, from the trail sixgun in the Dust Flats to a
+Nova frame in the Galaxy. Everything else is tuned around them: a bar that
+starts at three and grows one life a level at about three levels every two
+worlds, and a forge ladder worth half a life a rung. See `enemyGunDamage` and
+`EXPECTED_POWER` in `src/game/progression.js`.
 
-| World | You have | A rider hits for | A rider carries | So a rider is |
-| --- | --- | --- | --- | --- |
-| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 | 2 shots |
-| Wildgrass Prairie | 4 lives, 1.5 | 0.5 | 3 | 2 shots |
-| Whitecrown Pass | 6 lives, 2.5 | 0.5 | 5 | 2 shots |
-| Blackwater Bayou | 7 lives, 3.5 | 1 | 7 | 2 shots |
-| Brimstone Basin | 9 lives, 3.5 | 1 | 9 | 2.6 shots |
-| Gallows Hollow | 10 lives, 3.5 | 1 | 11 | 3.2 shots |
-| Galaxy | 12 lives, 3.5 | 1 | 12 | 3.5 shots |
+| World | You have | A rider hits for | A rider carries | Hits to kill you | So a rider is |
+| --- | --- | --- | --- | --- | --- |
+| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 | 6 | 2 shots |
+| Wildgrass Prairie | 4 lives, 1.5 | 1 | 3 | 4 | 2 shots |
+| Whitecrown Pass | 6 lives, 2.5 | 1.5 | 5 | 4 | 2 shots |
+| Blackwater Bayou | 7 lives, 3.5 | 2 | 7 | 3.5 | 2 shots |
+| Brimstone Basin | 9 lives, 3.5 | 2.5 | 9 | 3.6 | 2.6 shots |
+| Gallows Hollow | 10 lives, 3.5 | 3 | 11 | 3.3 | 3.2 shots |
+| Galaxy | 12 lives, 3.5 | 3.5 | 12 | 3.4 | 3.5 shots |
 
-Six to twelve hits to kill you and two to three and a half to kill them. The
-headroom grows on purpose: **the last three worlds are where the forge ladder
-runs out** — the gun stops at three and a half and the riders keep climbing —
-so a fight out there takes a third shot and runs half again as long, which
-needs a deeper bar to cost the same third of itself. You cannot out-buy the
-road any more, and the last two worlds are shorter to pay for it.
+**The bullet climbs faster than the bar does, and that is the road.** Six
+connected hits deep in the Dust Flats — a fight you can afford to misplay twice
+— settling at three and a half from the Bayou on, which is a fight you cannot.
+The bullet was derived from the bar for a while, which held the price of a duel
+at about a third of it everywhere and produced a ladder with flat spots: three
+worlds running on the same bullet, which is three worlds running with the same
+gun in the man's hand. The one difficulty signal this game *shows* rather than
+states had stopped moving for half the run, so it is a hand-written ladder
+again and the road outgrows you on purpose.
+
+What that costs is written down rather than hidden: **nobody finishes this game
+any more.** Measured over 250 runs a skill level, an expert reaches the second
+world 96% of the time, the third 28%, the fourth 2%, and the Galaxy never. The
+harness bands moved with it — see `TARGETS` in `tools/sim.mjs`, which now
+measures how deep a run gets rather than who finishes — and the old contract is
+kept commented out beside them, which is what to restore if the two sides of the
+road are ever brought back together.
+
+**The last three worlds are where the forge ladder runs out** — the gun stops at
+three and a half and the riders keep climbing — so a fight out there takes a
+third shot and runs half again as long. You cannot out-buy the road any more,
+and the last two worlds are shorter to pay for it.
 
 The last rung of the rider ladder is **one** diamond rather than two, and that
 kink is the forge running out arriving in the arithmetic. A straight +2 ladder
@@ -80,31 +101,45 @@ the Basin easier as well. See `ENEMY_LIVES_FINAL_STEP` in
 `src/game/progression.js`.
 
 **And the road gets worse as you walk it.** From the halfway point of a world,
-half the riders carry the next rung of the ladder: the Dust Flats open on
+a third of the riders carry the next rung of the ladder: the Dust Flats open on
 half-life bullets and close on riders who hit for half or a whole one, the
 Prairie opens on one and closes on one or one and a half, and so on up. Six
 hits deep becomes four. You can see it coming — the heavier bullet comes with a
 heavier gun in the man's hand (`ENEMY_GUNS` in `src/game/gun-tiers.js`), so a
-longbarrel on the road ahead is a warning. Your own level-up lands in the same
-stretch, which is the other half of the deal: the world gets meaner and you get
-bigger, once per world, seven times.
+longbarrel on the road ahead is a warning, and his card says the same thing in
+the one form a sprite cannot carry: the revolver he is actually holding, and
+what one of its rounds costs you. Your own level-up lands in the same stretch,
+which is the other half of the deal: the world gets meaner and you get bigger,
+once per world, seven times.
 
 **Somebody goes down before anybody is told anything.** When the last diamond
-goes, the loser *falls* — a stagger, the knees buckling, the body leaning past
-the point of no return, and then a heap on the road — and only when it has
-landed does the overview come up. It used to be a banner over a man still
-breathing in his idle loop: the one thing a duel is about had no picture of
-itself.
+goes, the loser *falls* — the head snapping back, the knees folding, the body
+going past the point of no return and then flat out along the road, with the
+dust it threw up still settling — and only when it has landed does the overview
+come up. It used to be a banner over a man still breathing in his idle loop: the
+one thing a duel is about had no picture of itself.
 
-The fall is five frames off the rig, composed from that fighter's own head,
-torso and legs (see `FALL_FRAME_MS` in `src/art/sprites-character.js`), so the
-Sexton goes down as the Sexton in his own apron and a wraith goes down in its
-rags — without a line of art for either. It is stacked rather than *turned*: a
-hat brim is thirteen pixels wide, so a rotated hat is a thirteen-pixel vertical
-bar and the result reads as a cart. Turn a sprite drawn from one angle and you
-get a sprite drawn from no angle at all. So the legs fold out along the road,
-the torso comes down on top of them and the head lolls back over the shoulder —
-three stamps of the fighter's own parts, still the way round they were drawn.
+The fall is six frames off the rig, composed from that fighter's own head, torso
+and legs (see `FALL_FRAME_MS` in `src/art/sprites-character.js`), so the Sexton
+goes down as the Sexton in his own apron and a wraith goes down in its rags —
+without a line of art for either. It is stamped rather than *turned*: a hat brim
+is thirteen pixels wide, so a rotated hat is a thirteen-pixel vertical bar and
+the result reads as a cart. Turn a sprite drawn from one angle and you get a
+sprite drawn from no angle at all. So the head swings back and down, the torso
+follows it over and the shins slide out along the road — the fighter's own
+parts, at offsets that trace the arc, still the way round they were drawn.
+
+It is the one animation in the game drawn on a **wider canvas than a fighter**:
+a man is 24 tall and 16 wide, so lying down he is 24 long and there is nowhere
+in sixteen columns to put him. The fall is 28 columns with the standing body
+centred in it, and anything that draws a fighter centres a frame wider than
+sixteen on his own box — one line, in the duel scene and on the road.
+
+**And the gun goes with him.** It leaves the hand on the first frame of the fall
+and is thrown across the road: the real revolver, the tier the player bought or
+the rung the rider was carrying, in its own metal, tumbling end over end,
+bouncing once and lying there. It does not fade. A body and a gun in the dirt is
+the picture the overview slides up over.
 
 And the body stays. It is lying there under the overview, and it is still lying
 there on the road when you walk back out — see below.
@@ -115,6 +150,17 @@ does anyone fire: the flash blooming down the bore in four beats, burning
 grains thrown after it, a tracer laying a tail along the road behind it, the
 case out of the cylinder, and powder smoke left hanging. A life is lost when
 the round arrives, not when the gun appears.
+
+**A reload looks like a reload.** It used to play the draw — the round where a
+man loaded his gun and the round where he pointed it at you were the same four
+frames, in a game whose whole tension is reading what the other one is doing.
+Now it opens on the draw's own first two frames, on purpose, because both moves
+begin with a man reaching for his gun: for the first fifth of a second you
+cannot tell them apart. Then the gun goes **up** in front of the chest with the
+muzzle to the sky instead of forward, the off hand crosses with one brass pixel
+in it, a wrist flick shuts the cylinder, and the spent case drops on the road at
+his boots. It ends levelled, because a man who has just loaded is a man with a
+loaded gun in his hand. `RELOAD_SEQUENCE` in `src/art/sprites-character.js`.
 
 **Your gun is whatever you have paid for.** The flash, the tracer, the sparks
 and the shockwave all come off the rung of the forge ladder you are on, so the
@@ -698,10 +744,10 @@ There is no level select. You walk, and the road decides what you meet.
   deliberately cheap and lands on the very first fight, because the Dust Flats
   is the one stretch where the bar is at its shallowest exactly as the road
   starts ramping. And it **performs**: the level chip goes gold and flares, so
-  the slowest reward in the game is the one thing on the band you cannot miss. It does not make you safer: a rider's bullet is a sixth of
-  whatever the bar has grown to, so eighteen lives is the same six hits deep
-  that three was. What the growth buys is room to absorb a bad duel, not
-  immunity from one. It is not a refill: if you arrive at a level-up on your
+  the slowest reward in the game is the one thing on the band you cannot miss. It does not make you safer for long: the riders' bullet
+  climbs half a life every world and the bar gains about two thirds of one, so
+  what the growth buys is room to absorb a bad duel in the world you are in, not
+  immunity from the one after it. It is not a refill: if you arrive at a level-up on your
   last life you leave it on your fourth, and the bed at the inn is still the
   only way back to the top.
 - **Five worlds plus the Galaxy**, where a two-phase boss is waiting — and
@@ -837,6 +883,17 @@ halfway through still leaves the road open. `src/ui/hard-mode-cutscene.js`.
 **The choice is made on an empty slot and never again.** A new run's card grows
 a Mode dropdown once the road is open — Normal or Hard, with the honest list of
 what changes printed under it — and the answer is written into the save payload.
+
+**And choosing it sets the card on fire.** Picking Hard used to turn the card's
+border red, which is the right amount of interface for a checkbox and the wrong
+amount for a decision that cannot be undone. Now the card burns: pixel flames
+come up off the bottom edge and lick the button, embers rise off them and drift
+over the type, the edge glows and breathes, and the whole thing flares when the
+mode is chosen. A hard run already in progress burns lower — it is a fact about
+the slot rather than a decision being offered. The embers are the Ember Reaver's
+own emitter, the same particles that will burn on your shoulders if you ever
+finish this road, and a player who has asked for less motion gets one held frame
+of it instead of a loop. `src/ui/card-fire.js`.
 A slot is a Normal run or a Hard run for as long as it exists, it says which on
 its card, and picking it back up puts the same road under you. There is no
 difficulty setting in the options menu and there never will be: a run you can
@@ -852,8 +909,9 @@ on it means `npm test` measures both.
 
 | | |
 | --- | --- |
+| **what he is carrying** | **every gun on this road is one rung further up the ladder.** The first man in the Dust Flats holds the Prairie's brass sixgun and hits for a whole life against a bar of three. It is the one change that is a whole step rather than a few per cent, and it is the one you can see coming |
 | the man across the road | reads a repeated move off **two**, not three; answers it more often; plays off a read more often. He still never looks at your cylinder. |
-| how much of him | more life on every rider and every boss, more of them carrying a trick, more of the back half of a world carrying the heavier gun |
+| how much of him | more life on every rider and every boss, more of them carrying a trick, more of the back half of a world carrying the heavier gun again on top of the rung |
 | every counter | the stall, the inn **and the forge** all ask about half again, and the half-price tag turns up half as often |
 | what you carry | the cheap bed puts back less, the expensive one no longer restores every life, and the bandage, the kit, the bottle, the meal and the totem are all worth less than they say |
 | the purse | **bigger** — a body is worth more out here, and it does not cover it |
@@ -891,9 +949,26 @@ opposite of the first four guesses. Where it landed:
 | plays reasonably | 17% → **2%** | 1% → 0% |
 | reads the cylinder, buys correctly | 59% → **23%** | 14% → **1.8%** |
 
-An expert on the hard road is having roughly the run an average player has on
-the ordinary one, and the ending is something they reach about once an evening
-rather than once a week.
+An expert on the hard road was having roughly the run an average player has on
+the ordinary one, and the ending was something they reached about once an
+evening rather than once a week.
+
+**Those figures are history now, and the sentence under them survived it.** They
+were measured against a rider whose bullet was derived from your own bar. The
+bullet is a hand-written ladder again — half a life a world, one rung of the gun
+per world — and this road is a rung ahead of it, so nobody finishes the game on
+either crossing. Measured, 250 runs a skill:
+
+| | reaches the Prairie | reaches the Pass |
+| --- | --- | --- |
+| mashes one button | 73% → **5%** | 6% → 0% |
+| plays reasonably | 73% → **9%** | 10% → 0% |
+| reads the cylinder, buys correctly | 96% → **32%** | 28% → 0% |
+
+An expert out here gets about as far as somebody mashing one button does on the
+ordinary road — the same sentence this column was always designed around, one
+world in instead of six. The multipliers below are untouched by any of it and
+every word about them still holds; what moved is the road under them.
 
 **And there is something at the end of it.** See the Ember Reaver, below.
 
@@ -1257,11 +1332,17 @@ player ever finished. None of that is visible in a diff.
 The design target is a skill ladder rather than a difficulty, and the harness
 fails if the game leaves it:
 
-| | reaches the Galaxy |
-| --- | --- |
-| mashes one button, spends badly | ~6% |
-| plays reasonably | ~19% |
-| reads the cylinder, buys correctly | ~54% |
+| | reaches the Prairie | reaches the Pass |
+| --- | --- | --- |
+| mashes one button, spends badly | ~73% | ~6% |
+| plays reasonably | ~73% | ~10% |
+| reads the cylinder, buys correctly | ~96% | ~28% |
+
+Those used to be numbers about the *last* world — 6%, 19% and 54% reaching the
+Galaxy — and they are numbers about the second and third now, because the
+riders' bullet climbs faster than your bar does and nobody finishes the road
+(see *The duel*, above). What is being measured has not changed: how much
+further a player who reads the man across the road gets than one who does not.
 
 Almost all of that spread is the **ledger**, not the trigger finger. Reading the
 opponent's chambers is worth about a fifth of the damage you take; buying food
@@ -1274,18 +1355,23 @@ the entire point of building the second road out of multipliers over the first
 A second road that is only checked when somebody remembers to check it is the
 second set of tables that design exists to avoid, wearing a different hat.
 
-| | reaches the Galaxy, hard |
+| | reaches the Prairie, hard |
 | --- | --- |
-| mashes one button, spends badly | ~1% |
-| plays reasonably | ~2% |
-| reads the cylinder, buys correctly | ~23% |
+| mashes one button, spends badly | ~5% |
+| plays reasonably | ~9% |
+| reads the cylinder, buys correctly | ~32% |
 
 `node tools/sim.mjs asymmetry` is the other half of the harness and the one that
 would have caught the worst bug this game has had. It puts the two sides of the
 road on one page — what the progression curve *claims* the player will have,
 what the economy actually delivers, what the riders carry, and how many
 connected shots it takes to kill each of you — and fails the build if a rider
-needs fewer than four or more than eight hits to finish the player.
+needs fewer than **three** hits to finish the player, which is where a duel
+stops being one. It used to hold that number inside two hits of what the economy
+pays for; the bullet is a hand-written ladder now and outgrows the bar on
+purpose, so what is left of that check is the floor. The gap between the two is
+still printed side by side on the same page, which is the honest measure of how
+far the road has been pushed past what it pays for.
 
 ### Where the numbers are
 
@@ -1311,9 +1397,11 @@ Balance lives in data, not in code:
   turn rule, not the tuning.
 - `src/game/progression.js` — every curve, and the spine of the difficulty:
   `EXPECTED_POWER` (what the player's bar and revolver look like in each world)
-  plus `HITS_TO_KILL_PLAYER`, `HITS_TO_KILL_ENEMY` and `HITS_TO_KILL_BOSS`, from
-  which every rider's damage and every rider's life total is **derived** rather
-  than written down separately. Also exp and the level ladder, gold, prices, inn
+  plus `HITS_TO_KILL_PLAYER`, `HITS_TO_KILL_ENEMY` and `HITS_TO_KILL_BOSS`, the
+  yardsticks the rest of it is measured against — and the two ladders that are
+  written down by hand rather than derived from them, `enemyGunDamage` (half a
+  life a world, one rung of the gun per world) and `enemyLives` (two diamonds a
+  world). `enemyBulletFloor` is where the hard road's extra rung is added. Also exp and the level ladder, gold, prices, inn
   healing as a fraction of the bar, the gun's damage and its deliberately
   super-exponential upgrade cost, hunger drain, how fast starving ticks against
   the size of your bar, walking speed, the horse discount. Everything that hurts

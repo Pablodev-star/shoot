@@ -92,7 +92,9 @@ import {
   getVestSprites,
   CHARACTER_TIMING,
   FALL_FRAME_MS,
+  FALL_IMPACT_INDEX,
   FIRE_FRAME_MS,
+  RELOAD_FRAME_MS,
   GUN_TRACK,
   VEST_TRACK,
 } from '../art/sprites-character.js';
@@ -128,8 +130,20 @@ const FIRE_MS = FIRE_FRAME_MS.reduce((a, b) => a + b, 0);
  * see `endDuel` in src/duel/duel-screen.js.
  */
 export const FALL_MS = FALL_FRAME_MS.reduce((a, b) => a + b, 0);
-/** The frame the body actually lands on, measured off the same table. */
-const FALL_LAND_AT = FALL_FRAME_MS.slice(0, -1).reduce((a, b) => a + b, 0);
+/**
+ * When the body actually reaches the road, measured off the same table as the
+ * frames — it is the moment the landing frame comes up, not the moment the
+ * last one does. See FALL_IMPACT_INDEX in src/art/sprites-character.js: the
+ * fall settles a pixel after it lands, and hanging the thud off the final
+ * frame put the dust and the camera kick a tenth of a second late.
+ */
+const FALL_LAND_AT = FALL_FRAME_MS.slice(0, FALL_IMPACT_INDEX).reduce((a, b) => a + b, 0);
+
+/**
+ * The beat the spent case leaves the cylinder on: the frame the gun comes up
+ * in front of the chest. One round out, one round in, on the same picture.
+ */
+const RELOAD_EJECT_AT = RELOAD_FRAME_MS.slice(0, 2).reduce((a, b) => a + b, 0);
 
 /** Milliseconds a puff of powder smoke hangs, and a spent case is in the air. */
 const SMOKE_LIFE = 810;
@@ -409,6 +423,13 @@ export function createDuelScene({
   const vestOn = { player: false, enemy: false };
   const vestFalls = [];
 
+  /**
+   * The revolvers on the ground. One per fighter who has gone down, thrown out
+   * of the hand by `spawnDroppedGun` and never cleared — the scene outlives a
+   * duel by about a second and a half and this is what is lying in it.
+   */
+  const dropped = [];
+
   /** How long a shot-off vest tumbles, lies there, and fades out. */
   const VEST_FALL_MS = 1500;
 
@@ -490,6 +511,11 @@ export function createDuelScene({
     actor.pose = pose;
     actor.t = 0;
     actor.landed = false;
+    actor.ejected = false;
+    // A man who is going down lets go of his gun. It is thrown here rather
+    // than by the screen so that every road to a fall — a bullet, a rock out
+    // of a volcano, a stick of dynamite — puts the revolver in the dirt.
+    if (pose === 'fall') spawnDroppedGun(side);
   }
 
   /**
@@ -503,18 +529,152 @@ export function createDuelScene({
   function spawnFallDust(side) {
     if (!layout || !groundLine) return;
     const { originX, fs } = layout[side];
-    for (let i = 0; i < 14; i++) {
+    /**
+     * A BODY IS NOT A FOOTSTEP
+     * -----------------------------------------------------------------------
+     * This used to throw fourteen motes straight up, which is the puff a boot
+     * makes. What lands here is a whole man, sideways, along the road — so the
+     * dust goes OUT as well as up, it is thrown from the length the body now
+     * occupies (a fallen fighter is a good half wider than a standing one, see
+     * the note over FALL_FRAME_MS), and the pieces nearest the impact are the
+     * fastest. Twice as many of them, and the far half of them travel.
+     */
+    for (let i = 0; i < 30; i++) {
+      // 0 at the head end of the body, 1 at the boots — the dust is thrown
+      // along the whole length of it rather than out of one point.
+      const along = Math.random();
+      const out = (along - 0.5) * 2;
       debris.push({
         kind: 'mote',
-        x: originX + (Math.random() * 1.4 - 0.1) * FIGHTER_W * fs,
-        y: groundLine - Math.random() * 3 * fs,
-        vx: (Math.random() - 0.5) * 0.06 * fs,
-        vy: -(0.01 + Math.random() * 0.03) * fs,
-        g: 0.00004 * fs,
-        size: Math.max(1, Math.round(fs * 0.8)),
+        x: originX + (along * 1.7 - 0.35) * FIGHTER_W * fs,
+        y: groundLine - Math.random() * 2 * fs,
+        vx: out * (0.03 + Math.random() * 0.09) * fs,
+        vy: -(0.02 + Math.random() * 0.05) * fs,
+        g: 0.00006 * fs,
+        size: Math.max(1, Math.round(fs * (Math.random() < 0.3 ? 1.4 : 0.8))),
         color: parallax.dust,
         t: 0,
-        life: 620 + Math.random() * 320,
+        life: 700 + Math.random() * 420,
+      });
+    }
+  }
+
+  /**
+   * THE GUN GOES WITH HIM
+   * ---------------------------------------------------------------------------
+   * `GUN_TRACK.fall` is nulls, so the revolver vanishes out of the hand on the
+   * first frame of a fall. That was always the right decision about the SPRITE
+   * and the wrong one about the road: a gun does not stop existing because the
+   * man holding it does, and the thing the player is looking at in the half
+   * second after a duel ends is exactly where that gun went.
+   *
+   * So it is thrown. The real revolver — the tier the player bought, or the
+   * rung the rider was carrying, in its own metal — tumbling end over end away
+   * from the fight, bouncing once and lying there. It does not fade: the fall's
+   * last frame holds forever and so does this, because a body and a gun in the
+   * dirt is the picture the overview slides up over.
+   */
+  function spawnDroppedGun(side) {
+    if (!layout) return;
+    const { originX, topY, fs, flip } = layout[side];
+    const art = guns[side]?.level?.sprite;
+    if (!art) return;
+    // Away from the fight, the way he is going: the player's spins off to the
+    // left, the enemy's to the right.
+    const dir = flip ? 1 : -1;
+    dropped.push({
+      art,
+      fs,
+      x: originX + (FIGHTER_W * 0.6) * fs,
+      y: topY + 13 * fs,
+      vx: dir * fs * 0.03,
+      vy: -fs * 0.055,
+      g: fs * 0.00045,
+      /** Where it comes to rest: flat on the road it was fired over. */
+      floor: topY + (FIGHTER_H - art.height) * fs,
+      flip,
+      landed: false,
+      t: 0,
+    });
+  }
+
+  function stepDropped(dt) {
+    for (const d of dropped) {
+      d.t += dt;
+      if (d.landed) continue;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vy += d.g * dt;
+      if (d.y >= d.floor) {
+        d.y = d.floor;
+        // One short bounce off the road, then it stays where it stopped.
+        if (d.vy > d.fs * 0.028) {
+          d.vy = -d.vy * 0.3;
+          d.vx *= 0.45;
+        } else {
+          d.landed = true;
+        }
+      }
+    }
+  }
+
+  /**
+   * The tumble, and the one place in this game a sprite is allowed to rotate.
+   *
+   * Everything else here is drawn from the angle it was authored at, because
+   * turning a figure gives you a figure drawn from no angle at all (see the
+   * note over FALL_FRAME_MS). A revolver is different on both counts: it is a
+   * side view of a rigid object, and the turn is a QUARTER — which on a pixel
+   * grid is exact, moves every pixel to another whole pixel, and costs nothing
+   * in sharpness. So the gun goes end over end in the air in four steps, and
+   * comes to rest at none of them: the art it was drawn at IS a gun lying on
+   * its side seen from the road.
+   */
+  function drawQuarterTurned(ctx, sprite, x, y, scale, turns, flip) {
+    const w = sprite.width * scale;
+    const h = sprite.height * scale;
+    ctx.save();
+    // Round about the centre, so a turned sprite stays on the same grid the
+    // unturned one is on.
+    ctx.translate(Math.round(x + w / 2), Math.round(y + h / 2));
+    ctx.rotate((Math.PI / 2) * turns);
+    if (flip) ctx.scale(-1, 1);
+    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  function drawDropped(ctx) {
+    for (const d of dropped) {
+      // End over end in the air on a fast clock, and flat once it is down:
+      // the art is a side view of a levelled gun, which is also exactly what a
+      // gun lying in the road looks like from here.
+      const turns = d.landed ? 0 : Math.floor(d.t / 60) % 4;
+      drawQuarterTurned(ctx, d.art, d.x, d.y, d.fs, turns, d.flip);
+    }
+  }
+
+  /**
+   * The empty case coming out of the cylinder on a reload.
+   *
+   * The same brass a shot throws (see `fire`), from the same gun, because it is
+   * the same round — one leaves on the frame the gun comes up and one goes in
+   * two frames later. It is the only part of a reload that lands on the road,
+   * and it is what makes the move read as a reload from across the screen
+   * rather than as a man waving his gun about.
+   */
+  function spawnSpentCase(side) {
+    const m = liveMuzzle(side);
+    if (!m) return;
+    for (let i = 0; i < 2; i++) {
+      shells.push({
+        // Out of the cylinder, which is back down the barrel from the muzzle.
+        x: m.x - m.dir * m.fs * 4,
+        y: m.y + m.fs * 3,
+        vx: -m.dir * (0.004 + Math.random() * 0.006) * m.fs,
+        vy: -(0.02 + Math.random() * 0.02) * m.fs,
+        g: 0.00035 * m.fs,
+        fs: m.fs,
+        t: 0,
       });
     }
   }
@@ -524,35 +684,41 @@ export function createDuelScene({
     if (pose === 'aim' || pose === 'fire') return set[pose];
     if (pose === 'hit') return set.hit;
     if (pose === 'fall') return set.fall;
+    /**
+     * A rider whose art was baked before the reload existed — nothing in the
+     * game ships like that, but the Admin Panel can hand a set in — falls back
+     * to the draw rather than throwing in the render loop.
+     */
+    if (pose === 'reload') return set.reload || set.aim;
     return set.idle;
+  }
+
+  /**
+   * A one-shot pose that holds on its last frame, timed off its own table.
+   * The shot, the reload and the fall are all this shape.
+   */
+  function oneShotFrame(t, table, frameCount) {
+    let acc = 0;
+    for (let i = 0; i < table.length; i++) {
+      acc += table[i];
+      if (t < acc) return Math.min(frameCount - 1, i);
+    }
+    return frameCount - 1;
   }
 
   /** Frame index for a pose, holding on the last frame of a one-shot. */
   function poseFrame(actor, frameCount = 4) {
     const { pose, t } = actor;
     if (pose === 'aim') return Math.min(frameCount - 1, Math.floor(t / CHARACTER_TIMING.aim));
-    if (pose === 'fire') {
-      let acc = 0;
-      for (let i = 0; i < FIRE_FRAME_MS.length; i++) {
-        acc += FIRE_FRAME_MS[i];
-        if (t < acc) return i;
-      }
-      return FIRE_FRAME_MS.length - 1;
-    }
+    if (pose === 'fire') return oneShotFrame(t, FIRE_FRAME_MS, frameCount);
+    if (pose === 'reload') return oneShotFrame(t, RELOAD_FRAME_MS, frameCount);
     if (pose === 'hit') return Math.min(frameCount - 1, Math.floor(t / CHARACTER_TIMING.hit));
     /**
      * The fall is a one-shot with per-frame timings, exactly like the shot —
      * and it HOLDS on its last frame forever, because that frame is a body on
      * the ground and a body on the ground does not get up.
      */
-    if (pose === 'fall') {
-      let acc = 0;
-      for (let i = 0; i < FALL_FRAME_MS.length; i++) {
-        acc += FALL_FRAME_MS[i];
-        if (t < acc) return Math.min(frameCount - 1, i);
-      }
-      return frameCount - 1;
-    }
+    if (pose === 'fall') return oneShotFrame(t, FALL_FRAME_MS, frameCount);
     return Math.floor(elapsed / CHARACTER_TIMING.idle) % frameCount;
   }
 
@@ -1075,6 +1241,16 @@ export function createDuelScene({
           fx.shake = Math.max(fx.shake, 260);
           spawnFallDust(side);
         }
+        /**
+         * …and the moment a spent case leaves the cylinder, on the frame the
+         * gun comes up to be loaded. Same flag pattern as the landing above,
+         * for the same reason: an event hung off a frame index rather than off
+         * a timer somewhere else cannot drift away from the picture.
+         */
+        if (actor.pose === 'reload' && !actor.ejected && actor.t >= RELOAD_EJECT_AT) {
+          actor.ejected = true;
+          spawnSpentCase(side);
+        }
       }
 
       /**
@@ -1154,6 +1330,7 @@ export function createDuelScene({
       pops.player.update(dt);
       pops.enemy.update(dt);
       stepVestFalls(dt);
+      stepDropped(dt);
       stepGunGlow(dt);
     },
 
@@ -1274,6 +1451,10 @@ export function createDuelScene({
       // It is an object, not an effect: it goes down here with the fighters so
       // the hour of the day falls on it like anything else out there.
       drawVestFalls(ctx);
+
+      // …and the revolver of whoever is not getting up, in the dirt where it
+      // landed. Same layer, and for the same reason.
+      drawDropped(ctx);
 
       // The plus or the carrot, rising out of whoever used it.
       for (const side of ['player', 'enemy']) {
@@ -2781,14 +2962,31 @@ export function createDuelScene({
     const index = poseFrame(actor, frames.length);
     const frame = frames[index];
     const y = topY + (FIGHTER_H - frame.height) * fs;
-    drawSprite(ctx, frame, originX, y, fs, flip);
+    /**
+     * A FRAME WIDER THAN A FIGHTER IS CENTRED ON HIM
+     * -----------------------------------------------------------------------
+     * Every pose is 16 columns except the fall, which is 28 so that a body has
+     * room to lie down in (see the note over FALL_FRAME_MS). The extra width is
+     * road, split evenly either side, so centring it on the fighter's own box
+     * puts the standing body exactly where every other pose draws it — and
+     * because the padding is symmetric, the mirrored duellist lands in the same
+     * place without a second case. One line, and nothing else in here has to
+     * know that one animation is a different size.
+     */
+    const x = originX - ((frame.width - FIGHTER_W) / 2) * fs;
+    drawSprite(ctx, frame, x, y, fs, flip);
 
     // The vest, while he still has one. Drawn at the body's own offset for the
     // frame that is up, so it rides the breath and takes the stagger with him
     // — see VEST_TRACK in src/art/sprites-character.js. The mirrored fighter
     // gets a mirrored offset, or a knocked-back enemy would shove his vest the
     // wrong way across his chest.
-    if (vestOn[side]) {
+    //
+    // Not during the fall: the plate is drawn at the STANDING body's offsets
+    // and there is no honest offset for a man lying down — a vest that stayed
+    // on through the fall hung in the air where his chest used to be. He is
+    // wearing it, and it goes down with him inside the silhouette.
+    if (vestOn[side] && actor.pose !== 'fall') {
       const worn = VEST_TRACK[actor.pose]?.[index] || { x: 0, y: 0 };
       const wx = originX + (flip ? -worn.x : worn.x) * fs;
       drawSprite(ctx, vestArt.worn, wx, topY + worn.y * fs, fs, flip);
@@ -2801,7 +2999,7 @@ export function createDuelScene({
     const tint = statusTint[side];
     if (tint) {
       ctx.globalAlpha = tint.alpha * (0.75 + Math.sin(elapsed / 260) * 0.25);
-      drawSprite(ctx, tintedFrame(frame, tint.color), originX, y, fs, flip);
+      drawSprite(ctx, tintedFrame(frame, tint.color), x, y, fs, flip);
       ctx.globalAlpha = 1;
     }
 
@@ -2810,7 +3008,7 @@ export function createDuelScene({
     const wash = pops[side].wash();
     if (wash) {
       ctx.globalAlpha = wash.alpha;
-      drawSprite(ctx, tintedFrame(frame, wash.color), originX, y, fs, flip);
+      drawSprite(ctx, tintedFrame(frame, wash.color), x, y, fs, flip);
       ctx.globalAlpha = 1;
     }
 

@@ -343,17 +343,61 @@
 
 .slot-mode-terms li::marker { color: var(--red); }
 
-/* A hard slot, empty or in progress, is edged in red. It is the only property
-   of a run that can never be changed, so it is worth being able to see across
-   the screen. */
+/* A hard slot, empty or in progress, is edged in red AND ON FIRE — the border
+   is the label and the fire is the promise. See src/ui/card-fire.js for what
+   is actually burning; everything here is the box it burns inside.
+
+   The edge glows with it: an ember colour on the inside of the border and a
+   slow breath on the shadow, so a card that is alight reads as lit from within
+   rather than as a card with a picture of fire behind it. */
 .slot-card.is-hard {
   border-color: var(--red-dark);
-  box-shadow: inset 0 0 0 2px rgba(198, 47, 42, 0.18);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 127, 34, 0.22),
+    inset 0 -18px 26px -14px rgba(255, 127, 34, 0.5);
+  animation: hard-breathe 2.6s ease-in-out infinite;
 }
 
 .slot-card.is-hard:hover {
   border-color: var(--red);
-  box-shadow: inset 0 0 0 2px rgba(240, 87, 79, 0.28), var(--lift-3);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 190, 82, 0.34),
+    inset 0 -18px 26px -14px rgba(255, 127, 34, 0.6),
+    var(--lift-3);
+}
+
+@keyframes hard-breathe {
+  0%,
+  100% {
+    border-color: var(--red-dark);
+  }
+  50% {
+    border-color: var(--red);
+  }
+}
+
+/* The fire itself: a canvas nailed over the whole card, under everything the
+   card says. It is `prepend`ed rather than positioned by z-index so the card's
+   own children keep their painting order — the type is drawn over the flames
+   because it is later in the document, which is one rule instead of five.
+
+   `pointer-events: none` is the important line: the card has a dropdown and a
+   button in it and a canvas across the whole surface would eat both. */
+.card-fire {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* …and the card has to be the thing it is nailed to. The grid's cards were
+   static, which would have hung every fire off the screen instead. */
+.slot-card {
+  position: relative;
+  overflow: hidden;
 }
 
 /* ==========================================================================
