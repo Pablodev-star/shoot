@@ -306,6 +306,69 @@ const HEADS = {
     '...kpqqqqqqpk...',
   ],
 
+
+  /**
+   * A bag drawn over the head and the rope still on the neck.
+   *
+   * The one head in the file with no face on it at all — not a mask, not a
+   * visor, not two lights in a hood, just cloth with the shape of a jaw under
+   * it. At sixteen pixels that reads as worse than a skull does, because a
+   * skull is a thing you can look at and this is a thing you cannot.
+   */
+  gallowsHood: [
+    '................',
+    '.....kkkkk......',
+    '....khhhhhk.....',
+    '...khHHHHHhk....',
+    '...khhhhhhhk....',
+    '...khhhhhhhk....',
+    '...khhKKKhhk....',
+    '....khhhhhk.....',
+    '.....kwwwk......',
+    '....kwWWWwk.....',
+    '...kwkqqqqkwk...',
+  ],
+
+  /** A face wound in linen, with one band left slack over the eyes. */
+  wrapped: [
+    '................',
+    '................',
+    '.....kkkkk......',
+    '....kwwwwwk.....',
+    '...kwWWWWWwk....',
+    '...kwwwwwwwk....',
+    '...kKKKKKKKk....',
+    '...kwwwwwwwk....',
+    '....kwWWWWk.....',
+    '....kwwwwwk.....',
+    '...kwwwWWwwwk...',
+  ],
+
+  /**
+   * THE SEXTON.
+   *
+   * A brim like a coffin lid — wider than the sombrero's and flat, so the
+   * silhouette is a horizontal bar with a skull hanging under it — and two
+   * lights in the sockets. He is the only figure in Gallows Hollow with
+   * anything lit on him, and that is deliberate: the whole world is drawn with
+   * one saturated colour in it, and by the time the player reaches this door
+   * they have learned that corpse-light means something is awake.
+   */
+  sextonSkull: [
+    '................',
+    '...kkkkkkkkk....',
+    '..khhhhhhhhhk...',
+    '..khHHHHHHHhk...',
+    'kkkhhhhhhhhhkkk.',
+    'kHHHHHHHHHHHHHk.',
+    'kkkkkkkkkkkkkkk.',
+    '...kwwwwwwwk....',
+    '..kwKzwwzKwwk...',
+    '...kwwwKwwwk....',
+    '..kwwKwKwKwwk...',
+  ],
+
+
   /**
    * THE STRANGER, phase one.
    *
@@ -470,6 +533,36 @@ const TORSOS = {
     '..kspPPPPPPpsk..',
     '..kPPPPPPPPPPk..',
     '.kPPPPPPPPPPPPk.',
+  ],
+
+
+  /** A working apron in cracked leather, and the strap of a spade across it. */
+  apron: [
+    '...kppppppppk...',
+    '..kqppppppppqk..',
+    '..kpPPPPPPPPpk..',
+    '..kPPwwwwwwPPk..',
+    '..kspPPPPPPpsk..',
+    '...kPPPPPPPPk...',
+    '...kTttllttTk...',
+  ],
+
+  /**
+   * Burial linen, wound in bands, with the lowest one come loose.
+   *
+   * Read against the bayou's `ribs` and the basin's `suit`, this is the third
+   * way of drawing a torso with no person inside it: bone says what is left,
+   * plate says what is holding it together, and wrapping says somebody put it
+   * in the ground and something took it back out.
+   */
+  shroud: [
+    '...kwwwwwwwwk...',
+    '..kwWWWWWWWWwk..',
+    '..kwwwwwwwwwwk..',
+    '..kWWWWWWWWWWk..',
+    '..kswwwwwwwwsk..',
+    '...kWWWWWWWWk...',
+    '..kwwkwwkwwwwk..',
   ],
 
   /**
@@ -874,6 +967,70 @@ export const ARCHETYPES = {
     }),
   },
 
+
+  // --- the hollow -----------------------------------------------------------
+  // Nobody down here is dressed for a fight. They are dressed for a funeral,
+  // for a burial detail, or for having already had one — which is the whole
+  // difference between this world's cast and the basin's. Brimstone rides at
+  // you; Gallows Hollow is simply already standing there when you arrive.
+  hangman: {
+    look: 'A drawn bag over the head and the rope still round the neck',
+    names: ['The Hangman', 'Rope-and-Bag', 'The Long Drop'],
+    head: 'gallowsHood',
+    torso: 'coat',
+    key: palette({
+      hat: PALETTE.gloamDark, hatLit: PALETTE.gloam,
+      cloth: PALETTE.gloamDark, clothDark: PALETTE.gloamDeep, clothLit: PALETTE.gloam,
+      accent: PALETTE.pall, accentDark: PALETTE.pallMid, shade: PALETTE.gloamDeep,
+      trouser: PALETTE.gloamDeep, boot: PALETTE.gravewood,
+    }),
+  },
+
+  gravedigger: {
+    look: 'A hat gone shapeless and a leather apron with the day’s work on it',
+    names: ['The Gravedigger', 'Spade Hand', 'Hole-Digger'],
+    head: 'hat',
+    torso: 'apron',
+    key: palette({
+      hat: PALETTE.gravewood, hatLit: PALETTE.gravewoodLight,
+      cloth: PALETTE.gravewoodLight, clothDark: PALETTE.gravewood, clothLit: PALETTE.pallMid,
+      accent: PALETTE.pall, accentDark: PALETTE.gloam,
+      trouser: PALETTE.gloamDark, boot: PALETTE.gravewood,
+      belt: PALETTE.gravewoodLight, beltDark: PALETTE.gloamDeep,
+      skin: { s: PALETTE.pallMid, d: PALETTE.gloam },
+    }),
+  },
+
+  pallbearer: {
+    look: 'Wound head to belt in burial linen, and walking anyway',
+    names: ['Pallbearer', 'The Wound Man', 'Linen Rider'],
+    head: 'wrapped',
+    torso: 'shroud',
+    key: palette({
+      cloth: PALETTE.pall, clothDark: PALETTE.pallMid, clothLit: PALETTE.corpseLight,
+      accent: PALETTE.pall, accentDark: PALETTE.pallMid, shade: PALETTE.gloamDeep,
+      trouser: PALETTE.gloamDark, boot: PALETTE.gloam,
+      skin: { s: PALETTE.pall, d: PALETTE.gloam },
+    }),
+    gun: 'bone',
+  },
+
+  revenant: {
+    look: 'A bare skull over rags, with nothing under the hem but a trail',
+    names: ['Revenant', 'The One That Came Back', 'Hollow Walker'],
+    head: 'skull',
+    torso: 'tatters',
+    legs: LEGS_TRAIL,
+    holster: null,
+    key: palette({
+      cloth: PALETTE.gloam, clothDark: PALETTE.gloamDeep, clothLit: PALETTE.pallMid,
+      accent: PALETTE.corpseLight, glow: PALETTE.corpseLight, shade: PALETTE.gloamDeep,
+      trouser: PALETTE.gloamDark, boot: PALETTE.gloam,
+      skin: { s: PALETTE.pall, d: PALETTE.pallMid },
+    }),
+    gun: 'bone',
+  },
+
   // --- past the last horizon ------------------------------------------------
   starhelm: {
     look: 'A sealed helmet with stars caught in the visor',
@@ -988,6 +1145,46 @@ export const ARCHETYPES = {
       glow: PALETTE.goldLight, trouser: PALETTE.inkSoft, boot: PALETTE.redDark,
       skin: { s: PALETTE.redDark, d: PALETTE.redDeep },
     }),
+  },
+
+
+  /**
+   * THE SEXTON.
+   *
+   * The man whose job it was to dig the holes, still doing it. He is a head
+   * taller than anybody else on the road — `scale`, which until now only the
+   * Stranger had — and he is the only boss on the human half of the journey
+   * wearing no holster: the bone revolver is in his hand and there is nowhere
+   * on him it could have come from.
+   *
+   * The scale is 1.2 rather than the Stranger's 2. That is the largest a
+   * fighter can be drawn and still read as a MAN, which is exactly what this
+   * boss has to be — the last human being on the journey, standing in front of
+   * the world where there are none.
+   */
+  bossSexton: {
+    look: 'A brim like a coffin lid, two lights in the sockets, and a spade',
+    names: ['The Sexton'],
+    head: 'sextonSkull',
+    torso: 'apron',
+    scale: 1.2,
+    holster: null,
+    key: palette({
+      hat: PALETTE.gloamDeep, hatLit: PALETTE.gravewoodLight,
+      cloth: PALETTE.gravewood, clothDark: PALETTE.gloamDeep, clothLit: PALETTE.gravewoodLight,
+      /**
+       * The skull is the LIGHTEST thing on him and the brim is the darkest,
+       * which is the whole silhouette: a black bar with a pale head hanging
+       * under it. It was drawn the other way round first — a dark skull under
+       * a dark brim — and at duel distance the boss had no face at all.
+       */
+      accent: PALETTE.pall, accentDark: PALETTE.pallMid, shade: PALETTE.gloamDeep,
+      glow: PALETTE.corpseLight,
+      trouser: PALETTE.gloamDeep, boot: PALETTE.gravewood,
+      belt: PALETTE.gravewoodLight, beltDark: PALETTE.gloamDeep,
+      skin: { s: PALETTE.pall, d: PALETTE.pallMid },
+    }),
+    gun: 'bone',
   },
 
   /**

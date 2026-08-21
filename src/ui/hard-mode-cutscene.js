@@ -87,7 +87,7 @@ const BEATS = {
  * makes the card that follows an offer rather than an announcement.
  */
 const LINES = [
-  'Six worlds. Every one of them behind you.',
+  'Seven worlds. Every one of them behind you.',
   'The Stranger laid that road out easy, and you still nearly died on it.',
   'There is another one under it. Nobody has walked that one.',
 ];

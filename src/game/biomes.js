@@ -7,7 +7,7 @@
  *
  * The two are deliberately separate. Several worlds could share one biome, and
  * a biome carries no difficulty of its own, so retheming a world never
- * rebalances it. As it happens each of the six worlds now has a landscape to
+ * rebalances it. As it happens each of the seven worlds now has a landscape to
  * itself, which is the state this file was always written for rather than a
  * new rule: nothing here would change if two of them shared one tomorrow.
  *
@@ -106,6 +106,29 @@ export const BIOMES = {
       clear: { cloudy: 4, ash: 5 },
       cloudy: { ash: 6, clear: 3 },
       ash: { cloudy: 4, clear: 3 },
+    },
+  },
+
+  hollow: {
+    id: 'hollow',
+    label: 'Hollow',
+    /**
+     * The stillest sky in the game, and the only one that goes DARK rather
+     * than wet. Fog off the ground at every hour, an overcast that never quite
+     * breaks, and the gloom — a dusk that arrives in the middle of the
+     * afternoon and takes the world down with it.
+     *
+     * There is no rain here on purpose. Rain is weather that is HAPPENING, and
+     * the whole idea of this stretch is that nothing has happened in it for a
+     * very long time; what the Hollow does instead is sit there and get
+     * darker. `clear` is the rarest state of any biome in the game — nothing
+     * routes to it heavily, and everything routes back into the murk.
+     */
+    weather: {
+      clear: { cloudy: 5, fog: 4, gloom: 3 },
+      cloudy: { fog: 5, gloom: 4, clear: 2 },
+      fog: { gloom: 4, cloudy: 4, clear: 2 },
+      gloom: { fog: 5, cloudy: 4, clear: 2 },
     },
   },
 

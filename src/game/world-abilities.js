@@ -92,7 +92,7 @@
  * POISON AND DYNAMITE ARE WORLD ABILITIES, NOT SHOP STAPLES
  * ---------------------------------------------------------------------------
  * They used to be throwables anybody could buy anywhere, which made two of the
- * six worlds' signatures into general stock. Poison belongs to the Blackwater
+ * seven worlds' signatures into general stock. Poison belongs to the Blackwater
  * Bayou and dynamite to Brimstone Basin: they are sold in that world's shop and
  * nowhere else, they are carried by that world's riders and nobody else's, and
  * both were rewritten to be worth the trip — poison bites every round for three
@@ -201,7 +201,7 @@ const fx = (motion, colors, extra = {}) => ({ motion, colors, count: 26, ...extr
  * and it is a nerf: a trick is no longer something both sides get to use in
  * every fight, it is something one of you gets to use in a LONG fight. See the
  * note over PLAYER_SPECIAL at the bottom of this file for the whole argument —
- * it applies to all nineteen of these.
+ * it applies to all twenty-three of these.
  */
 export const ABILITIES = {
   // --- 1 · Dust Flats -------------------------------------------------------
@@ -823,18 +823,205 @@ export const ABILITIES = {
     }),
   },
 
-  // --- 6 · Galaxy -----------------------------------------------------------
+  // --- 6 · Gallows Hollow ---------------------------------------------------
+  /**
+   * THE WORLD THAT TAKES THINGS AWAY
+   * -------------------------------------------------------------------------
+   * Four tricks, and only one of them is damage. That is the Hollow's whole
+   * hand: the basin hits you with a stick of dynamite and the Hollow takes the
+   * gun out of your hand, takes the shield off your arm, and makes everything
+   * that lands on you afterwards cost more. It is the only world whose kit is
+   * built around the SHAPE of your turn rather than around your life bar, which
+   * is what a place that is trying to frighten you should do.
+   *
+   * Each of the four is the strongest version of a mechanic that already
+   * exists a world or two back — a longer jam than the prairie's rope, a bigger
+   * drain than the bayou's hand, a longer mark than the fever, a longer panic
+   * than the hornets. That is the upgrade path this file has always had
+   * (see `abilityPoolForWorld` in src/game/items.js): the only way to a better
+   * version of an effect is to reach the world that sells one.
+   */
+  /** Something under the road has hold of the gun arm, and it is not letting go. */
+  gravesGrip: {
+    effect: 'jam',
+    world: 6,
+    turns: 3,
+    charge: 9,
+    label: "Grave's Grip",
+    tip: 'A hand out of the ground on the gun arm — they cannot shoot for three rounds',
+    icon: 'gravesGrip',
+    banner: 'HELD!',
+    hold: { color: PALETTE.gloamDark, alpha: 0.45 },
+    /**
+     * It comes UP, and it stays up. The bayou's grasp drags somebody under and
+     * lets go; this one closes on the wrist and is still there three rounds
+     * later, which is why the sprite is held for most of a second and why the
+     * fighter is tinted for as long as the jam lasts.
+     */
+    fx: fx('rise', [PALETTE.gloamDark, PALETTE.pallMid, PALETTE.gloamDeep], {
+      count: 28,
+      shake: 180,
+      props: [
+        {
+          art: 'boneHand',
+          path: 'rise',
+          to: 'gun',
+          ms: 300,
+          scale: 0.9,
+          hold: 820,
+          grow: true,
+          shake: 200,
+          burst: {
+            colors: [PALETTE.gloamDark, PALETTE.pallMid, PALETTE.gloam],
+            count: 16,
+            speed: 0.2,
+            up: true,
+          },
+        },
+      ],
+    }),
+  },
+  /**
+   * The only thing in the Hollow that costs a life, and it does not so much
+   * take one as MOVE one. Twice the bayou's hand, which is the whole reason to
+   * carry the later one.
+   */
+  marrowDrain: {
+    effect: 'drain',
+    world: 6,
+    amount: 1,
+    charge: 10,
+    label: 'Marrow Drain',
+    tip: 'Takes a life out of them and puts it in you',
+    icon: 'marrowDrain',
+    banner: 'DRAINED!',
+    /**
+     * A thread of red leaving them and arriving in you, and a bone cup on the
+     * road underneath it — the object says where the life is going, which is
+     * the half of a drain that a particle burst has never been able to say.
+     */
+    fx: fx('spiral', [PALETTE.pall, PALETTE.corpseLight, PALETTE.gloam], {
+      count: 30,
+      props: [
+        {
+          art: 'ossuary',
+          path: 'throw',
+          to: 'front',
+          ms: 420,
+          arc: 9,
+          spin: 60,
+          scale: 0.85,
+          hold: 420,
+          burst: { colors: [PALETTE.corpseLight, PALETTE.pall], count: 14, speed: 0.2 },
+        },
+        {
+          art: 'life',
+          path: 'return',
+          to: 'chest',
+          to2: 'chest',
+          ms: 460,
+          delay: 420,
+          scale: 0.9,
+          trail: [PALETTE.corpseLight],
+        },
+      ],
+    }),
+  },
+  /** Somebody has written your name down. Everything finds you after that. */
+  deathMark: {
+    effect: 'mark',
+    world: 6,
+    turns: 4,
+    charge: 8,
+    label: 'Death Mark',
+    tip: 'For four rounds, every shot that hits them costs one extra life',
+    icon: 'deathMark',
+    banner: 'MARKED!',
+    hold: { color: PALETTE.corpseDeep, alpha: 0.38 },
+    /**
+     * A grave marker, driven into the road in front of them, with their name
+     * on it. It is `hold` rather than a burst on purpose: a mark is a thing
+     * that STAYS, and the prop standing at their boots for the rest of the
+     * animation is the only honest picture of four rounds of it.
+     */
+    fx: fx('fall', [PALETTE.corpseLight, PALETTE.pall, PALETTE.gravewood], {
+      count: 26,
+      shake: 160,
+      props: [
+        {
+          art: 'marker',
+          path: 'drop',
+          to: 'feet',
+          ms: 300,
+          scale: 1,
+          hold: 900,
+          shake: 200,
+          trail: [PALETTE.pall],
+          burst: { colors: [PALETTE.pall, PALETTE.gloam], count: 16, speed: 0.24, up: true },
+        },
+      ],
+    }),
+  },
+  /**
+   * Fear, as a mechanic. A shield is a decision made with a steady hand, and
+   * nobody out here has one for the next three rounds.
+   */
+  coldSweat: {
+    effect: 'panic',
+    world: 6,
+    turns: 3,
+    charge: 8,
+    label: 'Cold Sweat',
+    tip: 'Their shield stops nothing for three rounds',
+    icon: 'coldSweat',
+    banner: 'TERRIFIED!',
+    hold: { color: PALETTE.pall, alpha: 0.3 },
+    /**
+     * Nothing is thrown. The air in front of them simply goes cold and stays
+     * that way — this is the Hollow's answer to the pass's whiteout, and like
+     * that one it is weather rather than an object, because a thing you could
+     * see coming would be a thing you could raise a shield against.
+     */
+    fx: fx('sweep', [PALETTE.pall, PALETTE.corpseLight, PALETTE.gloam], {
+      count: 38,
+      props: [
+        {
+          art: 'dread',
+          path: 'hold',
+          to: 'chest',
+          delay: 140,
+          hold: 900,
+          grow: true,
+          scale: 1.05,
+          alpha: 0.8,
+          float: 0.006,
+        },
+      ],
+    }),
+  },
+
+  // --- 7 · Galaxy -----------------------------------------------------------
   /** Everything in the cylinder leaves it, and two of them arrive in yours. */
   gravityPull: {
     effect: 'empty',
-    world: 6,
-    take: 2,
-    charge: 12,
+    world: 7,
+    /**
+     * THREE, AND A ROUND OFF THE CHARGE
+     * -------------------------------------------------------------------------
+     * Every entry in this block moved up a rung when the Hollow was put in
+     * front of the Galaxy. The reason is the same one written over the Galaxy's
+     * enemy block in src/game/worlds.js: the player reaching the last world now
+     * arrives with a world more of everything, so a last world left exactly as
+     * it was would be a last world that got easier. A full cylinder plus three
+     * in yours is what an emptying should be worth at the end of the road.
+     */
+    take: 3,
+    charge: 11,
     label: 'Gravity Pull',
-    tip: 'Empties their gun and two of the rounds end up in yours',
+    tip: 'Empties their gun and three of the rounds end up in yours',
     icon: 'gravityPull',
     banner: 'PULLED!',
-    /** A hole opens on their chest, the cylinder empties into it, and two of
+    /** A hole opens on their chest, the cylinder empties into it, and three of
      * the rounds come out the other side in your hand. */
     fx: fx('swarm', [PALETTE.astralLight, PALETTE.astral, PALETTE.purple], {
       count: 34,
@@ -856,8 +1043,8 @@ export const ABILITIES = {
           to2: 'gun',
           ms: 460,
           delay: 430,
-          count: 2,
-          stagger: 150,
+          count: 3,
+          stagger: 130,
           scale: 1.1,
           trail: [PALETTE.astralLight],
         },
@@ -867,9 +1054,23 @@ export const ABILITIES = {
   /** The next thing fired at you arrives at the man who fired it. */
   voidMirror: {
     effect: 'reflect',
-    world: 6,
+    world: 7,
+    /**
+     * THE ONE THAT MOVED IN TEMPO RATHER THAN IN SIZE
+     * -------------------------------------------------------------------------
+     * Two mirrors instead of one was tried and it is the same mistake as a
+     * two-round freeze: a reflect does not scale, it INVERTS — the second one
+     * turns a fight the player is winning into a fight they cannot shoot in.
+     * Measured, the Stranger's win rate against an expert went from 85% to 56%
+     * with this and the boss's other numbers moved together, and a last fight
+     * that is a coin toss is not a climax.
+     *
+     * So the rung it went up is the clock: it charges a round sooner, which is
+     * the same thing every ability in this block gets and the only thing this
+     * one can safely take.
+     */
     turns: 1,
-    charge: 10,
+    charge: 9,
     label: 'Void Mirror',
     tip: 'The next shot that would hit you goes back at them instead',
     icon: 'starRot',
@@ -898,11 +1099,11 @@ export const ABILITIES = {
   /** A rock out of nothing at all. Three lives, and no shield is over it. */
   meteorStrike: {
     effect: 'pierce',
-    world: 6,
-    amount: 1.5,
+    world: 7,
+    amount: 2,
     charge: 10,
     label: 'Meteor Strike',
-    tip: 'Three lives out of the sky. A shield is no use under it',
+    tip: 'Four lives out of the sky. A shield is no use under it',
     icon: 'meteorStrike',
     banner: 'METEOR!',
     /** One rock, out of the top of the frame, straight through them. */
@@ -931,9 +1132,17 @@ export const ABILITIES = {
   /** The space between a thought and a hand comes apart for two rounds. */
   mindRift: {
     effect: 'freeze',
-    world: 6,
+    world: 7,
+    /**
+     * The one thing in this block that did NOT get bigger, and the exception is
+     * the point. A freeze hands its caster the other side's turns, so two of
+     * them is not "a rung stronger", it is a fight that ends without the loser
+     * taking a turn — the note over `deepFreeze` is the whole argument. What
+     * moved instead is the clock: it charges a round faster, so it is likelier
+     * to land at all in a fight this long.
+     */
     turns: 1,
-    charge: 8,
+    charge: 7,
     label: 'Mind Rift',
     tip: 'Two rounds in which they can do nothing at all',
     icon: 'mindRift',
@@ -959,7 +1168,7 @@ export const ABILITIES = {
 };
 
 /**
- * The six specials, one per world.
+ * The seven specials, one per world.
  *
  * Every one of them is the same machine with different weather: a landmark
  * drawn behind the road, a dormant stretch, a warning, and a window in which it
@@ -989,7 +1198,7 @@ export const ABILITIES = {
  * They all used to erupt identically — `strikes` evenly spread, `damage` each —
  * so the volcano, the hornet tree and a tear in the sky were the same
  * metronome in three colours, and a player who had survived one had survived
- * all six. The numbers are almost unchanged; the RHYTHM is not:
+ * all of them. The numbers are almost unchanged; the RHYTHM is not:
  *
  *   twister    an even, unjittered beat — a wall crossing the road
  *   hornets    one flurry at the front of the window, then the buzzing
@@ -1002,7 +1211,7 @@ export const ABILITIES = {
  * the note on the rift at the bottom of this table.
  *
  * The two extras — `steal` (rounds knocked out of the cylinder) and `poisons` —
- * are what keep the totals from being the same three lives in six colours.
+ * are what keep the totals from being the same three lives in seven colours.
  *
  * The volcano is the reference implementation and the numbers it was specified
  * with: twenty seconds quiet, then rocks, and three lives across the eruption.
@@ -1157,8 +1366,59 @@ export const SPECIALS = {
     sfx: 'rumble',
   },
 
+
   /**
-   * 6 · THE RIFT — the one that does not throw anything.
+   * 6 · THE GALLOWS — the one that is a COUNTDOWN rather than weather.
+   *
+   * A frame of grey timber on the rise behind the road with a bell hung off
+   * the crossbeam, and it is the only landmark in the game that makes a noise
+   * before it does anything. It tolls, and then it tolls again a little
+   * sooner, and again sooner than that, and by the time the beats are on top
+   * of one another the eruption is over — which is the `toll` pattern in
+   * src/duel/duel-hazard.js and the reason that pattern exists.
+   *
+   * Every other special in this table is something that HAPPENS to the road:
+   * a wall of sand crosses it, a slab comes off the mountain, the ground opens.
+   * This one is a clock being run down at you, and the difference is entirely
+   * in the rhythm — the arithmetic (three half-lives an eruption) is the same
+   * as the volcano's and a shade under the rift's.
+   *
+   * It leaves the same thing behind that the bayou does, for a different
+   * reason: what comes out from under a gallows is not gas, it is grave air,
+   * and it stays in you after the bell has stopped.
+   */
+  gallows: {
+    id: 'gallows',
+    world: 6,
+    label: 'The Gallows',
+    icon: 'gallows',
+    tip: 'Raises the gallows behind the road. The bell tolls every 20 seconds, faster each beat',
+    banner: 'THE GALLOWS!',
+    /** Not the sky, and not the ground. The one warning that is a SOUND. */
+    warnBanner: 'THE BELL IS SWINGING',
+    art: 'gallows',
+    motif: 'bone',
+    debris: [PALETTE.pall, PALETTE.gravewoodLight, PALETTE.gloamDark],
+    /**
+     * The only sky in the table that takes light OUT rather than putting a
+     * colour in. Half opacity of the world's own deepest tone, so an eruption
+     * out here looks like the afternoon being switched off — which is what the
+     * Hollow's weather does anyway, arriving all at once.
+     */
+    sky: { color: '#242822', alpha: 0.5 },
+    pattern: 'toll',
+    cycleMs: 18000,
+    firstCycleMs: 7500,
+    warnMs: 2400,
+    activeMs: 6000,
+    strikes: 3,
+    damage: 0.5,
+    poisons: true,
+    sfx: 'toll',
+  },
+
+  /**
+   * 7 · THE RIFT — the one that does not throw anything.
    *
    * Every other special is weather: it goes off, it scatters its cost across a
    * window, and being hit by it is a thing that happens to you two or three
@@ -1179,7 +1439,7 @@ export const SPECIALS = {
    */
   rift: {
     id: 'rift',
-    world: 6,
+    world: 7,
     label: 'The Rift',
     icon: 'rift',
     tip: 'Tears the sky open for the rest of the duel. Every 20 seconds it charges, then fires once for everything at once',
@@ -1195,16 +1455,23 @@ export const SPECIALS = {
     sky: { color: '#4c2f80', alpha: 0.55 },
     pattern: 'charge',
     /**
-     * Two seconds longer between eruptions than the old rift, and a window
-     * that is all wind-up: from the sky turning to the beam landing is a hair
-     * over six seconds, which is long enough to be a real decision — press the
-     * fight, or spend the round shielding something a shield cannot stop.
+     * A window that is all wind-up: from the sky turning to the beam landing is
+     * a hair over six seconds, which is long enough to be a real decision —
+     * press the fight, or spend the round shielding something a shield cannot
+     * stop.
+     *
+     * A second off the quiet and a fourth strike on the shot, both for the
+     * reason written over the Galaxy's abilities: the last world is a rung
+     * further along every ladder now that it is the seventh stop rather than
+     * the sixth. Two whole lives arriving at once is still under a fifth of the
+     * bar the player brings out here, which is where every special in this
+     * table is priced.
      */
-    cycleMs: 19000,
+    cycleMs: 18000,
     firstCycleMs: 8500,
     warnMs: 2600,
     activeMs: 4600,
-    strikes: 3,
+    strikes: 4,
     damage: 0.5,
     steal: 1,
     sfx: 'rumble',
@@ -1306,7 +1573,8 @@ export function specialDamage(spec) {
  * WHY THE NUMBERS ARE ON THE ABILITY AND NOT IN A BAND TABLE
  * ---------------------------------------------------------------------------
  * They used to be tuned three times over, once per pair of worlds, because the
- * same four effects turned up in all six. Each ability is its own mechanic now
+ * same four effects turned up in all of them. Each ability is its own mechanic
+ * now
  * and belongs to exactly one world, so "it gets better as you go" is simply
  * that the later entries are stronger — Dust Snatch takes one round, Gravity
  * Pull takes the whole cylinder. One number, in one place, on the thing it
@@ -1383,6 +1651,7 @@ export function describeAbility(a) {
  *   worlds 1-2  12 rounds → 2 lives
  *   worlds 3-4  10 rounds → 3 lives
  *   worlds 5-6  10 rounds → 4 lives
+ *   world  7    10 rounds → 5 lives
  *
  * TEN ROUNDS IS LONGER THAN A DUEL, AND THAT IS THE POINT
  * ---------------------------------------------------------------------------
@@ -1401,9 +1670,18 @@ export const PLAYER_SPECIAL = [
   { charge: 12, strikes: 2 },
   { charge: 10, strikes: 3 },
   { charge: 10, strikes: 4 },
+  /**
+   * The fourth band exists for exactly one landmark: the rift, in the seventh
+   * world. The player's copy of a special has always been worth a shade more
+   * the further down the road it is sold, and the last one on the road should
+   * be the largest thing anybody can put in a saddlebag — five lives in a
+   * single shot, at legendary prices, in a world where the boss carries twenty.
+   */
+  { charge: 10, strikes: 5 },
 ];
 
-const specialBand = (worldId) => (worldId <= 2 ? 0 : worldId <= 4 ? 1 : 2);
+const specialBand = (worldId) =>
+  (worldId <= 2 ? 0 : worldId <= 4 ? 1 : worldId <= 6 ? 2 : 3);
 
 /** The player's version of one world special. */
 export function playerSpecial(id) {

@@ -1,7 +1,7 @@
 /**
  * SHOOT! — Admin Panel · Gear.
  *
- * The whole catalogue, including the twenty-four abilities that only exist as
+ * The whole catalogue, including the thirty abilities that only exist as
  * shop stock in one world each, with a give/take on every line. It is the
  * fastest answer to most of the questions this game raises: what the diadem
  * does to a bayou rider, whether the totem's break animation still lines up,

@@ -588,7 +588,7 @@ function makeSnowGround({ seed, height }) {
    * Sastrugi: the ridges wind cuts into open snow. Shallow arcs, lit on top
    * and blue underneath — the same pass the desert makes over its sand, which
    * is not a coincidence. Wind does the same thing to both, and drawing them
-   * with the same hand is what keeps the six worlds looking like one game.
+   * with the same hand is what keeps the seven worlds looking like one game.
    */
   for (let i = 0; i < 130; i++) {
     const y0 = rng.int(1, height - 3);

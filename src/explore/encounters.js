@@ -111,6 +111,45 @@ export const SERVICE_MIN_GAP = 330;
 export const BOSS_GAP = 900;
 
 /**
+ * THE QUIET STRETCH, WHICH EXISTS SO THAT NOTHING IS DUE
+ * ---------------------------------------------------------------------------
+ * Gallows Hollow has one thing on it that no other world has: the scare
+ * (src/explore/scare.js). It fires while the player is WALKING, and the single
+ * most important thing about it is that they are not braced for anything when
+ * it does.
+ *
+ * A player on this road is braced almost all the time, because the road is
+ * built to be read: every stretch is a stretch towards a stop, buildings come
+ * up over the horizon and are walked towards, and the whole of `revealNext`
+ * exists to make what is coming next legible. So the scare is given a piece of
+ * road where nothing is coming: one gap in the back half of the world is
+ * lengthened by SCARE_LULL, and the scare stands at SCARE_LEAD into it. That
+ * leaves the better part of ten seconds of empty road on the far side of it —
+ * long enough that the fight or the counter at the end of the stretch is not
+ * on the player's mind yet, and not so long that the stretch itself becomes
+ * the tell.
+ *
+ * It is deliberately modest. Four hundred pixels is under twice an ordinary
+ * gap; at three times it, a player on their second run would learn that the
+ * long walk means something.
+ *
+ * THE LULL IS PLACED EVEN WHEN THE SCARE IS NOT
+ * ---------------------------------------------------------------------------
+ * `generateSegment` is a pure function of the world and the seed, and it has
+ * to stay one: the walk engine rebuilds the segment from the seed on every
+ * load, and the odometer that comes back off the save is measured against the
+ * road it built last time. If the lull appeared only while the scare was still
+ * unspent, then saving after the scare and reloading would rebuild a road four
+ * hundred pixels shorter and drop the traveller into the middle of the next
+ * encounter. So the ROAD always has the quiet stretch; only the scare itself
+ * knows whether it has been used.
+ */
+export const SCARE_LULL = 400;
+export const SCARE_LEAD = 300;
+/** The world it belongs to. Gallows Hollow, and nowhere else, ever. */
+export const SCARE_WORLD = 6;
+
+/**
  * How many shops (and, rolled again, how many inns) a world gets: the full
  * number, or one fewer.
  *
@@ -407,6 +446,35 @@ export function generateSegment(worldId, seed) {
     });
   });
 
+  // --- 4b. The quiet stretch ----------------------------------------------
+  // Only in the world that has a scare on it, and only ever one of them. See
+  // SCARE_LULL above for why this happens whether or not the scare is still
+  // in hand.
+  let scare = null;
+  if (worldId === SCARE_WORLD && events.length > 3) {
+    /**
+     * Which gap it lengthens: somewhere in the back half, and never the last
+     * one before the boss — the march up to a name card is the one stretch on
+     * this road where the player IS braced, and it is also the stretch they
+     * will remember afterwards as "the bit before the boss". A scare there
+     * would be filed under the boss rather than under the road.
+     */
+    const first = Math.max(2, Math.round(events.length * 0.5));
+    const last = Math.max(first, events.length - 2);
+    const at = rng.int(first, last);
+    const prev = events[at - 1].distance;
+    events[at].gap += SCARE_LULL;
+    for (let i = at; i < events.length; i++) events[i].distance += SCARE_LULL;
+    distance += SCARE_LULL;
+    /**
+     * The scare carries a `gap` of its own so that `effectiveDistance` bends it
+     * exactly the way it bends an encounter — a player who bought a horse is
+     * covering this stretch at a different rate, and a scare left at its
+     * on-foot position would drift out of the quiet it was given.
+     */
+    scare = { distance: prev + SCARE_LEAD, gap: SCARE_LEAD, index: at };
+  }
+
   // --- 5. Boss ------------------------------------------------------------
   distance += BOSS_GAP;
   events.push({
@@ -436,6 +504,11 @@ export function generateSegment(worldId, seed) {
     seed,
     events,
     totalDistance: distance,
+    /**
+     * Where the quiet stretch is, and therefore where the scare stands. Null in
+     * six worlds out of seven. See SCARE_LULL.
+     */
+    scare,
     /** Everything the world is holding. Nothing is face up until it is dealt. */
     hand: order,
   };
@@ -548,8 +621,8 @@ function planReveal(segment, event, state) {
    * THE LAST BED IS SAVED FOR THE DOOR OF THE BOSS
    * -------------------------------------------------------------------------
    * Seven runs in ten ended at a boss, and the fights themselves were not the
-   * problem — measured at a full bar the six of them sit between two thirds
-   * and nine tenths winnable. What killed the runs was arriving on half a bar,
+   * problem — measured at a full bar they sit between two thirds and nine
+   * tenths winnable. What killed the runs was arriving on half a bar,
    * because the world had spent both its inns in its opening stretch.
    *
    * So while a world still has one bed in hand and the player is carrying any

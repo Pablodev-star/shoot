@@ -321,6 +321,32 @@ export const HATS = {
     ],
   },
 
+  /**
+   * Burial linen, wound over the head and knotted at the back, with the slack
+   * of it left hanging down one side.
+   *
+   * The only headwear in the set with no hard edge anywhere in it — no crown,
+   * no brim, no band — so its silhouette cannot be confused with any of the
+   * thirteen hats it stands next to in the wardrobe. It is what the Hollow's
+   * pallbearers wear, taken off one of them.
+   */
+  shroud: {
+    key: { h: PALETTE.pall, H: PALETTE.pallMid, a: PALETTE.gloam, A: PALETTE.corpseLight },
+    rows: [
+      '................',
+      '.....kkkkk......',
+      '....khhhhhk.....',
+      '...khHHHHHhk....',
+      '...khhhhhhhk....',
+      '...khaaaaahk....',
+      '...khhhhhhhkk...',
+      '....khhhhhk.hk..',
+      '.....kkkkk..hk..',
+      '............Hk..',
+      '............kk..',
+    ],
+  },
+
   /** A circlet of void iron, and a ring of starlight that does not touch it. */
   starcrown: {
     key: { h: PALETTE.voidRock, H: PALETTE.voidRockLight, a: PALETTE.star, A: PALETTE.astral },

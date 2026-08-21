@@ -37,6 +37,7 @@ import {
   HORSE_SIZE,
 } from '../art/sprites-character.js';
 import { createParallax, heroX as heroAnchorX } from './parallax.js';
+import { createScare } from './scare.js';
 import * as weather from './weather.js';
 import { starvationProgress } from './hunger.js';
 import { createVitalPops } from '../art/vital-pop.js';
@@ -282,6 +283,17 @@ export const ExploreScreen = {
     const embers = createEmberAura({ intensity: 0 });
     const horseEmbers = createEmberAura({ intensity: 0 });
 
+    /**
+     * THE ONE THING ON THIS ROAD THAT IS NOT SCENERY
+     * -----------------------------------------------------------------------
+     * Gallows Hollow's scare — see src/explore/scare.js for what it is and why
+     * it is built the way it is. It is created unconditionally and handed the
+     * world's scare position, which is null in the six worlds that do not have
+     * one; everything below is then a no-op in those worlds.
+     */
+    const scare = createScare();
+    scare.setPosition(engine.getScareAt());
+
     // --- live bindings -----------------------------------------------------
     const unsubs = [
       on(EVENTS.ITEM_USED, ({ effect, icon: iconName }) => pops.spawn(effect, iconName)),
@@ -331,12 +343,38 @@ export const ExploreScreen = {
         parallax.updateAmbient(dt, lastView);
         pops.update(dt);
         parallax.setStructures(engine.visibleStructures());
+        /**
+         * The scare is stepped against the ODOMETER rather than against the
+         * camera, and the two are the same number — but the odometer is the one
+         * the encounters are measured in, and the scare has to go off in the
+         * same space the quiet stretch was cut in.
+         */
+        scare.update(dt, engine.getTravelled());
       },
 
       render(ctx, view) {
         lastView = view;
         const s = view.scale;
         const cameraX = engine.getCameraX();
+        /**
+         * THE FLINCH
+         * -------------------------------------------------------------------
+         * The whole scene is drawn through the scare's camera kick for the six
+         * hundred milliseconds after it fires, and nothing else in this file
+         * knows about it: the shake belongs to the CAMERA, so it has to move
+         * the ground, the traveller, the weather and the props together, and
+         * the only place all four of those are drawn is here.
+         *
+         * The transform itself lives in `src/explore/scare.js` because the red
+         * wash at the end of this function draws through it too, and the two
+         * passes have to agree to the pixel. Outside the scare it is a bare
+         * `save()` and costs nothing.
+         *
+         * The wash itself is deliberately NOT inside it. A flash that shakes
+         * with the scene is a red rectangle sliding about; a flash that stays
+         * still while the world moves under it is the screen itself being hit.
+         */
+        scare.beginKick(ctx, view);
         const gy = parallax.groundY(view);
         // The rain needs to know where the road is before it can break on it —
         // both edges of it, so a downpour lands across the depth of the floor
@@ -351,6 +389,15 @@ export const ExploreScreen = {
         // `drawStructures` — and two files disagreeing about where the
         // traveller stands is what put the shop doors off to his left.
         const heroX = heroAnchorX(view);
+
+        /**
+         * The skull on its stake, drawn with the props rather than with the
+         * actors: it goes down after the scatter band and before the traveller,
+         * which is exactly where an ordinary roadside prop sits, and that is
+         * the point — until the moment it moves, it has to be indistinguishable
+         * from the dozens of them the player has already walked past.
+         */
+        scare.draw(ctx, view, { cameraX, groundY: gy, heroX, biome: world.biome });
 
         // The traveller's shadow, thrown by whatever is up in the sky. A horse
         // is twice as wide as a man and throws twice the shadow.
@@ -446,6 +493,10 @@ export const ExploreScreen = {
         parallax.renderAmbient(ctx, view);
         weather.render(ctx, view);
 
+        // The scene is finished; the camera stops being thrown here, so
+        // everything after this is drawn on a screen that is not moving.
+        scare.endKick(ctx);
+
         // Starving: a red pulse creeping in from the edges.
         const starve = getState().hunger <= 0 ? starvationProgress() : 0;
         if (starve > 0) {
@@ -458,6 +509,11 @@ export const ExploreScreen = {
           ctx.fillStyle = vg;
           ctx.fillRect(0, 0, view.w, view.h);
         }
+
+        // And the scare's wash, last of all and over everything — the HUD is
+        // DOM and sits above it, which is correct: the world went red, not the
+        // interface.
+        scare.drawFlash(ctx, view);
       },
     };
 

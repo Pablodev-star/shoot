@@ -254,7 +254,7 @@ export const RunTab = {
        * being on the save (see the note at the bottom of
        * src/game/difficulty.js). Which makes testing the hard road otherwise a
        * matter of playing to the end of the game to unlock it and then playing
-       * five worlds to reach the interesting part of it.
+       * six worlds to reach the interesting part of it.
        *
        * So the panel can move it, live, mid-run. It behaves exactly like every
        * other override in here: it takes effect on the next thing that reads a

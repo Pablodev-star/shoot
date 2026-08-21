@@ -89,6 +89,7 @@ export const WARDROBE = {
     { id: 'sheriff', name: "Sheriff's Stetson", blurb: 'Pale felt, tall crown, a brass band. Somebody has to keep order.' },
     { id: 'tophat', name: "Gambler's Stovepipe", blurb: 'Silk, and a brim that has never been rained on.' },
     { id: 'horns', name: 'Basin Helm', blurb: 'Iron off the Brimstone floor, with the horns still on it.' },
+    { id: 'shroud', name: 'Hollow Shroud', blurb: 'Linen off somebody who was not using it. It smells of turned earth and it always will.' },
     { id: 'starcrown', name: 'Starcrown', blurb: 'A circlet of void iron, and a ring of light that does not touch it.' },
     { id: 'reaver', name: "Reaver's Hood", blurb: 'A peak of black cloth, ragged at the jaw, and a slit of fire where the eyes go.' },
     { id: 'bowler', name: 'Derby Bowler', blurb: 'Town hat. Out here it is a joke, and it knows it.', source: 'shop', price: 70 },
