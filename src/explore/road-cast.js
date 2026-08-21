@@ -138,5 +138,5 @@ export function createRoadCast() {
     }
   }
 
-  return { draw, shadows, reset: () => cache.clear() };
+  return { draw, shadows };
 }
