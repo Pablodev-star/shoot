@@ -27,8 +27,14 @@
  *                   the gun comes out.
  *   PLAYER.fire   — 3 frames @ 60/110/90ms  the shot: the gun driven back into
  *                   the hand, the muzzle kicked up, then dropping back on line.
+ *   PLAYER.reload — 6 frames, own timings  the two frames the draw opens on,
+ *                   then the gun up in front of the chest, a round pushed into
+ *                   the cylinder and a wrist flick that shuts it. See
+ *                   RELOAD_FRAME_MS.
  *   PLAYER.hit    — 2 frames @ 120ms  knocked back a pixel and lit up, then a
  *                   stagger onto the back foot.
+ *   PLAYER.fall   — 6 frames, own timings, on a 28-wide canvas  going down and
+ *                   staying down. See FALL_FRAME_MS.
  *   RIDER.ride    — 2 frames @ 200ms  seated upper body + a leg in the stirrup.
  *
  *   HORSE.idle    — 2 frames @ 400ms  tail swish and a cocked hind hoof.
@@ -410,6 +416,47 @@ const DRAW_POSES = {
     holstered: false,
     gun: { art: 'raised', hand: { x: 14, y: 12 } },
   },
+
+  // --- THE RELOAD ----------------------------------------------------------
+  //
+  // See the note over RELOAD_FRAME_MS. These three are the middle of it; the
+  // two frames it opens on and the one it ends on are `ready`, `clear` and
+  // `level` above, borrowed whole.
+
+  /**
+   * The gun comes off the line and up in front of the chest, muzzle to the
+   * sky. That is how a revolver is loaded and it is also the only place on a
+   * 16-pixel body where a gun can be held without leaving the silhouette.
+   */
+  up: {
+    at: 12,
+    rows: ['.........kkssk..', '.........kssk...', '..........kkk...'],
+    holstered: false,
+    gun: { art: 'raised', hand: { x: 12, y: 12 } },
+  },
+  /**
+   * The round going in: the off hand comes across to the cylinder with one
+   * brass pixel in it, and the whole body settles a row — a man loading in the
+   * open makes himself small.
+   *
+   * The brass is the only thing on this frame the player is meant to actually
+   * SEE. It is a single gold pixel (`l`, the belt buckle's colour) because at
+   * this size a round is one pixel and anything larger reads as a coin.
+   */
+  feed: {
+    at: 11,
+    rows: ['........kslk....', '.......kdskkk...', '.........kssk...', '..........kkk...'],
+    holstered: false,
+    settled: true,
+    gun: { art: 'raised', hand: { x: 12, y: 13 } },
+  },
+  /** Wrist flick: the cylinder goes home and the gun is already coming down. */
+  snap: {
+    at: 11,
+    rows: ['........kdk.....', '.........kssk...', '.........kkkk...'],
+    holstered: false,
+    gun: { art: 'raised', hand: { x: 13, y: 12 } },
+  },
 };
 
 /**
@@ -420,35 +467,135 @@ const DRAW_POSES = {
  * standing in his idle loop underneath it, breathing, while the overview slid
  * up over him. The one thing a duel is about had no picture of itself.
  *
- * It is five frames, and every one of them is built out of the SAME head,
- * torso and legs the fighter has been wearing all fight — which is what makes
- * it adaptive without a line of art per archetype. The Sexton goes down as the
- * Sexton, in his own apron and his own brim; a wraith goes down in its rags.
- * Nobody had to draw either.
+ * Then it was five frames, and they had three things wrong with them that are
+ * worth writing down because they are the three ways this animation can be got
+ * wrong again:
  *
- * The shape of it, and why:
+ *   IT FELL THE WRONG WAY. The tipping frames leaned the body FORWARD, towards
+ *   the man who had just shot it, and the heap it landed in had its head
+ *   backwards. A body cannot go both ways in four frames; it read as two
+ *   different animations cut together.
  *
- *   `hit`     one frame of the stagger that already exists. A fall that starts
+ *   IT SLID OFF ITS OWN CANVAS. Leaning a 16-wide sprite by half a pixel a row
+ *   throws the top eleven rows out of the frame — the hat, the face and one
+ *   shoulder were simply clipped away by the lean, and what was left looked
+ *   like the man was being erased rather than falling.
+ *
+ *   IT NEVER LAY DOWN. The last frame stacked the head, torso and legs in a
+ *   24-row column, which is a standing man compressed, not a body on the road.
+ *
+ * WHAT IT IS NOW: SIX FRAMES, IN A WIDER BOX
+ * ---------------------------------------------------------------------------
+ * A man is 24 tall and 16 wide. Lying down he is 24 LONG, and there is no way
+ * to draw that in a 16-wide frame — which is the whole reason the old one never
+ * lay down. So the fall is the one animation in this game drawn on a wider
+ * canvas: 28 columns, with the standing body centred in it, six columns of
+ * road spare on each side. Everything that draws a fighter centres a frame
+ * wider than 16 on the fighter's own box (see `drawFighter` in
+ * src/duel/duel-scene.js), so the extra width costs the callers one line and
+ * mirrors correctly for the duellist facing the other way.
+ *
+ * The six, and what each one is for:
+ *
+ *   `flash`   the impact, one pixel back and washed out. A fall that starts
  *             from a standing idle reads as a sprite being switched
- *   `buckle`  the knees go: the whole body drops onto the last three rows of
- *             its own legs, which is a crouch for a man and a slump for
- *             anything with a hem
- *   `tip`     past the point of no return — the body leans a third of the way
- *             over, pivoting on the heels (`lean`)
- *   `over`    two thirds, and lifted a pixel: the feet have left the road
- *   `down`    the quarter-turn (`rotateCCW`). Head to the left, flat out, and
- *             this is the frame that holds — it is what is lying on the road
- *             when the player walks back out of the overview
+ *   `reel`    the head goes back and the weight comes off the front foot
+ *   `buckle`  the knees fold: the body drops onto the last rows of its own
+ *             legs, which is a crouch for a man and a slump for anything with
+ *             a hem
+ *   `tip`     past the point of no return — hips out, shoulders going down,
+ *             the shins sliding forward along the road
+ *   `land`    flat out and squashed a row INTO the road. This is the frame the
+ *             thud, the dust and the camera kick are hung off
+ *   `down`    the body, settled a pixel back up, and this is the frame that
+ *             holds — it is what is lying there when the player walks back out
+ *             of the overview
  *
- * The gun is not in any of them. `GUN_TRACK.fall` is five nulls, so it leaves
- * the hand the moment the fall starts, which is the one detail that says the
- * fight is over rather than paused.
+ * Every one of them is built out of the SAME head, torso and legs the fighter
+ * has been wearing all fight, stamped at offsets that trace the arc: the head
+ * swings back and down, the torso follows it over, the legs stay planted and
+ * then slide out along the road. Nothing is rotated (a rotated hat is a
+ * thirteen-pixel vertical bar — see the note this replaced) and nothing is
+ * clipped. The Sexton goes down as the Sexton, in his own apron and his own
+ * brim; a wraith goes down in its rags. Nobody had to draw either.
+ *
+ * The head TILTS as it goes, which is the one thing here that is not just a
+ * translation: `lean` on the head alone throws the brim back over the crown,
+ * so the last frame is a man with his hat under him rather than a man wearing
+ * one lying down.
+ *
+ * The gun is not in any of them. `GUN_TRACK.fall` is six nulls, so it leaves
+ * the hand the moment the fall starts — and the scene throws the revolver
+ * itself across the road after it, which is the detail that says the fight is
+ * over rather than paused.
  */
-export const FALL_FRAME_MS = [110, 130, 100, 100, 520];
+export const FALL_FRAME_MS = [80, 110, 120, 110, 90, 520];
+
+/**
+ * Which frame the body actually reaches the road on — the thud, the dust and
+ * the camera kick are all fired off this index rather than off a duration, so
+ * they can never drift out of step with the picture. `down` is the settle
+ * after it, not the landing.
+ */
+export const FALL_IMPACT_INDEX = 4;
+
+/**
+ * The last entry above is the HOLD, and it is the one number here that is not
+ * about the animation: the frame it times holds forever (see `poseFrame` in
+ * src/duel/duel-scene.js), so all it decides is `FALL_MS` — how long the duel
+ * screen waits with a body on the road before the overview slides up over it.
+ */
+
+/**
+ * How wide the fall is drawn, against the 16 a standing fighter is. Even, so
+ * the standing body sits dead centre and a mirrored draw lands in the same
+ * place as an unmirrored one.
+ */
+export const FALL_FRAME_W = 28;
 
 /** The order the poses play in. `fire` runs once and hands back to `level`. */
 const AIM_SEQUENCE = ['ready', 'clear', 'rising', 'level'];
 const FIRE_SEQUENCE = ['recoil', 'kicked', 'level'];
+
+/**
+ * THE RELOAD
+ * ---------------------------------------------------------------------------
+ * One of the three things this game is, and until now it had no animation at
+ * all: pressing Reload played the DRAW — the same four frames as pressing
+ * Shoot — and the round where a man loaded his gun and the round where he
+ * pointed it at you looked identical. In a game whose whole tension is reading
+ * what the other one is doing, that is the worst thing an animation can be.
+ *
+ * IT OPENS ON THE DRAW, AND THAT IS THE POINT
+ * ---------------------------------------------------------------------------
+ * The first two frames are `ready` and `clear`, exactly as the draw plays them.
+ * Both moves start with a man reaching for his gun, because both moves ARE a
+ * man reaching for his gun — the tell has to come from what he does with it,
+ * not from a different reach. So for the first two hundred milliseconds the
+ * player cannot tell the two apart, and then the gun goes UP instead of
+ * forward and there is no mistaking it for the rest of the round.
+ *
+ * The middle three do the work: the gun comes up in front of the chest with
+ * the muzzle to the sky, the off hand crosses with one brass pixel in it, and
+ * a wrist flick shuts the cylinder. It ends on `level` — the same frame the
+ * draw ends on — because a man who has just loaded is a man with a loaded gun
+ * in his hand, and the next thing the player has to read is whether it is
+ * pointed at them.
+ *
+ * The scene throws the spent case out on the `up` frame (see `reloadEject` in
+ * src/duel/duel-scene.js), which is the same brass the shot ejects: one round
+ * leaves and one round goes in, on the same beat, in the same picture.
+ */
+const RELOAD_SEQUENCE = ['ready', 'clear', 'up', 'feed', 'snap', 'level'];
+
+/**
+ * Milliseconds a frame, and the sum matters: the shooting phase of a round
+ * lands at DRAW_MS (four frames of the draw, 520ms — see src/duel/duel-screen.js).
+ * The gun is back on line at 530 here, so a reloading fighter finishes exactly
+ * as the round resolves and holds `level` while the shot that may be coming
+ * arrives. The last entry is the hold and its length means nothing.
+ */
+export const RELOAD_FRAME_MS = [110, 110, 100, 130, 80, 200];
 
 /** Milliseconds each frame of the shot is held. See CHARACTER_TIMING.fire. */
 export const FIRE_FRAME_MS = [60, 110, 90];
@@ -678,8 +825,9 @@ export const GUN_TRACK = {
   hit: [null, null],
   aim: AIM_SEQUENCE.map((name) => DRAW_POSES[name].gun),
   fire: FIRE_SEQUENCE.map((name) => DRAW_POSES[name].gun),
+  reload: RELOAD_SEQUENCE.map((name) => DRAW_POSES[name].gun),
   /** Nothing. A falling man is not holding his revolver any more. */
-  fall: [null, null, null, null, null],
+  fall: [null, null, null, null, null, null],
 };
 
 // ---------------------------------------------------------------------------
@@ -774,6 +922,11 @@ export const VEST_TRACK = {
   aim: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
   fire: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }],
   hit: [{ x: -1, y: 0 }, { x: 0, y: 1 }],
+  /** The loading frame settles a pixel, so the plate settles with it. */
+  reload: [
+    { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 },
+    { x: 0, y: 1 }, { x: 0, y: 0 }, { x: 0, y: 0 },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -1110,10 +1263,17 @@ export function composeFighter(parts = {}) {
   const holstered = (rows) => (holsterArt ? stamp(rows, holsterArt, 13, 17) : rows);
   const standing = (up) => ground(up, legs.stand);
 
-  /** One frame of the draw: the arm stamp over a standing body. */
+  /**
+   * One frame of the draw, or of the reload: the arm stamp over a standing
+   * body.
+   *
+   * `settled` drops the upper body a pixel first — the breathing loop's own
+   * exhale, borrowed by the reload's loading frame, because a man pushing a
+   * round into a cylinder in the open makes himself small while he does it.
+   */
   const drawPose = (name) => {
     const pose = DRAW_POSES[name];
-    const body = stamp(standing(upper), pose.rows, 0, pose.at);
+    const body = stamp(standing(pose.settled ? low : upper), pose.rows, 0, pose.at);
     return pose.holstered ? holstered(body) : body;
   };
 
@@ -1144,44 +1304,60 @@ export function composeFighter(parts = {}) {
       holstered(ground(low, legs.contactB)),
     ],
     /**
-     * Going down. See the note over FALL_FRAME_MS.
+     * The reload. See the note over RELOAD_FRAME_MS: it opens on the same two
+     * frames as the draw, on purpose, and only the third one tells the player
+     * which of the two moves this was.
+     */
+    reload: RELOAD_SEQUENCE.map(drawPose),
+    /**
+     * Going down. See the long note over FALL_FRAME_MS for the shape of it and
+     * for the three things the version before this got wrong.
      *
-     * `buckle` drops the body onto the last three rows of its own legs and
-     * pads the top back out, so the figure stays 24 rows tall and loses three
-     * rows of shin — which is a fighter whose knees have gone, in whatever
-     * that fighter has instead of knees.
+     * Every frame is the fighter's own head, torso and legs stamped into a
+     * 28-wide box at the offsets that trace the arc. `PAD` is where the
+     * standing body sits in that box, so an offset of zero here is exactly
+     * where that part stands.
      */
     fall: (() => {
-      const buckled = ['................', '................', '................',
-        ...upper, ...legs.stand.slice(0, 3)];
+      const PAD = (FALL_FRAME_W - 16) / 2;
+      const blank = () => Array.from({ length: 24 }, () => '.'.repeat(FALL_FRAME_W));
+      /** A 16-wide frame dropped into the wide box, soles on the last row. */
+      const wide = (rows, dx = 0) => stamp(blank(), rows, PAD + dx, 24 - rows.length);
+
       /**
-       * DOWN, AND IT IS STACKED RATHER THAN TURNED
-       * ---------------------------------------------------------------------
-       * The obvious way to lay a fighter out is to rotate the whole frame a
-       * quarter turn, and the obvious way is wrong. It was tried: a hat brim is
-       * thirteen pixels WIDE, so a rotated hat is a thirteen-pixel vertical
-       * bar, the boots become two blocks, and the result reads as a cart. Turn
-       * a sprite that was drawn from one angle and you get a sprite drawn from
-       * no angle at all.
+       * One frame of the fall: the three parts, each at its own offset, with
+       * the head tilted back by `tilt` (see `lean` — on the head alone, so the
+       * brim goes back over the crown instead of the whole man shearing
+       * sideways).
        *
-       * So the body is COLLAPSED instead of turned, in the same three-quarter
-       * view it has been in all fight: the legs fold out along the road, the
-       * torso comes down on top of them, and the head lolls back over the
-       * shoulder — three stamps of the fighter's own parts, at three offsets,
-       * on the ground. Everything stays the way round it was drawn, so a hat is
-       * still a hat, a ribcage is still a ribcage, and every archetype in the
-       * game collapses in its own clothes without a line of art for any of them.
+       * The legs are stamped FIRST and the head LAST, which is the order they
+       * overlap in on a body lying on its back.
        */
-      let heap = Array.from({ length: 24 }, () => '.'.repeat(16));
-      heap = stamp(heap, legs.contactB.slice(1), 2, 19);
-      heap = stamp(heap, flare, 0, 15);
-      heap = stamp(heap, head, -3, 9);
+      const heap = ({ hx, hy, tx, ty, lx, ly, shank, chest = flare, tilt = 0 }) => {
+        let f = blank();
+        f = stamp(f, shank, PAD + lx, ly);
+        f = stamp(f, chest, PAD + tx, ty);
+        f = stamp(f, tilt ? lean(head, tilt) : head, PAD + hx, hy);
+        return f;
+      };
+
+      /** The two lengths of leg the fall uses: knees-down, and shins-out. */
+      const knees = legs.stand.slice(2);
+      const shins = legs.contactB.slice(2);
+
       return [
-        shiftX(recolor(holstered(standing(upper)), { P: 'p', p: 'q', q: 'w' }), -1),
-        buckled,
-        lean(buckled, 0.22),
-        lean(buckled, 0.5),
-        heap,
+        // flash — the impact, knocked back a pixel and lit up.
+        shiftX(recolor(wide(holstered(standing(upper))), { P: 'p', p: 'q', q: 'w' }), -1),
+        // reel — head back, weight off the front foot, still on his feet.
+        heap({ hx: -1, hy: 1, tx: 0, ty: 12, lx: 0, ly: 18, shank: legs.contactB, chest: torso, tilt: -0.1 }),
+        // buckle — the knees fold and the whole body drops onto them.
+        heap({ hx: -3, hy: 4, tx: -1, ty: 15, lx: 0, ly: 20, shank: knees, tilt: -0.2 }),
+        // tip — hips out, shoulders going down, shins sliding along the road.
+        heap({ hx: -5, hy: 9, tx: -2, ty: 16, lx: 2, ly: 19, shank: shins, tilt: -0.3 }),
+        // land — flat out, and squashed a row into the road.
+        heap({ hx: -6, hy: 15, tx: -1, ty: 18, lx: 4, ly: 20, shank: shins, tilt: -0.45 }),
+        // down — settled back up a pixel. This one holds.
+        heap({ hx: -5, hy: 14, tx: 0, ty: 17, lx: 3, ly: 19, shank: shins, tilt: -0.4 }),
       ];
     })(),
   };

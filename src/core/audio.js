@@ -34,6 +34,7 @@ export const AUDIO_MANIFEST = {
   horse: 'horse-neigh.wav',
   thunder: 'thunder.wav',
   wind: 'sandstorm-loop.wav',     // looping ambience
+  fuse: 'fire-catch.wav',         // the hard slot going up
   type: 'speech-tick.wav',        // one character of a spoken line
   heartbeat: 'heartbeat.wav',     // the cut-scene's pulse under a held shot
   rumble: 'rumble.wav',           // something very large moving
@@ -84,6 +85,13 @@ const SYNTH = {
   horse: { type: 'sawtooth', freq: 400, dur: 0.4, gain: 0.12, slide: -180 },
   thunder: { noise: true, dur: 0.9, gain: 0.3, lowpass: 400 },
   wind: { noise: true, dur: 0.6, gain: 0.08, lowpass: 900 },
+  /**
+   * Something catching light: the slot picker's hard card going up (see
+   * src/ui/card-fire.js). Noise, rolled off low so it is a WHOOMPH rather than
+   * a hiss, and quiet — it is the sound of a decision being made, not of a
+   * building burning down.
+   */
+  fuse: { noise: true, dur: 0.5, gain: 0.16, lowpass: 620 },
   /**
    * Speech. Very short, very quiet, and pitched low: this fires once every
    * couple of characters, so anything with a tail on it turns a three-line

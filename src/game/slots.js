@@ -36,6 +36,7 @@ import { livesRow, icon, uiIcon, backButton, iconButton } from '../ui/widgets.js
 import { startMenuScene } from '../menu/menu-scene.js';
 import { toast } from '../ui/toast.js';
 import { confirmDialog } from '../ui/confirm.js';
+import { igniteCard } from '../ui/card-fire.js';
 import {
   DEFAULT_DIFFICULTY,
   DIFFICULTIES,
@@ -73,7 +74,40 @@ export const SlotsScreen = {
      */
     const chosen = new Map();
 
+    /**
+     * THE CARDS THAT ARE ON FIRE
+     * -----------------------------------------------------------------------
+     * One handle per burning card (see src/ui/card-fire.js), kept because the
+     * grid is thrown away and rebuilt from storage on every change — a fire
+     * whose card has been removed has to be told to stop, or it keeps a canvas
+     * and an animation frame alive for a card nobody can see.
+     *
+     * `burn` is the only thing that puts one on a card, and it is called from
+     * exactly two places: an empty card whose dropdown says Hard, and a card
+     * with a hard run already in it.
+     */
+    let fires = [];
+
+    /**
+     * Slots whose fire has just been ASKED for, as opposed to slots that are
+     * already alight. Set by the dropdown and spent by the next render — see
+     * the note on it there.
+     */
+    const lighting = new Set();
+
+    function burn(card, opts) {
+      const fire = igniteCard(card, opts);
+      fires.push(fire);
+      return fire;
+    }
+
+    function douse() {
+      for (const fire of fires) fire.stop();
+      fires = [];
+    }
+
     async function render() {
+      douse();
       clearNode(grid);
       const slots = await readAllSlots();
 
@@ -81,66 +115,83 @@ export const SlotsScreen = {
         const info = describeSlot(data);
 
         if (!info) {
-          grid.append(emptyCard(slot));
+          const card = emptyCard(slot);
+          grid.append(card);
+          if ((chosen.get(slot) || DEFAULT_DIFFICULTY) === 'hard') {
+            const fire = burn(card);
+            // Lit just now, by hand, rather than found already burning.
+            if (lighting.has(slot)) {
+              lighting.delete(slot);
+              fire.flare();
+            }
+          }
           continue;
         }
 
         const world = getWorld(info.world);
-        grid.append(
-          el('div.panel.slot-card', {
-            class: info.difficulty === 'hard' ? 'is-hard' : '',
-          }, [
-            el('div.slot-head', {}, [
-              el('span.slot-name', { text: `Slot ${slot}` }),
-              /**
-               * A hard run says so on the card and everywhere else it can. It
-               * is the one thing about a slot that cannot be changed and cannot
-               * be worked out by looking at the numbers — a Hard run three
-               * worlds in looks exactly like a Normal run three worlds in, and
-               * the difference is every price and every rider on the road
-               * ahead.
-               */
-              info.difficulty === 'hard'
-                ? el('span.chip.chip--hard', { text: 'Hard' })
-                : null,
-              info.completed
-                ? el('span.chip.chip--legendary', { text: 'Finished' })
-                : el('span.chip', { text: `${info.world} / ${FINAL_WORLD}` }),
-            ]),
+        /**
+         * A hard run in progress burns too, and at half strength: it is a fact
+         * about the slot rather than a decision being offered, so it is a fire
+         * that has been going for a while rather than one that was just lit.
+         */
+        const hardRun = info.difficulty === 'hard';
+        const card = el('div.panel.slot-card', {
+          class: hardRun ? 'is-hard' : '',
+        }, [
+          el('div.slot-head', {}, [
+            el('span.slot-name', { text: `Slot ${slot}` }),
+            /**
+             * A hard run says so on the card and everywhere else it can. It
+             * is the one thing about a slot that cannot be changed and cannot
+             * be worked out by looking at the numbers — a Hard run three
+             * worlds in looks exactly like a Normal run three worlds in, and
+             * the difference is every price and every rider on the road
+             * ahead.
+             */
+            info.difficulty === 'hard'
+              ? el('span.chip.chip--hard', { text: 'Hard' })
+              : null,
+            info.completed
+              ? el('span.chip.chip--legendary', { text: 'Finished' })
+              : el('span.chip', { text: `${info.world} / ${FINAL_WORLD}` }),
+          ]),
 
-            el('div.col', { style: { gap: 'var(--sp-2)' } }, [
-              el('div.slot-world', { text: world.name }),
-              livesRow(info.lives, info.maxLives, { bonus: info.bonusLives }),
-            ]),
+          el('div.col', { style: { gap: 'var(--sp-2)' } }, [
+            el('div.slot-world', { text: world.name }),
+            livesRow(info.lives, info.maxLives, { bonus: info.bonusLives }),
+          ]),
 
-            el('div.slot-lines', {}, [
-              el('div.slot-line', {}, [
-                el('span.k', { text: 'Level' }),
-                el('span.v', { text: String(info.level) }),
-              ]),
-              el('div.slot-line', {}, [
-                el('span.k', { text: 'Gold' }),
-                el('span.v', {}, [icon('coin', 0.9), String(info.gold)]),
-              ]),
-              el('div.slot-line', {}, [
-                el('span.k', { text: 'Saved' }),
-                el('span.v', { text: timeAgo(info.savedAt) }),
-              ]),
+          el('div.slot-lines', {}, [
+            el('div.slot-line', {}, [
+              el('span.k', { text: 'Level' }),
+              el('span.v', { text: String(info.level) }),
             ]),
-
-            el('div.slot-actions', {}, [
-              el('button.btn.btn--sm.btn--gold', { onclick: () => resume(slot, data) }, [
-                info.completed ? 'View ending' : 'Continue',
-              ]),
-              iconButton('close', {
-                onClick: () => erase(slot),
-                label: `Erase slot ${slot}`,
-                tip: 'Erase this run',
-                variant: 'btn--danger',
-              }),
+            el('div.slot-line', {}, [
+              el('span.k', { text: 'Gold' }),
+              el('span.v', {}, [icon('coin', 0.9), String(info.gold)]),
+            ]),
+            el('div.slot-line', {}, [
+              el('span.k', { text: 'Saved' }),
+              el('span.v', { text: timeAgo(info.savedAt) }),
             ]),
           ]),
-        );
+
+          el('div.slot-actions', {}, [
+            el('button.btn.btn--sm.btn--gold', { onclick: () => resume(slot, data) }, [
+              info.completed ? 'View ending' : 'Continue',
+            ]),
+            iconButton('close', {
+              onClick: () => erase(slot),
+              label: `Erase slot ${slot}`,
+              tip: 'Erase this run',
+              variant: 'btn--danger',
+            }),
+          ]),
+        ]);
+        grid.append(card);
+        // After the append: the fire measures the card, and a card that is not
+        // in the document yet has no size to measure.
+        if (hardRun) burn(card, { intensity: 0.6 });
       }
       attachButtonSounds(grid);
     }
@@ -182,8 +233,18 @@ export const SlotsScreen = {
       const select = el('select.slot-difficulty', {
         'aria-label': `Difficulty for slot ${slot}`,
         onchange: (e) => {
-          chosen.set(slot, e.currentTarget.value);
-          play('click');
+          const next = e.currentTarget.value;
+          chosen.set(slot, next);
+          /**
+           * Choosing the hard road LIGHTS it, and the flare has to happen on
+           * the card that gets built by the re-render rather than on this one,
+           * which is about to be thrown away. `lighting` is that message: the
+           * next card for this slot goes up with a burst instead of simply
+           * being alight already.
+           */
+          if (next === 'hard') lighting.add(slot);
+          else lighting.delete(slot);
+          play(next === 'hard' ? 'fuse' : 'click');
           render();
         },
       }, DIFFICULTIES.map((d) => el('option', {
@@ -252,5 +313,9 @@ export const SlotsScreen = {
     root.append(screen);
     attachButtonSounds(screen);
     render();
+
+    // The screen owns the fires; the router owns the screen. Anything still
+    // burning when the player walks away goes out with the grid.
+    return douse;
   },
 };

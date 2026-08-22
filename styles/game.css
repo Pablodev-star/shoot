@@ -1341,6 +1341,27 @@
   border-top-color: var(--red-dark);
 }
 
+/* What the man across the road is carrying, and what it costs. The picture is
+   the baked revolver itself (see `gunChip` in src/duel/duel-screen.js), so the
+   chip is sized around a sprite rather than around a glyph: the art keeps its
+   own aspect ratio and a longbarrel is visibly longer than a sixgun. */
+.chip--gun {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-color: var(--red-dark);
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+}
+
+.gun-chip-art {
+  /* The gun points at the player on the enemy's card, which is the way it is
+     pointed on the road. */
+  transform: scaleX(-1);
+  image-rendering: pixelated;
+}
+
 .fighter-card.is-hit { animation: card-hit var(--dur-slow) var(--ease-out); }
 
 @keyframes card-hit {

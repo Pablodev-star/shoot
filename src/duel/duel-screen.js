@@ -54,7 +54,7 @@ import { createLocalAgent, createAiAgent } from './duel-ai.js';
 import { createDuelScene, FALL_MS } from './duel-scene.js';
 import { playBossIntro } from './boss-intro.js';
 import { getPortrait } from '../art/sprites-portraits.js';
-import { CHARACTER_TIMING } from '../art/sprites-character.js';
+import { CHARACTER_TIMING, getRevolverSprites } from '../art/sprites-character.js';
 import { getWeatherState } from '../explore/weather.js';
 import { getTimeState } from '../explore/daynight.js';
 import { resolveDuel } from '../game/run.js';
@@ -282,9 +282,26 @@ export const DuelScreen = {
       playerCylinder,
       playerStatus,
     ]);
+    /**
+     * WHAT HE IS HOLDING, WRITTEN DOWN
+     * -----------------------------------------------------------------------
+     * The gun is already in his hand on the road — the scene draws the exact
+     * silhouette his bullet buys (ENEMY_GUNS in src/game/gun-tiers.js) — and
+     * that is the reading the fight is meant to be won on. This is the same
+     * fact in the one form a sprite cannot carry: the NUMBER. A player who has
+     * not yet learned to tell a longbarrel from a sixgun at sixteen pixels can
+     * read "1.5 a shot" off the card and count how many of them their bar has
+     * left, which is the whole decision every round of this game is.
+     *
+     * It is on the enemy's card only. The player's own bullet is on the forge
+     * screen, on the Shoot button's tooltip and in the help panel already, and
+     * a fourth copy of it here would be the interface repeating itself.
+     */
+    const enemyGunChip = gunChip(enemy.gunDamage);
     const enemyCard = el('div.fighter-card.is-enemy', {}, [
       enemyName,
       enemyLives,
+      enemyGunChip,
       enemyCylinder,
       enemyAbilities,
       enemyStatus,
@@ -1229,14 +1246,41 @@ export const DuelScreen = {
      * arriving after the fact.
      */
     async function animate(res) {
-      const draws = (move) => move === MOVES.SHOOT || move === MOVES.RELOAD;
-      // A frozen fighter and one that spent its turn casting both just stand
-      // there — the ice on the sprite and the particles say which is which.
-      const poseFor = (move) =>
-        move === MOVES.SHIELD ? 'shield' : draws(move) ? 'aim' : 'idle';
+      /**
+       * A RELOAD LOOKS LIKE A RELOAD NOW
+       * -----------------------------------------------------------------------
+       * Both of these used to play `aim`, which meant the round where a man
+       * loaded his gun and the round where he pointed it at you were the same
+       * four frames. In a game that is entirely about reading the other one,
+       * that was the single worst thing on the screen.
+       *
+       * They still START the same — the reload's first two frames ARE the
+       * draw's, because both moves begin with a man reaching for his gun (see
+       * RELOAD_SEQUENCE in src/art/sprites-character.js) — and then the gun
+       * goes up to be loaded instead of forward to be fired. The tell arrives
+       * about two hundred milliseconds in, which is late enough to be a duel
+       * and early enough to be a warning.
+       *
+       * A frozen fighter and one that spent its turn casting both just stand
+       * there — the ice on the sprite and the particles say which is which.
+       */
+      const poseFor = (move) => {
+        if (move === MOVES.SHIELD) return 'shield';
+        if (move === MOVES.RELOAD) return 'reload';
+        if (move === MOVES.SHOOT) return 'aim';
+        return 'idle';
+      };
 
       scene.setPose('player', poseFor(res.playerMove));
       scene.setPose('enemy', poseFor(res.enemyMove));
+      /**
+       * The rival's cylinder, out loud. The player's own reload already
+       * sounded under their finger when they pressed the plate (`data-sfx` on
+       * the move button), and the man across the road has never made a noise
+       * doing it — which meant the one move you most want to hear him make was
+       * the only silent thing in the fight.
+       */
+      if (res.enemyMove === MOVES.RELOAD) play('reload');
 
       if (res.playerMove) setCallout(`${moveWord(res.playerMove)} vs ${moveWord(res.enemyMove)}`);
       // Long enough for the four-frame draw to finish: the guns are up before
@@ -1699,6 +1743,35 @@ function flashEffect(row, effect) {
   badge.classList.remove('is-firing');
   void badge.offsetWidth; // restart the animation
   badge.classList.add('is-firing');
+}
+
+/**
+ * The rival's gun, as a chip: the revolver he is actually carrying and what one
+ * of its rounds costs, in lives.
+ *
+ * The picture is the BAKED SPRITE rather than an interface icon — the same
+ * canvas the scene draws in his hand, at the same finish and the same
+ * silhouette — so the chip and the man across the road can never disagree
+ * about what he brought. It is levelled rather than raised because that is the
+ * pose the gun spends a fight in.
+ */
+function gunChip(damage) {
+  const look = enemyGunLook(damage);
+  const art = getRevolverSprites(look.finish, look.shape).level.sprite;
+  const cost = Number(damage) || 0;
+  const tip = `${look.name} — ${cost} ${cost === 1 ? 'life' : 'lives'} a shot`;
+  return el('span.chip.chip--gun', { 'data-tip': tip, 'aria-label': tip }, [
+    el('img.pixel.gun-chip-art', {
+      src: art.toDataURL(),
+      alt: '',
+      'aria-hidden': 'true',
+      draggable: 'false',
+      // Sized off the sprite's own width so a longbarrel is drawn longer than
+      // a sixgun instead of every gun being squeezed into one box.
+      style: { height: '16px', width: `${Math.round((art.width / art.height) * 16)}px` },
+    }),
+    el('span', { text: `${cost} a shot` }),
+  ]);
 }
 
 /**

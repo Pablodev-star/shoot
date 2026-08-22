@@ -226,20 +226,33 @@ export function gunTier(level = 0) {
  * threat readout. Same shapes and the same four metals, no glow, no orbit, no
  * nebula.
  */
+/**
+ * Seven rungs, and one world each — the Dust Flats carry the first and the
+ * Galaxy carries the last (`enemyGunDamage` in src/game/progression.js). The
+ * `name` is not decoration: the duel card names what the man across the road is
+ * holding and what it costs, so the silhouette in his hand and the number on
+ * the card are two readings of the same fact.
+ */
 export const ENEMY_GUNS = [
-  { damage: 0.5, shape: 'sixgun', finish: 'steel' },
-  { damage: 1, shape: 'sixgun', finish: 'brass' },
-  { damage: 1.5, shape: 'longbarrel', finish: 'steel' },
-  { damage: 2, shape: 'longbarrel', finish: 'brass' },
-  { damage: 2.5, shape: 'longbarrel', finish: 'bone' },
-  { damage: 3, shape: 'nova', finish: 'bone' },
-  { damage: 3.5, shape: 'nova', finish: 'void' },
+  { damage: 0.5, shape: 'sixgun', finish: 'steel', name: 'Trail Sixgun' },
+  { damage: 1, shape: 'sixgun', finish: 'brass', name: 'Brass Sixgun' },
+  { damage: 1.5, shape: 'longbarrel', finish: 'steel', name: 'Steel Longbarrel' },
+  { damage: 2, shape: 'longbarrel', finish: 'brass', name: 'Brass Longbarrel' },
+  { damage: 2.5, shape: 'longbarrel', finish: 'bone', name: 'Bone Longbarrel' },
+  { damage: 3, shape: 'nova', finish: 'bone', name: 'Bone Nova' },
+  { damage: 3.5, shape: 'nova', finish: 'void', name: 'Void Nova' },
 ];
 
 /**
  * The gun that goes with a rider's bullet.
+ *
+ * The ladder tops out and the bullet does not: a hard-road rider past halfway
+ * in the Galaxy is carrying four and a half lives a shot, which is off the end
+ * of this list. He holds the Void Nova, which is the honest answer — there is
+ * no eighth silhouette, and the card beside him prints what it actually costs.
+ *
  * @param {number} damage what one of their shots costs you
- * @returns {{damage:number, shape:string, finish:string}}
+ * @returns {{damage:number, shape:string, finish:string, name:string}}
  */
 export function enemyGunLook(damage = 0.5) {
   const rung = Math.round((Number(damage) || 0.5) / 0.5) - 1;

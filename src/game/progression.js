@@ -17,7 +17,7 @@ import { OVERRIDES } from '../admin/overrides.js';
  * ordinary road every knob below is 1 and every line reading one is a
  * multiplication by one — see src/game/difficulty.js for the whole table.
  */
-import { tuning } from './difficulty.js';
+import { tuning, isHard } from './difficulty.js';
 
 // ---------------------------------------------------------------------------
 // Experience & levels
@@ -102,17 +102,24 @@ export function expForNextLevel(level) {
  * twice.
  *
  * It grows ONE life a level, at about three levels every two worlds, so the
- * whole climb is three diamonds to ten. The inflation was never the problem:
- * the problem was that only the player's side inflated. What holds the two
- * sides together now is that the rider's bullet is derived from this bar
- * (`enemyGunDamage`) — a player on ten lives is shot at for one and is ten
- * hits from the end of the run, against three lives and half a life a shot in
- * the Dust Flats, which is six.
+ * whole climb is three diamonds to ten.
  *
- * The number actually being held steady is how much of the bar a duel costs —
- * about a third of it, everywhere — and `node tools/sim.mjs asymmetry` fails
- * the build if the hits-to-kill behind it drifts out of what the length of
- * that world's fights needs.
+ * AND THE ROAD OUTGROWS IT ON PURPOSE
+ * ---------------------------------------------------------------------------
+ * For a while the rider's bullet was DERIVED from this bar, which held the
+ * price of a duel at about a third of it in every world. It is a hand-written
+ * ladder again (`enemyGunDamage`): half a life in the Dust Flats and half a
+ * life more every world, one rung of ENEMY_GUNS per world, because that ladder
+ * is the only difficulty signal in the game the player can SEE — it is the gun
+ * in the man's hand — and a derived bullet stood still for three worlds at a
+ * time.
+ *
+ * The bar gains about two thirds of a life a world and the bullet gains a
+ * half, so the two diverge, and the road gets steeper the further along it you
+ * are: six connected hits deep in the Dust Flats, about three and a half from
+ * the Bayou on. Nothing here compensates for that and nothing is meant to —
+ * see the note over TARGETS in tools/sim.mjs for how far a run now gets, which
+ * is the number that decision is written in.
  */
 export const LIVES_PER_LEVEL = 1;
 export const STARTING_LIVES = 3;
@@ -136,23 +143,26 @@ export const STARTING_LIVES = 3;
  * Flats and two more every world (`enemyLives`). Those are the shape of the
  * journey and they are not derived from anything.
  *
- * The player's two: a bar that starts at three and grows four a level on a
- * curve that pays out one level a world, and a forge ladder worth half a life a
- * rung that a run finishes buying around the Bayou.
+ * The player's two: a bar that starts at three and grows one a level on a curve
+ * that pays out about three levels every two worlds, and a forge ladder worth
+ * half a life a rung that a run finishes buying around the Bayou.
  *
- *   world | you have      | a rider hits for | and carries | so a rider is
- *   ------+---------------+------------------+-------------+---------------
- *     1   |  3 lives  0.5 |       0.5        |   1 life    | 2 shots
- *     2   |  7 lives  1.5 |       1          |   3 lives   | 2 shots
- *     3   | 11 lives  2.5 |       1.5        |   5 lives   | 2 shots
- *     4   | 15 lives  3.5 |       2          |   7 lives   | 2 shots
- *     5   | 19 lives  3.5 |       2.5        |   9 lives   | 2.6 shots
- *     6   | 23 lives  3.5 |       3          |  11 lives   | 3.2 shots
+ *   world | you have      | a rider hits for | and carries | hits to kill you
+ *   ------+---------------+------------------+-------------+-----------------
+ *     1   |  3 lives  0.5 |       0.5        |   1 life    | 6
+ *     2   |  4 lives  1.5 |       1          |   3 lives   | 4
+ *     3   |  6 lives  2.5 |       1.5        |   5 lives   | 4
+ *     4   |  7 lives  3.5 |       2          |   7 lives   | 3.5
+ *     5   |  9 lives  3.5 |       2.5        |   9 lives   | 3.6
+ *     6   | 10 lives  3.5 |       3          |  11 lives   | 3.3
+ *     7   | 12 lives  3.5 |       3.5        |  12 lives   | 3.4
  *
- * Which comes out at six to eight hits to kill you and two to three to kill
- * them, everywhere — and a rider in the back half of a world is carrying the
- * NEXT world's bullet half the time (`enemyGunDamageAt`), so the second half of
- * a crossing is where a bar that was six hits deep turns into four.
+ * The last column is the whole story of this road: it starts at six, which is a
+ * fight you can afford to misplay twice, and it settles at three and a half,
+ * which is a fight you cannot. And a rider in the back half of a world is
+ * carrying the NEXT world's bullet a third of the time (`enemyGunDamageAt`),
+ * so the second half of a crossing takes another half-hit off it — and on the
+ * hard road every rider on it is already a rung up before the coin is flipped.
  *
  * THE LAST TWO WORLDS ARE WHERE THE LADDER RUNS OUT
  * ---------------------------------------------------------------------------
@@ -216,14 +226,16 @@ const toHalfDown = (n) => Math.max(0.5, Math.floor(n * 2) / 2);
  * hits to finish you: enough cushion that a duel is winnable from behind,
  * tight enough that a rider is a threat rather than a toll booth.
  *
- * IT IS A TARGET, NOT A FORMULA
+ * IT IS A TARGET, AND THE ROAD NO LONGER MEETS IT
  * ---------------------------------------------------------------------------
- * It used to decide the riders' damage — bullet = bar / six — and that was the
- * wrong way round once the road's two ladders were written down by hand. What
- * the bullet costs is `enemyGunDamage` and what a rider carries is
- * `enemyLives`; this is what the PLAYER'S bar is solved against, and what
- * `tools/sim.mjs asymmetry` gates: four to eight hits, in every world, or the
- * build fails.
+ * It used to decide the riders' damage — bullet = bar / six. It does not any
+ * more: what the bullet costs is a hand-written ladder (`enemyGunDamage`) and
+ * what a rider carries is another (`enemyLives`), and neither is solved against
+ * this number. What is left of it is a yardstick — `tools/sim.mjs asymmetry`
+ * prints the hits-to-kill each world actually delivers beside what this target
+ * would pay for, and the gap between them is the measure of how far the road
+ * has been pushed past its own economy. The build only fails if a world drops
+ * under THREE connected hits, which is where a duel stops being one.
  *
  * It comes out at six in the Dust Flats and drifts up to about seven and a
  * half by the Galaxy, and that drift is deliberate. A duel out there takes
@@ -335,28 +347,43 @@ export const ENEMY_LIVES_PER_WORLD = 2;
 export const ENEMY_LIVES_FINAL_STEP = 1;
 
 /**
- * WHAT A RIDER'S BULLET COSTS YOU: THE BAR, OVER SIX
+ * WHAT A RIDER'S BULLET COSTS YOU: ONE RUNG OF THE GUN LADDER PER WORLD
  * ---------------------------------------------------------------------------
- * Derived again, and it went back to being derived the day the level curve
- * changed. A hand-written ladder (half a life in the Dust Flats and half a
- * life more every world) is the right shape only while the player's bar grows
- * at the same rate — and on a bar that now gains ONE life a level at three
- * levels every two worlds, a bullet climbing by a half every world would have
- * the Galaxy killing you in three and a half hits where the Dust Flats takes
- * six. The two cannot both be written down by hand; the bar is the one the
- * player can see, so the bullet is the one that follows.
+ * Half a life in the Dust Flats and half a life more every world after it, all
+ * the way to three and a half in the Galaxy. It is written down by hand, and
+ * it is written down by hand ON PURPOSE — this is the one enemy number the
+ * player is shown rather than told, because a rider's bullet comes with the
+ * gun that fires it (ENEMY_GUNS in src/game/gun-tiers.js) and that ladder is
+ * seven rungs long. One world, one rung: the Dust Flats carry the short steel
+ * sixgun, the Prairie the brass one, the Pass the longbarrel, and the thing
+ * standing in the Galaxy is holding a Nova frame. A player who has crossed two
+ * worlds can read the road ahead off the silhouette in the man's hand.
  *
- * What comes out is a ladder that still climbs, just more slowly — a half in
- * the flats and the Prairie, a whole one through the pass and the Bayou, a
- * life and a half out in the Basin and the Galaxy — and six hits to kill you
- * in every world of the game, which is the number this file exists to hold.
+ * WHAT IT REPLACED, AND WHY
+ * ---------------------------------------------------------------------------
+ * It used to be DERIVED — bar over six, rounded down — which held the price of
+ * a duel at about a third of the bar in every world and produced a ladder with
+ * flat spots in it: two worlds at a half, two at a whole, three at a life and
+ * a half. That is the right curve for the spreadsheet and the wrong one for the
+ * road, because three worlds running with the same bullet is three worlds
+ * running with the same gun in the man's hand, and the one difficulty signal
+ * the game shows rather than states stops moving for half the run.
+ *
+ * The cost of writing it by hand is real and it is not hidden: the bullet now
+ * climbs faster than the bar does (the bar gains about two thirds of a life a
+ * world; the bullet gains a half), so the back half of the game is meaner than
+ * it was. `tools/sim.mjs asymmetry` prints the hits-to-kill this produces in
+ * every world and its band was widened to admit it — see the note there.
  *
  * This is the FLOOR of it. Riders past the halfway mark of a world can be
- * carrying more; see `enemyGunDamageAt`, which is what actually arms an enemy.
+ * carrying more, and on the hard road every one of them is; see
+ * `enemyGunDamageAt`, which is what actually arms an enemy.
  */
+export const ENEMY_BULLET_STEP = 0.5;
+
 export function enemyGunDamage(worldId) {
-  const power = EXPECTED_POWER[worldId] || EXPECTED_POWER[1];
-  return toHalfDown(power.lives / hitsToKillPlayer(worldId));
+  const world = Math.max(1, Math.min(FINAL_WORLD, Math.round(worldId) || 1));
+  return world * ENEMY_BULLET_STEP;
 }
 
 /**
@@ -410,10 +437,34 @@ export function enemyRampChance() {
   return tuning().enemyRampChance;
 }
 
-export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
+/**
+ * THE HARD ROAD IS ALWAYS ONE RUNG AHEAD
+ * ---------------------------------------------------------------------------
+ * Every other knob in src/game/difficulty.js is a multiplier of a few per cent,
+ * because that is what a chain of fifty survival checks needs (see the long
+ * note over the `hard` column there). This one is not a multiplier and it is
+ * not subtle: on the hard road the man across from you is carrying the NEXT
+ * world's gun, from the first rider in the Dust Flats to the thing at the end
+ * of the Galaxy, and he is carrying it where the player can see it.
+ *
+ * It is here rather than in the tuning table for the same reason the ramp is:
+ * the ladder is the thing that has a picture of itself. A rider one rung up is
+ * a different silhouette in the hand, so "hard" is legible on the road instead
+ * of being a number the player is told about on a card and never sees again.
+ *
+ * The two shifts stack. A hard rider past halfway in the Prairie is on the
+ * Prairie's whole life, plus a rung for the road, plus the coin — one and a
+ * half, or two.
+ */
+export function enemyBulletFloor(worldId) {
   const base = enemyGunDamage(worldId);
+  return isHard() ? base + ENEMY_DAMAGE_STEP : base;
+}
+
+export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
+  const floor = enemyBulletFloor(worldId);
   const late = (Number(progress) || 0) >= ENEMY_DAMAGE_RAMP_AT;
-  return late && upgraded ? base + ENEMY_DAMAGE_STEP : base;
+  return late && upgraded ? floor + ENEMY_DAMAGE_STEP : floor;
 }
 
 /** How much life a rider of a given world carries, before its own spread. */

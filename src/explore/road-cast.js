@@ -109,7 +109,15 @@ export function createRoadCast() {
       // Placed against the traveller's own anchor, exactly as the buildings
       // are: at the moment the stop is reached he is BATTLE_DISTANCE ahead,
       // and that is the same number on every screen size.
-      const x = heroX + (foe.worldX - cameraX) * s;
+      /**
+       * The fall is drawn on a wider canvas than the standing poses — a body
+       * lying down does not fit in sixteen columns; see the note over
+       * FALL_FRAME_MS in src/art/sprites-character.js — with the extra road
+       * split evenly either side. Centring anything wider than a fighter on
+       * the fighter's own box puts the body exactly where the man was
+       * standing, which is the same line the duel scene draws with.
+       */
+      const x = heroX + (foe.worldX - cameraX) * s - ((frame.width - PLAYER_SIZE.w) / 2) * fs;
       const y = groundY + 2 * s - frame.height * fs;
       if (x < -frame.width * fs * 2 || x > view.w + frame.width * fs * 2) continue;
       /**

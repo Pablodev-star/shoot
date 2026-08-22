@@ -28,10 +28,19 @@
  *   top of src/duel/duel-ai.js) — so he is smarter rather than psychic, and
  *   everything he does is still escapable by not repeating yourself.
  *
+ *   WHAT HE IS CARRYING. Every gun on this road is one rung further up the
+ *   enemy ladder than the ordinary one hands out — see `enemyBulletFloor` in
+ *   src/game/progression.js — so the first man in the Dust Flats is holding the
+ *   Prairie's brass sixgun and hitting for a whole life against a bar of three.
+ *   It is the one change in this column that is a whole step rather than a few
+ *   per cent, and it is deliberately the one the player can SEE: the gun in his
+ *   hand says it before the first shot does.
+ *
  *   HOW MUCH OF HIM THERE IS. More life on every rider and on every boss, more
  *   of them carrying a trick, and more of the back half of every world carrying
- *   the heavier gun. A fight that took two shots takes three, and a fight that
- *   runs longer is a fight with more of his rounds in it.
+ *   the heavier gun again on top of the rung. A fight that took two shots takes
+ *   three, and a fight that runs longer is a fight with more of his rounds in
+ *   it.
  *
  *   WHAT EVERYTHING COSTS. Every counter in the game asks about half again —
  *   the stall, the inn and the forge alike — and the half-price tag turns up
@@ -45,14 +54,21 @@
  *   to a diamond and a half would take a quarter off the cheapest thing on the
  *   counter — which is the one purchase a broke run can always make.)
  *
- * AND IT IS STILL WINNABLE, WHICH IS THE ONLY LINE THAT MATTERS
+ * IT IS A WALL NOW, AND THAT IS A DECISION RATHER THAN A DRIFT
  * ---------------------------------------------------------------------------
- * A hard mode nobody finishes is a wall with a name on it. The harness runs the
- * whole thing (`node tools/sim.mjs hard`) and `npm test` gates it, so the two
- * roads are measured on every build rather than the ordinary one being measured
- * and the hard one being hoped about. Every number in the table below came out
- * of that harness rather than out of a guess — the first four attempts at it
- * are described over the `hard` column, and all four were walls.
+ * This column was built and rebuilt around one line — a hard mode nobody
+ * finishes is a wall with a name on it — and every number in it came out of the
+ * harness rather than out of a guess. That line no longer holds, and it is not
+ * the multipliers below that broke it: it is the enemy bullet ladder itself
+ * (`enemyGunDamage` in src/game/progression.js), which climbs half a life a
+ * world on both roads and which this road is a rung ahead of. Nobody finishes
+ * either one; an expert out here gets a third of the way through the first
+ * world. The measured figures are over the `hard` column below.
+ *
+ * The harness still runs the whole thing (`node tools/sim.mjs hard`) and
+ * `npm test` still gates it, so both roads are measured on every build — but
+ * what the bands now check is how DEEP a run gets, because there is no ending
+ * left to count. See the note over HARD_TARGETS in tools/sim.mjs.
  *
  * WHERE THE MODE LIVES
  * ---------------------------------------------------------------------------
@@ -98,6 +114,7 @@ export const DIFFICULTIES = [
     name: 'Hard',
     blurb: 'The same road, and nothing on it is on your side.',
     changes: [
+      'Every gun on this road is one rung further up the ladder. A Dust Flats rider carries the Prairie\'s.',
       'Riders carry more life, and the man across the road reads a repeated move off two instead of three.',
       'Bosses are bigger, more riders carry a trick, and more of them carry the heavier gun.',
       'Every counter asks about half again — the stall, the inn and the forge — and half-price tags are rare.',
@@ -225,6 +242,25 @@ const TUNING = {
    * roughly the game an average player has on the ordinary one, and the ending
    * is something an expert reaches about once in a long evening rather than
    * once a week.
+   *
+   * THOSE NUMBERS ARE HISTORY, AND THE SENTENCE UNDER THEM IS NOT
+   * -------------------------------------------------------------------------
+   * They were measured against a rider whose bullet was derived from the
+   * player's own bar. It is a hand-written ladder now — half a life a world,
+   * one rung of the gun per world — and on top of it this road adds a rung of
+   * its own (`enemyBulletFloor`), so nobody finishes the game on either road
+   * any more. MEASURED, 250 runs a skill, the roads that ship:
+   *
+   *                    reaches the Prairie    reaches the Pass
+   *   expert              96%  →  32%            28%  →  0%
+   *   average             73%  →   9%            10%  →  0%
+   *   novice              73%  →   5%             6%  →  0%
+   *
+   * The multipliers below are untouched by that and every word about them
+   * still holds — they are the same few per cent of the same road. What moved
+   * is the road, and the one sentence this column is designed around moved with
+   * it intact: an expert out here gets about as far as a novice on the ordinary
+   * one, one world in instead of six.
    *
    * THE FIRST FOUR PASSES AT THIS WERE ALL WALLS, IN THE SAME WAY
    * -------------------------------------------------------------------------
