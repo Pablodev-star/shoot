@@ -29,7 +29,6 @@ import {
   itemBonusLives,
 } from './progression.js';
 import { getDifficulty, tuning } from './difficulty.js';
-import { toast } from '../ui/toast.js';
 import { play } from '../core/audio.js';
 import { track as trackAchievement } from './achievements.js';
 import { OVERRIDES } from '../admin/overrides.js';
@@ -401,15 +400,15 @@ export function addExp(amount) {
      * a real purchase for anybody tracking their exp bar, and walking into a
      * world on one life was survivable as long as a level was due.
      *
-     * You now get exactly what the level adds: one more maximum life, and one
-     * more life to go in it. A player at full stays full, a player at 1 of 5
+     * You now get exactly what the level adds: LIVES_PER_LEVEL more maximum
+     * lives, and as many to go in them. A player at full stays full, a player at 1 of 5
      * comes out at 2 of 6, and the bed is still the only way back to the top.
      */
     state.lives = Math.min(state.maxLives, state.lives + LIVES_PER_LEVEL * levelled);
     emitLives();
     emit(EVENTS.LEVEL_UP, { level: state.level, maxLives: state.maxLives, gained: levelled });
     play('levelUp');
-    toast(`Level ${state.level}! +${LIVES_PER_LEVEL * levelled} life`, 'gold');
+    // The card is src/ui/level-up.js, listening for LEVEL_UP above.
   }
   emit(EVENTS.EXP_CHANGED, {
     exp: state.exp,

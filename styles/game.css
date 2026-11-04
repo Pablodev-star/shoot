@@ -1417,7 +1417,10 @@
 .plate--enemy .plate-head { flex-direction: row-reverse; }
 
 .plate-name {
-  flex: 1 1 auto;
+  /* Basis zero: the name takes what the chip leaves and wraps to its second
+     line, rather than growing first and squeezing the gun chip into a
+     clipped "0.5 POR DISPA". */
+  flex: 1 1 0;
   min-width: 0;
   font-family: var(--font-display);
   font-size: var(--text-sm);
@@ -1441,7 +1444,7 @@
 /* The gun chip may shrink; it may not push the name out of the plate. The
    plate no longer clips its own contents — the token popover hangs below it —
    so anything in here that could grow has to be told not to. */
-.plate-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; line-height: 0; }
+.plate-tag { flex: 0 0 auto; max-width: 60%; min-width: 0; overflow: hidden; line-height: 0; }
 .plate-tag:empty { display: none; }
 
 /* What the man across the road is carrying, and what it costs. The picture is
@@ -2448,3 +2451,124 @@
 }
 
 .ending-screen { --screen-max: 640px; }
+
+/* --- Numbers that come off a man ------------------------------------------
+   See src/ui/combat-text.js. Fixed to the viewport, because the scene canvas
+   is and the anchors are read off it. Never takes a click. */
+.duel-screen > .combat-text-layer,
+.combat-text-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.combat-text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(22px, 2.6vw, 34px);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #ff6a5c;
+  -webkit-text-stroke: 1px rgba(30, 6, 4, 0.85);
+  text-shadow:
+    0 3px 0 rgba(30, 6, 4, 0.9),
+    0 0 14px rgba(255, 70, 50, 0.45);
+  animation: combat-text-rise 1.15s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.combat-text.is-big-hit {
+  font-size: clamp(28px, 3.4vw, 46px);
+  color: #ff3d2e;
+  animation-name: combat-text-slam;
+  animation-duration: 1.35s;
+}
+
+.combat-text.is-heal {
+  color: #8ff07a;
+  -webkit-text-stroke-color: rgba(6, 28, 6, 0.85);
+  text-shadow:
+    0 3px 0 rgba(6, 28, 6, 0.9),
+    0 0 14px rgba(110, 230, 90, 0.45);
+}
+
+.combat-text.is-block {
+  font-size: clamp(16px, 1.8vw, 22px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9fd2ff;
+  -webkit-text-stroke-color: rgba(6, 16, 30, 0.85);
+  text-shadow:
+    0 2px 0 rgba(6, 16, 30, 0.9),
+    0 0 12px rgba(120, 180, 255, 0.5);
+}
+
+@keyframes combat-text-rise {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5); }
+  14% { opacity: 1; transform: translate(-50%, -90%) scale(1.25); }
+  28% { transform: translate(-50%, -110%) scale(1); }
+  75% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--drift, 0px)), -230%) scale(0.92);
+  }
+}
+
+@keyframes combat-text-slam {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.4) rotate(-6deg); }
+  12% { opacity: 1; transform: translate(-50%, -70%) scale(0.9) rotate(2deg); }
+  20% { transform: translate(-50%, -80%) scale(1.12) rotate(0deg); }
+  30% { transform: translate(-50%, -90%) scale(1); }
+  78% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--drift, 0px)), -220%) scale(0.95);
+  }
+}
+
+/* --- On the last shot's worth of life --------------------------------------
+   A slow red pulse in from the edges of the frame, and nothing else: no text,
+   no sound. It is set by the duel screen whenever one more hit would end it. */
+.duel-screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 52%,
+    rgba(160, 14, 10, 0.28) 78%,
+    rgba(120, 6, 4, 0.62) 100%
+  );
+  transition: opacity 0.6s ease;
+}
+
+.duel-screen.is-critical::before {
+  opacity: 1;
+  animation: critical-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes critical-pulse {
+  0%, 100% { opacity: 0.55; }
+  18% { opacity: 1; }
+  36% { opacity: 0.7; }
+  52% { opacity: 0.95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-text,
+  .combat-text.is-big-hit { animation: combat-text-fade 1.1s ease forwards; }
+  .duel-screen.is-critical::before { animation: none; opacity: 0.8; }
+}
+
+@keyframes combat-text-fade {
+  0% { opacity: 0; transform: translate(-50%, -80%); }
+  15%, 75% { opacity: 1; transform: translate(-50%, -100%); }
+  100% { opacity: 0; transform: translate(-50%, -120%); }
+}

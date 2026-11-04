@@ -124,6 +124,7 @@ export const VictoryScreen = {
            * exactly like the ordinary clear.
            */
           hardRun ? el('span.chip.chip--hard', { text: 'Hard road' }) : null,
+          params.difficulty === 'easy' ? el('span.chip.chip--easy', { text: 'Easy road' }) : null,
         ]),
         el('div.stat-grid', {}, [
           statTile('Level', player.level),
@@ -141,6 +142,11 @@ export const VictoryScreen = {
          * exists, and a card that ends on a to-do list is a card that takes
          * the ending off its own ending.
          */
+        params.difficulty === 'easy' && !isHardUnlocked()
+          ? el('p.muted.center', {
+              text: 'Finish the normal road to open the hard one.',
+            })
+          : null,
         !hardRun && isHardUnlocked()
           ? el('p.muted.center', {
               text: 'The hard road is open. Start a new slot and pick it from the mode list.',
@@ -189,8 +195,10 @@ export const GameOverScreen = {
             // and "somewhere in the Bayou" reads very differently when the
             // Bayou in question was the hard one.
             text: params.difficulty === 'hard'
-              ? `Somewhere in ${world.name}, on the hard road`
-              : `Somewhere in ${world.name}`,
+              ? t('Somewhere in {world}, on the hard road', { world: t(world.name) })
+              : params.difficulty === 'easy'
+                ? t('Somewhere in {world}, on the easy road', { world: t(world.name) })
+                : t('Somewhere in {world}', { world: t(world.name) }),
           }),
         ]),
         el('div.stat-grid', {}, [

@@ -1004,6 +1004,26 @@ export function createDuelScene({
     impact,
 
     /**
+     * Where a fighter's head is on screen, in CSS pixels — for anything the
+     * interface wants to hang over a man rather than over his card (the
+     * floating damage numbers, see src/ui/combat-text.js). Read through the
+     * camera, so a number still lands on the face during a close-up. Null
+     * before the first frame.
+     */
+    anchorOf(side) {
+      const L = layout?.[side];
+      if (!L || !lastView) return null;
+      let x = L.originX + (FIGHTER_W * L.fs) / 2;
+      let y = L.topY + L.fs * 2;
+      const cam = cameraTransform(lastView);
+      if (cam) {
+        x = x * cam.z + cam.tx;
+        y = y * cam.z + cam.ty;
+      }
+      return { x, y, size: FIGHTER_H * L.fs };
+    },
+
+    /**
      * Somebody just ate or patched up. `kind` is 'heal' or 'food'; `icon` is
      * the item's own icon, which is what a food pop throws up.
      */
