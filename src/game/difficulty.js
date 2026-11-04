@@ -103,10 +103,31 @@ import { getProfile, updateProfile } from '../core/settings.js';
  * eventually be wrong in two of them.
  */
 export const DIFFICULTIES = [
+  /**
+   * THE GENTLE ROAD
+   * -------------------------------------------------------------------------
+   * Open from the first run, because it is for the player the other two are
+   * not: someone who wants to see all seven worlds and the thing at the end of
+   * them. The same road, the same riders, the same permadeath — just more
+   * forgiving arithmetic on every side of the ledger. See the `easy` column in
+   * TUNING below; `tools/sim.mjs` holds it to roughly four in five careful runs
+   * finishing, and better than one in four for someone mashing SHOOT.
+   */
+  {
+    id: 'easy',
+    name: 'Easy',
+    blurb: 'The same road, walked at a gentler pace. For seeing the end of it.',
+    changes: [
+      'Riders and bosses carry less life, and aim a little worse.',
+      'The man across the road reads you a little less well.',
+      'Shops, inns and the forge are cheaper, and a body is worth more gold.',
+      'Beds, med kits and meals put back more, and hunger comes on slower.',
+    ],
+  },
   {
     id: 'normal',
     name: 'Normal',
-    blurb: 'The road as it was built. Long, and it kills most runs.',
+    blurb: 'The road as it was built. Long, and it rewards a careful hand.',
     changes: [],
   },
   {
@@ -114,7 +135,7 @@ export const DIFFICULTIES = [
     name: 'Hard',
     blurb: 'The same road, and nothing on it is on your side.',
     changes: [
-      'Every gun on this road is one rung further up the ladder. A Dust Flats rider carries the Prairie\'s.',
+      'The Prairie and the Pass arm their riders a rung early, and the man across the road does not forget.',
       'Riders carry more life, and the man across the road reads a repeated move off two instead of three.',
       'Bosses are bigger, more riders carry a trick, and more of them carry the heavier gun.',
       'Every counter asks about half again — the stall, the inn and the forge — and half-price tags are rare.',
@@ -301,6 +322,43 @@ const TUNING = {
    * have handed the hard road a maxed revolver a world early, which is the one
    * purchase in the game big enough to undo everything above.
    */
+  /**
+   * The gentle road. Every knob leans the player's way by about the amount the
+   * hard column leans the other, and none of them removes a system: hunger,
+   * the ledger and permadeath all still apply, so the game is the same game.
+   */
+  easy: {
+    enemyLivesMul: 0.92,
+    bossLivesMul: 0.92,
+    enemyAccuracyBonus: -0.02,
+    enemyAbilityChanceMul: 0.9,
+    enemySpecialChanceMul: 0.9,
+    enemyCastMul: 0.95,
+    enemyRampChance: 0.25,
+
+    aiReadCeiling: 0.56,
+    aiShieldCeiling: 0.18,
+    aiStreakTrigger: 3,
+    aiStreakBonus: 0.3,
+    aiFinisherBonus: 0,
+
+    priceMul: 0.92,
+    innPriceMul: 0.9,
+    gunCostMul: 0.92,
+    discountChanceMul: 1.15,
+    goldMul: 1.05,
+    expMul: 1,
+    startingGold: 75,
+
+    innBasicFraction: 0.55,
+    innPremiumFraction: 1,
+    itemHealMul: 1.05,
+    foodMul: 1.05,
+    bonusLivesMul: 1.1,
+    totemReviveMul: 1.05,
+    hungerDrainMul: 0.92,
+  },
+
   hard: {
     // --- the man across the road ------------------------------------------
     /**
@@ -376,7 +434,7 @@ const TUNING = {
  */
 let current = DEFAULT_DIFFICULTY;
 
-/** @returns {'normal'|'hard'} */
+/** @returns {'easy'|'normal'|'hard'} */
 export function getDifficulty() {
   return current;
 }

@@ -226,8 +226,25 @@ export const ES = {
     'La partida se guarda sola después de cada encuentro, y otra vez cada vez que te retiras desde el camino. Si mueres ahí fuera, la ranura se borra.',
   Normal: 'Normal',
   Hard: 'Difícil',
-  'The road as it was built. Long, and it kills most runs.':
-    'El camino tal y como se construyó. Largo, y se lleva por delante casi todas las partidas.',
+  'The road as it was built. Long, and it rewards a careful hand.':
+    'El camino tal y como se construyó. Largo, y premia una mano cuidadosa.',
+  Easy: 'Fácil',
+  'The same road, walked at a gentler pace. For seeing the end of it.':
+    'El mismo camino, a un paso más tranquilo. Para llegar a ver su final.',
+  'Riders and bosses carry less life, and aim a little worse.':
+    'Los jinetes y los jefes llevan menos vida, y apuntan un poco peor.',
+  'The man across the road reads you a little less well.':
+    'El hombre de enfrente te lee un poco peor.',
+  'Shops, inns and the forge are cheaper, and a body is worth more gold.':
+    'Las tiendas, las posadas y la fragua son más baratas, y un cadáver vale más oro.',
+  'Beds, med kits and meals put back more, and hunger comes on slower.':
+    'Las camas, los botiquines y las comidas curan más, y el hambre llega más despacio.',
+  'Easy road': 'Camino fácil',
+  'Finish the normal road to open the hard one.':
+    'Termina el camino normal para abrir el difícil.',
+  'Somewhere in {world}': 'En algún lugar de {world}',
+  'Somewhere in {world}, on the hard road': 'En algún lugar de {world}, en el camino difícil',
+  'Somewhere in {world}, on the easy road': 'En algún lugar de {world}, en el camino fácil',
   'The same road, and nothing on it is on your side.':
     'El mismo camino, y nada de lo que hay en él está de tu parte.',
   'A body is worth more gold out here. It does not cover it.':
@@ -236,8 +253,8 @@ export const ES = {
     'Los jefes son más grandes, más jinetes llevan un truco, y más de ellos llevan el arma pesada.',
   'Every counter asks about half again — the stall, the inn and the forge — and half-price tags are rare.':
     'Todos los mostradores piden casi la mitad más —el puesto, la posada y la fragua— y las rebajas escasean.',
-  'Every gun on this road is one rung further up the ladder. A Dust Flats rider carries the Prairie\'s.':
-    'Cada arma de este camino está un peldaño más arriba. Un jinete de los Llanos de Polvo lleva la de la Pradera.',
+  'The Prairie and the Pass arm their riders a rung early, and the man across the road does not forget.':
+    'La Pradera y el Paso arman a sus jinetes un peldaño antes, y el hombre de enfrente no olvida.',
   'Med kits, bottles, meals and the Dusk Totem are all worth less than they say.':
     'Los botiquines, los frascos, las comidas y el Tótem del Ocaso valen menos de lo que dicen.',
   'Riders carry more life, and the man across the road reads a repeated move off two instead of three.':
@@ -432,6 +449,7 @@ export const ES = {
   'You both go down a life': 'Los dos perdéis una vida',
   'You both reload': 'Los dos recargáis',
   'You blocked it': 'Lo has bloqueado',
+  'Blocked!': '¡Bloqueado!',
   'They spent their turn on that': 'Han gastado su turno en eso',
   'They scrambled for their belt': 'Han rebuscado en el cinturón',
   'They shot wide': 'Han disparado desviado',
@@ -2049,4 +2067,43 @@ export const ES = {
   'The sigil still opens this panel with the button hidden':
     'El sigilo sigue abriendo este panel con el botón oculto',
   'Put the one-tap button back on the road': 'Devolver el botón de un toque al camino',
+
+  // --- added with the 2026 rebalance: strings that were printing in English
+  "YOU WIN": "VICTORIA",
+  "YOU LOSE": "DERROTA",
+  "Your shield ate the blast": "Tu escudo se ha tragado la explosión",
+  "The blast went straight through": "La explosión ha pasado de lleno",
+  "You win the duel": "Ganas el duelo",
+  "Duel won": "Duelo ganado",
+  "Duel lost": "Duelo perdido",
+  "Shoot (empty)": "Disparar (vacío)",
+  "Poor visibility — they read you less well": "Poca visibilidad: te leen peor",
+  "They got a shield up in time": "Se han cubierto a tiempo",
+  "The blast lands": "La explosión da de lleno",
+  "You are down": "Has caído",
+  "Mirrored": "Reflejado",
+  "You hit": "Le das",
+  "You were hit": "Te dan",
+  "Wide": "Desviado",
+  "Misfire": "Fallo de pólvora",
+  "Save and leave": "Guardar y salir",
+  "That run has been erased. It is gone for good.": "Esa partida se ha borrado. No hay vuelta atrás.",
+  "Erase it": "Borrarla",
+  "In hand": "En la mano",
+  "Your saddlebag is empty": "Tu alforja está vacía",
+  "Shops on the road will sell you what you need.": "Las tiendas del camino te venderán lo que necesites.",
+  "Nothing of that kind": "Nada de ese tipo",
+  "Try another tab.": "Prueba otra pestaña.",
+  "Works on its own while you carry it": "Funciona solo mientras lo lleves",
+  "Already in use": "Ya está en uso",
+  "Only in a duel": "Solo en un duelo",
+  "Swap abilities before the fight, not in it": "Cambia de habilidades antes del duelo, no durante",
+  "In hand — it charges as you fight": "En la mano: se carga mientras peleas",
+  "Not usable here": "No se puede usar aquí",
+  "Drink": "Beber",
+  "Open": "Abrir",
+  "Throw": "Lanzar",
+  "Trailhead": "Inicio del camino",
+  'Level up': 'Subes de nivel',
+  'Max lives {n}': 'Vidas máximas: {n}',
 };

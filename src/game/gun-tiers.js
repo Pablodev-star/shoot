@@ -35,6 +35,7 @@
  */
 
 import { PALETTE } from '../art/palette.js';
+import { enemyBulletFloor } from './progression.js';
 
 /**
  * One rung each. The index IS the gun level, so a save that has never seen a
@@ -254,7 +255,19 @@ export const ENEMY_GUNS = [
  * @param {number} damage what one of their shots costs you
  * @returns {{damage:number, shape:string, finish:string, name:string}}
  */
-export function enemyGunLook(damage = 0.5) {
+export function enemyGunLook(damage = 0.5, worldId = null) {
+  /*
+   * Since the rebalance the bullet climbs slower than one rung a world (see
+   * ENEMY_BULLET_LADDER in src/game/progression.js), so when the caller knows
+   * the world the SILHOUETTE comes off the world — one rung each, as it always
+   * read — and a rider carrying more than his world's floor is a rung up on
+   * top of it. The chip still prints the real cost of a round.
+   */
+  if (worldId != null) {
+    const world = Math.max(1, Math.round(Number(worldId)) || 1);
+    const heavier = (Number(damage) || 0) > enemyBulletFloor(world) ? 1 : 0;
+    return ENEMY_GUNS[Math.max(0, Math.min(ENEMY_GUNS.length - 1, world - 1 + heavier))];
+  }
   const rung = Math.round((Number(damage) || 0.5) / 0.5) - 1;
   return ENEMY_GUNS[Math.max(0, Math.min(ENEMY_GUNS.length - 1, rung))];
 }

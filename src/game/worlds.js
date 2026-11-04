@@ -279,7 +279,7 @@ export const WORLDS = [
     encounters: { duels: 8 },
     rarity: { common: 30, rare: 45, legendary: 25 },
     enemy: {
-      lives: { 8: 30, 9: 40, 10: 25, 11: 5 },
+      lives: { 7: 30, 8: 40, 9: 25, 10: 5 },
       abilityChance: 0.36,
       abilities: ['dynamite', 'magmaSpout', 'cinderSnatch', 'hellWhisper'],
       accuracy: 0.55,
@@ -291,7 +291,7 @@ export const WORLDS = [
     boss: {
       name: 'Old Scratch',
       archetype: 'bossScratch',
-      lives: 16,
+      lives: 12,
       abilities: ['magmaSpout', 'hellWhisper', 'dynamite'],
       accuracy: 0.66,
       special: 'volcano',
@@ -367,7 +367,7 @@ export const WORLDS = [
     encounters: { duels: 6 },
     rarity: { common: 24, rare: 44, legendary: 32 },
     enemy: {
-      lives: { 10: 30, 11: 40, 12: 25, 13: 5 },
+      lives: { 8: 30, 9: 40, 10: 25, 11: 5 },
       abilityChance: 0.36,
       /**
        * Four tricks, and not one of them does damage in the way the basin's do.
@@ -396,7 +396,7 @@ export const WORLDS = [
     boss: {
       name: 'The Sexton',
       archetype: 'bossSexton',
-      lives: 16.5,
+      lives: 13.5,
       abilities: ['deathMark', 'coldSweat', 'marrowDrain'],
       accuracy: 0.65,
       special: 'gallows',
@@ -463,7 +463,7 @@ export const WORLDS = [
      * curve, read one step further along.
      */
     enemy: {
-      lives: { 11: 30, 12: 40, 13: 22, 14: 8 },
+      lives: { 9: 30, 10: 40, 11: 22, 12: 8 },
       abilityChance: 0.48,
       abilities: ['gravityPull', 'voidMirror', 'meteorStrike', 'mindRift'],
       accuracy: 0.6,
@@ -484,7 +484,7 @@ export const WORLDS = [
      */
     boss: {
       name: 'THE STRANGER',
-      lives: 9.5,
+      lives: 7.5,
       abilities: ['mindRift', 'meteorStrike', 'voidMirror'],
       accuracy: 0.73,
       archetype: 'bossStranger',
@@ -525,7 +525,7 @@ export const WORLDS = [
         {
           name: 'The Stranger',
           archetype: 'bossStranger',
-          lives: 9.5,
+          lives: 7.5,
           accuracy: 0.73,
           abilities: ['voidMirror', 'meteorStrike'],
           special: 'rift',
@@ -534,7 +534,7 @@ export const WORLDS = [
           name: 'The Stranger · Unmasked',
           /** The cloak comes off: phase two is a different sprite, not a bar refill. */
           archetype: 'bossStrangerUnmasked',
-          lives: 9.5,
+          lives: 7.5,
           accuracy: 0.75,
           abilities: ['mindRift', 'meteorStrike', 'voidMirror', 'gravityPull'],
           special: 'rift',

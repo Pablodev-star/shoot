@@ -151,7 +151,9 @@ export const SlotsScreen = {
              */
             info.difficulty === 'hard'
               ? el('span.chip.chip--hard', { text: 'Hard' })
-              : null,
+              : info.difficulty === 'easy'
+                ? el('span.chip.chip--easy', { text: 'Easy' })
+                : null,
             info.completed
               ? el('span.chip.chip--legendary', { text: 'Finished' })
               : el('span.chip', { text: `${info.world} / ${FINAL_WORLD}` }),
@@ -222,14 +224,12 @@ export const SlotsScreen = {
         'aria-label': t('Start a new {mode} run in slot {slot}', { mode: t(info.name), slot }),
       }, [uiIcon('plus', 1.1), el('span', { text: 'Ride out' })]);
 
-      if (!hardOpen) {
-        return el('div.panel.slot-card.is-empty', {}, [
-          uiIcon('plus', 2),
-          el('span.slot-world', { text: 'New run' }),
-          el('span.slot-name', { text: t('Slot {slot}', { slot }) }),
-          startButton,
-        ]);
-      }
+      /*
+       * The picker is on every empty card now: the gentle road is open from
+       * the first run, and the hard one joins the list once the game has been
+       * finished. A road that is not open yet is not offered at all.
+       */
+      const offered = DIFFICULTIES.filter((d) => d.id !== 'hard' || hardOpen);
 
       /**
        * The game's own list, not the operating system's — see `select` in
@@ -240,7 +240,7 @@ export const SlotsScreen = {
       const modePicker = select({
         value: pick,
         label: t('Difficulty for slot {slot}', { slot }),
-        options: DIFFICULTIES.map((d) => ({ value: d.id, label: d.name })),
+        options: offered.map((d) => ({ value: d.id, label: d.name })),
         onChange: (next) => {
           chosen.set(slot, next);
           /**
@@ -258,7 +258,7 @@ export const SlotsScreen = {
       });
 
       return el('div.panel.slot-card.is-empty', {
-        class: pick === 'hard' ? 'is-hard' : '',
+        class: pick === 'hard' ? 'is-hard' : pick === 'easy' ? 'is-easy' : '',
       }, [
         el('span.slot-world', { text: 'New run' }),
         el('span.slot-name', { text: t('Slot {slot}', { slot }) }),
@@ -309,7 +309,7 @@ export const SlotsScreen = {
       ]),
       el('div.screen-body', {}, [
         grid,
-        el('p.muted.center', {
+        el('p.muted.center.slots-footnote', {
           text: 'Progress saves itself after every encounter, and again whenever you leave from the road. Die out there and the slot is erased.',
         }),
       ]),

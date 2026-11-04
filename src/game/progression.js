@@ -121,8 +121,43 @@ export function expForNextLevel(level) {
  * see the note over TARGETS in tools/sim.mjs for how far a run now gets, which
  * is the number that decision is written in.
  */
-export const LIVES_PER_LEVEL = 1;
-export const STARTING_LIVES = 3;
+export const LIVES_PER_LEVEL = 2;
+export const STARTING_LIVES = 4;
+
+/*
+ * THE 2026 REBALANCE — THE ROAD CAN BE FINISHED AGAIN
+ * ---------------------------------------------------------------------------
+ * The notes above describe the road as it was before this change, and they
+ * are kept because the reasoning in them still holds. What did not hold was
+ * the conclusion: on three diamonds plus one a level, against a bullet that
+ * climbed half a life every world, NOBODY finished the game. Measured, an
+ * expert reached the fourth world one run in twenty and the Galaxy never, and
+ * three runs in four ended in the Prairie to attrition rather than to any one
+ * duel. A road nobody can walk is not a gauntlet, it is a wall.
+ *
+ * Three numbers moved, and every one of them on the player's side of the
+ * ledger except the bullet:
+ *
+ *   - the bar starts at FOUR and grows TWO a level, so it keeps pace with the
+ *     road instead of falling behind it (4 → about 22 across a run);
+ *   - the riders' bullet is a hand-written ladder that tops out at a life and
+ *     a half before the Galaxy (`ENEMY_BULLET_LADDER`), so the late worlds are hard because of
+ *     their abilities, landmarks and bosses — not because every rider can
+ *     take a third of the bar in two shots;
+ *   - the late riders carry a little less (`ENEMY_LIVES_LADDER`), so a duel in
+ *     the Galaxy is three of your shots instead of three and a half.
+ *
+ * What that buys, over 400 runs a skill level with permadeath on:
+ *
+ *                  clears W1   reaches Galaxy   finishes
+ *     novice          96%           ~18%           ~5%
+ *     average         96%           ~44%          ~14%
+ *     expert         100%           ~77%          ~42%
+ *
+ *     hard, expert    99%           ~17%           ~8%
+ *
+ * — a skill ladder again, and the bands in `TARGETS` (tools/sim.mjs) hold it.
+ */
 
 /**
  * Roughly what the player's bar and revolver look like walking into each world.
@@ -180,12 +215,12 @@ export const STARTING_LIVES = 3;
  * the bar cannot pay for it.
  */
 export const EXPECTED_POWER = {
-  1: { lives: 3, damage: 0.5 },
-  2: { lives: 4, damage: 1.5 },
-  3: { lives: 6, damage: 2.5 },
-  4: { lives: 7, damage: 3.5 },
-  5: { lives: 9, damage: 3.5 },
-  6: { lives: 10, damage: 3.5 },
+  1: { lives: 4, damage: 0.5 },
+  2: { lives: 8, damage: 1.5 },
+  3: { lives: 12, damage: 3 },
+  4: { lives: 14, damage: 3.5 },
+  5: { lives: 18, damage: 3.5 },
+  6: { lives: 20, damage: 3.5 },
   /**
    * The seventh row, and it is the reason the Galaxy could be moved up a rung
    * without the ending becoming a wall. A player who has crossed the Hollow
@@ -195,7 +230,7 @@ export const EXPECTED_POWER = {
    * two sides moved together, which is the only way this file allows either of
    * them to move at all.
    */
-  7: { lives: 12, damage: 3.5 },
+  7: { lives: 22, damage: 3.5 },
 };
 
 /** Rounded to the half-diamond grid the whole game lives on. */
@@ -347,6 +382,14 @@ export const ENEMY_LIVES_PER_WORLD = 2;
 export const ENEMY_LIVES_FINAL_STEP = 1;
 
 /**
+ * …and since the rebalance the ladder is written out by hand, because its
+ * back half is flatter than any one step can say: two a world to the Bayou,
+ * then one a world. It must agree with the `lives` tables in
+ * src/game/worlds.js — `tools/sim.mjs asymmetry` fails the build if not.
+ */
+export const ENEMY_LIVES_LADDER = [1, 3, 5, 7, 8, 9, 10];
+
+/**
  * WHAT A RIDER'S BULLET COSTS YOU: ONE RUNG OF THE GUN LADDER PER WORLD
  * ---------------------------------------------------------------------------
  * Half a life in the Dust Flats and half a life more every world after it, all
@@ -381,9 +424,19 @@ export const ENEMY_LIVES_FINAL_STEP = 1;
  */
 export const ENEMY_BULLET_STEP = 0.5;
 
+/**
+ * The ladder as it ships since the rebalance (see the note over
+ * `STARTING_LIVES`): half a life for two worlds, a life in the Pass, and a
+ * life and a half from the Bayou on, and two in the Galaxy. The man's GUN still climbs one rung a
+ * world (`enemyGunLook` in src/game/gun-tiers.js takes the world), so the
+ * silhouette keeps telling you how far you have come; the card beside it
+ * prints what a round actually costs.
+ */
+export const ENEMY_BULLET_LADDER = [0.5, 0.5, 1, 1.5, 1.5, 1.5, 2];
+
 export function enemyGunDamage(worldId) {
   const world = Math.max(1, Math.min(FINAL_WORLD, Math.round(worldId) || 1));
-  return world * ENEMY_BULLET_STEP;
+  return ENEMY_BULLET_LADDER[world - 1] ?? world * ENEMY_BULLET_STEP;
 }
 
 /**
@@ -457,9 +510,26 @@ export function enemyRampChance() {
  * half, or two.
  */
 export function enemyBulletFloor(worldId) {
-  const base = enemyGunDamage(worldId);
-  return isHard() ? base + ENEMY_DAMAGE_STEP : base;
+  /*
+   * Since the rebalance the hard road no longer adds a rung EVERYWHERE. One
+   * rung up on top of everything else in the hard column of
+   * src/game/difficulty.js meant an expert never left the Pass; it has its own
+   * ladder now (`HARD_BULLET_LADDER`), and with the multipliers there it holds
+   * an expert to about one finish in twelve.
+   */
+  if (isHard()) {
+    const world = Math.max(1, Math.min(FINAL_WORLD, Math.round(worldId) || 1));
+    return HARD_BULLET_LADDER[world - 1];
+  }
+  return enemyGunDamage(worldId);
 }
+
+/**
+ * The hard road's own ladder: the Prairie and the Pass a rung up, where the
+ * ordinary road is still teaching. Past them it is the multipliers in the
+ * hard column of src/game/difficulty.js that make the mode, not the bullet.
+ */
+export const HARD_BULLET_LADDER = [0.5, 1, 1, 1.5, 1.5, 1.5, 1.5];
 
 export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
   const floor = enemyBulletFloor(worldId);
@@ -470,6 +540,7 @@ export function enemyGunDamageAt(worldId, progress = 0, upgraded = false) {
 /** How much life a rider of a given world carries, before its own spread. */
 export function enemyLives(worldId) {
   const world = Math.max(1, Math.min(FINAL_WORLD, worldId || 1));
+  if (ENEMY_LIVES_LADDER[world - 1] != null) return ENEMY_LIVES_LADDER[world - 1];
   const fullSteps = Math.min(world, FINAL_WORLD - 1) - 1;
   return ENEMY_LIVES_BASE + fullSteps * ENEMY_LIVES_PER_WORLD
     + (world === FINAL_WORLD ? ENEMY_LIVES_FINAL_STEP : 0);

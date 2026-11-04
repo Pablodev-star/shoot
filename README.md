@@ -40,51 +40,64 @@ diamonds that are not red are the **gold** ones a Potion hangs on the end of the
 bar: three lives that were never yours, spent before the red and healed by
 nothing.
 
-**You start on three diamonds and the trail iron takes half of one a shot, so a
-rider needs six clean hits to finish you.** That is the Dust Flats, and it is
-the deepest the bar is ever going to feel: the road climbs half a life a world
-and your bar does not keep up, so six becomes four in the Prairie and settles at
-three and a half from the Bayou on. The harness watches the floor of it — under
-three connected hits there is no fight left in a duel — and it once caught the
-opposite failure, a version where the number had quietly grown to *twelve* in
-the Dust Flats and *fourteen* by the second world because the player's life bar
-and the rider's bullet were two numbers in two files growing at different rates.
+## The 2026 rebalance: the road can be finished again
 
-**Two ladders are written down by hand.** A rider carries two diamonds more
-every world, and a rider's bullet goes up half a life every world — one rung of
-the enemy gun ladder per world, from the trail sixgun in the Dust Flats to a
-Nova frame in the Galaxy. Everything else is tuned around them: a bar that
-starts at three and grows one life a level at about three levels every two
-worlds, and a forge ladder worth half a life a rung. See `enemyGunDamage` and
-`EXPECTED_POWER` in `src/game/progression.js`.
+The version before this one had drifted into a wall. Measured over 250 runs a
+skill level, an expert reached the fourth world one run in twenty and **nobody
+ever reached the Galaxy** — three runs in four ended in the Prairie, worn down
+by attrition rather than beaten by any one duel. Three numbers moved:
 
-| World | You have | A rider hits for | A rider carries | Hits to kill you | So a rider is |
-| --- | --- | --- | --- | --- | --- |
-| Dust Flats | 3 lives, 0.5 a shot | 0.5 | 1 | 6 | 2 shots |
-| Wildgrass Prairie | 4 lives, 1.5 | 1 | 3 | 4 | 2 shots |
-| Whitecrown Pass | 6 lives, 2.5 | 1.5 | 5 | 4 | 2 shots |
-| Blackwater Bayou | 7 lives, 3.5 | 2 | 7 | 3.5 | 2 shots |
-| Brimstone Basin | 9 lives, 3.5 | 2.5 | 9 | 3.6 | 2.6 shots |
-| Gallows Hollow | 10 lives, 3.5 | 3 | 11 | 3.3 | 3.2 shots |
-| Galaxy | 12 lives, 3.5 | 3.5 | 12 | 3.4 | 3.5 shots |
+- **Your bar starts at four diamonds and grows two a level** (it was three and
+  one), so it keeps pace with the road instead of falling behind it.
+- **A rider's bullet is a gentler hand-written ladder** — half a life for two
+  worlds, one in the Pass, one and a half from the Bayou on, two in the Galaxy
+  (`ENEMY_BULLET_LADDER` in `src/game/progression.js`). The man's *gun* still
+  climbs one rung a world, so the silhouette in his hand still tells you how
+  far you have come; his card prints what a round really costs.
+- **Late riders carry a little less** — 8, 9 and 10 lives in the last three
+  worlds (`ENEMY_LIVES_LADDER`), and the last three bosses with them.
 
-**The bullet climbs faster than the bar does, and that is the road.** Six
-connected hits deep in the Dust Flats — a fight you can afford to misplay twice
-— settling at three and a half from the Bayou on, which is a fight you cannot.
-The bullet was derived from the bar for a while, which held the price of a duel
-at about a third of it everywhere and produced a ladder with flat spots: three
-worlds running on the same bullet, which is three worlds running with the same
-gun in the man's hand. The one difficulty signal this game *shows* rather than
-states had stopped moving for half the run, so it is a hand-written ladder
-again and the road outgrows you on purpose.
+And there is a third road, open from the first run: **Easy**, the same road
+with friendlier arithmetic on every side of the ledger (`easy` in
+`src/game/difficulty.js`). Permadeath still applies; finishing on Easy does not
+open the hard road. What the three roads deliver now, 250–400 runs a skill:
 
-What that costs is written down rather than hidden: **nobody finishes this game
-any more.** Measured over 250 runs a skill level, an expert reaches the second
-world 96% of the time, the third 28%, the fourth 2%, and the Galaxy never. The
-harness bands moved with it — see `TARGETS` in `tools/sim.mjs`, which now
-measures how deep a run gets rather than who finishes — and the old contract is
-kept commented out beside them, which is what to restore if the two sides of the
-road are ever brought back together.
+| Road | Novice finishes | Average finishes | Expert finishes | Expert reaches the Galaxy |
+| --- | --- | --- | --- | --- |
+| Easy | ~32% | ~60% | ~84% | ~97% |
+| Normal | ~5% | ~14% | ~42% | ~76% |
+| Hard | ~0% | ~1% | ~7% | ~17% |
+
+Nearly everyone clears the first world on every road. `tools/sim.mjs` gates all
+three (see `TARGETS`, `HARD_TARGETS` and `EASY_TARGETS`), so CI fails if a
+change pushes any of them out of its band.
+
+| World | You have | A rider hits for | A rider carries | Hits to kill you |
+| --- | --- | --- | --- | --- |
+| Dust Flats | 4 lives, 0.5 a shot | 0.5 | 1 | 8 |
+| Wildgrass Prairie | 8 lives, 1.5 | 0.5 | 3 | 16 |
+| Whitecrown Pass | 12 lives, 3 | 1 | 5 | 12 |
+| Blackwater Bayou | 14 lives, 3.5 | 1.5 | 7 | 9.3 |
+| Brimstone Basin | 18 lives, 3.5 | 1.5 | 8 | 12 |
+| Gallows Hollow | 20 lives, 3.5 | 1.5 | 9 | 13.3 |
+| Galaxy | 22 lives, 3.5 | 2 | 10 | 11 |
+
+Hits-to-kill is no longer the whole story it used to be: the late worlds are
+hard because of their abilities, landmarks and bosses, and because a back-half
+rider can carry the next rung of the gun. Much of what follows describes the
+road *before* this rebalance and is kept for its reasoning; where it quotes
+numbers, the table above wins.
+
+### Also new
+
+- **Damage numbers** fly off whoever was hit (red), healed (green), or whose
+  shield caught a round ("¡Bloqueado!") — `src/ui/combat-text.js`.
+- **A red pulse at the edges of the duel** when one more hit would end you.
+- **A level-up card** with the new level and your new maximum, instead of a
+  corner toast.
+- The rival's gun chip no longer gets clipped by a long name, the note under
+  the slot cards is readable, and about thirty duel and saddlebag strings that
+  were still printing in English are now translated.
 
 **The last three worlds are where the forge ladder runs out** — the gun stops at
 three and a half and the riders keep climbing — so a fight out there takes a

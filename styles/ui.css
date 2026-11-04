@@ -530,6 +530,8 @@
   text-shadow: 0 0 10px rgba(240, 87, 79, 0.55);
 }
 .chip--live { border-color: var(--green); color: #b7e9a0; }
+/* The gentle road: the same pill in the colour of the meadow. */
+.chip--easy { border-color: var(--green); color: #b7e9a0; }
 
 /* The level chip wears its exp along the bottom of the pill. The number alone
    only moves once every several fights; between those, this is the only thing
@@ -1826,4 +1828,101 @@ input[type='range']::-moz-range-thumb {
   letter-spacing: var(--tracking-tight);
   color: var(--red-light);
   opacity: 0.9;
+}
+
+/* --- The level-up card (src/ui/level-up.js) ------------------------------- */
+.levelup-card {
+  position: fixed;
+  left: 50%;
+  top: 34%;
+  z-index: 60;
+  pointer-events: none;
+  min-width: 200px;
+  padding: 14px 34px 16px;
+  text-align: center;
+  background: linear-gradient(180deg, #4a2c12, #2a170a);
+  border: 3px solid var(--gold-light, #ffe27a);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(255, 200, 80, 0.45),
+    0 14px 30px rgba(0, 0, 0, 0.5);
+  animation: levelup-in 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.levelup-card[data-multi]::after {
+  content: attr(data-multi);
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--red, #c62f2a);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+
+.levelup-kicker {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-light, #ffe27a);
+}
+
+.levelup-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 1;
+  margin: 4px 0;
+  color: #fff3c4;
+  text-shadow: 0 4px 0 #6b3a0e, 0 0 24px rgba(255, 210, 90, 0.8);
+  animation: levelup-num 0.7s 0.15s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.levelup-sub {
+  font-size: 14px;
+  color: var(--bone, #f2e3c6);
+}
+
+.levelup-sparks { position: absolute; left: 50%; top: 50%; }
+.levelup-sparks i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #ffe27a;
+  box-shadow: 0 0 8px #ffb52e;
+  animation: levelup-spark 0.9s ease-out both;
+}
+
+@keyframes levelup-in {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-4deg); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(1deg); }
+  20% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(0.96); }
+}
+
+@keyframes levelup-num {
+  0% { transform: scale(0.2); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes levelup-spark {
+  0% { transform: translate(0, 0) scale(1.4); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .levelup-card { animation-name: combat-text-fade-simple; }
+  .levelup-num, .levelup-sparks i { animation: none; }
+  .levelup-sparks { display: none; }
+}
+
+@keyframes combat-text-fade-simple {
+  0% { opacity: 0; transform: translate(-50%, -50%); }
+  10%, 80% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -50%); }
 }

@@ -14,6 +14,7 @@ import { initScene } from './core/scene.js';
 import { initRouter, register, go } from './core/router.js';
 import { initToasts } from './ui/toast.js';
 import { initAchievementNotices } from './ui/achievement-notice.js';
+import { initLevelUp } from './ui/level-up.js';
 import { loadSettings } from './core/settings.js';
 import { loadAchievements, initAchievements, isUnlocked } from './game/achievements.js';
 import { applyOutfit } from './game/wardrobe.js';
@@ -101,6 +102,7 @@ async function boot() {
   initScene(document.getElementById('scene-canvas'));
   initToasts(document.getElementById('toasts'));
   initAchievementNotices(document.getElementById('achievement-notices'));
+  initLevelUp(document.getElementById('app'));
   initRouter(document.getElementById('screen-root'), document.getElementById('transition'));
 
   SCREENS.forEach(register);

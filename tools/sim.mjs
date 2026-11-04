@@ -992,6 +992,7 @@ async function reportRuns(difficulty = 'normal') {
 
 /** The hard road, measured the same way and gated against its own bands. */
 const reportHard = () => reportRuns('hard');
+const reportEasy = () => reportRuns('easy');
 
 // ---------------------------------------------------------------------------
 // The gate
@@ -1048,20 +1049,29 @@ const TARGETS = [
    *   { what: 'average reaches the Galaxy', field: 'reachedGalaxyPct', min: 1,  max: 16 },
    *   { what: 'expert reaches the Galaxy',  field: 'reachedGalaxyPct', min: 28, max: 56 },
    */
-  { what: 'novice reaches the Prairie', field: 'reachedPrairiePct', min: 58, max: 86 },
-  { what: 'average reaches the Prairie', field: 'reachedPrairiePct', min: 58, max: 86 },
-  { what: 'expert reaches the Prairie', field: 'reachedPrairiePct', min: 86, max: 100 },
-  { what: 'novice reaches the Pass', field: 'reachedPassPct', min: 1, max: 16 },
-  { what: 'average reaches the Pass', field: 'reachedPassPct', min: 2, max: 20 },
-  { what: 'expert reaches the Pass', field: 'reachedPassPct', min: 15, max: 44 },
-  /**
-   * The deepest anybody gets, and the one band with a floor of zero: two runs
-   * in a hundred is inside the noise of 250 runs, so a floor here would fail
-   * builds at random. The ceiling is the real check — an expert reaching the
-   * Bayou more than one run in eight means something gave the first three
-   * worlds back.
+  /*
+   * THE 2026 REBALANCE PUT THE OLD KIND OF CONTRACT BACK
+   * -------------------------------------------------------------------------
+   * Everything above this line describes the gauntlet nobody finished. That
+   * road was retuned (see the note over STARTING_LIVES in
+   * src/game/progression.js) and the bands are once again about who FINISHES,
+   * plus a floor on the first world so a first-time player is not turned away
+   * at the door. Measured over 400 runs a skill level:
+   *
+   *                   Prairie   Galaxy   finished
+   *     novice           96%      18%       5%
+   *     average          96%      44%      14%
+   *     expert          100%      77%      42%
    */
-  { what: 'expert reaches the Bayou', field: 'reachedBayouPct', min: 0, max: 12 },
+  { what: 'novice reaches the Prairie', field: 'reachedPrairiePct', min: 86, max: 100 },
+  { what: 'average reaches the Prairie', field: 'reachedPrairiePct', min: 86, max: 100 },
+  { what: 'expert reaches the Prairie', field: 'reachedPrairiePct', min: 94, max: 100 },
+  { what: 'novice reaches the Galaxy', field: 'reachedGalaxyPct', min: 6, max: 32 },
+  { what: 'average reaches the Galaxy', field: 'reachedGalaxyPct', min: 28, max: 60 },
+  { what: 'expert reaches the Galaxy', field: 'reachedGalaxyPct', min: 60, max: 92 },
+  { what: 'novice finishes', field: 'finishedPct', min: 1, max: 12 },
+  { what: 'average finishes', field: 'finishedPct', min: 5, max: 26 },
+  { what: 'expert finishes', field: 'finishedPct', min: 28, max: 58 },
 ];
 
 /**
@@ -1100,10 +1110,28 @@ const TARGETS = [
  * always meant: somebody who mashes SHOOT and never reads a price tag is not
  * promised anything out here.
  */
+/**
+ * The gentle road (see the `easy` column in src/game/difficulty.js). Its job
+ * is to let somebody who is not going to learn the cylinder see the ending, so
+ * its bands are about finishing, and its floor on the novice is the point.
+ * Measured over 300 runs: novice 32%, average 61%, expert 83%.
+ */
+const EASY_TARGETS = [
+  { what: 'novice finishes (easy)', field: 'finishedPct', min: 15, max: 50 },
+  { what: 'average finishes (easy)', field: 'finishedPct', min: 40, max: 80 },
+  { what: 'expert finishes (easy)', field: 'finishedPct', min: 70, max: 97 },
+];
+
 const HARD_TARGETS = [
-  { what: 'novice reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 0, max: 14 },
-  { what: 'average reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 1, max: 20 },
-  { what: 'expert reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 18, max: 46 },
+  /*
+   * The hard road after the rebalance: the first world is still a door
+   * everyone can walk through, and the end of it belongs to experts — about
+   * one finish in twelve, against nearly nobody else.
+   */
+  { what: 'expert reaches the Prairie (hard)', field: 'reachedPrairiePct', min: 90, max: 100 },
+  { what: 'expert reaches the Galaxy (hard)', field: 'reachedGalaxyPct', min: 7, max: 30 },
+  { what: 'expert finishes (hard)', field: 'finishedPct', min: 2, max: 18 },
+  { what: 'average finishes (hard)', field: 'finishedPct', min: 0, max: 5 },
 ];
 
 /**
@@ -1149,15 +1177,16 @@ async function reportAll() {
    * design exists to avoid, wearing a different hat.
    */
   const hard = await reportHard();
+  const easy = await reportEasy();
 
   console.log('\n=== TARGETS ===');
-  const failed = [...gate(runs, TARGETS), ...gate(hard, HARD_TARGETS)];
+  const failed = [...gate(runs, TARGETS), ...gate(hard, HARD_TARGETS), ...gate(easy, EASY_TARGETS)];
   if (failed.length) {
     console.error(`\n${failed.length} target(s) missed:`);
     for (const f of failed) console.error(`  ${f.what}: ${f.value}% (want ${f.min}–${f.max}%)`);
     process.exitCode = 1;
   } else {
-    console.log('\nAll targets met, on both roads.');
+    console.log('\nAll targets met, on every road.');
   }
 }
 
@@ -1168,6 +1197,7 @@ const MODES = {
   specials: reportSpecials,
   runs: reportRuns,
   hard: reportHard,
+  easy: reportEasy,
   all: reportAll,
 };
 

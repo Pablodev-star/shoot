@@ -84,6 +84,7 @@ import { MAX_BULLETS } from './duel-engine.js';
 import { getSettings } from '../core/settings.js';
 import { toast } from '../ui/toast.js';
 import { openHowToPlay } from '../ui/help.js';
+import { createCombatText } from '../ui/combat-text.js';
 import { PALETTE } from '../art/palette.js';
 
 /**
@@ -195,7 +196,7 @@ export const DuelScreen = {
        * the player can read the threat before the first draw instead of after
        * the first hit.
        */
-      enemyGun: enemyGunLook(enemy.gunDamage),
+      enemyGun: enemyGunLook(enemy.gunDamage, worldId),
     });
 
     const localAgent = createLocalAgent();
@@ -317,7 +318,7 @@ export const DuelScreen = {
      * on the Shoot button's tooltip and in the help panel already, and a
      * fourth copy of it here would be the interface repeating itself.
      */
-    enemyPlate.setTag(gunChip(enemy.gunDamage));
+    enemyPlate.setTag(gunChip(enemy.gunDamage, worldId));
 
     /**
      * WHAT IS HAPPENING TO A FIGHTER, AND WHAT THEY CAN DO, IN ONE STRIP
@@ -712,6 +713,15 @@ export const DuelScreen = {
     ]);
 
     root.append(screen);
+    const combatText = createCombatText(screen, (side) => scene.anchorOf(side));
+
+    /**
+     * What each side's bar held the last time it was drawn, so every redraw
+     * can say what CHANGED — and throw that number up off the man it happened
+     * to (src/ui/combat-text.js). Null until the first sync, which only sets it.
+     */
+    const lastLives = { player: null, enemy: null };
+
     attachButtonSounds(screen);
     buildAbilityBar();
     syncBars();
@@ -731,8 +741,27 @@ export const DuelScreen = {
     window.addEventListener('resize', syncHud);
 
     // --- state sync --------------------------------------------------------
+    function popDeltas(sides) {
+      for (const side of ['player', 'enemy']) {
+        const now = (sides[side].lives || 0) + (sides[side].bonus || 0);
+        const before = lastLives[side];
+        lastLives[side] = now;
+        if (before == null) continue;
+        const change = now - before;
+        // A boss rising into his next phase refills the bar: that is a new
+        // fight, not a heal, and it has its own entrance.
+        if (side === 'enemy' && change > 0 && change >= (sides.enemy.maxLives || 1) * 0.5) continue;
+        combatText.delta(side, change);
+      }
+      // On the last shot's worth of life, the whole frame says so.
+      const p = sides.player;
+      const threat = Math.max(0.5, Number(enemy.gunDamage) || 0.5);
+      screen.classList.toggle('is-critical', p.lives > 0 && p.lives + (p.bonus || 0) <= threat);
+    }
+
     function syncBars() {
       const sides = duel.getSides();
+      popDeltas(sides);
       playerPlate.setLives(sides.player.lives, sides.player.maxLives, sides.player.bonus);
       enemyPlate.setLives(sides.enemy.lives, sides.enemy.maxLives, sides.enemy.bonus);
       playerPlate.setBullets(sides.player.bullets);
@@ -1394,6 +1423,14 @@ export const DuelScreen = {
         play('hit');
       }
 
+      // A raised shield that actually caught something says so over the man
+      // holding it — the one good outcome in the game that had no picture.
+      if (res.enemyMove === MOVES.SHOOT && res.playerMove === MOVES.SHIELD && res.enemyFires && !res.hits.player) {
+        combatText.word('player', 'Blocked!');
+      }
+      if (res.playerMove === MOVES.SHOOT && res.enemyMove === MOVES.SHIELD && res.playerFires && !res.hits.enemy) {
+        combatText.word('enemy', 'Blocked!');
+      }
       syncBars();
       const [text, tone] = describe(res);
       setCallout(text, tone);
@@ -1554,7 +1591,7 @@ export const DuelScreen = {
        */
       scene.setPose(won ? 'enemy' : 'player', 'fall');
       play(won ? 'win' : 'lose');
-      scene.fx.banner = won ? 'YOU WIN' : 'YOU LOSE';
+      scene.fx.banner = t(won ? 'YOU WIN' : 'YOU LOSE');
       scene.fx.bannerTimer = 1600;
 
       const sides = duel.getSides();
@@ -1800,6 +1837,7 @@ export const DuelScreen = {
       // belongs to reachable long after the duel is over.
       playerPlate.dispose();
       enemyPlate.dispose();
+      combatText.dispose();
     };
   },
 };
@@ -1814,8 +1852,8 @@ export const DuelScreen = {
  * about what he brought. It is levelled rather than raised because that is the
  * pose the gun spends a fight in.
  */
-function gunChip(damage) {
-  const look = enemyGunLook(damage);
+function gunChip(damage, worldId) {
+  const look = enemyGunLook(damage, worldId);
   const art = getRevolverSprites(look.finish, look.shape).level.sprite;
   const cost = Number(damage) || 0;
   const tip = `${look.name} — ${cost} ${cost === 1 ? 'life' : 'lives'} a shot`;

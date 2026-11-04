@@ -304,7 +304,8 @@ async function finishGame() {
    * the lock existed, a profile that was reset), so this asks rather than
    * assuming.
    */
-  const firstTime = await unlockHardMode();
+  // The gentle road shows you the ending; it does not open the hard one.
+  const firstTime = difficulty === 'easy' ? false : await unlockHardMode();
   if (firstTime) await playHardModeUnlock();
 
   leaveRoad();
