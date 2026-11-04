@@ -739,6 +739,8 @@ function blankProgress() {
      */
     hardRuns: 0,
     hardFinishes: 0,
+    /** Clears on the gentle road, which do not open the hard one. */
+    easyFinishes: 0,
     /** Sets, stored as arrays because JSON has no set. */
     worldsReached: [],
     /** Worlds reached on the hard road, kept apart from `worldsReached`. */
@@ -924,6 +926,11 @@ export function track(what, detail = {}) {
       break;
 
     case 'gameFinished':
+      // Easy clears are counted apart so boot can tell whether a finish
+      // qualifies for the hard road (see main.js). Bumped BEFORE the total:
+      // the total unlocks 'finished', which saves at once, and that save has
+      // to carry this count with it.
+      if (detail.difficulty === 'easy') bump('easyFinishes');
       bump('gamesFinished');
       // …and the hard road's own count, which is what the Ember Reaver hangs
       // on. A hard clear counts as both, because it is both.
