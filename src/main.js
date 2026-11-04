@@ -16,7 +16,7 @@ import { initToasts } from './ui/toast.js';
 import { initAchievementNotices } from './ui/achievement-notice.js';
 import { initLevelUp } from './ui/level-up.js';
 import { loadSettings } from './core/settings.js';
-import { loadAchievements, initAchievements, isUnlocked } from './game/achievements.js';
+import { loadAchievements, initAchievements, isUnlocked, getAchievementState } from './game/achievements.js';
 import { applyOutfit } from './game/wardrobe.js';
 import { unlockHardMode } from './game/difficulty.js';
 
@@ -90,7 +90,12 @@ async function boot() {
    * announcement plays — which is correct. Somebody who finished the game last
    * month is not shown a cut-scene about a thing they are already holding.
    */
-  if (isUnlocked('finished')) await unlockHardMode();
+  // Only a clear on the normal or hard road opens it: Easy clears are
+  // counted apart (`easyFinishes`) and do not qualify.
+  const finishes = getAchievementState().progress;
+  if (isUnlocked('finished') && (finishes.gamesFinished || 0) > (finishes.easyFinishes || 0)) {
+    await unlockHardMode();
+  }
   /**
    * Dress the gunslinger before anything draws one. It goes here rather than
    * inside the rig because a garment is locked behind an achievement, so the
